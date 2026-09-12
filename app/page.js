@@ -38,17 +38,21 @@ async function getRecords(tableId) {
 }
 
 function getBlock(records, key) {
-  return records.find((record) => record.fields["Clé"] === key)?.fields;
+  return records.find(
+    (record) => record.fields["Clé"] === key
+  )?.fields;
 }
 
 export default async function Home() {
-  const [cmsRecords, articleRecords, productRecords] = await Promise.all([
-    getRecords(CMS_TABLE),
-    getRecords(ARTICLES_TABLE),
-    getRecords(PRODUCTS_TABLE),
-  ]);
+  const [cmsRecords, articleRecords, productRecords] =
+    await Promise.all([
+      getRecords(CMS_TABLE),
+      getRecords(ARTICLES_TABLE),
+      getRecords(PRODUCTS_TABLE),
+    ]);
 
   const hero = getBlock(cmsRecords, "hero") || {};
+  const logo = getBlock(cmsRecords, "logo") || {};
   const method = getBlock(cmsRecords, "methode") || {};
   const ebook = getBlock(cmsRecords, "ebook") || {};
 
@@ -67,7 +71,8 @@ export default async function Home() {
 
   const product = productRecords.find(
     (record) =>
-      record.fields["Actif"] || record.fields["Mis en avant"]
+      record.fields["Actif"] ||
+      record.fields["Mis en avant"]
   )?.fields;
 
   return (
@@ -75,7 +80,22 @@ export default async function Home() {
       <header className="header">
         <nav className="nav">
           <a className="brand" href="#">
-            <span className="owl">🦉</span>
+            {logo["Image URL"] ? (
+              <img
+                src={logo["Image URL"]}
+                alt="Le Hibou Rusé"
+                style={{
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <span className="owl">🦉</span>
+            )}
+
             Le Hibou Rusé
           </a>
 
@@ -83,7 +103,7 @@ export default async function Home() {
             <a href="#decryptages">Décryptages</a>
             <a href="#methode">La méthode</a>
             <a href="#articles">Articles</a>
-            <a href="#ebook">L'ebook</a>
+            <a href="#ebook">L&apos;ebook</a>
           </div>
         </nav>
       </header>
@@ -105,17 +125,29 @@ export default async function Home() {
                 "Le Hibou Rusé décrypte les règles qui façonnent votre argent et vos décisions."}
             </p>
 
-            <a className="button" href="#decryptages">
-              {hero["CTA texte"] || "Découvrir les décryptages"}
+            <a
+              className="button"
+              href={
+                hero["CTA URL"] || "#decryptages"
+              }
+            >
+              {hero["CTA texte"] ||
+                "Découvrir les décryptages"}
             </a>
           </div>
         </section>
 
-        <section className="section" id="decryptages">
-          <div className="eyebrow">Nos terrains de jeu</div>
+        <section
+          className="section"
+          id="decryptages"
+        >
+          <div className="eyebrow">
+            Nos terrains de jeu
+          </div>
 
           <h2 className="section-title">
-            Regarder derrière les règles, les chiffres et les idées reçues.
+            Regarder derrière les règles, les chiffres et
+            les idées reçues.
           </h2>
 
           <div className="grid">
@@ -142,7 +174,9 @@ export default async function Home() {
         <section className="method" id="methode">
           <div className="method-inner">
             <div>
-              <div className="eyebrow">La méthode</div>
+              <div className="eyebrow">
+                La méthode
+              </div>
 
               <h2>
                 {method["Titre"] ||
@@ -157,13 +191,17 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="section" id="articles">
+        <section
+          className="section"
+          id="articles"
+        >
           <div className="eyebrow">
             Décryptages récents
           </div>
 
           <h2 className="section-title">
-            Comprendre aujourd'hui pour mieux décider demain.
+            Comprendre aujourd&apos;hui pour mieux décider
+            demain.
           </h2>
 
           <div className="articles">
@@ -178,17 +216,25 @@ export default async function Home() {
                       "Décryptage"}
                   </div>
 
-                  <h3>{article.fields["Titre"]}</h3>
+                  <h3>
+                    {article.fields["Titre"]}
+                  </h3>
 
-                  <p>{article.fields["Résumé"]}</p>
+                  <p>
+                    {article.fields["Résumé"]}
+                  </p>
                 </article>
               ))
             ) : (
               <article className="article">
-                <div className="tag">Bientôt</div>
+                <div className="tag">
+                  Bientôt
+                </div>
+
                 <h3>
                   Les premiers décryptages arrivent.
                 </h3>
+
                 <p>
                   Les articles publiés dans Airtable
                   apparaîtront automatiquement ici.
@@ -199,7 +245,9 @@ export default async function Home() {
         </section>
 
         <section className="ebook" id="ebook">
-          <div className="eyebrow">Le guide</div>
+          <div className="eyebrow">
+            Le guide
+          </div>
 
           <h2>
             {product?.["Produit"] ||
@@ -223,9 +271,6 @@ export default async function Home() {
               >
                 {product["CTA texte"] ||
                   "Acheter l'ebook"}
-                {product["Prix €"]
-                  ? ` — ${product["Prix €"]} €`
-                  : ""}
               </a>
             )}
         </section>

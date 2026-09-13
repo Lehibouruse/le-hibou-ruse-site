@@ -5,8 +5,11 @@ import { vercelCommitState } from "../lib/agent-runtime.mjs";
 
 const API = process.env.HIBOU_WORKER_URL || "https://le-hibou-ruse-site.vercel.app/api/agent-worker";
 const ROOT = process.cwd();
-const MAX_STEPS = 16;
-const MAX_AI_CALLS = 8;
+const MAX_STEPS = 32;
+// A video needs several sequential tool turns (brief, images, voice, music,
+// assembly, checks and registration). Keep a hard bound, but do not make a
+// successful CREATE_VIDEO mathematically impossible.
+const MAX_AI_CALLS = 24;
 const MAX_AI_COST_USD = 2;
 let testsPassed = false;
 let buildPassed = false;
@@ -34,6 +37,16 @@ async function api(body) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) throw new Error(data.error || `Worker API: ${response.status}`);
   return data;
+}
+
+async function checkpoint(state, telemetry, details) {
+  return api({
+    operation: "checkpoint",
+    record_id: state.record_id,
+    lock_token: state.lock_token,
+    telemetry,
+    ...details,
+  });
 }
 
 function safePath(path, mode = "read") {
@@ -126,7 +139,7 @@ async function openPullRequest(pushed, job) {
     body: JSON.stringify({ sha: commit, merge_method: "squash", commit_title: `Hibou agent: ${job.fields.job_id}` }),
   });
   const mergeData = await merge.json().catch(() => ({}));
-  return { branch, commit, changed_paths: changedPaths, pull_request: data.html_url, merged: merge.ok && mergeData.merged === true, merge_message: mergeData.message || "", vercel };
+  return { branch, commit, changed_paths: changedPaths, pull_request: data.html_url, merged: merge.ok && mergeData.merged === true, merge_sha: mergeData.sha || "", merge_message: mergeData.message || "", vercel };
 }
 
 async function executeTool(call, state) {
@@ -189,10 +202,16 @@ async function executeTool(call, state) {
       const output = safePath(args.output_path, "media");
       const voice = safePath(args.voice_path, "media");
       const music = args.music_path ? safePath(args.music_path, "media") : null;
-      const scenes = args.scenes.map((scene) => ({ ...scene, image: safePath(scene.image_path, "media") }));
+      let scenes = args.scenes.map((scene) => ({ ...scene, duration_seconds: Number(scene.duration_seconds), image: safePath(scene.image_path, "media") }));
       mkdirSync(dirname(output.full), { recursive: true });
       const listPath = resolve(dirname(output.full), "scenes.ffconcat");
       const srtPath = resolve(dirname(output.full), "subtitles.srt");
+      const voiceDuration = Number(run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", voice.full]).trim());
+      const plannedDuration = scenes.reduce((total, scene) => total + scene.duration_seconds, 0);
+      if (Number.isFinite(voiceDuration) && voiceDuration > 0 && plannedDuration > 0) {
+        const scale = voiceDuration / plannedDuration;
+        scenes = scenes.map((scene) => ({ ...scene, duration_seconds: Math.max(0.5, scene.duration_seconds * scale) }));
+      }
       const concat = ["ffconcat version 1.0", ...scenes.flatMap((scene) => [`file '${scene.image.full.replaceAll("'", "'\\''")}'`, `duration ${Number(scene.duration_seconds)}`]), `file '${scenes.at(-1).image.full.replaceAll("'", "'\\''")}'`].join("\n");
       writeFileSync(listPath, concat, "utf8");
       createSrt(scenes, srtPath);
@@ -210,7 +229,8 @@ async function executeTool(call, state) {
       if (readFileSync(video.full).byteLength > 90 * 1024 * 1024) throw new Error("Brouillon supérieur à 90 Mo");
       const pushed = await pushBranch(state.job, `Add autonomous video draft for ${state.job.fields.job_id}`);
       const proposal = await openPullRequest(pushed, state.job);
-      const result = await api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: { ...args, branch: pushed.branch } });
+      const immutableRef = proposal.merged && proposal.merge_sha ? proposal.merge_sha : pushed.branch;
+      const result = await api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: { ...args, branch: immutableRef } });
       state.external_id = result.url;
       return { ...result, proposal };
     }
@@ -256,6 +276,7 @@ async function main() {
       telemetry.input_tokens += Number(response.usage?.input_tokens || 0);
       telemetry.cached_input_tokens += Number(response.usage?.input_tokens_details?.cached_tokens || 0);
       telemetry.output_tokens += Number(response.usage?.output_tokens || 0); telemetry.cost += Number(result.estimated_cost_usd || 0);
+      await checkpoint(state, telemetry, { phase: "model", step: step + 1, tool: "", ok: true });
       input.push(...(response.output || []));
       const calls = (response.output || []).filter((item) => item.type === "function_call");
       if (!calls.length) {
@@ -266,6 +287,7 @@ async function main() {
         let toolResult;
         try { toolResult = await executeTool(call, state); }
         catch (error) { toolResult = { ok: false, error: String(error.message || error).slice(0, 12000) }; }
+        await checkpoint(state, telemetry, { phase: "tool", step: step + 1, tool: call.name, ok: toolResult?.ok !== false, error: toolResult?.ok === false ? toolResult.error : "" });
         input.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(toolResult) });
       }
     }

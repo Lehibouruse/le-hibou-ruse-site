@@ -50,10 +50,18 @@ test("un tier désactivé redescend vers le meilleur tier autorisé", () => {
   assert.equal(routeJob(job("REPURPOSE", { complexity: "critical" }), config).tier, "sol");
 });
 
-test("les actions sans outil connecté attendent sans IA", () => {
+test("CREATE_VIDEO est agentique et sélectionne directement Sol", () => {
   const route = routeJob(job("CREATE_VIDEO"));
-  assert.equal(route.kind, "waiting_for_human");
-  assert.equal(route.status, "waiting_for_human");
+  assert.equal(route.kind, "ai");
+  assert.equal(route.tier, "sol");
+});
+
+test("UPDATE_SITE global n'exige plus parameters.key", () => {
+  const global = routeJob(job("UPDATE_SITE", { objective: "Finaliser le site" }));
+  const deterministic = routeJob(job("UPDATE_SITE", { key: "hero", fields: { Titre: "Titre" } }));
+  assert.equal(global.kind, "ai");
+  assert.equal(global.tier, "sol");
+  assert.equal(deterministic.kind, "deterministic");
 });
 
 test("le contexte minimal supprime les secrets", () => {

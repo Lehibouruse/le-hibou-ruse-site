@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_RESERVED_JOB_IDS, eligibleJobsFormula, reservedJobIds } from "../lib/job-eligibility.mjs";
 import { validateGithubActionsClaims } from "../lib/github-oidc.mjs";
+import { isAgenticAction, toolsForAction } from "../lib/agent-capabilities.mjs";
 
 const NOW = 2_000_000_000;
 
@@ -37,4 +38,17 @@ test("l'OIDC accepte uniquement le workflow scheduler exact sur main", () => {
   assert.throws(() => validateGithubActionsClaims(validClaims({ workflow_ref: "Lehibouruse/le-hibou-ruse-site/.github/workflows/other.yml@refs/heads/main" }), NOW), /workflow/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ ref: "refs/heads/dev" }), NOW), /ref/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ iat: NOW - 601 }), NOW), /mission/);
+});
+
+test("le registre borne les écritures site et branche la chaîne vidéo", () => {
+  assert.equal(isAgenticAction("UPDATE_SITE", { objective: "mission globale" }), true);
+  assert.equal(isAgenticAction("UPDATE_SITE", { key: "hero" }), false);
+  assert.equal(isAgenticAction("CREATE_VIDEO", {}), true);
+  const siteNames = toolsForAction("UPDATE_SITE").map((tool) => tool.name);
+  const videoNames = toolsForAction("CREATE_VIDEO").map((tool) => tool.name);
+  assert.ok(siteNames.includes("site_write"));
+  assert.equal(siteNames.includes("generate_speech"), false);
+  assert.ok(videoNames.includes("assemble_video"));
+  assert.ok(videoNames.includes("register_video_draft"));
+  assert.equal(videoNames.includes("schedule_post"), false);
 });

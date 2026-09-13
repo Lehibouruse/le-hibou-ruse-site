@@ -36,7 +36,7 @@ jobs:
         if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
         run: npm ci
       - name: Verify wake authentication without consuming a Job
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        if: ${{ github.event_name == 'schedule' || inputs.dry_run }}
         env:
           DRY_RUN: true
         shell: bash

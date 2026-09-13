@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { DEFAULT_RESERVED_JOB_IDS, eligibleJobsFormula, reservedJobIds } from "../lib/job-eligibility.mjs";
 import { validateGithubActionsClaims } from "../lib/github-oidc.mjs";
 import { isAgenticAction, toolsForAction } from "../lib/agent-capabilities.mjs";
@@ -70,4 +71,10 @@ test("l'auto-merge attend explicitement le statut Vercel", () => {
   assert.equal(vercelCommitState([{ context: "Vercel", state: "pending" }]), "pending");
   assert.equal(vercelCommitState([{ context: "Vercel", state: "success" }]), "success");
   assert.equal(vercelCommitState([{ context: "Vercel", state: "failure" }]), "failure");
+});
+
+test("chaque réveil planifié commence par un dry-run OIDC", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
+  assert.match(workflow, /github\.event_name == 'schedule' \|\| inputs\.dry_run/);
+  assert.match(workflow, /X-Hibou-Dry-Run/);
 });

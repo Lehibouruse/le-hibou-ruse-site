@@ -125,7 +125,7 @@ async function serverTool(body) {
     const expectedRecord = parameters(job).content_record_id;
     if (!expectedRecord || args.record_id !== expectedRecord) throw new Error("Fiche Content Pipeline hors périmètre");
     if (!/^public\/generated\/[a-zA-Z0-9._/-]+\.mp4$/.test(args.video_path) || args.video_path.includes("..")) throw new Error("Chemin vidéo refusé");
-    if (!/^hibou-agent\/[a-zA-Z0-9._/-]+$/.test(args.branch) || args.branch.includes("..")) throw new Error("Branche refusée");
+    if (!(/^[a-f0-9]{40}$/.test(args.branch) || /^hibou-agent\/[a-zA-Z0-9._/-]+$/.test(args.branch)) || args.branch.includes("..")) throw new Error("Référence Git refusée");
     const rawUrl = `https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${args.branch}/${args.video_path}`;
     await updateRecord(TABLES.content, args.record_id, {
       "Vidéo finale": [{ url: rawUrl }],
@@ -138,6 +138,32 @@ async function serverTool(body) {
     return { ok: true, url: rawUrl, publication_authorization: false, waiting_for: "Marc" };
   }
   throw new Error("Outil serveur refusé");
+}
+
+async function checkpoint(body) {
+  const job = await ownedJob(body.record_id, body.lock_token);
+  const telemetry = body.telemetry || {};
+  const tool = String(body.tool || "").slice(0, 100);
+  const phase = String(body.phase || "progress").slice(0, 40);
+  const ok = body.ok !== false;
+  await updateRecord(TABLES.jobs, job.id, {
+    agent_status: `${phase}:${tool || `step-${Number(body.step || 0)}`}:${ok ? "ok" : "failed"}`,
+    model_used: telemetry.model || "", reasoning_effort: telemetry.reasoning || "",
+    input_tokens: Number(telemetry.input_tokens || 0), cached_input_tokens: Number(telemetry.cached_input_tokens || 0),
+    output_tokens: Number(telemetry.output_tokens || 0), estimated_cost_usd: Number(telemetry.cost || 0),
+    ai_calls: Number(telemetry.ai_calls || 0), response_ids: (telemetry.response_ids || []).join("\n"),
+    lease_expires_at: new Date(Date.now() + LEASE_MS).toISOString(),
+  });
+  if (phase === "tool") {
+    await createRecord(TABLES.journal, {
+      Workflow: "HIBOU_AGENT_V1 — tool checkpoint",
+      Déclencheur: "GitHub Actions OIDC",
+      Action: `${actionName(job)} · ${job.fields?.job_id || job.id} · ${tool} · ${ok ? "OK" : "FAILED"}`,
+      Erreur: ok ? "" : String(body.error || "Erreur outil").slice(0, 5000),
+      Notes: JSON.stringify({ executed_at: new Date().toISOString(), step: Number(body.step || 0), model: telemetry.model || "", ai_calls: Number(telemetry.ai_calls || 0), cost_usd: Number(telemetry.cost || 0) }),
+    });
+  }
+  return { ok: true };
 }
 
 async function finalize(body) {
@@ -179,6 +205,7 @@ export async function POST(request) {
     const result = body.operation === "claim" ? await claim()
       : body.operation === "step" ? await openaiStep(body)
         : body.operation === "tool" ? await serverTool(body)
+          : body.operation === "checkpoint" ? await checkpoint(body)
           : body.operation === "finalize" ? await finalize(body)
             : (() => { throw new Error("Opération inconnue"); })();
     return NextResponse.json(result);

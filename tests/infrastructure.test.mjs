@@ -79,3 +79,10 @@ test("chaque réveil planifié commence par un dry-run OIDC", () => {
   assert.match(workflow, /github\.event_name == 'schedule' \|\| inputs\.dry_run/);
   assert.match(workflow, /X-Hibou-Dry-Run/);
 });
+
+test("le worker autorise assez de tours pour une vidéo tout en gardant des plafonds", () => {
+  const worker = readFileSync(new URL("../scripts/hibou-worker.mjs", import.meta.url), "utf8");
+  assert.match(worker, /const MAX_AI_CALLS = 24/);
+  assert.match(worker, /const MAX_AI_COST_USD = 2/);
+  assert.match(worker, /operation: "checkpoint"/);
+});

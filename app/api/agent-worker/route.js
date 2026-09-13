@@ -1,0 +1,172 @@
+import { randomUUID } from "node:crypto";
+import { NextResponse } from "next/server";
+import { getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { toolsForAction, isAgenticAction, workerInstructions } from "../../../lib/agent-capabilities.mjs";
+import { estimateCost, getAgentConfig, HIBOU_AGENT_INSTRUCTIONS, HIBOU_AGENT_PROMPT_VERSION, routeJob } from "../../../lib/hibou-agent.mjs";
+import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+const LEASE_MS = 30 * 60 * 1000;
+const TABLE_ALIASES = {
+  cms: TABLES.cms, benchmark: TABLES.benchmark, content: TABLES.content,
+  articles: TABLES.articles, products: TABLES.products, montages: TABLES.montages,
+};
+
+function actionName(job) {
+  return job.fields?.action?.name || job.fields?.action || "UNKNOWN";
+}
+
+function parameters(job) {
+  try { return JSON.parse(job.fields?.parameters || "{}"); } catch { return {}; }
+}
+
+async function authenticate(request) {
+  const auth = request.headers.get("authorization") || "";
+  if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
+  return verifyGithubActionsToken(auth.slice(7));
+}
+
+async function ownedJob(recordId, lockToken) {
+  if (!recordId || !lockToken) throw new Error("Job ou lease absent");
+  const job = await getRecord(TABLES.jobs, recordId);
+  if (job.fields?.lock_token !== lockToken) throw new Error("Lease perdue");
+  return job;
+}
+
+async function claim() {
+  const candidates = await queryRecords(TABLES.jobs, {
+    filterByFormula: eligibleJobsFormula(process.env, { includeReserved: true }),
+    sortField: "created_at", pageSize: 5,
+  });
+  const candidate = candidates.find((job) => isAgenticAction(actionName(job), parameters(job)));
+  if (!candidate) return { ok: true, claimed: false };
+  const lockToken = randomUUID();
+  const now = new Date();
+  await updateRecord(TABLES.jobs, candidate.id, {
+    status: "Running", started_at: now.toISOString(), completed_at: null, error: "",
+    lock_token: lockToken, lease_expires_at: new Date(now.getTime() + LEASE_MS).toISOString(),
+  });
+  const current = await getRecord(TABLES.jobs, candidate.id);
+  if (current.fields?.lock_token !== lockToken) return { ok: true, claimed: false };
+  const route = routeJob(current, getAgentConfig());
+  return {
+    ok: true, claimed: true, record_id: current.id, lock_token: lockToken,
+    job: { id: current.id, fields: current.fields }, action: actionName(current),
+    model: getAgentConfig().models[route.tier], reasoning: route.reasoning,
+  };
+}
+
+async function openaiStep(body) {
+  const job = await ownedJob(body.record_id, body.lock_token);
+  const action = actionName(job);
+  if (!isAgenticAction(action, parameters(job))) throw new Error("Action agentique refusée");
+  const config = getAgentConfig();
+  if (!config.aiEnabled) throw new Error("IA désactivée par kill switch");
+  const route = routeJob(job, config);
+  const model = config.models[route.tier];
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model, reasoning: { effort: route.reasoning }, input: body.input,
+      instructions: `${HIBOU_AGENT_INSTRUCTIONS}\n\n# EXECUTION BORNEE\n${workerInstructions(action)}`,
+      tools: toolsForAction(action), tool_choice: "auto", parallel_tool_calls: false,
+      include: ["reasoning.encrypted_content"],
+      max_output_tokens: config.maxOutputTokens, store: false, prompt_cache_key: "hibou-agent-worker-v1",
+      metadata: { agent: HIBOU_AGENT_PROMPT_VERSION, job_id: String(job.fields.job_id).slice(0, 512), action },
+      text: { verbosity: "low", format: { type: "json_schema", name: "hibou_worker_result", strict: true, schema: {
+        type: "object", additionalProperties: false,
+        properties: { status: { type: "string", enum: ["completed", "failed", "waiting_for_human"] }, result: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 } },
+        required: ["status", "result", "confidence"],
+      } } },
+    }), cache: "no-store",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`OpenAI Responses API: ${response.status} ${data?.error?.code || "unknown"}`);
+  await updateRecord(TABLES.jobs, job.id, { lease_expires_at: new Date(Date.now() + LEASE_MS).toISOString() });
+  return { ok: true, response: data, estimated_cost_usd: estimateCost(model, data.usage) || 0 };
+}
+
+async function serverTool(body) {
+  const job = await ownedJob(body.record_id, body.lock_token);
+  const action = actionName(job);
+  const args = body.arguments || {};
+  if (body.name === "airtable_read") {
+    const tableId = TABLE_ALIASES[args.table];
+    if (!tableId) throw new Error("Table non autorisée");
+    const records = args.record_id ? [await getRecord(tableId, args.record_id)] : await queryRecords(tableId, { pageSize: Math.min(20, Number(args.limit) || 10) });
+    return { ok: true, records: records.map((record) => ({ id: record.id, fields: record.fields })) };
+  }
+  if (body.name === "generate_image" && action === "CREATE_VIDEO") {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: process.env.HIBOU_IMAGE_MODEL || "gpt-image-1.5", prompt: String(args.prompt).slice(0, 8000), size: "1024x1536", quality: "medium", n: 1 }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.data?.[0]?.b64_json) throw new Error(`Image API: ${response.status} ${data?.error?.code || "empty"}`);
+    return { ok: true, path: args.path, base64: data.data[0].b64_json };
+  }
+  if (body.name === "generate_speech" && action === "CREATE_VIDEO") {
+    const allowedVoices = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse", "marin", "cedar"]);
+    const voice = allowedVoices.has(args.voice) ? args.voice : "onyx";
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: process.env.HIBOU_TTS_MODEL || "gpt-4o-mini-tts", voice, input: String(args.text).slice(0, 4096), format: "mp3", instructions: "Voix française profonde, posée, premium, intelligible." }),
+    });
+    if (!response.ok) throw new Error(`Speech API: ${response.status}`);
+    return { ok: true, path: args.path, base64: Buffer.from(await response.arrayBuffer()).toString("base64") };
+  }
+  if (body.name === "register_video_draft" && action === "CREATE_VIDEO") {
+    const expectedRecord = parameters(job).content_record_id;
+    if (!expectedRecord || args.record_id !== expectedRecord) throw new Error("Fiche Content Pipeline hors périmètre");
+    if (!/^public\/generated\/[a-zA-Z0-9._/-]+\.mp4$/.test(args.video_path) || args.video_path.includes("..")) throw new Error("Chemin vidéo refusé");
+    if (!/^hibou-agent\/[a-zA-Z0-9._/-]+$/.test(args.branch) || args.branch.includes("..")) throw new Error("Branche refusée");
+    const rawUrl = `https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${args.branch}/${args.video_path}`;
+    await updateRecord(TABLES.content, args.record_id, {
+      "Vidéo finale": [{ url: rawUrl }],
+      "Statut": "Validation humaine",
+      "Validation humaine": false,
+      "Statut publication": "À valider par Marc — aucune publication autorisée",
+      "Journal automatisation": String(args.notes || "Brouillon autonome généré").slice(0, 5000),
+      "Erreur pipeline": "",
+    });
+    return { ok: true, url: rawUrl, publication_authorization: false, waiting_for: "Marc" };
+  }
+  throw new Error("Outil serveur refusé");
+}
+
+async function finalize(body) {
+  const job = await ownedJob(body.record_id, body.lock_token);
+  const outcome = body.outcome || {};
+  const status = outcome.status === "completed" ? "Completed" : outcome.status === "waiting_for_human" ? "Manual Review" : "Error";
+  await updateRecord(TABLES.jobs, job.id, {
+    status, completed_at: new Date().toISOString(), next_run_at: null,
+    result: String(outcome.result || "").slice(0, 100000), error: status === "Error" ? String(outcome.result || "").slice(0, 5000) : "",
+    agent_status: outcome.status || "failed", model_used: body.telemetry?.model || "",
+    reasoning_effort: body.telemetry?.reasoning || "", input_tokens: Number(body.telemetry?.input_tokens || 0),
+    cached_input_tokens: Number(body.telemetry?.cached_input_tokens || 0), output_tokens: Number(body.telemetry?.output_tokens || 0),
+    estimated_cost_usd: Number(body.telemetry?.cost || 0), ai_calls: Number(body.telemetry?.ai_calls || 0),
+    response_ids: (body.telemetry?.response_ids || []).join("\n"), external_id: String(body.external_id || "").slice(0, 1000),
+    lock_token: "", lease_expires_at: null,
+  });
+  return { ok: true, status };
+}
+
+export async function POST(request) {
+  try {
+    await authenticate(request);
+    const body = await request.json();
+    const result = body.operation === "claim" ? await claim()
+      : body.operation === "step" ? await openaiStep(body)
+        : body.operation === "tool" ? await serverTool(body)
+          : body.operation === "finalize" ? await finalize(body)
+            : (() => { throw new Error("Opération inconnue"); })();
+    return NextResponse.json(result);
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 500) }, { status: 400 });
+  }
+}

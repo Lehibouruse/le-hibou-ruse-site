@@ -7,6 +7,7 @@ import {
   routeJob,
   runAgentJob,
 } from "../../../lib/hibou-agent.mjs";
+import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -213,7 +214,7 @@ export async function GET(request) {
   }
 
   const candidates = await queryRecords(TABLES.jobs, {
-    filterByFormula: "OR({status}='Pending',AND({status}='Retry',OR({next_run_at}=BLANK(),{next_run_at}<=NOW())),AND({status}='Running',{lease_expires_at}!=BLANK(),{lease_expires_at}<=NOW()))",
+    filterByFormula: eligibleJobsFormula(),
     sortField: "created_at",
     pageSize: 1,
   });

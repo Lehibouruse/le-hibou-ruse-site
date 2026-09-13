@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { failureDisposition } from "../../../lib/agent-runtime.mjs";
 import { toolsForAction, isAgenticAction, workerInstructions } from "../../../lib/agent-capabilities.mjs";
 import { estimateCost, getAgentConfig, HIBOU_AGENT_INSTRUCTIONS, HIBOU_AGENT_PROMPT_VERSION, routeJob } from "../../../lib/hibou-agent.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
@@ -142,17 +143,32 @@ async function serverTool(body) {
 async function finalize(body) {
   const job = await ownedJob(body.record_id, body.lock_token);
   const outcome = body.outcome || {};
-  const status = outcome.status === "completed" ? "Completed" : outcome.status === "waiting_for_human" ? "Manual Review" : "Error";
+  const now = Date.now();
+  const terminal = outcome.status === "completed"
+    ? { status: "Completed", completed_at: new Date(now).toISOString(), next_run_at: null, retry_count: Number(job.fields?.retry_count || 0) }
+    : outcome.status === "waiting_for_human"
+      ? { status: "Manual Review", completed_at: new Date(now).toISOString(), next_run_at: null, retry_count: Number(job.fields?.retry_count || 0) }
+      : failureDisposition(job.fields, now);
+  const status = terminal.status;
+  const telemetry = body.telemetry || {};
   await updateRecord(TABLES.jobs, job.id, {
-    status, completed_at: new Date().toISOString(), next_run_at: null,
-    result: String(outcome.result || "").slice(0, 100000), error: status === "Error" ? String(outcome.result || "").slice(0, 5000) : "",
-    agent_status: outcome.status || "failed", model_used: body.telemetry?.model || "",
-    reasoning_effort: body.telemetry?.reasoning || "", input_tokens: Number(body.telemetry?.input_tokens || 0),
-    cached_input_tokens: Number(body.telemetry?.cached_input_tokens || 0), output_tokens: Number(body.telemetry?.output_tokens || 0),
-    estimated_cost_usd: Number(body.telemetry?.cost || 0), ai_calls: Number(body.telemetry?.ai_calls || 0),
-    response_ids: (body.telemetry?.response_ids || []).join("\n"), external_id: String(body.external_id || "").slice(0, 1000),
+    ...terminal,
+    result: String(outcome.result || "").slice(0, 100000), error: ["Error", "Retry"].includes(status) ? String(outcome.result || "").slice(0, 5000) : "",
+    agent_status: outcome.status || "failed", model_used: telemetry.model || "",
+    reasoning_effort: telemetry.reasoning || "", input_tokens: Number(telemetry.input_tokens || 0),
+    cached_input_tokens: Number(telemetry.cached_input_tokens || 0), output_tokens: Number(telemetry.output_tokens || 0),
+    estimated_cost_usd: Number(telemetry.cost || 0), ai_calls: Number(telemetry.ai_calls || 0),
+    response_ids: (telemetry.response_ids || []).join("\n"), external_id: String(body.external_id || "").slice(0, 1000),
     lock_token: "", lease_expires_at: null,
   });
+  await createRecord(TABLES.journal, {
+    Workflow: "HIBOU_AGENT_V1 — GitHub worker",
+    Déclencheur: "GitHub Actions OIDC",
+    Action: `${actionName(job)} · ${job.fields?.job_id || job.id} · ${status}`,
+    "URL résultat": String(body.external_id || "").startsWith("http") ? String(body.external_id).slice(0, 1000) : "",
+    Erreur: ["Error", "Retry"].includes(status) ? String(outcome.result || "").slice(0, 5000) : "",
+    Notes: JSON.stringify({ executed_at: new Date(now).toISOString(), model: telemetry.model || "", reasoning: telemetry.reasoning || "", ai_calls: Number(telemetry.ai_calls || 0), cost_usd: Number(telemetry.cost || 0), retry_count: terminal.retry_count, next_run_at: terminal.next_run_at, external_id: String(body.external_id || "").slice(0, 1000), result: String(outcome.result || "").slice(0, 3000) }),
+  }).catch((error) => console.error("Agent worker journal write failed", error?.message || error));
   return { ok: true, status };
 }
 

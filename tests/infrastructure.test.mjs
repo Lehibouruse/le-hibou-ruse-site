@@ -3,6 +3,7 @@ import test from "node:test";
 import { DEFAULT_RESERVED_JOB_IDS, eligibleJobsFormula, reservedJobIds } from "../lib/job-eligibility.mjs";
 import { validateGithubActionsClaims } from "../lib/github-oidc.mjs";
 import { isAgenticAction, toolsForAction } from "../lib/agent-capabilities.mjs";
+import { failureDisposition, vercelCommitState } from "../lib/agent-runtime.mjs";
 
 const NOW = 2_000_000_000;
 
@@ -53,4 +54,20 @@ test("le registre borne les écritures site et branche la chaîne vidéo", () =>
   assert.ok(videoNames.includes("assemble_video"));
   assert.ok(videoNames.includes("register_video_draft"));
   assert.equal(videoNames.includes("schedule_post"), false);
+});
+
+test("une erreur récupérable passe en Retry avec backoff borné", () => {
+  const first = failureDisposition({ retry_count: 0, max_retries: 2 }, 1_000_000);
+  assert.equal(first.status, "Retry");
+  assert.equal(first.retry_count, 1);
+  assert.equal(first.next_run_at, new Date(1_060_000).toISOString());
+  const exhausted = failureDisposition({ retry_count: 2, max_retries: 2 }, 1_000_000);
+  assert.equal(exhausted.status, "Error");
+});
+
+test("l'auto-merge attend explicitement le statut Vercel", () => {
+  assert.equal(vercelCommitState([]), "pending");
+  assert.equal(vercelCommitState([{ context: "Vercel", state: "pending" }]), "pending");
+  assert.equal(vercelCommitState([{ context: "Vercel", state: "success" }]), "success");
+  assert.equal(vercelCommitState([{ context: "Vercel", state: "failure" }]), "failure");
 });

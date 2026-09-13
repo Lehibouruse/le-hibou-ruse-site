@@ -37,10 +37,11 @@ test("les exclusions configurées complètent les exclusions obligatoires", () =
 
 test("l'OIDC accepte uniquement le workflow scheduler exact sur main", () => {
   assert.equal(validateGithubActionsClaims(validClaims(), NOW).event_name, "workflow_dispatch");
-  assert.equal(validateGithubActionsClaims(validClaims({ sub: "repo:Lehibouruse/le-hibou-ruse-site:environment:Production" }), NOW).ref, "refs/heads/main");
+  assert.equal(validateGithubActionsClaims(validClaims({ sub: "repository_id:1367354762:environment:Production" }), NOW).ref, "refs/heads/main");
   assert.throws(() => validateGithubActionsClaims(validClaims({ workflow_ref: "Lehibouruse/le-hibou-ruse-site/.github/workflows/other.yml@refs/heads/main" }), NOW), /workflow/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ ref: "refs/heads/dev" }), NOW), /ref/);
-  assert.throws(() => validateGithubActionsClaims(validClaims({ sub: "repo:attacker/other:ref:refs/heads/main" }), NOW), /subject/);
+  assert.throws(() => validateGithubActionsClaims(validClaims({ sub: "", repository: "Lehibouruse/le-hibou-ruse-site" }), NOW), /subject/);
+  assert.throws(() => validateGithubActionsClaims(validClaims({ sub: "repository_id:1367354762", repository: "attacker/other" }), NOW), /repository/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ iat: NOW - 601 }), NOW), /mission/);
 });
 

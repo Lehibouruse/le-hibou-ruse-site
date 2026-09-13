@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Verify authentication and queue visibility without processing a Job
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -16,25 +22,21 @@ concurrency:
 jobs:
   wake:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      - name: Request GitHub OIDC token
-        id: oidc
+      - name: Wake Hibou orchestrator with GitHub OIDC
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
         shell: bash
         run: |
           set -euo pipefail
           token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-
-      - name: Wake Hibou orchestrator
-        env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          echo "::add-mask::$token"
           curl --fail-with-body --silent --show-error \
             --retry 2 --retry-all-errors \
             -X POST \
-            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H "Authorization: Bearer ${token}" \
+            -H "X-Hibou-Dry-Run: ${DRY_RUN}" \
             -H "Content-Type: application/json" \
             https://le-hibou-ruse-site.vercel.app/api/wake

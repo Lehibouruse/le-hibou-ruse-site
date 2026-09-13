@@ -39,12 +39,15 @@ test("Terra est utilisé pour l'intermédiaire", () => {
   assert.equal(routeJob(job("REPURPOSE", { complexity: "intermediate" })).tier, "terra");
 });
 
-test("Sol exige un échec Terra confirmé et une justification", () => {
-  assert.equal(routeJob(job("REPURPOSE", { complexity: "complex" })).tier, "terra");
-  assert.equal(
-    routeJob(job("REPURPOSE", { confirmed_terra_failure: true, escalation_justification: "résultat contradictoire" })).tier,
-    "sol",
-  );
+test("Sol et Astra peuvent être sélectionnés directement selon la difficulté", () => {
+  assert.equal(routeJob(job("REPURPOSE", { complexity: "complex" })).tier, "sol");
+  assert.equal(routeJob(job("REPURPOSE", { complexity: "critical" })).tier, "astra");
+  assert.equal(routeJob(job("REPURPOSE", { requested_model: "gpt-6-astra" })).reasoning, "xhigh");
+});
+
+test("un tier désactivé redescend vers le meilleur tier autorisé", () => {
+  const config = getAgentConfig({ HIBOU_ALLOW_ASTRA: "false", HIBOU_ALLOW_SOL: "true" });
+  assert.equal(routeJob(job("REPURPOSE", { complexity: "critical" }), config).tier, "sol");
 });
 
 test("les actions sans outil connecté attendent sans IA", () => {
@@ -71,6 +74,13 @@ test("le coût sépare entrée normale et entrée cachée", () => {
     output_tokens: 200,
   });
   assert.equal(cost, ((600 * 0.2) + (400 * 0.02) + (200 * 1.2)) / 1_000_000);
+});
+
+test("le coût Astra utilise son tarif officiel", () => {
+  assert.equal(
+    estimateCost("gpt-6-astra", { input_tokens: 1000, input_tokens_details: { cached_tokens: 200 }, output_tokens: 100 }),
+    ((800 * 10) + (200 * 1) + (100 * 50)) / 1_000_000,
+  );
 });
 
 test("le kill switch et les plafonds sont bornés", () => {
@@ -143,4 +153,30 @@ test("le plafond journalier arrête le Job avant tout appel", async () => {
   });
   assert.equal(result.status, "waiting_for_human");
   assert.equal(result.ai_calls, 0);
+});
+
+test("une escalade Sol peut atteindre Astra sans passer par les tiers inférieurs", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push(body.model);
+    const status = calls.length === 1 ? "needs_escalation" : "completed";
+    return {
+      ok: true,
+      json: async () => ({
+        id: `resp_${calls.length}`,
+        output_text: JSON.stringify({ status, result: "résultat", escalation_reason: status === "completed" ? "" : "enjeu exceptionnel", confidence: 0.8 }),
+        usage: { input_tokens: 100, input_tokens_details: { cached_tokens: 0 }, output_tokens: 20 },
+      }),
+    };
+  };
+  try {
+    const source = job("REPURPOSE", { complexity: "complex" });
+    const result = await runAgentJob({ job: source, route: routeJob(source), env: { OPENAI_API_KEY: "test-only", HIBOU_MAX_API_RETRIES: "0" } });
+    assert.deepEqual(calls, ["gpt-5.6-sol", "gpt-6-astra"]);
+    assert.equal(result.status, "completed");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

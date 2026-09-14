@@ -177,10 +177,14 @@ async function openPullRequest(pushed, job) {
   if (!token) return { branch, commit, changed_paths: changedPaths, pull_request: null, merged: false, warning: "GITHUB_TOKEN absent" };
   const response = await fetch("https://api.github.com/repos/Lehibouruse/le-hibou-ruse-site/pulls", {
     method: "POST", headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" },
-    body: JSON.stringify({ title: `Hibou agent: ${job.fields.job_id}`, head: branch, base: "main", body: `Proposition autonome bornée pour le job ${job.fields.job_id}. Tests et build exécutés. Fusion automatique seulement après statut Vercel réussi.` }),
+    body: JSON.stringify({ title: `Hibou agent: ${job.fields.job_id}`, head: branch, base: "main", body: `Proposition autonome bornée pour le job ${job.fields.job_id}. Tests et build exécutés. Fusion automatique uniquement si le Job contient parameters.merge_authorization=true et si Vercel est vert.` }),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) return { branch, commit, changed_paths: changedPaths, pull_request: null, merged: false, warning: `PR ${response.status}` };
+  const acceptedPermissions = response.headers.get("x-accepted-github-permissions") || "";
+  if (!response.ok) {
+    const detail = data?.message || data?.error || "unknown";
+    return { branch, commit, changed_paths: changedPaths, pull_request: null, merged: false, warning: `PR ${response.status}: ${String(detail).slice(0, 500)}`, accepted_github_permissions: acceptedPermissions };
+  }
   let vercel = "pending";
   for (let attempt = 0; attempt < 24; attempt += 1) {
     const statusResponse = await fetch(`https://api.github.com/repos/Lehibouruse/le-hibou-ruse-site/commits/${commit}/status`, {
@@ -193,6 +197,9 @@ async function openPullRequest(pushed, job) {
     await sleep(10000);
   }
   if (vercel !== "success") return { branch, commit, changed_paths: changedPaths, pull_request: data.html_url, merged: false, vercel, warning: "Fusion refusée: preview Vercel non validée" };
+  if (jobParameters(job).merge_authorization !== true) {
+    return { branch, commit, changed_paths: changedPaths, pull_request: data.html_url, merged: false, vercel, warning: "PR prête, mais fusion automatique interdite: parameters.merge_authorization=true requis" };
+  }
   const merge = await fetch(`https://api.github.com/repos/Lehibouruse/le-hibou-ruse-site/pulls/${data.number}/merge`, {
     method: "PUT", headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" },
     body: JSON.stringify({ sha: commit, merge_method: "squash", commit_title: `Hibou agent: ${job.fields.job_id}` }),

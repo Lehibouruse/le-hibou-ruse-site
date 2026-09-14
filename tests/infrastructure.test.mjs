@@ -37,7 +37,10 @@ test("les exclusions configurées complètent les exclusions obligatoires", () =
 
 test("l'OIDC accepte uniquement le workflow scheduler exact sur main", () => {
   assert.equal(validateGithubActionsClaims(validClaims(), NOW).event_name, "workflow_dispatch");
+  assert.equal(validateGithubActionsClaims(validClaims({ event_name: "schedule" }), NOW).event_name, "schedule");
+  assert.equal(validateGithubActionsClaims(validClaims({ event_name: "push" }), NOW).event_name, "push");
   assert.equal(validateGithubActionsClaims(validClaims({ sub: "repository_id:1367354762:environment:Production" }), NOW).ref, "refs/heads/main");
+  assert.throws(() => validateGithubActionsClaims(validClaims({ event_name: "pull_request" }), NOW), /event/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ workflow_ref: "Lehibouruse/le-hibou-ruse-site/.github/workflows/other.yml@refs/heads/main" }), NOW), /workflow/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ ref: "refs/heads/dev" }), NOW), /ref/);
   assert.throws(() => validateGithubActionsClaims(validClaims({ sub: "", repository: "Lehibouruse/le-hibou-ruse-site" }), NOW), /subject/);
@@ -77,10 +80,14 @@ test("l'auto-merge attend explicitement le statut Vercel", () => {
   assert.equal(vercelCommitState([{ context: "Vercel", state: "failure" }]), "failure");
 });
 
-test("chaque réveil planifié commence par un dry-run OIDC", () => {
+test("le cron effectue un vrai wake et le dry-run reste manuel", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
-  assert.match(workflow, /github\.event_name == 'schedule' \|\| inputs\.dry_run/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && inputs\.dry_run/);
   assert.match(workflow, /X-Hibou-Dry-Run/);
+  assert.match(workflow, /Wake scheduler and inspect queue/);
+  assert.match(workflow, /worker_required=\$worker_required/);
+  assert.match(workflow, /steps\.wake\.outputs\.worker_required == 'true'/);
+  assert.match(workflow, /steps\.wake\.outputs\.action == 'CREATE_VIDEO'/);
 });
 
 test("le worker autorise assez de tours pour les missions complexes tout en gardant des plafonds", () => {

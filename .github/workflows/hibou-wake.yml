@@ -31,18 +31,46 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Wake scheduler and inspect queue
+        id: wake
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
+          token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
+          echo "::add-mask::$token"
+          response=$(curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors \
+            -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "X-Hibou-Dry-Run: ${DRY_RUN}" \
+            -H "Content-Type: application/json" \
+            https://le-hibou-ruse-site.vercel.app/api/wake)
+          printf '%s\n' "$response"
+          worker_required=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if d.get("reason") == "github_worker_required" else "false")' <<< "$response")
+          action=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("action") or "")' <<< "$response")
+          echo "worker_required=$worker_required" >> "$GITHUB_OUTPUT"
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        if: steps.wake.outputs.worker_required == 'true'
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
+        if: steps.wake.outputs.worker_required == 'true'
         with:
           node-version: 22
           cache: npm
+
       - name: Install worker dependencies
-        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || !inputs.dry_run }}
+        if: steps.wake.outputs.worker_required == 'true'
         run: npm ci
+
       - name: Ensure media runtime
-        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || !inputs.dry_run }}
+        if: steps.wake.outputs.worker_required == 'true' && steps.wake.outputs.action == 'CREATE_VIDEO'
         shell: bash
         run: |
           set -euo pipefail
@@ -53,24 +81,9 @@ jobs:
           ffmpeg -version | head -1
           ffprobe -version | head -1
           rsvg-convert --version
-      - name: Wake scheduler and verify authentication
-        env:
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
-          token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
-          echo "::add-mask::$token"
-          curl --fail-with-body --silent --show-error \
-            --retry 2 --retry-all-errors \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "X-Hibou-Dry-Run: ${DRY_RUN}" \
-            -H "Content-Type: application/json" \
-            https://le-hibou-ruse-site.vercel.app/api/wake
+
       - name: Run bounded autonomous worker
-        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || !inputs.dry_run }}
+        if: steps.wake.outputs.worker_required == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HIBOU_WORKER_URL: https://le-hibou-ruse-site.vercel.app/api/agent-worker

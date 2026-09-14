@@ -2,22 +2,11 @@ import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway.mjs";
+import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-function configMap(records) {
-  return Object.fromEntries((records || []).map((record) => [record.fields?.Clé, record.fields?.Valeur]));
-}
-
-function bool(value, fallback = false) {
-  if (value === true || value === false) return value;
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (["true", "1", "yes", "oui"].includes(normalized)) return true;
-  if (["false", "0", "no", "non"].includes(normalized)) return false;
-  return fallback;
-}
 
 function safeFormula(value) {
   return String(value).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
@@ -36,14 +25,13 @@ async function authenticate(request) {
   return { kind: "github_oidc" };
 }
 
-async function publicationPolicy() {
+async function runtimeConfiguration() {
   const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
-  const config = configMap(records);
+  const config = configurationMap(records);
   return {
-    gateway_enabled: bool(config.social_gateway_enabled, true),
-    test_mode: bool(config.social_test_mode, true),
-    review_required: bool(config.social_publication_requires_review, true),
-    first_videos_review_count: Number(config.human_review_first_videos || 10),
+    config,
+    policy: socialPolicy(config),
+    env: socialRuntimeEnv(config),
   };
 }
 
@@ -93,14 +81,15 @@ export async function POST(request) {
   try {
     const identity = await authenticate(request);
     const body = await request.json().catch(() => ({}));
-    const policy = await publicationPolicy();
+    const runtimeConfig = await runtimeConfiguration();
+    const { policy, env } = runtimeConfig;
 
     if (body.operation === "status") {
       return NextResponse.json({
         ok: true,
         authenticated_via: identity.kind,
         policy,
-        providers: socialGatewayStatus(),
+        providers: socialGatewayStatus(env),
       });
     }
 
@@ -143,7 +132,7 @@ export async function POST(request) {
     const result = await dispatchSocialPost({
       ...body,
       dry_run: !liveAllowed,
-    });
+    }, env);
 
     if (intent) {
       await updateDispatchIntent(intent, {

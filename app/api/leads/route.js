@@ -9,14 +9,19 @@ export async function POST(request) {
     if (body.company) return NextResponse.json({ ok: true });
     const contact = clean(body.contact, 120);
     const email = clean(body.email, 160);
-    const context = clean(body.context, 2500);
-    const need = clean(body.need, 1500);
-    const goal = clean(body.goal, 1500);
-    if (!contact || !email.includes("@") || !context || !need || !goal) return NextResponse.json({ error: "Données invalides" }, { status: 400 });
+    const context = clean(body.context, 3500);
+    const need = clean(body.need, 2500);
+    if (!email.includes("@") || !context || !need) return NextResponse.json({ error: "Données invalides" }, { status: 400 });
     await createRecord(TABLES.leads, {
-      Contact: contact, Email: email, Contexte: context, Besoin: need, Objectif: goal,
-      Statut: "Nouveau", Notes: "Créé automatiquement depuis le formulaire du site.",
-      Source: "Site — Montage personnalisé", Date: new Date().toISOString(),
+      Contact: contact || "Anonyme",
+      Email: email,
+      Contexte: context,
+      Besoin: need,
+      Objectif: need,
+      Statut: "Nouveau",
+      Notes: "Créé automatiquement depuis le formulaire Services proposés du site.",
+      Source: "Site — Services proposés",
+      Date: new Date().toISOString(),
     });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {

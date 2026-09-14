@@ -3,6 +3,11 @@ name: Hibou Agent Wake
 on:
   schedule:
     - cron: "*/5 * * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/hibou-wake.yml"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -33,10 +38,10 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install worker dependencies
-        if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || !inputs.dry_run }}
         run: npm ci
       - name: Ensure media runtime
-        if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || !inputs.dry_run }}
         shell: bash
         run: |
           set -euo pipefail
@@ -64,7 +69,7 @@ jobs:
             -H "Content-Type: application/json" \
             https://le-hibou-ruse-site.vercel.app/api/wake
       - name: Run bounded autonomous worker
-        if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || !inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HIBOU_WORKER_URL: https://le-hibou-ruse-site.vercel.app/api/agent-worker

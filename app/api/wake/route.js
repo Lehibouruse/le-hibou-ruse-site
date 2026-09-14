@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ORCHESTRATOR_PATH = "/api/orchestrator";
+const SOCIAL_SCHEDULER_PATH = "/api/social-scheduler";
 const MAX_BATCH = 1;
 
 function baseUrl(request) {
@@ -33,8 +34,8 @@ async function firstEligibleJob() {
   return records[0] || null;
 }
 
-async function runDeterministicOrchestrator(request, cronSecret) {
-  const response = await fetch(`${baseUrl(request)}${ORCHESTRATOR_PATH}`, {
+async function delegate(request, cronSecret, path, label) {
+  const response = await fetch(`${baseUrl(request)}${path}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${cronSecret}` },
     cache: "no-store",
@@ -43,12 +44,12 @@ async function runDeterministicOrchestrator(request, cronSecret) {
   if (!response.ok) {
     return NextResponse.json({
       ok: false,
-      delegated: "orchestrator",
+      delegated: label,
       status: response.status,
-      error: data?.error || data?.status || "Orchestrator failed",
+      error: data?.error || data?.status || `${label} failed`,
     }, { status: response.status >= 500 ? 503 : response.status });
   }
-  return NextResponse.json({ ok: true, delegated: "orchestrator", ...data });
+  return NextResponse.json({ ok: true, delegated: label, ...data });
 }
 
 export async function POST(request) {
@@ -68,13 +69,17 @@ export async function POST(request) {
         dry_run: dryRun,
         eligible: candidate ? 1 : 0,
         processed: 0,
+        action: candidate ? actionName(candidate) : "",
         audience: githubOidcAudience(),
       });
     }
 
     const action = actionName(candidate);
+    if (action === "SCHEDULE_POST") {
+      return delegate(request, cronSecret, SOCIAL_SCHEDULER_PATH, "social_scheduler");
+    }
     if (!isAgenticAction(action, parameters(candidate))) {
-      return runDeterministicOrchestrator(request, cronSecret);
+      return delegate(request, cronSecret, ORCHESTRATOR_PATH, "orchestrator");
     }
 
     return NextResponse.json({

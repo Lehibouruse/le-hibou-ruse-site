@@ -16,7 +16,7 @@ export default async function Home() {
   const footer = block(cms, "footer");
   const config = configMap(configuration);
   const product = productRecords.find((record) => record.fields.Actif)?.fields || {};
-  const checkoutUrl = config.checkout_url || "";
+  const checkoutUrl = config.checkout_url || product["Stripe URL"] || "";
   const ctaText = config.ebook_cta || product["CTA texte"] || "Acheter l’e-book — 29 €";
   const articles = articleRecords.filter((record) => record.fields.Publié).sort((a, b) => Number(Boolean(b.fields["À la une"])) - Number(Boolean(a.fields["À la une"]))).slice(0, 6);
   const categories = ["argent", "fiscalite", "patrimoine"].map((key) => block(cms, key));

@@ -1,5 +1,6 @@
 import "./globals.css";
 import "./revamp.css";
+import "./polish.css";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
@@ -8,7 +9,7 @@ export const metadata = {
   description: "Fiscalité, argent et patrimoine : comprendre les règles, exploiter les failles et explorer des montages du D4 au D6.",
   openGraph: {
     title: "Le Hibou Rusé",
-    description: "Des stratégies optimisées, ingénieuses, parfois agressives. Des cas concrets, des chiffres et les risques.",
+    description: "Des stratégies optimisées, ingénieuses, parfois agressives. Cas concrets, chiffres et risques explicités.",
     url: "/",
     siteName: "Le Hibou Rusé",
     locale: "fr_FR",

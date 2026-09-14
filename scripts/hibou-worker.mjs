@@ -5,14 +5,15 @@ import { vercelCommitState } from "../lib/agent-runtime.mjs";
 
 const API = process.env.HIBOU_WORKER_URL || "https://le-hibou-ruse-site.vercel.app/api/agent-worker";
 const ROOT = process.cwd();
-const MAX_STEPS = 32;
+const MAX_STEPS = 40;
 // A video needs several sequential tool turns (brief, images, voice, music,
 // assembly, checks and registration). Keep a hard bound, but do not make a
 // successful CREATE_VIDEO mathematically impossible.
-const MAX_AI_CALLS = 24;
+const MAX_AI_CALLS = 32;
 const MAX_AI_COST_USD = 2;
 let testsPassed = false;
 let buildPassed = false;
+let videoQcPassed = false;
 
 function safeJobId(value) {
   return String(value || "job").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 80);
@@ -68,7 +69,7 @@ function run(command, args, options = {}) {
   try {
     return execFileSync(command, args, { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, ...options }).slice(0, 50000);
   } catch (error) {
-    throw new Error(`${command} a échoué\n${String(error.stdout || "").slice(-12000)}\n${String(error.stderr || "").slice(-12000)}`);
+    throw new Error(`${command} a échoué: ${String(error.message || error)} (code=${error.status ?? error.code ?? "inconnu"})\n${String(error.stdout || "").slice(-12000)}\n${String(error.stderr || "").slice(-12000)}`);
   }
 }
 
@@ -154,12 +155,38 @@ async function executeTool(call, state) {
       if (!existsSync(file.full)) throw new Error("Fichier introuvable");
       return { path: file.normalized, content: readFileSync(file.full, "utf8").slice(0, 60000) };
     }
+    case "repo_read_many": {
+      let remaining = 120000;
+      const files = [];
+      for (const path of args.paths.slice(0, 12)) {
+        const file = safePath(path);
+        if (!existsSync(file.full)) { files.push({ path: file.normalized, error: "Fichier introuvable" }); continue; }
+        const content = readFileSync(file.full, "utf8").slice(0, remaining);
+        remaining -= content.length;
+        files.push({ path: file.normalized, content });
+        if (remaining <= 0) break;
+      }
+      return { files };
+    }
     case "site_write": {
       const file = safePath(args.path, "site");
       mkdirSync(dirname(file.full), { recursive: true });
       writeFileSync(file.full, String(args.content), "utf8");
-      testsPassed = false; buildPassed = false;
+      testsPassed = false; buildPassed = false; videoQcPassed = false;
       return { written: file.normalized, bytes: Buffer.byteLength(String(args.content)) };
+    }
+    case "site_edit": {
+      const file = safePath(args.path, "site");
+      if (!existsSync(file.full)) throw new Error("Fichier introuvable");
+      const content = readFileSync(file.full, "utf8");
+      const oldText = String(args.old_text || "");
+      if (!oldText) throw new Error("old_text vide");
+      const occurrences = content.split(oldText).length - 1;
+      if (occurrences !== 1) throw new Error(`old_text doit être unique (occurrences=${occurrences})`);
+      const next = content.replace(oldText, String(args.new_text));
+      writeFileSync(file.full, next, "utf8");
+      testsPassed = false; buildPassed = false;
+      return { written: file.normalized, bytes: Buffer.byteLength(next), changed_bytes: Buffer.byteLength(String(args.new_text)) - Buffer.byteLength(oldText) };
     }
     case "git_diff":
       return { status: run("git", ["status", "--short"]), diff: run("git", ["diff", "--stat"]) + run("git", ["diff", "--", "app", "components", "public"]).slice(0, 50000) };
@@ -187,7 +214,7 @@ async function executeTool(call, state) {
       const result = await api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: args });
       mkdirSync(dirname(file.full), { recursive: true });
       writeFileSync(file.full, Buffer.from(result.base64, "base64"));
-      testsPassed = false; buildPassed = false;
+      testsPassed = false; buildPassed = false; videoQcPassed = false;
       return { ok: true, path: file.normalized, bytes: Buffer.byteLength(result.base64, "base64") };
     }
     case "generate_music": {
@@ -195,7 +222,7 @@ async function executeTool(call, state) {
       mkdirSync(dirname(file.full), { recursive: true });
       const duration = Math.min(90, Math.max(2, Number(args.duration_seconds)));
       run("ffmpeg", ["-y", "-f", "lavfi", "-i", `sine=frequency=110:duration=${duration}`, "-af", "volume=0.035,afade=t=in:st=0:d=1,afade=t=out:st=" + Math.max(0, duration - 2) + ":d=2", file.full]);
-      testsPassed = false; buildPassed = false;
+      testsPassed = false; buildPassed = false; videoQcPassed = false;
       return { ok: true, path: file.normalized, original: true, mood: args.mood };
     }
     case "assemble_video": {
@@ -206,6 +233,8 @@ async function executeTool(call, state) {
       mkdirSync(dirname(output.full), { recursive: true });
       const listPath = resolve(dirname(output.full), "scenes.ffconcat");
       const srtPath = resolve(dirname(output.full), "subtitles.srt");
+      const logoPath = resolve(dirname(output.full), "hibou-logo.png");
+      run("rsvg-convert", ["-w", "132", "-h", "132", "-o", logoPath, resolve(ROOT, "public/hibou.svg")]);
       const voiceDuration = Number(run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", voice.full]).trim());
       const plannedDuration = scenes.reduce((total, scene) => total + scene.duration_seconds, 0);
       if (Number.isFinite(voiceDuration) && voiceDuration > 0 && plannedDuration > 0) {
@@ -217,15 +246,31 @@ async function executeTool(call, state) {
       createSrt(scenes, srtPath);
       const inputs = ["-f", "concat", "-safe", "0", "-i", listPath, "-i", voice.full];
       if (music) inputs.push("-i", music.full);
+      inputs.push("-loop", "1", "-i", logoPath);
+      const logoInput = music ? 3 : 2;
       const escapedSrt = srtPath.replaceAll("\\", "/").replace(":", "\\:").replaceAll("'", "\\'");
       const audio = music ? "[1:a]volume=1[a1];[2:a]volume=0.15[a2];[a1][a2]amix=inputs=2:duration=first[a]" : "[1:a]anull[a]";
-      run("ffmpeg", ["-y", ...inputs, "-filter_complex", `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles='${escapedSrt}':force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=170'[v];${audio}`, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-c:a", "aac", "-b:a", "160k", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output.full]);
-      testsPassed = false; buildPassed = false;
+      run("ffmpeg", ["-y", ...inputs, "-filter_complex", `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles='${escapedSrt}':force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=170'[base];[${logoInput}:v]format=rgba,colorchannelmixer=aa=0.92[logo];[base][logo]overlay=W-w-48:48[v];${audio}`, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-c:a", "aac", "-b:a", "160k", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output.full]);
+      testsPassed = false; buildPassed = false; videoQcPassed = false;
       return { ok: true, path: output.normalized, bytes: readFileSync(output.full).byteLength, publication: false };
+    }
+    case "video_qc": {
+      const video = safePath(args.video_path, "media");
+      if (!existsSync(video.full)) throw new Error("Brouillon vidéo introuvable");
+      const probe = JSON.parse(run("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type,width,height,duration:format=duration,size", "-of", "json", video.full]));
+      const videoStream = (probe.streams || []).find((stream) => stream.codec_type === "video");
+      const audioStream = (probe.streams || []).find((stream) => stream.codec_type === "audio");
+      const duration = Number(probe.format?.duration || videoStream?.duration || 0);
+      const bytes = Number(probe.format?.size || readFileSync(video.full).byteLength);
+      const checks = { video: Boolean(videoStream), audio: Boolean(audioStream), vertical_1080x1920: videoStream?.width === 1080 && videoStream?.height === 1920, duration_ok: duration >= 5 && duration <= 90, size_ok: bytes >= 100000 && bytes <= 90 * 1024 * 1024 };
+      videoQcPassed = Object.values(checks).every(Boolean);
+      if (!videoQcPassed) throw new Error(`QC vidéo échoué: ${JSON.stringify({ checks, duration, bytes, width: videoStream?.width, height: videoStream?.height })}`);
+      return { ok: true, score: 100, checks, duration_seconds: duration, bytes, publication: false };
     }
     case "register_video_draft": {
       const video = safePath(args.video_path, "media");
       if (!existsSync(video.full)) throw new Error("Brouillon vidéo introuvable");
+      if (!videoQcPassed) throw new Error("video_qc réussi requis avant enregistrement");
       if (readFileSync(video.full).byteLength > 90 * 1024 * 1024) throw new Error("Brouillon supérieur à 90 Mo");
       const pushed = await pushBranch(state.job, `Add autonomous video draft for ${state.job.fields.job_id}`);
       const proposal = await openPullRequest(pushed, state.job);

@@ -1,0 +1,164 @@
+import { randomUUID } from "node:crypto";
+import { NextResponse } from "next/server";
+import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+const LEASE_MS = 5 * 60 * 1000;
+
+function parameters(job) {
+  try { return JSON.parse(job?.fields?.parameters || "{}"); }
+  catch { throw new Error("parameters doit contenir un JSON valide"); }
+}
+
+function actionName(job) {
+  return job?.fields?.action?.name || job?.fields?.action || "";
+}
+
+function baseUrl(request) {
+  const configured = process.env.HIBOU_PUBLIC_BASE_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "");
+  return configured ? new URL(configured).origin : new URL(request.url).origin;
+}
+
+function safeIdempotency(value) {
+  const normalized = String(value || "").replace(/[^A-Za-z0-9._:-]+/g, "-").slice(0, 190);
+  return normalized.length >= 8 ? normalized : `hibou-social-${Date.now()}`;
+}
+
+async function claim(job) {
+  const lockToken = randomUUID();
+  const now = new Date();
+  await updateRecord(TABLES.jobs, job.id, {
+    status: "Running",
+    started_at: now.toISOString(),
+    completed_at: null,
+    error: "",
+    lock_token: lockToken,
+    lease_expires_at: new Date(now.getTime() + LEASE_MS).toISOString(),
+  });
+  const current = await getRecord(TABLES.jobs, job.id);
+  const status = current?.fields?.status?.name || current?.fields?.status;
+  return current?.fields?.lock_token === lockToken && status === "Running"
+    ? { ...current, lockToken }
+    : null;
+}
+
+async function owns(job) {
+  const current = await getRecord(TABLES.jobs, job.id);
+  return current?.fields?.lock_token === job.lockToken;
+}
+
+async function finish(job, status, result, error = "") {
+  if (!(await owns(job))) return false;
+  await updateRecord(TABLES.jobs, job.id, {
+    status,
+    completed_at: ["Completed", "Manual Review", "Error"].includes(status) ? new Date().toISOString() : null,
+    result: String(result || "").slice(0, 100000),
+    error: String(error || "").slice(0, 5000),
+    agent_status: status === "Completed" ? "completed" : status === "Retry" ? "needs_escalation" : "waiting_for_human",
+    lock_token: "",
+    lease_expires_at: null,
+  });
+  await createRecord(TABLES.journal, {
+    Workflow: "HIBOU_SOCIAL_SCHEDULER_V1",
+    Déclencheur: job.fields?.requested_by || "Jobs",
+    Action: `SCHEDULE_POST · ${job.fields?.job_id || job.id} · ${status}`,
+    "Dernière exécution": new Date().toISOString(),
+    Erreur: String(error || "").slice(0, 5000),
+    Notes: String(result || "").slice(0, 10000),
+  }).catch(() => {});
+  return true;
+}
+
+async function retry(job, message) {
+  if (!(await owns(job))) return false;
+  const count = Number(job.fields?.retry_count || 0) + 1;
+  const max = Math.min(2, Number(job.fields?.max_retries ?? 2));
+  if (count > max) return finish(job, "Manual Review", message, message);
+  await updateRecord(TABLES.jobs, job.id, {
+    status: "Retry",
+    retry_count: count,
+    next_run_at: new Date(Date.now() + Math.min(15 * 60_000, 60_000 * 2 ** count)).toISOString(),
+    error: String(message).slice(0, 5000),
+    agent_status: "needs_escalation",
+    lock_token: "",
+    lease_expires_at: null,
+  });
+  return true;
+}
+
+export async function GET(request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const eligible = eligibleJobsFormula(process.env);
+    const candidates = await queryRecords(TABLES.jobs, {
+      filterByFormula: `AND(${eligible},{action}='SCHEDULE_POST')`,
+      sortField: "created_at",
+      pageSize: 5,
+    });
+    const candidate = candidates.find((job) => actionName(job) === "SCHEDULE_POST");
+    if (!candidate) return NextResponse.json({ ok: true, processed: 0, reason: "no_schedule_post" });
+
+    const job = await claim(candidate);
+    if (!job) return NextResponse.json({ ok: true, processed: 0, reason: "lease_not_acquired" });
+    const params = parameters(job);
+    const provider = String(params.provider || params.network || job.fields?.target || "").trim().toLowerCase();
+    const mediaUrl = String(params.media_url || params.video_url || params.url || "").trim();
+    if (!provider || !mediaUrl) {
+      const message = "SCHEDULE_POST requiert provider/network et media_url/video_url";
+      await finish(job, "Manual Review", message, message);
+      return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", error: message }, { status: 422 });
+    }
+
+    const requestedLive = params.publication_authorization === true || params.publish === true || params.dry_run === false;
+    const humanApproved = params.human_approved === true || params.validation_humaine === true;
+    const idempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${job.fields?.job_id || job.id}`);
+    const response = await fetch(`${baseUrl(request)}/api/social`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "dispatch",
+        provider,
+        media_url: mediaUrl,
+        caption: String(params.caption || params.text || ""),
+        title: String(params.title || ""),
+        privacy_level: String(params.privacy_level || ""),
+        dry_run: !requestedLive,
+        human_approved: humanApproved,
+        idempotency_key: idempotencyKey,
+        is_aigc: params.is_aigc !== false,
+        metadata: { ...(params.metadata || {}), job_id: job.fields?.job_id || job.id, idempotency_key: idempotencyKey },
+      }),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) {
+      const message = data.error || `Social gateway ${response.status}`;
+      if (response.status >= 500) {
+        await retry(job, message);
+        return NextResponse.json({ ok: false, processed: 1, status: "retry", error: message }, { status: 503 });
+      }
+      await finish(job, "Manual Review", message, message);
+      return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", error: message }, { status: 422 });
+    }
+
+    const summary = JSON.stringify({ provider, requested_live: requestedLive, gateway: data });
+    if (requestedLive && data.live_allowed !== true) {
+      await finish(job, "Manual Review", summary, data.forced_dry_run_reason || "Publication live bloquée par politique");
+      return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, dry_run: true });
+    }
+
+    await finish(job, "Completed", summary, "");
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 1000) }, { status: 500 });
+  }
+}

@@ -52,8 +52,11 @@ test("le registre borne les écritures site et branche la chaîne vidéo", () =>
   const siteNames = toolsForAction("UPDATE_SITE").map((tool) => tool.name);
   const videoNames = toolsForAction("CREATE_VIDEO").map((tool) => tool.name);
   assert.ok(siteNames.includes("site_write"));
+  assert.ok(siteNames.includes("site_edit"));
+  assert.ok(siteNames.includes("repo_read_many"));
   assert.equal(siteNames.includes("generate_speech"), false);
   assert.ok(videoNames.includes("assemble_video"));
+  assert.ok(videoNames.includes("video_qc"));
   assert.ok(videoNames.includes("register_video_draft"));
   assert.equal(videoNames.includes("schedule_post"), false);
 });
@@ -80,9 +83,13 @@ test("chaque réveil planifié commence par un dry-run OIDC", () => {
   assert.match(workflow, /X-Hibou-Dry-Run/);
 });
 
-test("le worker autorise assez de tours pour une vidéo tout en gardant des plafonds", () => {
+test("le worker autorise assez de tours pour les missions complexes tout en gardant des plafonds", () => {
   const worker = readFileSync(new URL("../scripts/hibou-worker.mjs", import.meta.url), "utf8");
-  assert.match(worker, /const MAX_AI_CALLS = 24/);
+  assert.match(worker, /const MAX_AI_CALLS = 32/);
   assert.match(worker, /const MAX_AI_COST_USD = 2/);
   assert.match(worker, /operation: "checkpoint"/);
+  const route = readFileSync(new URL("../app/api/agent-worker/route.js", import.meta.url), "utf8");
+  assert.match(route, /parallel_tool_calls: true/);
+  const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
+  assert.match(workflow, /sudo apt-get install -y ffmpeg librsvg2-bin/);
 });

@@ -75,9 +75,9 @@ async function openaiStep(body) {
     body: JSON.stringify({
       model, reasoning: { effort: route.reasoning }, input: body.input,
       instructions: `${HIBOU_AGENT_INSTRUCTIONS}\n\n# EXECUTION BORNEE\n${workerInstructions(action)}`,
-      tools: toolsForAction(action), tool_choice: "auto", parallel_tool_calls: false,
+      tools: toolsForAction(action), tool_choice: "auto", parallel_tool_calls: true,
       include: ["reasoning.encrypted_content"],
-      max_output_tokens: config.maxOutputTokens, store: false, prompt_cache_key: "hibou-agent-worker-v1",
+      max_output_tokens: Math.max(config.maxOutputTokens, action === "UPDATE_SITE" ? 5000 : 2000), store: false, prompt_cache_key: "hibou-agent-worker-v1",
       metadata: { agent: HIBOU_AGENT_PROMPT_VERSION, job_id: String(job.fields.job_id).slice(0, 512), action },
       text: { verbosity: "low", format: { type: "json_schema", name: "hibou_worker_result", strict: true, schema: {
         type: "object", additionalProperties: false,

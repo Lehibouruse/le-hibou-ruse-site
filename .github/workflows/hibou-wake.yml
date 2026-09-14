@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/hibou-wake.yml"
       - "scripts/hibou-worker.mjs"
+      - "scripts/prepare-hibou-worker.mjs"
       - "app/api/wake/**"
       - "app/api/agent-worker/**"
       - "app/api/orchestrator/**"
@@ -80,6 +81,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Prepare worker server-tool relays
+        if: steps.wake.outputs.worker_required == 'true'
+        run: node scripts/prepare-hibou-worker.mjs
 
       - name: Install worker dependencies
         if: steps.wake.outputs.worker_required == 'true'

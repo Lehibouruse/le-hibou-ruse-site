@@ -6,17 +6,43 @@ import { vercelCommitState } from "../lib/agent-runtime.mjs";
 const API = process.env.HIBOU_WORKER_URL || "https://le-hibou-ruse-site.vercel.app/api/agent-worker";
 const ROOT = process.cwd();
 const MAX_STEPS = 40;
-// A video needs several sequential tool turns (brief, images, voice, music,
-// assembly, checks and registration). Keep a hard bound, but do not make a
-// successful CREATE_VIDEO mathematically impossible.
 const MAX_AI_CALLS = 32;
 const MAX_AI_COST_USD = 2;
+const BACKGROUND_POLL_MS = 4000;
+const MAX_BACKGROUND_POLLS = 150;
 let testsPassed = false;
 let buildPassed = false;
 let videoQcPassed = false;
 
 function safeJobId(value) {
   return String(value || "job").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 80);
+}
+
+function sleep(ms) {
+  return new Promise((resolveWait) => setTimeout(resolveWait, ms));
+}
+
+function jobParameters(job) {
+  try { return JSON.parse(job.fields?.parameters || "{}"); } catch { return {}; }
+}
+
+function pinnedTier(job) {
+  const params = jobParameters(job);
+  const value = String(params.model_tier || params.requested_model || "").toLowerCase();
+  if (value.includes("astra")) return "astra";
+  if (value.includes("sol")) return "sol";
+  if (value.includes("terra")) return "terra";
+  if (value.includes("luna")) return "luna";
+  return null;
+}
+
+function chooseStepTier(job, baseTier, step, previousTools, previousFailure) {
+  const pinned = pinnedTier(job);
+  if (pinned) return pinned;
+  if (step === 0) return baseTier || "sol";
+  if (previousFailure) return "sol";
+  if (previousTools.length > 0) return "terra";
+  return baseTier || "sol";
 }
 
 async function oidcToken() {
@@ -48,6 +74,38 @@ async function checkpoint(state, telemetry, details) {
     telemetry,
     ...details,
   });
+}
+
+async function modelStep(state, input, modelTier) {
+  const started = await api({
+    operation: "step", record_id: state.record_id, lock_token: state.lock_token,
+    input, model_tier: modelTier,
+  });
+  let result = started;
+  let response = started.response;
+  if (!response?.id) throw new Error("OpenAI background response sans identifiant");
+
+  for (let poll = 0; result.pending || ["queued", "in_progress"].includes(response.status); poll += 1) {
+    if (poll >= MAX_BACKGROUND_POLLS) throw new Error(`OpenAI background timeout: ${response.id}`);
+    await sleep(BACKGROUND_POLL_MS);
+    result = await api({
+      operation: "step_status", record_id: state.record_id, lock_token: state.lock_token,
+      response_id: response.id,
+    });
+    response = result.response;
+  }
+
+  if (response.status !== "completed") {
+    const detail = response.error?.message || response.incomplete_details?.reason || response.status || "unknown";
+    throw new Error(`OpenAI background response ${response.status}: ${detail}`);
+  }
+  return {
+    ...result,
+    response,
+    tier: started.tier || modelTier,
+    model: started.model || response.model,
+    reasoning: started.reasoning || "",
+  };
 }
 
 function safePath(path, mode = "read") {
@@ -132,7 +190,7 @@ async function openPullRequest(pushed, job) {
     if (!statusResponse.ok) return { branch, commit, changed_paths: changedPaths, pull_request: data.html_url, merged: false, warning: `Statut Vercel ${statusResponse.status}` };
     vercel = vercelCommitState(statusData.statuses || []);
     if (vercel !== "pending") break;
-    await new Promise((resolveWait) => setTimeout(resolveWait, 10000));
+    await sleep(10000);
   }
   if (vercel !== "success") return { branch, commit, changed_paths: changedPaths, pull_request: data.html_url, merged: false, vercel, warning: "Fusion refusée: preview Vercel non validée" };
   const merge = await fetch(`https://api.github.com/repos/Lehibouruse/le-hibou-ruse-site/pulls/${data.number}/merge`, {
@@ -190,18 +248,16 @@ async function executeTool(call, state) {
     }
     case "git_diff":
       return { status: run("git", ["status", "--short"]), diff: run("git", ["diff", "--stat"]) + run("git", ["diff", "--", "app", "components", "public"]).slice(0, 50000) };
-    case "run_tests":
-      {
-        const output = run("npm", ["test"]);
-        testsPassed = true;
-        return { ok: true, output };
-      }
-    case "run_build":
-      {
-        const output = run("npm", ["run", "build"]);
-        buildPassed = true;
-        return { ok: true, output };
-      }
+    case "run_tests": {
+      const output = run("npm", ["test"]);
+      testsPassed = true;
+      return { ok: true, output };
+    }
+    case "run_build": {
+      const output = run("npm", ["run", "build"]);
+      buildPassed = true;
+      return { ok: true, output };
+    }
     case "propose_changes": {
       const pushed = await pushBranch(state.job, args.message);
       const proposal = await openPullRequest(pushed, state.job);
@@ -286,7 +342,7 @@ async function executeTool(call, state) {
         const response = await fetch("https://le-hibou-ruse-site.vercel.app/api/health", { cache: "no-store" });
         last = await response.text();
         if (response.ok) return { ok: true, status: response.status, body: last.slice(0, 5000), attempt: attempt + 1 };
-        if (attempt + 1 < attempts) await new Promise((resolve) => setTimeout(resolve, 15000));
+        if (attempt + 1 < attempts) await sleep(15000);
       }
       throw new Error(`Déploiement non prêt: ${last.slice(0, 1000)}`);
     }
@@ -296,7 +352,7 @@ async function executeTool(call, state) {
 }
 
 function initialInput(job) {
-  return [{ role: "user", content: [{ type: "input_text", text: `Exécute ce Job avec les outils autorisés.\n${JSON.stringify({ job_id: job.fields.job_id, action: job.fields.action?.name || job.fields.action, target: job.fields.target || "", parameters: JSON.parse(job.fields.parameters || "{}") })}` }] }];
+  return [{ role: "user", content: [{ type: "input_text", text: `Exécute ce Job avec les outils autorisés.\n${JSON.stringify({ job_id: job.fields.job_id, action: job.fields.action?.name || job.fields.action, target: job.fields.target || "", parameters: jobParameters(job) })}` }] }];
 }
 
 function finalText(response) {
@@ -311,27 +367,38 @@ async function main() {
   const input = initialInput(claimed.job);
   const telemetry = { model: claimed.model, reasoning: claimed.reasoning, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, cost: 0, ai_calls: 0, response_ids: [] };
   let outcome = { status: "failed", result: "Limite d'étapes atteinte", confidence: 0 };
+  let previousTools = [];
+  let previousFailure = false;
   try {
     for (let step = 0; step < MAX_STEPS; step += 1) {
       if (telemetry.ai_calls >= MAX_AI_CALLS) throw new Error("Plafond d'appels IA du worker atteint");
       if (telemetry.cost >= MAX_AI_COST_USD) throw new Error("Plafond de coût IA du worker atteint");
-      const result = await api({ operation: "step", record_id: state.record_id, lock_token: state.lock_token, input });
+      const modelTier = chooseStepTier(state.job, state.tier, step, previousTools, previousFailure);
+      const result = await modelStep(state, input, modelTier);
       const response = result.response;
-      telemetry.ai_calls += 1; telemetry.response_ids.push(response.id);
+      telemetry.model = result.model || response.model || telemetry.model;
+      telemetry.reasoning = result.reasoning || telemetry.reasoning;
+      telemetry.ai_calls += 1;
+      telemetry.response_ids.push(response.id);
       telemetry.input_tokens += Number(response.usage?.input_tokens || 0);
       telemetry.cached_input_tokens += Number(response.usage?.input_tokens_details?.cached_tokens || 0);
-      telemetry.output_tokens += Number(response.usage?.output_tokens || 0); telemetry.cost += Number(result.estimated_cost_usd || 0);
-      await checkpoint(state, telemetry, { phase: "model", step: step + 1, tool: "", ok: true });
+      telemetry.output_tokens += Number(response.usage?.output_tokens || 0);
+      telemetry.cost += Number(result.estimated_cost_usd || 0);
+      await checkpoint(state, telemetry, { phase: "model", step: step + 1, tool: result.tier || modelTier, ok: true });
       input.push(...(response.output || []));
       const calls = (response.output || []).filter((item) => item.type === "function_call");
       if (!calls.length) {
         outcome = JSON.parse(finalText(response));
         break;
       }
+      previousTools = [];
+      previousFailure = false;
       for (const call of calls) {
+        previousTools.push(call.name);
         let toolResult;
         try { toolResult = await executeTool(call, state); }
         catch (error) { toolResult = { ok: false, error: String(error.message || error).slice(0, 12000) }; }
+        if (toolResult?.ok === false) previousFailure = true;
         await checkpoint(state, telemetry, { phase: "tool", step: step + 1, tool: call.name, ok: toolResult?.ok !== false, error: toolResult?.ok === false ? toolResult.error : "" });
         input.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(toolResult) });
       }

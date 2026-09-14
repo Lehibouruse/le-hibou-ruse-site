@@ -6,6 +6,7 @@ import { toolsForAction, isAgenticAction, workerInstructions } from "../../../li
 import { estimateCost, getAgentConfig, HIBOU_AGENT_INSTRUCTIONS, HIBOU_AGENT_PROMPT_VERSION, routeJob } from "../../../lib/hibou-agent.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,14 @@ function actionName(job) {
 
 function parameters(job) {
   try { return JSON.parse(job.fields?.parameters || "{}"); } catch { return {}; }
+}
+
+function bool(value, fallback = false) {
+  if (value === true || value === false) return value;
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "1", "yes", "oui"].includes(normalized)) return true;
+  if (["false", "0", "no", "non"].includes(normalized)) return false;
+  return fallback;
 }
 
 function reasoningForTier(tier) {
@@ -69,7 +78,7 @@ function openAiError(response, data, label = "OpenAI Responses API") {
 async function claim() {
   const candidates = await queryRecords(TABLES.jobs, {
     filterByFormula: eligibleJobsFormula(process.env, { includeReserved: true }),
-    sortField: "created_at", pageSize: 5,
+    sortField: "created_at", pageSize: 10,
   });
   const candidate = candidates.find((job) => isAgenticAction(actionName(job), parameters(job)));
   if (!candidate) return { ok: true, claimed: false };
@@ -143,6 +152,17 @@ async function openaiStepStatus(body) {
   };
 }
 
+async function socialPolicySnapshot() {
+  const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
+  const config = Object.fromEntries(records.map((record) => [record.fields?.Clé, record.fields?.Valeur]));
+  return {
+    gateway_enabled: bool(config.social_gateway_enabled, true),
+    test_mode: bool(config.social_test_mode, true),
+    review_required: bool(config.social_publication_requires_review, true),
+    first_videos_review_count: Number(config.human_review_first_videos || 10),
+  };
+}
+
 async function serverTool(body) {
   const job = await ownedJob(body.record_id, body.lock_token);
   const action = actionName(job);
@@ -152,6 +172,21 @@ async function serverTool(body) {
     if (!tableId) throw new Error("Table non autorisée");
     const records = args.record_id ? [await getRecord(tableId, args.record_id)] : await queryRecords(tableId, { pageSize: Math.min(20, Number(args.limit) || 10) });
     return { ok: true, records: records.map((record) => ({ id: record.id, fields: record.fields })) };
+  }
+  if (body.name === "social_status") {
+    return { ok: true, policy: await socialPolicySnapshot(), providers: socialGatewayStatus() };
+  }
+  if (body.name === "social_prepare") {
+    return dispatchSocialPost({
+      provider: args.provider,
+      media_url: args.media_url,
+      caption: args.caption,
+      title: args.title,
+      privacy_level: args.privacy_level,
+      dry_run: true,
+      is_aigc: true,
+      metadata: { source_job: job.fields?.job_id || job.id },
+    });
   }
   if (body.name === "generate_image" && action === "CREATE_VIDEO") {
     const response = await fetch("https://api.openai.com/v1/images/generations", {

@@ -14,6 +14,27 @@ test("social gateway reports configured webhook without exposing secrets", () =>
   assert.equal(JSON.stringify(status).includes("super-secret"), false);
 });
 
+test("direct mode can be preferred over an existing webhook during migration", () => {
+  const env = {
+    HIBOU_SOCIAL_INSTAGRAM_WEBHOOK_URL: "https://example.com/instagram",
+    HIBOU_SOCIAL_INSTAGRAM_MODE: "direct",
+    META_ACCESS_TOKEN: "secret-meta",
+    INSTAGRAM_BUSINESS_ACCOUNT_ID: "1784",
+  };
+  const instagram = socialGatewayStatus(env).find((item) => item.provider === "instagram");
+  assert.equal(instagram.mode, "direct");
+  assert.equal(instagram.direct_configured, true);
+  assert.equal(instagram.webhook_configured, true);
+  assert.deepEqual(instagram.direct_capabilities, ["video_native"]);
+  assert.equal(JSON.stringify(instagram).includes("secret-meta"), false);
+});
+
+test("provider diagnostics name missing environment variables but never values", () => {
+  const youtube = socialGatewayStatus({}).find((item) => item.provider === "youtube");
+  assert.equal(youtube.configured, false);
+  assert.ok(youtube.missing_direct_env[0].includes("YOUTUBE_ACCESS_TOKEN"));
+});
+
 test("dry-run validates and returns a publish plan without network access", async () => {
   const result = await dispatchSocialPost({
     provider: "tiktok",

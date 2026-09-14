@@ -1,9 +1,11 @@
-export const metadata = { title: "Merci — Le Hibou Rusé" };
+import Brand from "../../components/Brand";
+
+export const metadata = { title: "Merci" };
 
 export default function ThankYouPage() {
   return (
-    <main className="legal-page">
-      <a className="brand" href="/"><img src="/hibou.svg" alt="" />Le Hibou Rusé</a>
+    <main className="legal thank-you">
+      <Brand />
       <article>
         <p className="eyebrow dark"><span /> Commande confirmée</p>
         <h1>Merci pour votre confiance.</h1>

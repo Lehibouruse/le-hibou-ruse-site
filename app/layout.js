@@ -2,8 +2,18 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
-  title: "Le Hibou Rusé",
+  metadataBase: new URL("https://d4d5d6.com"),
+  title: { default: "Le Hibou Rusé", template: "%s — Le Hibou Rusé" },
   description: "Fiscalité, argent et patrimoine : comprendre les règles, exploiter les arbitrages et garder une longueur d’avance.",
+  openGraph: {
+    title: "Le Hibou Rusé",
+    description: "Des stratégies du D4 au D6, expliquées avec des chiffres et sans jargon.",
+    url: "/",
+    siteName: "Le Hibou Rusé",
+    locale: "fr_FR",
+    type: "website",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }) {

@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const LEASE_MS = 30 * 60 * 1000;
+const RESPONSE_PENDING = new Set(["queued", "in_progress"]);
+const MODEL_TIERS = new Set(["luna", "terra", "sol", "astra"]);
 const TABLE_ALIASES = {
   cms: TABLES.cms, benchmark: TABLES.benchmark, content: TABLES.content,
   articles: TABLES.articles, products: TABLES.products, montages: TABLES.montages,
@@ -25,6 +27,18 @@ function parameters(job) {
   try { return JSON.parse(job.fields?.parameters || "{}"); } catch { return {}; }
 }
 
+function reasoningForTier(tier) {
+  return tier === "luna" ? "low" : tier === "terra" ? "medium" : tier === "sol" ? "high" : "xhigh";
+}
+
+function allowedTier(requested, config, fallback) {
+  let tier = MODEL_TIERS.has(String(requested || "").toLowerCase()) ? String(requested).toLowerCase() : fallback;
+  if (tier === "astra" && !config.allowAstra) tier = config.allowSol ? "sol" : config.allowTerra ? "terra" : "luna";
+  if (tier === "sol" && !config.allowSol) tier = config.allowTerra ? "terra" : "luna";
+  if (tier === "terra" && !config.allowTerra) tier = "luna";
+  return tier;
+}
+
 async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
@@ -36,6 +50,16 @@ async function ownedJob(recordId, lockToken) {
   const job = await getRecord(TABLES.jobs, recordId);
   if (job.fields?.lock_token !== lockToken) throw new Error("Lease perdue");
   return job;
+}
+
+async function refreshLease(job) {
+  await updateRecord(TABLES.jobs, job.id, { lease_expires_at: new Date(Date.now() + LEASE_MS).toISOString() });
+}
+
+function openAiError(response, data, label = "OpenAI Responses API") {
+  const error = new Error(`${label}: ${response.status} ${data?.error?.code || "unknown"}`);
+  error.httpStatus = response.status;
+  return error;
 }
 
 async function claim() {
@@ -53,11 +77,12 @@ async function claim() {
   });
   const current = await getRecord(TABLES.jobs, candidate.id);
   if (current.fields?.lock_token !== lockToken) return { ok: true, claimed: false };
-  const route = routeJob(current, getAgentConfig());
+  const config = getAgentConfig();
+  const route = routeJob(current, config);
   return {
     ok: true, claimed: true, record_id: current.id, lock_token: lockToken,
     job: { id: current.id, fields: current.fields }, action: actionName(current),
-    model: getAgentConfig().models[route.tier], reasoning: route.reasoning,
+    tier: route.tier, model: config.models[route.tier], reasoning: route.reasoning,
   };
 }
 
@@ -68,17 +93,20 @@ async function openaiStep(body) {
   const config = getAgentConfig();
   if (!config.aiEnabled) throw new Error("IA désactivée par kill switch");
   const route = routeJob(job, config);
-  const model = config.models[route.tier];
+  const tier = allowedTier(body.model_tier, config, route.tier);
+  const model = config.models[tier];
+  const reasoning = reasoningForTier(tier);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model, reasoning: { effort: route.reasoning }, input: body.input,
+      model, reasoning: { effort: reasoning }, input: body.input,
       instructions: `${HIBOU_AGENT_INSTRUCTIONS}\n\n# EXECUTION BORNEE\n${workerInstructions(action)}`,
       tools: toolsForAction(action), tool_choice: "auto", parallel_tool_calls: true,
       include: ["reasoning.encrypted_content"],
-      max_output_tokens: Math.max(config.maxOutputTokens, action === "UPDATE_SITE" ? 5000 : 2000), store: false, prompt_cache_key: "hibou-agent-worker-v1",
-      metadata: { agent: HIBOU_AGENT_PROMPT_VERSION, job_id: String(job.fields.job_id).slice(0, 512), action },
+      max_output_tokens: Math.max(config.maxOutputTokens, action === "UPDATE_SITE" ? 5000 : 2000),
+      background: true, store: true, prompt_cache_key: "hibou-agent-worker-v1",
+      metadata: { agent: HIBOU_AGENT_PROMPT_VERSION, job_id: String(job.fields.job_id).slice(0, 512), action, tier },
       text: { verbosity: "low", format: { type: "json_schema", name: "hibou_worker_result", strict: true, schema: {
         type: "object", additionalProperties: false,
         properties: { status: { type: "string", enum: ["completed", "failed", "waiting_for_human"] }, result: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 } },
@@ -87,9 +115,28 @@ async function openaiStep(body) {
     }), cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`OpenAI Responses API: ${response.status} ${data?.error?.code || "unknown"}`);
-  await updateRecord(TABLES.jobs, job.id, { lease_expires_at: new Date(Date.now() + LEASE_MS).toISOString() });
-  return { ok: true, response: data, estimated_cost_usd: estimateCost(model, data.usage) || 0 };
+  if (!response.ok) throw openAiError(response, data);
+  await refreshLease(job);
+  return {
+    ok: true, response: data, pending: RESPONSE_PENDING.has(data.status),
+    estimated_cost_usd: estimateCost(model, data.usage) || 0, model, tier, reasoning,
+  };
+}
+
+async function openaiStepStatus(body) {
+  const job = await ownedJob(body.record_id, body.lock_token);
+  const responseId = String(body.response_id || "");
+  if (!/^resp_[A-Za-z0-9_-]+$/.test(responseId)) throw new Error("Response ID OpenAI invalide");
+  const response = await fetch(`https://api.openai.com/v1/responses/${encodeURIComponent(responseId)}`, {
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, cache: "no-store",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw openAiError(response, data, "OpenAI Responses retrieve");
+  await refreshLease(job);
+  return {
+    ok: true, response: data, pending: RESPONSE_PENDING.has(data.status),
+    estimated_cost_usd: estimateCost(data.model, data.usage) || 0,
+  };
 }
 
 async function serverTool(body) {
@@ -204,12 +251,15 @@ export async function POST(request) {
     const body = await request.json();
     const result = body.operation === "claim" ? await claim()
       : body.operation === "step" ? await openaiStep(body)
-        : body.operation === "tool" ? await serverTool(body)
-          : body.operation === "checkpoint" ? await checkpoint(body)
-          : body.operation === "finalize" ? await finalize(body)
-            : (() => { throw new Error("Opération inconnue"); })();
+        : body.operation === "step_status" ? await openaiStepStatus(body)
+          : body.operation === "tool" ? await serverTool(body)
+            : body.operation === "checkpoint" ? await checkpoint(body)
+              : body.operation === "finalize" ? await finalize(body)
+                : (() => { throw new Error("Opération inconnue"); })();
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 500) }, { status: 400 });
+    const upstream = Number(error?.httpStatus || 0);
+    const status = error?.message === "Unauthorized" ? 401 : upstream === 429 || upstream >= 500 ? 503 : 400;
+    return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 500) }, { status });
   }
 }

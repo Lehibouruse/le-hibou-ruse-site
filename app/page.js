@@ -21,7 +21,9 @@ export default async function Home() {
   const logoUrl = logo["Image URL"] || product["Image URL"] || "/hibou.svg";
   const checkoutUrl = config.checkout_url || product["Stripe URL"] || "";
   const ctaText = config.ebook_cta || product["CTA texte"] || "Découvrir le guide — 29 €";
-  const articles = articleRecords.filter((record) => record.fields.Publié).sort((a, b) => Number(Boolean(b.fields["À la une"])) - Number(Boolean(a.fields["À la une"]))).slice(0, 6);
+  const articles = articleRecords
+    .filter((record) => record.fields.Publié && record.fields["À la une"])
+    .slice(0, 6);
 
   return (
     <>
@@ -40,7 +42,7 @@ export default async function Home() {
           <p className="hero-reassurance">Cas concrets · exemples chiffrés · risques explicités</p>
         </div><aside className="hero-card" aria-label="La méthode du Hibou"><img src={logoUrl} alt="Emblème du Hibou Rusé" /><p className="hero-card-title">Trois niveaux de montage. Jusqu’où peut-on pousser l’optimisation ?</p><div className="level-line"><strong>D4</strong><span>Solide et documenté</span></div><div className="level-line"><strong>D5</strong><span>Agressif mais argumentable</span></div><div className="level-line"><strong>D6</strong><span>Limite (borderline selon interprétation)</span></div></aside></div></section>
 
-        <section className="ebook" id="ebook"><div><div className="eyebrow"><span /> Le guide du Hibou Rusé</div><h2>{ebook.Titre || product.Produit || "Le guide du Hibou Rusé — 29 €"}</h2><p className="ebook-intro">{ebook["Sous-titre"] || ebook.Contenu || product.Description}</p>
+        <section className="ebook" id="ebook"><div><div className="eyebrow"><span /> Guide pratique</div><h2>{ebook.Titre || product.Produit || "Le guide du Hibou Rusé"}</h2><p className="ebook-intro">{ebook["Sous-titre"] || ebook.Contenu || product.Description}</p>
           <ul className="ebook-benefits ebook-benefits-main">
             <li><strong>Ramener légalement l’imposition à zéro</strong> dans certaines configurations.</li>
             <li><strong>Bâtir un business rentable autour d’aides et de subventions publiques</strong>, sans confondre financement public et revenu personnel.</li>
@@ -49,8 +51,8 @@ export default async function Home() {
             <li><strong>Combiner fiscalité, crédit, structures et patrimoine</strong> plutôt que raisonner dispositif par dispositif.</li>
           </ul>
           <div className="not-basic"><strong>Vous n’apprendrez pas ici les montages que l’on retrouve partout.</strong><span>PEA · assurance-vie · PER · Girardin · 150-0 B ter · LMNP · SCPI…</span></div>
-          <p className="ebook-goal"><strong>L’objectif :</strong> des montages plus élaborés, plus originaux et parfois plus gris — toujours avec leurs conditions, leurs limites et leur niveau de risque D4, D5 ou D6.</p>
-          <div className="price">{config.ebook_price || product["Prix €"] || 29} € <small>paiement unique</small></div>{checkoutUrl ? <><TrackedLink event="checkout_opened" className="button" href={checkoutUrl} target="_blank" rel="noopener noreferrer">{ctaText}</TrackedLink><p className="checkout-note">Paiement sécurisé chez notre prestataire · accès envoyé par e-mail</p></> : <button className="button disabled" disabled>{ctaText} · bientôt disponible</button>}
+          <p className="ebook-goal"><strong>L’objectif :</strong> des montages plus élaborés, plus originaux et parfois plus gris. Toujours avec leurs conditions, leurs limites et leur niveau de risque D4, D5 ou D6.</p>
+          <div className="price"><span className="price-amount">{config.ebook_price || product["Prix €"] || 29}&nbsp;€</span> <small>paiement unique</small></div>{checkoutUrl ? <><TrackedLink event="checkout_opened" className="button" href={checkoutUrl} target="_blank" rel="noopener noreferrer">{ctaText}</TrackedLink><p className="checkout-note">Paiement sécurisé chez notre prestataire · accès envoyé par e-mail</p></> : <button className="button disabled" disabled>{ctaText} · bientôt disponible</button>}
         </div><div className="book-mark" aria-label="Couverture du guide"><img src={logoUrl} alt="" /><span>LE GUIDE DU</span><strong>HIBOU<br />RUSÉ</strong><small>COMPRENDRE · EXPLOITER · ARBITRER</small></div></section>
 
         <section className="method" id="methode"><div className="method-inner"><div><div className="eyebrow"><span /> D4 → D6</div><h2>{method.Titre || "Jusqu’où peut-on optimiser ?"}</h2><p className="method-intro">{method["Sous-titre"] || "Trois niveaux de montage. Trois niveaux d’audace."}</p></div><div className="levels"><article><b>D4</b><div><h3>Solide et documenté</h3><p>Montage légal, propre et difficile à contester lorsque les conditions sont réellement remplies.</p></div></article><article><b>D5</b><div><h3>Agressif mais argumentable</h3><p>On pousse les textes, exceptions et interactions plus loin. Le montage reste défendable, mais exige une documentation sérieuse.</p></div></article><article><b>D6</b><div><h3>Limite (borderline selon interprétation)</h3><p>Optimisation très agressive : le montage peut tenir ou tomber selon les faits, la rédaction et l’interprétation retenue.</p></div></article></div></div></section>

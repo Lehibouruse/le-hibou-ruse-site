@@ -1,6 +1,7 @@
 import "./globals.css";
 import "./revamp.css";
 import "./polish.css";
+import "./micro-polish.css";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {

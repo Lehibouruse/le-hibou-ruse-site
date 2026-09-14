@@ -37,7 +37,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: hibou-agent-wake
+  # A long business Job must never prevent an infrastructure push self-test.
+  # Leases in Airtable still prevent two workers from owning the same Job.
+  group: hibou-agent-wake-${{ github.event_name == 'push' && 'self-test' || 'scheduler' }}
   cancel-in-progress: false
 
 jobs:

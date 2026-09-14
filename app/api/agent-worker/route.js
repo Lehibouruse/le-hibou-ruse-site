@@ -39,6 +39,10 @@ function allowedTier(requested, config, fallback) {
   return tier;
 }
 
+function responseCost(model, usage) {
+  return usage ? (estimateCost(model, usage) || 0) : 0;
+}
+
 async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
@@ -119,7 +123,7 @@ async function openaiStep(body) {
   await refreshLease(job);
   return {
     ok: true, response: data, pending: RESPONSE_PENDING.has(data.status),
-    estimated_cost_usd: estimateCost(model, data.usage) || 0, model, tier, reasoning,
+    estimated_cost_usd: responseCost(model, data.usage), model, tier, reasoning,
   };
 }
 
@@ -135,7 +139,7 @@ async function openaiStepStatus(body) {
   await refreshLease(job);
   return {
     ok: true, response: data, pending: RESPONSE_PENDING.has(data.status),
-    estimated_cost_usd: estimateCost(data.model, data.usage) || 0,
+    estimated_cost_usd: responseCost(data.model, data.usage),
   };
 }
 

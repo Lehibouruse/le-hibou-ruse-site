@@ -1,0 +1,35 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { dispatchSocialPost, socialGatewayStatus } from "../lib/social-gateway.mjs";
+
+test("social gateway reports configured webhook without exposing secrets", () => {
+  const env = {
+    HIBOU_SOCIAL_YOUTUBE_WEBHOOK_URL: "https://example.com/youtube",
+    HIBOU_SOCIAL_WEBHOOK_SECRET: "super-secret",
+  };
+  const status = socialGatewayStatus(env);
+  const youtube = status.find((item) => item.provider === "youtube");
+  assert.equal(youtube.configured, true);
+  assert.equal(youtube.mode, "webhook");
+  assert.equal(JSON.stringify(status).includes("super-secret"), false);
+});
+
+test("dry-run validates and returns a publish plan without network access", async () => {
+  const result = await dispatchSocialPost({
+    provider: "tiktok",
+    media_url: "https://example.com/video.mp4",
+    caption: "Test Hibou",
+    dry_run: true,
+  }, {});
+  assert.equal(result.ok, true);
+  assert.equal(result.dry_run, true);
+  assert.equal(result.provider, "tiktok");
+  assert.equal(result.payload.media_url, "https://example.com/video.mp4");
+});
+
+test("social gateway refuses non-HTTPS media URLs", async () => {
+  await assert.rejects(
+    dispatchSocialPost({ provider: "youtube", media_url: "http://example.com/video.mp4", dry_run: true }, {}),
+    /HTTPS/,
+  );
+});

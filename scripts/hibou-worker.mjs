@@ -250,7 +250,7 @@ async function executeTool(call, state) {
       const logoInput = music ? 3 : 2;
       const escapedSrt = srtPath.replaceAll("\\", "/").replace(":", "\\:").replaceAll("'", "\\'");
       const audio = music ? "[1:a]volume=1[a1];[2:a]volume=0.15[a2];[a1][a2]amix=inputs=2:duration=first[a]" : "[1:a]anull[a]";
-      run("ffmpeg", ["-y", ...inputs, "-filter_complex", `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles='${escapedSrt}':force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=170'[base];[${logoInput}:v]format=rgba,colorchannelmixer=aa=0.92[logo];[base][logo]overlay=W-w-48:48[v];${audio}`, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-c:a", "aac", "-b:a", "160k", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output.full]);
+      run("ffmpeg", ["-y", ...inputs, "-filter_complex", `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles='${escapedSrt}':force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=170'[base];[${logoInput}:v]format=rgba,colorchannelmixer=aa=0.92[logo];[base][logo]overlay=W-w-48:48:shortest=1:eof_action=pass[v];${audio}`, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output.full]);
       testsPassed = false; buildPassed = false; videoQcPassed = false;
       return { ok: true, path: output.normalized, bytes: readFileSync(output.full).byteLength, publication: false };
     }

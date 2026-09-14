@@ -26,18 +26,15 @@ export default function LeadForm() {
   return (
     <form className="lead-form" onSubmit={submit} aria-busy={state === "sending"}>
       <div className="form-row">
-        <label>Nom ou prénom<input name="contact" required maxLength={120} autoComplete="name" /></label>
+        <label>Nom ou prénom <span className="optional">(facultatif)</span><input name="contact" maxLength={120} autoComplete="name" /></label>
         <label>E-mail<input name="email" type="email" required maxLength={160} autoComplete="email" /></label>
       </div>
-      <label>Votre situation<textarea name="context" required maxLength={2500} rows={4} placeholder="Les éléments utiles pour comprendre votre contexte" /></label>
-      <div className="form-row">
-        <label>Votre besoin<textarea name="need" required maxLength={1500} rows={3} /></label>
-        <label>Votre objectif<textarea name="goal" required maxLength={1500} rows={3} /></label>
-      </div>
+      <label>Votre situation<textarea name="context" required maxLength={3500} rows={6} placeholder="Revenus, société, patrimoine, dettes, projets, contraintes… Donnez les éléments utiles." /></label>
+      <label>Votre besoin et vos objectifs<textarea name="need" required maxLength={2500} rows={5} placeholder="Ce que vous cherchez à comprendre, optimiser ou structurer — et le résultat que vous visez." /></label>
       <label className="honeypot" aria-hidden="true">Société<input name="company" tabIndex={-1} autoComplete="off" /></label>
       <div className="form-footer">
-        <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Décrire mon projet"}</button>
-        <p role="status" aria-live="polite">{state === "sent" && "Demande reçue. Elle va être étudiée."}{state === "error" && "L’envoi a échoué. Réessayez dans quelques instants."}</p>
+        <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Présenter ma situation"}</button>
+        <p role="status" aria-live="polite">{state === "sent" && "Demande reçue. Le Hibou va l’étudier."}{state === "error" && "L’envoi a échoué. Réessayez dans quelques instants."}</p>
       </div>
       <p className="form-privacy">En envoyant ce formulaire, vous acceptez que ces informations soient utilisées pour étudier votre demande. <a href="/confidentialite">Confidentialité</a></p>
     </form>

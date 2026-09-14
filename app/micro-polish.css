@@ -1,0 +1,12 @@
+/* Micro-polish from live review */
+.nav{height:84px}
+.brand-mark{width:54px;height:54px;padding:4px;border-radius:18px;background:#fff;overflow:visible}
+.brand-mark img{width:100%;height:100%;object-fit:contain;border-radius:14px}
+.brand-copy strong{font-size:17px}.brand-copy em{font-size:21px}
+.hero-card>img{width:118px;height:118px;padding:6px;object-fit:contain;border-radius:22px;background:#fff;border:2px solid rgba(217,169,78,.65);box-shadow:0 12px 30px rgba(0,0,0,.24)}
+.ebook{margin:42px auto 100px}
+.price{display:flex;align-items:baseline;gap:8px;flex-wrap:nowrap}
+.price-amount{display:inline-block;white-space:nowrap}
+.book-mark img{width:84px;height:84px;padding:5px;object-fit:contain;border-radius:18px;background:#fff;border:1px solid rgba(16,43,35,.18)}
+@media(max-width:980px){.ebook{margin-top:34px}}
+@media(max-width:850px){.nav{height:72px}.brand-mark{width:46px;height:46px;border-radius:15px}.brand-mark img{border-radius:11px}.hero-card>img{width:104px;height:104px}.ebook{margin:22px 14px 78px}}

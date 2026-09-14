@@ -47,10 +47,9 @@ jobs:
           ffmpeg -version | head -1
           ffprobe -version | head -1
           rsvg-convert --version
-      - name: Verify wake authentication without consuming a Job
-        if: ${{ github.event_name == 'schedule' || inputs.dry_run }}
+      - name: Wake scheduler and verify authentication
         env:
-          DRY_RUN: true
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
         shell: bash
         run: |
           set -euo pipefail

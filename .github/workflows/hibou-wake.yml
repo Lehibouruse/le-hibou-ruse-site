@@ -1,5 +1,6 @@
 name: Hibou Agent Wake
 
+# Changes to this workflow self-test the wake path on main.
 on:
   schedule:
     - cron: "*/5 * * * *"

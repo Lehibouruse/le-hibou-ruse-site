@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES } from "../../../lib/airtable";
+import { isAgenticAction } from "../../../lib/agent-capabilities.mjs";
 import { githubOidcAudience, verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 
@@ -15,12 +16,39 @@ function baseUrl(request) {
   return configured ? new URL(configured).origin : new URL(request.url).origin;
 }
 
-async function eligibleJobsCount() {
+function actionName(job) {
+  return job?.fields?.action?.name || job?.fields?.action || "UNKNOWN";
+}
+
+function parameters(job) {
+  try { return JSON.parse(job?.fields?.parameters || "{}"); } catch { return {}; }
+}
+
+async function firstEligibleJob() {
   const records = await queryRecords(TABLES.jobs, {
     filterByFormula: eligibleJobsFormula(process.env, { includeReserved: true }),
+    sortField: "created_at",
     pageSize: MAX_BATCH,
   });
-  return records.length;
+  return records[0] || null;
+}
+
+async function runDeterministicOrchestrator(request, cronSecret) {
+  const response = await fetch(`${baseUrl(request)}${ORCHESTRATOR_PATH}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${cronSecret}` },
+    cache: "no-store",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return NextResponse.json({
+      ok: false,
+      delegated: "orchestrator",
+      status: response.status,
+      error: data?.error || data?.status || "Orchestrator failed",
+    }, { status: response.status >= 500 ? 503 : response.status });
+  }
+  return NextResponse.json({ ok: true, delegated: "orchestrator", ...data });
 }
 
 export async function POST(request) {
@@ -30,16 +58,33 @@ export async function POST(request) {
     await verifyGithubActionsToken(auth.slice("Bearer ".length));
 
     const dryRun = request.headers.get("x-hibou-dry-run") === "true";
-
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) return NextResponse.json({ ok: false, error: "CRON_SECRET absent" }, { status: 503 });
 
-    const count = await eligibleJobsCount();
-    if (dryRun || !count) {
-      return NextResponse.json({ ok: true, dry_run: dryRun, eligible: count, processed: 0, audience: githubOidcAudience() });
+    const candidate = await firstEligibleJob();
+    if (dryRun || !candidate) {
+      return NextResponse.json({
+        ok: true,
+        dry_run: dryRun,
+        eligible: candidate ? 1 : 0,
+        processed: 0,
+        audience: githubOidcAudience(),
+      });
     }
 
-    return NextResponse.json({ ok: true, dry_run: false, eligible: count, processed: 0, reason: "github_worker_required" });
+    const action = actionName(candidate);
+    if (!isAgenticAction(action, parameters(candidate))) {
+      return runDeterministicOrchestrator(request, cronSecret);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      dry_run: false,
+      eligible: 1,
+      processed: 0,
+      reason: "github_worker_required",
+      action,
+    });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 500) }, { status: 401 });
   }

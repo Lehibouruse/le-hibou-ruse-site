@@ -1,6 +1,6 @@
 name: Hibou Agent Wake
 
-# Changes to this workflow self-test the wake path on main.
+# Core infrastructure changes self-test the wake path on main.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -9,6 +9,19 @@ on:
       - main
     paths:
       - ".github/workflows/hibou-wake.yml"
+      - "scripts/hibou-worker.mjs"
+      - "app/api/wake/**"
+      - "app/api/agent-worker/**"
+      - "app/api/orchestrator/**"
+      - "app/api/social/**"
+      - "lib/airtable.js"
+      - "lib/agent-capabilities.mjs"
+      - "lib/agent-runtime.mjs"
+      - "lib/github-oidc.mjs"
+      - "lib/hibou-agent.mjs"
+      - "lib/job-eligibility.mjs"
+      - "lib/social-gateway.mjs"
+      - "lib/social-runtime.mjs"
   workflow_dispatch:
     inputs:
       dry_run:

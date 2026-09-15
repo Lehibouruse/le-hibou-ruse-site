@@ -19,6 +19,55 @@ test("joint une vente à la performance avec provider + content_record_id", () =
   assert.equal(row.purchases_per_1000_views, 0.2);
   assert.equal(row.revenue_per_1000_views, 5.8);
   assert.equal(row.engagement_rate, 0.063);
+  assert.equal(row.engagement_rate_reach, 0);
+});
+
+test("utilise Total Interactions natif et Reach lorsqu'ils sont disponibles", () => {
+  const [row] = contentEfficiencySummary([], [
+    { fields: {
+      Provider: "instagram",
+      "Content Record ID": "recIg",
+      "External ID": "ig1",
+      Views: 1000,
+      Reach: 800,
+      Likes: 80,
+      Comments: 10,
+      Shares: 5,
+      Saves: 5,
+      "Total Interactions": 120,
+    } },
+  ]);
+  assert.equal(row.engagements, 120);
+  assert.equal(row.reach, 800);
+  assert.equal(row.engagement_rate, 0.12);
+  assert.equal(row.engagement_rate_reach, 0.15);
+});
+
+test("Total Interactions à zéro est respecté comme métrique native au lieu de retomber sur la somme", () => {
+  const [row] = contentEfficiencySummary([], [
+    { fields: {
+      Provider: "instagram",
+      "Content Record ID": "recZero",
+      Views: 100,
+      Likes: 10,
+      Comments: 2,
+      "Total Interactions": 0,
+    } },
+  ]);
+  assert.equal(row.engagements, 0);
+  assert.equal(row.engagement_rate, 0);
+});
+
+test("mélange proprement lignes avec interactions natives et fallback calculé", () => {
+  const [row] = contentEfficiencySummary([], [
+    { fields: { Provider: "instagram", "Content Record ID": "recMulti", Views: 100, Reach: 80, Likes: 4, "Total Interactions": 10 } },
+    { fields: { Provider: "instagram", "Content Record ID": "recMulti", Views: 200, Reach: 150, Likes: 6, Comments: 2, Shares: 1, Saves: 1 } },
+  ]);
+  assert.equal(row.views, 300);
+  assert.equal(row.reach, 230);
+  assert.equal(row.engagements, 20);
+  assert.equal(row.engagement_rate, 0.0667);
+  assert.equal(row.engagement_rate_reach, 0.087);
 });
 
 test("un remboursement réduit le revenu net sans supprimer l'achat historique", () => {
@@ -47,14 +96,18 @@ test("le même contenu sur deux réseaux reste séparé", () => {
   assert.equal(rows.find((row) => row.provider === "tiktok").revenue_per_1000_views, 2.9);
 });
 
-test("agrège les créations par provider sans perdre les ratios", () => {
+test("agrège les créations par provider sans perdre les ratios vues et reach", () => {
   const providerRows = providerEfficiencySummary([
-    { provider: "tiktok", views: 1000, engagements: 100, purchases: 1, refunds: 0, net_revenue: 29 },
-    { provider: "tiktok", views: 3000, engagements: 200, purchases: 2, refunds: 0, net_revenue: 58 },
+    { provider: "tiktok", views: 1000, reach: 800, engagements: 100, purchases: 1, refunds: 0, net_revenue: 29 },
+    { provider: "tiktok", views: 3000, reach: 2200, engagements: 200, purchases: 2, refunds: 0, net_revenue: 58 },
   ]);
   assert.equal(providerRows[0].views, 4000);
+  assert.equal(providerRows[0].reach, 3000);
   assert.equal(providerRows[0].purchases, 3);
   assert.equal(providerRows[0].net_revenue, 87);
   assert.equal(providerRows[0].purchases_per_1000_views, 0.75);
   assert.equal(providerRows[0].revenue_per_1000_views, 21.75);
+  assert.equal(providerRows[0].engagement_rate, 0.075);
+  assert.equal(providerRows[0].engagement_rate_reach, 0.1);
+  assert.equal(providerRows[0].purchase_rate_reach, 0.001);
 });

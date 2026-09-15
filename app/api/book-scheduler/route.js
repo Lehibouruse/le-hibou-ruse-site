@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const LEASE_MS = 5 * 60 * 1000;
-const MAX_SOURCE_RECORDS = 24;
+// Real production runs showed 10- and 20-montage outputs can be truncated at the
+// response token limit. Five is the largest batch size we accept in production.
+const MAX_SOURCE_RECORDS = 5;
 const MAX_EXISTING_CHARS = 90000;
 
 function parameters(job) {
@@ -65,7 +67,7 @@ async function finish(job, status, result, telemetry = {}, error = "") {
   if (Number.isFinite(Number(telemetry.output_tokens))) fields.output_tokens = Number(telemetry.output_tokens || 0);
   await updateRecord(TABLES.jobs, job.id, fields);
   await createRecord(TABLES.journal, {
-    Workflow: "HIBOU_BOOK_SCHEDULER_V2",
+    Workflow: "HIBOU_BOOK_SCHEDULER_V3",
     Déclencheur: job.fields?.requested_by || "Jobs",
     Action: `CREATE_BOOK · ${job.fields?.job_id || job.id} · ${status}`,
     "Dernière exécution": new Date().toISOString(),
@@ -123,6 +125,19 @@ function usageCost(model, usage = {}) {
   return ((input - cached) * p.input + cached * p.cached + output * p.output) / 1_000_000;
 }
 
+export function outputBudget(sourceCount, requested) {
+  const count = Number(sourceCount || 0);
+  const floor = count >= 5 ? 6000 : count >= 3 ? 5000 : 3500;
+  return Math.min(10000, Math.max(floor, Number(requested || floor)));
+}
+
+function chapterExpectedMontages(chapter) {
+  const start = Number(chapter?.fields?.["Source début"]);
+  const end = Number(chapter?.fields?.["Source fin"]);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) return 0;
+  return end - start + 1;
+}
+
 async function generatePart({ chapter, source, params }) {
   const model = ["gpt-5.6-sol", "gpt-5.6-terra"].includes(params.model) ? params.model : "gpt-5.6-sol";
   const instructions = bookInstructions({ part: params.part || "1" });
@@ -133,7 +148,7 @@ async function generatePart({ chapter, source, params }) {
     notes_editoriales: chapter.fields?.Notes || "",
     partie: String(params.part || "1"),
     plage_sources: `${params.source_start}-${params.source_end}`,
-    objectif_mots_partie: Number(params.target_words || 3500),
+    objectif_mots_partie: Number(params.target_words || 2250),
     montages: safeSource(source),
   });
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -144,7 +159,7 @@ async function generatePart({ chapter, source, params }) {
       reasoning: { effort: model === "gpt-5.6-sol" ? "high" : "medium" },
       instructions,
       input,
-      max_output_tokens: Math.min(10000, Math.max(2500, Number(params.max_output_tokens || 7000))),
+      max_output_tokens: outputBudget(source.length, params.max_output_tokens),
       store: false,
       prompt_cache_key: "hibou-book-editorial-v2",
       text: { verbosity: "medium" },
@@ -224,24 +239,21 @@ export async function GET(request) {
     }
 
     const generated = await generatePart({ chapter, source, params });
-    const qc = bookQualityGate(generated.text, {
+    const partQc = bookQualityGate(generated.text, {
       expectedMontages,
       firstPart: String(params.part || "1") === "1",
     });
 
-    if (!qc.pass) {
+    if (!partQc.pass) {
       await updateRecord(TABLES.book, bookRecordId, {
-        "Montages couverts": qc.montageCount,
-        Caractères: qc.characters,
-        "Marqueurs À VÉRIFIER": qc.verifyMarkers,
         "QC éditorial": "fail",
-        "Notes QC": qc.notes,
+        "Notes QC": partQc.notes,
         "Prêt export": false,
         "Validation humaine": false,
       });
-      const result = `${BOOK_EDITORIAL_VERSION}: génération ${start}-${end} refusée par le quality gate; ancienne version conservée.\n${qc.notes}`;
-      await finish(claimedJob, "Manual Review", result, generated.telemetry, qc.notes);
-      return NextResponse.json({ ok: false, processed: 1, status: "manual_review", editorial_version: BOOK_EDITORIAL_VERSION, qc }, { status: 422 });
+      const result = `${BOOK_EDITORIAL_VERSION}: génération ${start}-${end} refusée par le quality gate; ancienne version conservée.\n${partQc.notes}`;
+      await finish(claimedJob, "Manual Review", result, generated.telemetry, partQc.notes);
+      return NextResponse.json({ ok: false, processed: 1, status: "manual_review", editorial_version: BOOK_EDITORIAL_VERSION, qc: partQc }, { status: 422 });
     }
 
     const previous = String(chapter.fields?.["Contenu V1"] || "");
@@ -254,23 +266,50 @@ export async function GET(request) {
       throw error;
     }
 
+    const expectedChapterMontages = chapterExpectedMontages(chapter);
+    const progress = bookQualityGate(next, { expectedMontages: 0, firstPart: false });
+    const chapterComplete = expectedChapterMontages > 0 && progress.montageCount === expectedChapterMontages;
+    let chapterQc = null;
+    if (chapterComplete) {
+      chapterQc = bookQualityGate(next, { expectedMontages: expectedChapterMontages, firstPart: true });
+      if (!chapterQc.pass) {
+        await updateRecord(TABLES.book, bookRecordId, {
+          "Montages couverts": progress.montageCount,
+          Caractères: next.length,
+          "Marqueurs À VÉRIFIER": progress.verifyMarkers,
+          "QC éditorial": "fail",
+          "Notes QC": `QC global du chapitre refusé avant écriture finale.\n${chapterQc.notes}`,
+          "Prêt export": false,
+          "Validation humaine": false,
+        });
+        const result = `${BOOK_EDITORIAL_VERSION}: lot ${start}-${end} valide mais assemblage final ${progress.montageCount}/${expectedChapterMontages} refusé; version partielle précédente conservée.\n${chapterQc.notes}`;
+        await finish(claimedJob, "Manual Review", result, generated.telemetry, chapterQc.notes);
+        return NextResponse.json({ ok: false, processed: 1, status: "manual_review", editorial_version: BOOK_EDITORIAL_VERSION, part_qc: partQc, chapter_qc: chapterQc }, { status: 422 });
+      }
+    }
+
+    const qcStatus = chapterComplete ? (chapterQc.warnings.length ? "review" : "pass") : "in_progress";
+    const qcNotes = chapterComplete
+      ? chapterQc.notes
+      : `PROGRESS: ${progress.montageCount}/${expectedChapterMontages || "?"} montages assemblés. Dernier lot: ${partQc.notes}`;
+
     await updateRecord(TABLES.book, bookRecordId, {
       "Contenu V1": next,
       Version: "V2-draft",
       "Dernière génération": new Date().toISOString(),
       "Validation humaine": false,
       Statut: "Brouillon",
-      "Montages couverts": qc.montageCount,
+      "Montages couverts": progress.montageCount,
       Caractères: next.length,
-      "Marqueurs À VÉRIFIER": qc.verifyMarkers,
-      "QC éditorial": qc.warnings.length ? "review" : "pass",
-      "Notes QC": qc.notes,
+      "Marqueurs À VÉRIFIER": progress.verifyMarkers,
+      "QC éditorial": qcStatus,
+      "Notes QC": qcNotes,
       "Prêt export": false,
     });
     const mode = params.replace_existing === true ? "remplacée" : "ajoutée";
-    const summary = `${BOOK_EDITORIAL_VERSION}: partie ${start}-${end} ${mode}; QC=${qc.warnings.length ? "review" : "pass"}; ${source.length} montages; ${generated.text.length} caractères.`;
+    const summary = `${BOOK_EDITORIAL_VERSION}: partie ${start}-${end} ${mode}; lot QC=${partQc.warnings.length ? "review" : "pass"}; chapitre=${progress.montageCount}/${expectedChapterMontages || "?"} (${qcStatus}); ${generated.text.length} caractères.`;
     await finish(claimedJob, "Completed", summary, generated.telemetry, "");
-    return NextResponse.json({ ok: true, processed: 1, status: "completed", editorial_version: BOOK_EDITORIAL_VERSION, chapter: bookRecordId, range: [start, end], replace_existing: params.replace_existing === true, characters: generated.text.length, qc });
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", editorial_version: BOOK_EDITORIAL_VERSION, chapter: bookRecordId, range: [start, end], replace_existing: params.replace_existing === true, characters: generated.text.length, part_qc: partQc, chapter_qc: chapterQc, chapter_progress: [progress.montageCount, expectedChapterMontages] });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 5000);
     const retryable = error?.retryable !== false;

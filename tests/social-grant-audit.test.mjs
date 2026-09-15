@@ -38,15 +38,23 @@ test("un OAuth connecté mais incomplet ne peut pas être présenté comme autor
   assert.deepEqual(meta.missing_publish_scopes.sort(), ["instagram_content_publish", "pages_manage_posts"].sort());
 });
 
-test("YouTube accepte le couple least-privilege upload + readonly", () => {
-  const audit = auditSocialGrants(ready, [{
+test("YouTube distingue publication least-privilege et Analytics complète", () => {
+  const partial = auditSocialGrants(ready, [{
     provider: "youtube",
     status: "Connected",
     scopes: "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly",
-  }]);
-  const youtube = audit.find((item) => item.provider === "youtube");
-  assert.equal(youtube.authorization_ready, true);
-  assert.equal(youtube.fully_ready, true);
+  }]).find((item) => item.provider === "youtube");
+  assert.equal(partial.authorization_ready, true);
+  assert.equal(partial.fully_ready, false);
+  assert.deepEqual(partial.missing_analytics_scopes, ["https://www.googleapis.com/auth/yt-analytics.readonly"]);
+
+  const complete = auditSocialGrants(ready, [{
+    provider: "youtube",
+    status: "Connected",
+    scopes: "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
+  }]).find((item) => item.provider === "youtube");
+  assert.equal(complete.authorization_ready, true);
+  assert.equal(complete.fully_ready, true);
 });
 
 test("Snapchat reste explicitement manuel tant que l'accès produit Snap n'est pas accordé", () => {

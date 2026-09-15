@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
-import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway.mjs";
+import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway-enhanced.mjs";
 import { dispatchSocialWebhookFallback, safeDirectFallbackError } from "../../../lib/social-fallback.mjs";
 import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
 import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";

@@ -5,8 +5,10 @@ import "./micro-polish.css";
 import { Analytics } from "@vercel/analytics/next";
 import AttributionCapture from "../components/AttributionCapture";
 
+const PUBLIC_SITE_URL = "https://le-hibou-ruse-site.vercel.app";
+
 export const metadata = {
-  metadataBase: new URL("https://d4d5d6.com"),
+  metadataBase: new URL(PUBLIC_SITE_URL),
   alternates: { canonical: "/" },
   title: { default: "Le Hibou Rusé", template: "%s — Le Hibou Rusé" },
   description: "Comprendre les règles. Exploiter les failles. Fiscalité, argent, patrimoine et montages D4 à D6 avec cas concrets, chiffres et risques explicités.",

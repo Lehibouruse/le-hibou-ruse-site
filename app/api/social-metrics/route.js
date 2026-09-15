@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createRecord, getAllRecords, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { escapeFormula } from "../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
-import { contentMetricTargets, fetchSocialMetrics, performanceKey, selectMetricTargets } from "../../../lib/social-metrics.mjs";
+import { contentMetricTargets, fetchSocialMetrics, performanceKey, selectMetricTargets } from "../../../lib/social-metrics-enhanced.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

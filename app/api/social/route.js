@@ -5,6 +5,7 @@ import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gat
 import { dispatchSocialWebhookFallback, safeDirectFallbackError } from "../../../lib/social-fallback.mjs";
 import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
 import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
+import { fetchTikTokPublishStatus, pollTikTokPublishStatus } from "../../../lib/tiktok-publish-status.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,27 @@ async function updateDispatchIntent(intent, fields) {
   });
 }
 
+async function tiktokPublicationStatus(body, env) {
+  const publishId = String(body.publish_id || body.external_id || "").trim();
+  if (!publishId) return NextResponse.json({ ok: false, error: "publish_id TikTok requis" }, { status: 400 });
+  const resolved = await resolveSocialEnv("tiktok", env);
+  const token = String(resolved.env?.TIKTOK_ACCESS_TOKEN || "").trim();
+  if (!token) return NextResponse.json({ ok: false, error: "TikTok OAuth direct non connecté" }, { status: 409 });
+  const shouldWait = body.wait === true;
+  const status = shouldWait
+    ? await pollTikTokPublishStatus(publishId, token, {
+      attempts: Math.max(1, Math.min(15, Number(body.attempts || 8))),
+      intervalMs: Math.max(500, Math.min(5000, Number(body.interval_ms || 2000))),
+    })
+    : await fetchTikTokPublishStatus(publishId, token);
+  return NextResponse.json({
+    ok: true,
+    provider: "tiktok",
+    credential_source: resolved.source,
+    ...status,
+  }, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function POST(request) {
   let intent = null;
   try {
@@ -95,8 +117,16 @@ export async function POST(request) {
       });
     }
 
+    if (body.operation === "publication_status") {
+      const provider = String(body.provider || "").trim().toLowerCase();
+      if (provider !== "tiktok") {
+        return NextResponse.json({ ok: false, error: "publication_status est actuellement implémenté pour TikTok" }, { status: 400 });
+      }
+      return tiktokPublicationStatus(body, env);
+    }
+
     if (body.operation !== "dispatch") {
-      return NextResponse.json({ ok: false, error: "operation doit être status ou dispatch" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "operation doit être status, publication_status ou dispatch" }, { status: 400 });
     }
     if (!policy.gateway_enabled) {
       return NextResponse.json({ ok: false, error: "Passerelle sociale désactivée par kill switch" }, { status: 423 });

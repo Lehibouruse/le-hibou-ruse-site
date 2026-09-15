@@ -1,0 +1,49 @@
+name: Hibou Social Control Plane Sync
+
+on:
+  schedule:
+    - cron: "43 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  HIBOU_BASE_URL: ${{ vars.HIBOU_PUBLIC_BASE_URL || 'https://le-hibou-ruse-site.vercel.app' }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sync authorization state to Airtable
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
+          token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
+          echo "::add-mask::$token"
+
+          response_file=$(mktemp)
+          http_code=$(curl --silent --show-error \
+            -o "$response_file" -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            --data '{"action":"sync_airtable"}' \
+            "${HIBOU_BASE_URL}/api/social/control-plane")
+          response=$(cat "$response_file")
+          rm -f "$response_file"
+          echo "$response"
+
+          if [ "$http_code" = "404" ]; then
+            echo "Control plane not deployed yet; next schedule will retry."
+            exit 0
+          fi
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Social control plane sync failed: HTTP $http_code" >&2
+            exit 1
+          fi
+
+          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; s=d.get("summary",{}); print("oauth_ready=%s external_blockers=%s metricool=%s" % (s.get("ready_for_human_approval"), s.get("exact_external_blockers"), s.get("metricool_verified")))' <<< "$response"

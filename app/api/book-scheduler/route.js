@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { BOOK_EDITORIAL_VERSION, bookInstructions } from "../../../lib/book-editorial.mjs";
+import { bookQualityGate } from "../../../lib/book-quality.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 
 export const runtime = "nodejs";
@@ -202,7 +203,8 @@ export async function GET(request) {
     const bookRecordId = String(params.book_record_id || "");
     const start = Number(params.source_start);
     const end = Number(params.source_end);
-    if (!/^rec[A-Za-z0-9]{14}$/.test(bookRecordId) || !Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start || end - start + 1 > MAX_SOURCE_RECORDS) {
+    const expectedMontages = end - start + 1;
+    if (!/^rec[A-Za-z0-9]{14}$/.test(bookRecordId) || !Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start || expectedMontages > MAX_SOURCE_RECORDS) {
       const message = `CREATE_BOOK invalide: book_record_id rec..., source_start/end requis, maximum ${MAX_SOURCE_RECORDS} montages par Job`;
       await finish(claimedJob, "Manual Review", message, {}, message);
       return NextResponse.json({ ok: false, processed: 1, error: message }, { status: 422 });
@@ -215,13 +217,33 @@ export async function GET(request) {
       pageSize: MAX_SOURCE_RECORDS,
       priorityAware: false,
     });
-    if (!source.length) {
-      const error = new Error(`Aucun montage trouvé pour ${start}-${end}`);
+    if (source.length !== expectedMontages) {
+      const error = new Error(`Corpus incomplet pour ${start}-${end}: ${source.length}/${expectedMontages} montages trouvés`);
       error.retryable = false;
       throw error;
     }
 
     const generated = await generatePart({ chapter, source, params });
+    const qc = bookQualityGate(generated.text, {
+      expectedMontages,
+      firstPart: String(params.part || "1") === "1",
+    });
+
+    if (!qc.pass) {
+      await updateRecord(TABLES.book, bookRecordId, {
+        "Montages couverts": qc.montageCount,
+        Caractères: qc.characters,
+        "Marqueurs À VÉRIFIER": qc.verifyMarkers,
+        "QC éditorial": "fail",
+        "Notes QC": qc.notes,
+        "Prêt export": false,
+        "Validation humaine": false,
+      });
+      const result = `${BOOK_EDITORIAL_VERSION}: génération ${start}-${end} refusée par le quality gate; ancienne version conservée.\n${qc.notes}`;
+      await finish(claimedJob, "Manual Review", result, generated.telemetry, qc.notes);
+      return NextResponse.json({ ok: false, processed: 1, status: "manual_review", editorial_version: BOOK_EDITORIAL_VERSION, qc }, { status: 422 });
+    }
+
     const previous = String(chapter.fields?.["Contenu V1"] || "");
     const existing = params.replace_existing === true ? "" : previous.slice(0, MAX_EXISTING_CHARS);
     const separator = existing ? "\n\n---\n\n" : "";
@@ -238,11 +260,17 @@ export async function GET(request) {
       "Dernière génération": new Date().toISOString(),
       "Validation humaine": false,
       Statut: "Brouillon",
+      "Montages couverts": qc.montageCount,
+      Caractères: next.length,
+      "Marqueurs À VÉRIFIER": qc.verifyMarkers,
+      "QC éditorial": qc.warnings.length ? "review" : "pass",
+      "Notes QC": qc.notes,
+      "Prêt export": false,
     });
     const mode = params.replace_existing === true ? "remplacée" : "ajoutée";
-    const summary = `${BOOK_EDITORIAL_VERSION}: partie ${start}-${end} ${mode} dans ${chapter.fields?.Chapitre || bookRecordId}; ${source.length} montages; ${generated.text.length} caractères.`;
+    const summary = `${BOOK_EDITORIAL_VERSION}: partie ${start}-${end} ${mode}; QC=${qc.warnings.length ? "review" : "pass"}; ${source.length} montages; ${generated.text.length} caractères.`;
     await finish(claimedJob, "Completed", summary, generated.telemetry, "");
-    return NextResponse.json({ ok: true, processed: 1, status: "completed", editorial_version: BOOK_EDITORIAL_VERSION, chapter: bookRecordId, range: [start, end], replace_existing: params.replace_existing === true, characters: generated.text.length });
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", editorial_version: BOOK_EDITORIAL_VERSION, chapter: bookRecordId, range: [start, end], replace_existing: params.replace_existing === true, characters: generated.text.length, qc });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 5000);
     const retryable = error?.retryable !== false;

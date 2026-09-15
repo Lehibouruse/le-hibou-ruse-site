@@ -20,7 +20,9 @@ test("CREATE_BOOK est délégué au scheduler dédié avant le worker agentique"
 
 test("le scheduler borne les lots et ne génère jamais tout le corpus en un appel", () => {
   assert.match(scheduler, /MAX_SOURCE_RECORDS = 24/);
-  assert.match(scheduler, /end - start \+ 1 > MAX_SOURCE_RECORDS/);
+  assert.match(scheduler, /const expectedMontages = end - start \+ 1/);
+  assert.match(scheduler, /expectedMontages > MAX_SOURCE_RECORDS/);
+  assert.match(scheduler, /source.length !== expectedMontages/);
   assert.match(scheduler, /source_start/);
   assert.match(scheduler, /source_end/);
 });
@@ -29,6 +31,13 @@ test("le contrat éditorial impose une ligne rouge non opérationnelle pour les 
   assert.match(editorial, /ne doivent jamais devenir des tutoriels/);
   assert.match(editorial, /Ne donne jamais de procédure pour contourner un contrôle/);
   assert.match(editorial, /\[À VÉRIFIER\]/);
+});
+
+test("le quality gate intervient avant l'écriture du contenu", () => {
+  assert.match(scheduler, /bookQualityGate\(generated\.text/);
+  assert.ok(scheduler.indexOf("bookQualityGate(generated.text") < scheduler.indexOf('"Contenu V1": next'));
+  assert.match(scheduler, /ancienne version conservée/);
+  assert.match(scheduler, /"QC éditorial": "fail"/);
 });
 
 test("les changements du scheduler déclenchent les self-tests", () => {

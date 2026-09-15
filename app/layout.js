@@ -3,6 +3,7 @@ import "./revamp.css";
 import "./polish.css";
 import "./micro-polish.css";
 import { Analytics } from "@vercel/analytics/next";
+import AttributionCapture from "../components/AttributionCapture";
 
 export const metadata = {
   metadataBase: new URL("https://d4d5d6.com"),
@@ -23,7 +24,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="fr">
-      <body>{children}<Analytics /></body>
+      <body>{children}<AttributionCapture /><Analytics /></body>
     </html>
   );
 }

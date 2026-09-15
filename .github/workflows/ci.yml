@@ -30,3 +30,5 @@ jobs:
         run: npm test
       - name: Worker syntax check
         run: node --check scripts/hibou-worker.mjs
+      - name: Production build
+        run: npm run build

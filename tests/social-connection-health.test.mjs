@@ -25,9 +25,10 @@ test("le watchdog ne reteste qu’un provider OAuth stale à la fois", () => {
   assert.match(watchdog, /social_read_health_test/);
 });
 
-test("l'état READ_TESTED exige auth et lecture API réussies", () => {
+test("l'état READ_TESTED exige auth et lecture API réussies sans valider la publication", () => {
   assert.match(health, /"Auth direct OK": true/);
   assert.match(health, /"Lecture API OK": true/);
   assert.match(health, /"État direct": "READ_TESTED"/);
-  assert.match(health, /"Publication testée"/m, "la publication reste gérée séparément et ne doit pas être auto-validée");
+  assert.doesNotMatch(health, /"Publication testée": true/);
+  assert.doesNotMatch(health, /"Analytics OK": true/);
 });

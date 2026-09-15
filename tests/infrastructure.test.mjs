@@ -82,8 +82,9 @@ test("l'auto-merge attend explicitement le statut Vercel", () => {
 
 test("le cron effectue un vrai wake et le dry-run reste manuel", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && inputs\.dry_run/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && \(inputs\.dry_run \|\| inputs\.export_book\)/);
   assert.match(workflow, /X-Hibou-Dry-Run/);
+  assert.match(workflow, /export_book:/);
   assert.match(workflow, /Wake scheduler and inspect queue/);
   assert.match(workflow, /worker_required=\$worker_required/);
   assert.match(workflow, /steps\.wake\.outputs\.worker_required == 'true'/);

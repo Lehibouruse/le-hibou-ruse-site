@@ -1,5 +1,6 @@
 import { completeSocialAuthorization } from "../../../../../../lib/social-oauth.mjs";
 import { queryRecords, TABLES } from "../../../../../../lib/airtable.js";
+import { testVaultProviderConnections } from "../../../../../../lib/social-connection-health.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -31,8 +32,16 @@ export async function GET(request, context) {
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
     if (!code || !state) return Response.redirect(adminUrl(request, { error: `${provider}:missing_code_or_state` }), 302);
-    const result = await completeSocialAuthorization(provider, { code, state }, await oauthEnv());
-    return Response.redirect(adminUrl(request, { connected: result.provider }), 302);
+
+    const env = await oauthEnv();
+    const result = await completeSocialAuthorization(provider, { code, state }, env);
+    const tests = await testVaultProviderConnections(result.provider, env)
+      .catch((error) => [{ ok: false, error: String(error?.message || error).slice(0, 180) }]);
+    const readOk = tests.length > 0 && tests.every((item) => item.ok === true);
+    return Response.redirect(adminUrl(request, {
+      connected: result.provider,
+      tested: readOk ? "read_ok" : "read_failed",
+    }), 302);
   } catch (error) {
     const message = String(error?.message || error).replace(/[\r\n]+/g, " ").slice(0, 180);
     return Response.redirect(adminUrl(request, { error: message }), 302);

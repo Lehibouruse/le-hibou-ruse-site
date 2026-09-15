@@ -1,5 +1,7 @@
 import { adminAuthorized, adminUnauthorized } from "../../../../lib/admin-auth.mjs";
+import { queryRecords, TABLES } from "../../../../lib/airtable.js";
 import { socialControlPlaneSnapshot, syncSocialControlPlaneToAirtable } from "../../../../lib/social-control-plane.mjs";
+import { configurationMap, socialRuntimeEnv } from "../../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,11 +23,21 @@ function badge(ok, yes, no) {
   return `<span class="badge ${ok ? "ok" : "wait"}">${esc(ok ? yes : no)}</span>`;
 }
 
+async function controlPlaneEnv() {
+  try {
+    const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
+    return socialRuntimeEnv(configurationMap(records), process.env);
+  } catch {
+    return process.env;
+  }
+}
+
 export async function POST(request) {
   if (!adminAuthorized(request)) return adminUnauthorized();
   try {
-    const snapshot = await socialControlPlaneSnapshot();
-    const result = await syncSocialControlPlaneToAirtable(snapshot);
+    const env = await controlPlaneEnv();
+    const snapshot = await socialControlPlaneSnapshot(env);
+    const result = await syncSocialControlPlaneToAirtable(snapshot, env);
     const url = new URL("/admin/social/control-plane", request.url);
     url.searchParams.set("synced", String(result.updated_count));
     return Response.redirect(url, 303);
@@ -40,7 +52,8 @@ export async function GET(request) {
   if (!adminAuthorized(request)) return adminUnauthorized();
   let snapshot;
   try {
-    snapshot = await socialControlPlaneSnapshot();
+    const env = await controlPlaneEnv();
+    snapshot = await socialControlPlaneSnapshot(env);
   } catch (error) {
     return new Response(`Control plane indisponible: ${esc(String(error?.message || error))}`, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
@@ -85,7 +98,7 @@ export async function GET(request) {
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Control plane social · Le Hibou Rusé</title><style>
   :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0d2821;color:#f6efdf;font-family:ui-sans-serif,system-ui;padding:32px}main{max-width:1700px;margin:auto}h1{font-family:Georgia,serif;font-size:42px;margin:0 0 8px}.sub,.muted{color:#aebfb9}.summary{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.pill{background:#173a30;border:1px solid #34594d;border-radius:999px;padding:9px 13px}.notice{padding:13px 16px;border:1px solid #c69d51;background:#173a30;border-radius:12px;margin:18px 0}.actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 26px}.button{display:inline-block;background:#d5a84c;color:#102d25;padding:9px 13px;border-radius:999px;text-decoration:none;font-weight:800;border:0;cursor:pointer}.secondary{background:#e9dbc0}.table-wrap{overflow:auto;border-radius:16px;border:1px solid #294b40}table{width:100%;min-width:1780px;border-collapse:collapse;background:#13342b}th,td{text-align:left;padding:13px;border-bottom:1px solid #2c4d43;vertical-align:top;font-size:13px}th{color:#dfbd79}.badge{display:inline-block;border-radius:999px;padding:5px 8px;font-weight:700}.ok{color:#8ee5aa}.wait,.missing{color:#f0c87a}.badge.ok{background:#173f30}.badge.wait{background:#4a3920}.detail{font-size:12px;line-height:1.45;margin-top:7px}.action-text{max-width:440px;line-height:1.45;margin-bottom:9px}.portal{color:#e8ca89}.foot{margin-top:22px;color:#aebfb9;line-height:1.5;font-size:13px}code{background:#091f19;border-radius:6px;padding:4px 6px;word-break:break-all}
   </style></head><body><main>
-  <h1>Control plane social</h1><p class="sub">Chaque réseau doit finir soit en HUMAN_OAUTH_APPROVAL_REQUIRED, soit avec un blocage externe explicite. Aucun secret n’est exposé au modèle ou à Airtable.</p>
+  <h1>Control plane social</h1><p class="sub">Chaque réseau doit finir soit en HUMAN_OAUTH_APPROVAL_REQUIRED, soit avec un blocage externe explicite. La configuration non secrète est centralisée dans Airtable ; aucun secret n’y est stocké.</p>
   <div class="summary"><span class="pill"><strong>${s.metricool_verified}</strong> voies Metricool vérifiées</span><span class="pill"><strong>${s.chatgpt_pilotable}</strong> réseaux pilotables depuis ChatGPT</span><span class="pill"><strong>${s.exact_external_blockers}</strong> blocages externes identifiés</span><span class="pill"><strong>${s.ready_for_human_approval}</strong> prêtes pour ton clic OAuth</span><span class="pill"><strong>${s.oauth_connected}/${s.oauth_providers}</strong> OAuth directs connectés</span><span class="pill"><strong>${s.fully_authorized_with_analytics}/${s.oauth_providers}</strong> directs complets + analytics</span></div>
   ${notice ? `<div class="notice">${esc(notice)}</div>` : ""}
   <div class="actions"><form method="post"><button class="button" type="submit">Synchroniser l’état vers Airtable</button></form><a class="button secondary" href="/admin/social">Vue OAuth simple</a><a class="button secondary" href="/api/social/control-plane">JSON control plane</a></div>

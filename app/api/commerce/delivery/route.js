@@ -32,6 +32,14 @@ async function productForSale(sale) {
   return records[0] || null;
 }
 
+async function currentEdition() {
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: "AND({Actif}=1,{Clé}='book_current_edition')",
+    pageSize: 1,
+  });
+  return String(records[0]?.fields?.Valeur || "V1.0");
+}
+
 export async function POST(request) {
   try {
     const auth = request.headers.get("authorization") || "";
@@ -87,17 +95,22 @@ export async function POST(request) {
   }
 
   try {
-    const delivered = await addDigifyRecipient({ fileGuid, email, orderId });
+    const [delivered, edition] = await Promise.all([
+      addDigifyRecipient({ fileGuid, email, orderId }),
+      currentEdition(),
+    ]);
     const url = delivered.accessUrl || String(process.env.DIGIFY_GENERIC_FILE_URL || "");
     await updateRecord(TABLES.sales, current.id, {
       "Livraison statut": "delivered",
       "Digify recipient email": email,
+      "Digify File GUID": fileGuid,
+      "Version livre livrée": edition,
       ...(url ? { "Digify access URL": url } : {}),
       "Livré le": new Date().toISOString(),
       "Livraison erreur": url ? "" : "Accès créé; l'API n'a pas renvoyé de lien individuel. La notification Digify doit être activée dans le template API.",
     });
-    await journal(current, "Completed", url ? "Accès Digify créé et URL enregistrée" : "Accès Digify créé; notification/lien géré par Digify", url);
-    return NextResponse.json({ ok: true, processed: 1, status: "delivered", access_url_recorded: Boolean(url) });
+    await journal(current, "Completed", `Accès Digify créé · édition ${edition}${url ? " · URL enregistrée" : ""}`, url);
+    return NextResponse.json({ ok: true, processed: 1, status: "delivered", edition, access_url_recorded: Boolean(url) });
   } catch (error) {
     const retryable = error?.retryable !== false && attempts < 3;
     const message = String(error?.message || error).slice(0, 5000);

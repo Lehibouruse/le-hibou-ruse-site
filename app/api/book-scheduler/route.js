@@ -24,8 +24,12 @@ async function claim(job) {
   const lockToken = randomUUID();
   const now = new Date();
   await updateRecord(TABLES.jobs, job.id, {
-    status: "Running", started_at: now.toISOString(), completed_at: null, error: "",
-    lock_token: lockToken, lease_expires_at: new Date(now.getTime() + LEASE_MS).toISOString(),
+    status: "Running",
+    started_at: now.toISOString(),
+    completed_at: null,
+    error: "",
+    lock_token: lockToken,
+    lease_expires_at: new Date(now.getTime() + LEASE_MS).toISOString(),
   });
   const current = await getRecord(TABLES.jobs, job.id);
   const status = current?.fields?.status?.name || current?.fields?.status;
@@ -33,13 +37,14 @@ async function claim(job) {
 }
 
 async function owns(job) {
+  if (!job?.id || !job?.lockToken) return false;
   const current = await getRecord(TABLES.jobs, job.id);
   return current?.fields?.lock_token === job.lockToken;
 }
 
 async function finish(job, status, result, telemetry = {}, error = "") {
   if (!(await owns(job))) return false;
-  await updateRecord(TABLES.jobs, job.id, {
+  const fields = {
     status,
     completed_at: ["Completed", "Manual Review", "Error"].includes(status) ? new Date().toISOString() : null,
     result: String(result || "").slice(0, 100000),
@@ -47,14 +52,16 @@ async function finish(job, status, result, telemetry = {}, error = "") {
     agent_status: status === "Completed" ? "completed" : status === "Retry" ? "needs_escalation" : "waiting_for_human",
     model_used: telemetry.model || "",
     reasoning_effort: telemetry.reasoning || "",
-    input_tokens: Number(telemetry.input_tokens || 0),
-    cached_input_tokens: Number(telemetry.cached_input_tokens || 0),
-    output_tokens: Number(telemetry.output_tokens || 0),
     estimated_cost_usd: Number(telemetry.cost || 0),
     ai_calls: Number(telemetry.ai_calls || 0),
     response_ids: telemetry.response_id || "",
-    lock_token: "", lease_expires_at: null,
-  });
+    lock_token: "",
+    lease_expires_at: null,
+  };
+  if (Number.isFinite(Number(telemetry.input_tokens))) fields.input_tokens = Number(telemetry.input_tokens || 0);
+  if (Number.isFinite(Number(telemetry.cached_input_tokens))) fields.cached_input_tokens = Number(telemetry.cached_input_tokens || 0);
+  if (Number.isFinite(Number(telemetry.output_tokens))) fields.output_tokens = Number(telemetry.output_tokens || 0);
+  await updateRecord(TABLES.jobs, job.id, fields);
   await createRecord(TABLES.journal, {
     Workflow: "HIBOU_BOOK_SCHEDULER_V1",
     Déclencheur: job.fields?.requested_by || "Jobs",
@@ -72,19 +79,24 @@ async function retry(job, message) {
   const max = Math.min(2, Number(job.fields?.max_retries ?? 2));
   if (count > max) return finish(job, "Manual Review", message, {}, message);
   await updateRecord(TABLES.jobs, job.id, {
-    status: "Retry", retry_count: count,
+    status: "Retry",
+    retry_count: count,
     next_run_at: new Date(Date.now() + Math.min(15 * 60_000, 60_000 * 2 ** count)).toISOString(),
-    error: String(message).slice(0, 5000), agent_status: "needs_escalation",
-    lock_token: "", lease_expires_at: null,
+    error: String(message).slice(0, 5000),
+    agent_status: "needs_escalation",
+    lock_token: "",
+    lease_expires_at: null,
   });
   return true;
 }
 
 function outputText(response) {
   if (typeof response.output_text === "string") return response.output_text;
-  return (response.output || []).flatMap((item) => item.content || [])
+  return (response.output || [])
+    .flatMap((item) => item.content || [])
     .filter((item) => item.type === "output_text")
-    .map((item) => item.text).join("");
+    .map((item) => item.text)
+    .join("");
 }
 
 function safeSource(records) {
@@ -103,9 +115,9 @@ function usageCost(model, usage = {}) {
   };
   const p = prices[model];
   if (!p) return 0;
-  const input = Number(usage.input_tokens || 0);
-  const cached = Math.min(input, Number(usage.input_tokens_details?.cached_tokens || 0));
-  const output = Number(usage.output_tokens || 0);
+  const input = Number(usage?.input_tokens || 0);
+  const cached = Math.min(input, Number(usage?.input_tokens_details?.cached_tokens || 0));
+  const output = Number(usage?.output_tokens || 0);
   return ((input - cached) * p.input + cached * p.cached + output * p.output) / 1_000_000;
 }
 
@@ -143,7 +155,11 @@ async function generatePart({ chapter, source, params }) {
     throw error;
   }
   const text = outputText(data).trim();
-  if (!text) throw new Error("OpenAI book: réponse vide");
+  if (!text) {
+    const error = new Error("OpenAI book: réponse vide");
+    error.retryable = true;
+    throw error;
+  }
   return {
     text,
     telemetry: {
@@ -152,7 +168,9 @@ async function generatePart({ chapter, source, params }) {
       input_tokens: Number(data.usage?.input_tokens || 0),
       cached_input_tokens: Number(data.usage?.input_tokens_details?.cached_tokens || 0),
       output_tokens: Number(data.usage?.output_tokens || 0),
-      cost: usageCost(data.model || model, data.usage), ai_calls: 1, response_id: data.id || "",
+      cost: usageCost(data.model || model, data.usage || {}),
+      ai_calls: 1,
+      response_id: data.id || "",
     },
   };
 }
@@ -162,38 +180,55 @@ export async function GET(request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  let claimedJob = null;
   try {
     const eligible = eligibleJobsFormula(process.env);
     const candidates = await queryRecords(TABLES.jobs, {
       filterByFormula: `AND(${eligible},{action}='CREATE_BOOK')`,
-      sortField: "created_at", pageSize: 5,
+      sortField: "created_at",
+      pageSize: 5,
     });
     const candidate = candidates.find((job) => actionName(job) === "CREATE_BOOK");
     if (!candidate) return NextResponse.json({ ok: true, processed: 0, reason: "no_create_book" });
-    const job = await claim(candidate);
-    if (!job) return NextResponse.json({ ok: true, processed: 0, reason: "lease_not_acquired" });
-    const params = parameters(job);
+
+    claimedJob = await claim(candidate);
+    if (!claimedJob) return NextResponse.json({ ok: true, processed: 0, reason: "lease_not_acquired" });
+
+    const params = parameters(claimedJob);
     const bookRecordId = String(params.book_record_id || "");
     const start = Number(params.source_start);
     const end = Number(params.source_end);
     if (!/^rec[A-Za-z0-9]{14}$/.test(bookRecordId) || !Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start || end - start + 1 > MAX_SOURCE_RECORDS) {
       const message = `CREATE_BOOK invalide: book_record_id rec..., source_start/end requis, maximum ${MAX_SOURCE_RECORDS} montages par Job`;
-      await finish(job, "Manual Review", message, {}, message);
+      await finish(claimedJob, "Manual Review", message, {}, message);
       return NextResponse.json({ ok: false, processed: 1, error: message }, { status: 422 });
     }
+
     const chapter = await getRecord(TABLES.book, bookRecordId);
     const source = await queryRecords(TABLES.montages, {
       filterByFormula: `AND({Numéro source}>=${start},{Numéro source}<=${end})`,
-      sortField: "Numéro source", pageSize: MAX_SOURCE_RECORDS,
+      sortField: "Numéro source",
+      pageSize: MAX_SOURCE_RECORDS,
       priorityAware: false,
     });
-    if (!source.length) throw new Error(`Aucun montage trouvé pour ${start}-${end}`);
+    if (!source.length) {
+      const error = new Error(`Aucun montage trouvé pour ${start}-${end}`);
+      error.retryable = false;
+      throw error;
+    }
+
     const generated = await generatePart({ chapter, source, params });
     const existing = String(chapter.fields?.["Contenu V1"] || "");
     const separator = existing ? "\n\n---\n\n" : "";
     const heading = `## Partie ${params.part || ""} — Montages ${start} à ${end}`.replace("Partie  —", "Partie —");
     const next = `${existing.slice(0, MAX_EXISTING_CHARS)}${separator}${heading}\n\n${generated.text}`;
-    if (next.length > 99000) throw new Error("Chapitre proche de la limite Airtable; exporter avant d'ajouter une nouvelle partie");
+    if (next.length > 99000) {
+      const error = new Error("Chapitre proche de la limite Airtable; exporter avant d'ajouter une nouvelle partie");
+      error.retryable = false;
+      throw error;
+    }
+
     await updateRecord(TABLES.book, bookRecordId, {
       "Contenu V1": next,
       Version: "V1",
@@ -202,16 +237,15 @@ export async function GET(request) {
       Statut: "Brouillon",
     });
     const summary = `Partie ${start}-${end} générée dans ${chapter.fields?.Chapitre || bookRecordId}; ${source.length} montages; ${generated.text.length} caractères.`;
-    await finish(job, "Completed", summary, generated.telemetry, "");
+    await finish(claimedJob, "Completed", summary, generated.telemetry, "");
     return NextResponse.json({ ok: true, processed: 1, status: "completed", chapter: bookRecordId, range: [start, end], characters: generated.text.length });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 5000);
     const retryable = error?.retryable !== false;
-    const eligible = await queryRecords(TABLES.jobs, {
-      filterByFormula: `AND(${eligibleJobsFormula(process.env)},{action}='CREATE_BOOK')`, sortField: "created_at", pageSize: 1,
-    }).catch(() => []);
-    const current = eligible[0];
-    if (current && retryable) await retry({ ...current, lockToken: current.fields?.lock_token }, message).catch(() => {});
+    if (claimedJob) {
+      if (retryable) await retry(claimedJob, message).catch(() => {});
+      else await finish(claimedJob, "Manual Review", message, {}, message).catch(() => {});
+    }
     return NextResponse.json({ ok: false, error: message }, { status: retryable ? 503 : 422 });
   }
 }

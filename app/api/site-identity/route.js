@@ -9,13 +9,13 @@ function hostOf(request) {
 
 export async function GET(request) {
   const host = hostOf(request);
-  const canonicalHost = "d4d5d6.com";
+  const canonicalHost = "le-hibou-ruse-site.vercel.app";
   const response = NextResponse.json({
     ok: true,
     site: "Le Hibou Rusé",
     canonical_host: canonicalHost,
     received_host: host,
-    canonical: host === canonicalHost || host === `www.${canonicalHost}`,
+    canonical: host === canonicalHost,
   });
   response.headers.set("Cache-Control", "no-store");
   response.headers.set("X-Hibou-Site", "le-hibou-ruse");

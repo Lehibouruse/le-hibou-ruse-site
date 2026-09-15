@@ -51,6 +51,18 @@ jobs:
               '    case "social_status":\n    case "social_prepare":\n      return api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: args });\n    case "site_write": {'
           )
 
+          # Main currently imports getAllRecords from two production routes although
+          # only queryAllRecords exists. Preserve the intended caller contract with
+          # a bounded compatibility helper rather than weakening pagination.
+          airtable_path = Path("lib/airtable.js")
+          airtable_text = airtable_path.read_text()
+          if "export async function getAllRecords(" not in airtable_text:
+              anchor = "\nexport async function getRecords(tableId, options = {}) {"
+              helper = "\nexport async function getAllRecords(tableId, options = {}) {\n  return queryAllRecords(tableId, {}, options);\n}\n"
+              if anchor not in airtable_text:
+                  raise SystemExit("lib/airtable.js: getRecords anchor missing")
+              airtable_path.write_text(airtable_text.replace(anchor, helper + anchor, 1))
+
           env_path = Path(".env.example")
           env_text = env_path.read_text()
           marker = "# Social direct API / OAuth (names only; never commit real values)"

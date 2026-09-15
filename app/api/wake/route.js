@@ -11,6 +11,7 @@ const ORCHESTRATOR_PATH = "/api/orchestrator";
 const SOCIAL_SCHEDULER_PATH = "/api/social-scheduler";
 const BOOK_SCHEDULER_PATH = "/api/book-scheduler";
 const MAX_BATCH = 1;
+const HANDLED_BUSINESS_STATUSES = new Set([409, 422]);
 
 function baseUrl(request) {
   const configured = process.env.HIBOU_PUBLIC_BASE_URL
@@ -42,13 +43,29 @@ async function delegate(request, cronSecret, path, label) {
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
+
+  // A scheduler can legitimately finish a business Job in Manual Review or
+  // reject a non-ready business state. That is a processed outcome, not an
+  // infrastructure failure: the next wake must be free to continue the queue.
+  if (HANDLED_BUSINESS_STATUSES.has(response.status)) {
+    return NextResponse.json({
+      ok: true,
+      delegated: label,
+      handled: true,
+      delegated_status: response.status,
+      outcome: data?.status || data?.error || "manual_review",
+      processed: Number(data?.processed || 1),
+      ...data,
+    });
+  }
+
   if (!response.ok) {
     return NextResponse.json({
       ok: false,
       delegated: label,
       status: response.status,
       error: data?.error || data?.status || `${label} failed`,
-    }, { status: response.status >= 500 ? 503 : response.status });
+    }, { status: 503 });
   }
   return NextResponse.json({ ok: true, delegated: label, ...data });
 }

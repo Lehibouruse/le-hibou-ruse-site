@@ -39,6 +39,7 @@ test("un secret serveur manquant expose le blocage externe exact sans révéler 
   assert.deepEqual(youtube.missing_env_names, ["YOUTUBE_CLIENT_SECRET"]);
   assert.match(youtube.external_blocker, /Google Cloud/);
   assert.match(youtube.authorization_session_step, /YouTube Data API v3/);
+  assert.match(youtube.authorization_session_step, /YouTube Analytics API/);
   assert.equal(JSON.stringify(youtube).includes("yt-secret"), false);
 });
 
@@ -87,6 +88,38 @@ test("Meta expose séparément les fallbacks Instagram et Facebook et reste pilo
   assert.equal(meta.fallback_configured, true);
   assert.equal(meta.metricool_verified, true);
   assert.deepEqual(meta.airtable_platforms, ["Instagram", "Facebook"]);
+});
+
+test("LinkedIn control plane respecte le mode organisation fourni par le runtime", () => {
+  const env = {
+    HIBOU_SOCIAL_VAULT_KEY: Buffer.alloc(32, 5).toString("base64url"),
+    LINKEDIN_CLIENT_ID: "li-id",
+    LINKEDIN_CLIENT_SECRET: "li-secret",
+    LINKEDIN_ORGANIZATION_URN: "urn:li:organization:146337938",
+    LINKEDIN_OAUTH_SCOPES: "openid profile w_member_social w_organization_social r_organization_social rw_organization_admin",
+  };
+  const readiness = [{
+    provider: "linkedin",
+    ready: true,
+    scopes: env.LINKEDIN_OAUTH_SCOPES,
+    redirect_uri: "https://example.com/linkedin",
+    error: "",
+  }];
+  const credentials = [{ provider: "linkedin", status: "Connected", scopes: "openid profile w_member_social" }];
+  const snapshot = buildSocialControlPlane({ readiness, credentials, env });
+  const linkedin = snapshot.providers.find((item) => item.provider === "linkedin");
+  assert.equal(linkedin.label, "LinkedIn · organisation");
+  assert.equal(linkedin.phase, "PUBLISH_SCOPE_REVIEW_REQUIRED");
+  assert.deepEqual(linkedin.missing_publish_scopes, ["w_organization_social"]);
+  assert.deepEqual(linkedin.missing_analytics_scopes, ["rw_organization_admin"]);
+});
+
+test("TikTok expose aussi la vérification du domaine média PULL_FROM_URL comme blocage externe", () => {
+  const snapshot = buildSocialControlPlane({ readiness: [], credentials: [], env: {} });
+  const tiktok = snapshot.providers.find((item) => item.provider === "tiktok");
+  assert.match(tiktok.external_blocker, /PULL_FROM_URL/);
+  assert.match(tiktok.external_blocker, /domaine|préfixe/i);
+  assert.match(tiktok.authorization_session_step, /vérifier le domaine|vérifier le.*préfixe/i);
 });
 
 test("les blocages externes non automatisables sont explicites réseau par réseau", () => {

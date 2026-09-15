@@ -3,6 +3,7 @@ import { queryRecords, TABLES } from "../../../lib/airtable";
 import { isAgenticAction } from "../../../lib/agent-capabilities.mjs";
 import { githubOidcAudience, verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+import { readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 const ORCHESTRATOR_PATH = "/api/orchestrator";
 const SOCIAL_SCHEDULER_PATH = "/api/social-scheduler";
 const BOOK_SCHEDULER_PATH = "/api/book-scheduler";
-const MAX_BATCH = 1;
+const MAX_BATCH = 10;
 const HANDLED_BUSINESS_STATUSES = new Set([409, 422]);
 
 function baseUrl(request) {
@@ -27,13 +28,17 @@ function parameters(job) {
   try { return JSON.parse(job?.fields?.parameters || "{}"); } catch { return {}; }
 }
 
-async function firstEligibleJob() {
-  const records = await queryRecords(TABLES.jobs, {
+function requiresOpenAi(job) {
+  const action = actionName(job);
+  return action === "CREATE_BOOK" || isAgenticAction(action, parameters(job));
+}
+
+async function eligibleJobs() {
+  return queryRecords(TABLES.jobs, {
     filterByFormula: eligibleJobsFormula(process.env, { includeReserved: true }),
     sortField: "created_at",
     pageSize: MAX_BATCH,
   });
-  return records[0] || null;
 }
 
 async function delegate(request, cronSecret, path, label) {
@@ -44,9 +49,6 @@ async function delegate(request, cronSecret, path, label) {
   });
   const data = await response.json().catch(() => ({}));
 
-  // A scheduler can legitimately finish a business Job in Manual Review or
-  // reject a non-ready business state. That is a processed outcome, not an
-  // infrastructure failure: the next wake must be free to continue the queue.
   if (HANDLED_BUSINESS_STATUSES.has(response.status)) {
     return NextResponse.json({
       ok: true,
@@ -80,33 +82,31 @@ export async function POST(request) {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) return NextResponse.json({ ok: false, error: "CRON_SECRET absent" }, { status: 503 });
 
-    const candidate = await firstEligibleJob();
+    const [records, circuit] = await Promise.all([eligibleJobs(), readOpenAiCircuit()]);
+    const candidate = circuit.active ? records.find((job) => !requiresOpenAi(job)) || null : records[0] || null;
+
     if (dryRun || !candidate) {
       return NextResponse.json({
         ok: true,
         dry_run: dryRun,
-        eligible: candidate ? 1 : 0,
+        eligible: records.length,
         processed: 0,
         action: candidate ? actionName(candidate) : "",
+        reason: !candidate && circuit.active && records.some(requiresOpenAi) ? "openai_credit_circuit_open" : "",
+        circuit: circuit.active ? { active: true, until: circuit.until, reason: circuit.reason } : { active: false },
         audience: githubOidcAudience(),
       });
     }
 
     const action = actionName(candidate);
-    if (action === "SCHEDULE_POST") {
-      return delegate(request, cronSecret, SOCIAL_SCHEDULER_PATH, "social_scheduler");
-    }
-    if (action === "CREATE_BOOK") {
-      return delegate(request, cronSecret, BOOK_SCHEDULER_PATH, "book_scheduler");
-    }
-    if (!isAgenticAction(action, parameters(candidate))) {
-      return delegate(request, cronSecret, ORCHESTRATOR_PATH, "orchestrator");
-    }
+    if (action === "SCHEDULE_POST") return delegate(request, cronSecret, SOCIAL_SCHEDULER_PATH, "social_scheduler");
+    if (action === "CREATE_BOOK") return delegate(request, cronSecret, BOOK_SCHEDULER_PATH, "book_scheduler");
+    if (!isAgenticAction(action, parameters(candidate))) return delegate(request, cronSecret, ORCHESTRATOR_PATH, "orchestrator");
 
     return NextResponse.json({
       ok: true,
       dry_run: false,
-      eligible: 1,
+      eligible: records.length,
       processed: 0,
       reason: "github_worker_required",
       action,

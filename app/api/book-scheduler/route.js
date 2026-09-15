@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { BOOK_EDITORIAL_VERSION, bookInstructions } from "../../../lib/book-editorial.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 
 export const runtime = "nodejs";
@@ -63,12 +64,12 @@ async function finish(job, status, result, telemetry = {}, error = "") {
   if (Number.isFinite(Number(telemetry.output_tokens))) fields.output_tokens = Number(telemetry.output_tokens || 0);
   await updateRecord(TABLES.jobs, job.id, fields);
   await createRecord(TABLES.journal, {
-    Workflow: "HIBOU_BOOK_SCHEDULER_V1",
+    Workflow: "HIBOU_BOOK_SCHEDULER_V2",
     Déclencheur: job.fields?.requested_by || "Jobs",
     Action: `CREATE_BOOK · ${job.fields?.job_id || job.id} · ${status}`,
     "Dernière exécution": new Date().toISOString(),
     Erreur: String(error || "").slice(0, 5000),
-    Notes: String(result || "").slice(0, 10000),
+    Notes: `${BOOK_EDITORIAL_VERSION}; ${String(result || "").slice(0, 9800)}`,
   }).catch(() => {});
   return true;
 }
@@ -103,7 +104,7 @@ function safeSource(records) {
   return records.map((record) => ({
     id: record.id,
     fields: Object.fromEntries(Object.entries(record.fields || {})
-      .filter(([key]) => key !== "Original verbatim")
+      .filter(([key]) => key !== "Contenu original (verbatim)")
       .map(([key, value]) => [key, typeof value === "string" ? value.slice(0, 12000) : value])),
   }));
 }
@@ -123,11 +124,13 @@ function usageCost(model, usage = {}) {
 
 async function generatePart({ chapter, source, params }) {
   const model = ["gpt-5.6-sol", "gpt-5.6-terra"].includes(params.model) ? params.model : "gpt-5.6-sol";
-  const instructions = `Tu écris la V1 du livre Le Hibou Rusé en français. Le style doit être très lisible, narratif, premium, parfois provocateur et accrocheur, mais le fond doit rester honnête. Pour chaque montage fourni : 1) ouvre par une micro-histoire fictive courte et mémorable, sans personne réelle ; 2) explique le mécanisme ; 3) explique le fondement et les conditions ; 4) donne l'intérêt économique quand il est étayé ; 5) détaille les risques juridiques, fiscaux et pratiques ; 6) indique ce qui doit être vérifié ; 7) termine par la variante robuste. N'invente jamais un texte, un taux, une jurisprudence ou une condition. Quand la source est incertaine, écris [À VÉRIFIER]. Les montages D6, frauduleux, fictifs, reposant sur fausse déclaration, fausse résidence, faux salarié, fausse facture, détournement d'aide, dissimulation ou abus manifeste ne doivent jamais devenir des tutoriels : raconte le scénario de façon non opérationnelle, explique pourquoi il franchit la ligne rouge, les indices de détection, les risques et l'alternative légale. Ne donne pas d'étapes permettant de commettre ou dissimuler une fraude. Structure avec titres Markdown. Le résultat doit pouvoir être relu tel quel comme un vrai chapitre de livre.`;
+  const instructions = bookInstructions({ part: params.part || "1" });
   const input = JSON.stringify({
+    version_editoriale: BOOK_EDITORIAL_VERSION,
     chapitre: chapter.fields?.Chapitre || "",
-    section: chapter.fields?.Section || "",
+    section: chapter.fields?.Section?.name || chapter.fields?.Section || "",
     notes_editoriales: chapter.fields?.Notes || "",
+    partie: String(params.part || "1"),
     plage_sources: `${params.source_start}-${params.source_end}`,
     objectif_mots_partie: Number(params.target_words || 3500),
     montages: safeSource(source),
@@ -142,9 +145,9 @@ async function generatePart({ chapter, source, params }) {
       input,
       max_output_tokens: Math.min(10000, Math.max(2500, Number(params.max_output_tokens || 7000))),
       store: false,
-      prompt_cache_key: "hibou-book-v1",
+      prompt_cache_key: "hibou-book-editorial-v2",
       text: { verbosity: "medium" },
-      metadata: { project: "le-hibou-ruse", purpose: "book-v1", chapter_record: chapter.id },
+      metadata: { project: "le-hibou-ruse", purpose: "book-v2", chapter_record: chapter.id, editorial_version: BOOK_EDITORIAL_VERSION },
     }),
     cache: "no-store",
   });
@@ -219,10 +222,10 @@ export async function GET(request) {
     }
 
     const generated = await generatePart({ chapter, source, params });
-    const existing = String(chapter.fields?.["Contenu V1"] || "");
+    const previous = String(chapter.fields?.["Contenu V1"] || "");
+    const existing = params.replace_existing === true ? "" : previous.slice(0, MAX_EXISTING_CHARS);
     const separator = existing ? "\n\n---\n\n" : "";
-    const heading = `## Partie ${params.part || ""} — Montages ${start} à ${end}`.replace("Partie  —", "Partie —");
-    const next = `${existing.slice(0, MAX_EXISTING_CHARS)}${separator}${heading}\n\n${generated.text}`;
+    const next = `${existing}${separator}${generated.text}`;
     if (next.length > 99000) {
       const error = new Error("Chapitre proche de la limite Airtable; exporter avant d'ajouter une nouvelle partie");
       error.retryable = false;
@@ -231,14 +234,15 @@ export async function GET(request) {
 
     await updateRecord(TABLES.book, bookRecordId, {
       "Contenu V1": next,
-      Version: "V1",
+      Version: "V2-draft",
       "Dernière génération": new Date().toISOString(),
       "Validation humaine": false,
       Statut: "Brouillon",
     });
-    const summary = `Partie ${start}-${end} générée dans ${chapter.fields?.Chapitre || bookRecordId}; ${source.length} montages; ${generated.text.length} caractères.`;
+    const mode = params.replace_existing === true ? "remplacée" : "ajoutée";
+    const summary = `${BOOK_EDITORIAL_VERSION}: partie ${start}-${end} ${mode} dans ${chapter.fields?.Chapitre || bookRecordId}; ${source.length} montages; ${generated.text.length} caractères.`;
     await finish(claimedJob, "Completed", summary, generated.telemetry, "");
-    return NextResponse.json({ ok: true, processed: 1, status: "completed", chapter: bookRecordId, range: [start, end], characters: generated.text.length });
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", editorial_version: BOOK_EDITORIAL_VERSION, chapter: bookRecordId, range: [start, end], replace_existing: params.replace_existing === true, characters: generated.text.length });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 5000);
     const retryable = error?.retryable !== false;

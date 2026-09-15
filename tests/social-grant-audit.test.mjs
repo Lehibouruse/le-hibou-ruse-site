@@ -57,6 +57,41 @@ test("YouTube distingue publication least-privilege et Analytics complète", () 
   assert.equal(complete.fully_ready, true);
 });
 
+test("LinkedIn organisation exige w_organization_social et rw_organization_admin", () => {
+  const orgReady = ready.map((item) => item.provider === "linkedin"
+    ? { ...item, scopes: "openid profile w_member_social w_organization_social r_organization_social rw_organization_admin" }
+    : item);
+  const incomplete = auditSocialGrants(orgReady, [{
+    provider: "linkedin",
+    status: "Connected",
+    scopes: "openid profile w_member_social",
+  }]).find((item) => item.provider === "linkedin");
+  assert.equal(incomplete.label, "LinkedIn · organisation");
+  assert.equal(incomplete.publish_scope_ok, false);
+  assert.equal(incomplete.analytics_scope_ok, false);
+  assert.deepEqual(incomplete.missing_publish_scopes, ["w_organization_social"]);
+  assert.deepEqual(incomplete.missing_analytics_scopes, ["rw_organization_admin"]);
+
+  const complete = auditSocialGrants(orgReady, [{
+    provider: "linkedin",
+    status: "Connected",
+    scopes: "openid profile w_organization_social r_organization_social rw_organization_admin",
+  }]).find((item) => item.provider === "linkedin");
+  assert.equal(complete.authorization_ready, true);
+  assert.equal(complete.fully_ready, true);
+});
+
+test("LinkedIn profil conserve les exigences membre si aucun mode organisation n'est configuré", () => {
+  const member = auditSocialGrants(ready, [{
+    provider: "linkedin",
+    status: "Connected",
+    scopes: "w_member_social r_member_postAnalytics",
+  }], {}).find((item) => item.provider === "linkedin");
+  assert.equal(member.label, "LinkedIn");
+  assert.equal(member.authorization_ready, true);
+  assert.equal(member.fully_ready, true);
+});
+
 test("Snapchat reste explicitement manuel tant que l'accès produit Snap n'est pas accordé", () => {
   const audit = auditSocialGrants(ready, []);
   const snapchat = audit.find((item) => item.provider === "snapchat");

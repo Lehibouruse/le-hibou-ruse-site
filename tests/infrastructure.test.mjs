@@ -80,14 +80,19 @@ test("l'auto-merge attend explicitement le statut Vercel", () => {
   assert.equal(vercelCommitState([{ context: "Vercel", state: "failure" }]), "failure");
 });
 
-test("le cron effectue un vrai wake et le dry-run reste manuel", () => {
+test("le cron effectue un vrai wake et le dry-run/export restent manuels", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && inputs\.dry_run/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && \(inputs\.dry_run \|\| inputs\.export_book\)/);
   assert.match(workflow, /X-Hibou-Dry-Run/);
   assert.match(workflow, /Wake scheduler and inspect queue/);
   assert.match(workflow, /worker_required=\$worker_required/);
   assert.match(workflow, /steps\.wake\.outputs\.worker_required == 'true'/);
   assert.match(workflow, /steps\.wake\.outputs\.action == 'CREATE_VIDEO'/);
+  assert.match(workflow, /HIBOU_BASE_URL:/);
+  assert.match(workflow, /vars\.HIBOU_PUBLIC_BASE_URL/);
+  assert.match(workflow, /\$\{HIBOU_BASE_URL\}\/api\/wake/);
+  assert.match(workflow, /actions\/checkout@v5/);
+  assert.match(workflow, /actions\/setup-node@v5/);
 });
 
 test("un Manual Review métier ne casse ni ne rejoue le wake", () => {

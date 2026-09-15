@@ -10,6 +10,17 @@ export const maxDuration = 300;
 
 const LEASE_MS = 5 * 60 * 1000;
 
+const PUBLICATION_FIELDS = {
+  youtube: { id: "ID YouTube", url: "URL YouTube" },
+  tiktok: { id: "ID TikTok", url: "URL TikTok" },
+  instagram: { id: "ID Instagram", url: "URL Instagram" },
+  facebook: { id: "ID Facebook", url: "URL Facebook" },
+  linkedin: { id: "ID LinkedIn", url: "URL LinkedIn" },
+  x: { id: "ID X", url: "URL X" },
+  threads: { id: "ID Threads", url: "URL Threads" },
+  snapchat: { id: "ID Snapchat", url: "URL Snapchat" },
+};
+
 function parameters(job) {
   try { return JSON.parse(job?.fields?.parameters || "{}"); }
   catch { throw new Error("parameters doit contenir un JSON valide"); }
@@ -92,6 +103,41 @@ async function retry(job, message) {
   return true;
 }
 
+function publicationResult(provider, data = {}) {
+  const result = data?.result && typeof data.result === "object" ? data.result : {};
+  const idByProvider = {
+    youtube: result.video_id,
+    tiktok: result.video_id || result.post_id || result.publish_id,
+    instagram: result.media_id,
+    facebook: result.video_id,
+    linkedin: result.post_id,
+    x: result.post_id,
+    threads: result.thread_id,
+    snapchat: result.post_id || result.media_id,
+  };
+  const id = String(idByProvider[provider] || result.external_id || result.id || "").trim();
+  let url = String(result.url || result.permalink || result.share_url || "").trim();
+  if (!url && id) {
+    if (provider === "youtube") url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+    if (provider === "x") url = `https://x.com/i/web/status/${encodeURIComponent(id)}`;
+    if (provider === "facebook") url = `https://www.facebook.com/watch/?v=${encodeURIComponent(id)}`;
+    if (provider === "linkedin") url = `https://www.linkedin.com/feed/update/${encodeURIComponent(id)}`;
+  }
+  return { id, url };
+}
+
+async function persistPublication(provider, contentRecordId, data) {
+  if (!/^rec[A-Za-z0-9]{14}$/.test(String(contentRecordId || ""))) return { skipped: true, reason: "content_record_id_absent" };
+  const mapping = PUBLICATION_FIELDS[provider];
+  if (!mapping) return { skipped: true, reason: "provider_unmapped" };
+  const publication = publicationResult(provider, data);
+  if (!publication.id) return { skipped: true, reason: "external_id_absent" };
+  const fields = { [mapping.id]: publication.id };
+  if (publication.url) fields[mapping.url] = publication.url;
+  await updateRecord(TABLES.content, contentRecordId, fields);
+  return { skipped: false, ...publication };
+}
+
 export async function GET(request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -124,9 +170,8 @@ export async function GET(request) {
     const jobId = String(job.fields?.job_id || job.id);
     const idempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${jobId}`);
     const campaign = String(params.utm_campaign || params.campaign || params.series || "hibou-organic").trim();
-    // Prefer the Airtable Content Pipeline record id so sales can be joined exactly
-    // to per-platform performance rows. Explicit utm_content still has priority.
-    const contentId = String(params.utm_content || params.content_record_id || params.content_id || params.video_id || jobId).trim();
+    const contentRecordId = String(params.content_record_id || "").trim();
+    const contentId = String(params.utm_content || contentRecordId || params.content_id || params.video_id || jobId).trim();
     const ctaUrl = socialCampaignUrl({ provider, campaign, contentId });
     let caption = String(params.caption || params.text || "");
     if (params.append_site_link === true && !caption.includes("d4d5d6.com")) {
@@ -150,7 +195,7 @@ export async function GET(request) {
         metadata: {
           ...(params.metadata || {}),
           job_id: jobId,
-          content_record_id: String(params.content_record_id || ""),
+          content_record_id: contentRecordId,
           idempotency_key: idempotencyKey,
           cta_url: ctaUrl,
           utm_source: provider,
@@ -172,14 +217,30 @@ export async function GET(request) {
       return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", error: message }, { status: 422 });
     }
 
-    const summary = JSON.stringify({ provider, requested_live: requestedLive, cta_url: ctaUrl, campaign, content_id: contentId, gateway: data });
+    const summaryBase = { provider, requested_live: requestedLive, cta_url: ctaUrl, campaign, content_id: contentId, gateway: data };
     if (requestedLive && data.live_allowed !== true) {
+      const summary = JSON.stringify(summaryBase);
       await finish(job, "Manual Review", summary, data.forced_dry_run_reason || "Publication live bloquée par politique");
       return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, dry_run: true, cta_url: ctaUrl });
     }
 
+    let persisted = { skipped: true, reason: data.dry_run === true ? "dry_run" : "not_live" };
+    if (requestedLive && data.live_allowed === true && data.dry_run !== true) {
+      try {
+        persisted = await persistPublication(provider, contentRecordId, data);
+      } catch (error) {
+        // Publication already happened. Never retry the external post automatically because
+        // Airtable persistence failed after the side effect.
+        const message = `Publié sur ${provider}, mais sauvegarde de l'ID externe impossible: ${String(error?.message || error)}`;
+        const summary = JSON.stringify({ ...summaryBase, publication_persistence: { ok: false, error: message } });
+        await finish(job, "Manual Review", summary, message);
+        return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, published: true, persistence_error: message, cta_url: ctaUrl });
+      }
+    }
+
+    const summary = JSON.stringify({ ...summaryBase, publication_persistence: persisted });
     await finish(job, "Completed", summary, "");
-    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true, cta_url: ctaUrl });
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true, cta_url: ctaUrl, publication: persisted });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 1000) }, { status: 500 });
   }

@@ -97,9 +97,10 @@ export async function GET(request) {
     <h1>Connexions sociales</h1><p class="sub">OAuth direct · tokens chiffrés · aucun jeton exposé au modèle.</p>
     <div class="summary"><span class="pill"><strong>${connectedCount}/${readiness.length}</strong> comptes OAuth connectés</span><span class="pill"><strong>${appReadyCount}/${readiness.length}</strong> apps prêtes</span><span class="pill">Domaine callback : <strong>${esc(callbackOrigin)}</strong></span></div>
     ${notice ? `<div class="notice">${esc(notice)}</div>` : ""}
+    <p><a class="button" href="/admin/social/control-plane">Ouvrir le control plane complet</a></p>
     <p>Coffre OAuth : <code>${esc(fingerprint)}</code>. Les tokens utilisateurs sont stockés chiffrés ; les client secrets restent des secrets serveur.</p>
     <div class="table-wrap"><table><thead><tr><th>Réseau</th><th>État</th><th>Scopes / préparation</th><th>Callback à déclarer</th><th>Configuration app</th><th>Portail</th><th>OAuth</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="foot">Ordre conseillé : 1) créer les apps et leurs secrets serveur ; 2) copier exactement les callbacks affichés ; 3) revenir ici et cliquer Connecter ; 4) conserver social_test_mode=TRUE jusqu’aux dry-runs et validations humaines. Le domaine d4d5d6.com pourra remplacer l’alias Vercel après validation DNS sans bloquer les premiers OAuth. Snapchat reste séparé : la publication organique serveur dépend d’un accès produit/approbation Snap distinct.</p>
+    <p class="foot">Ordre conseillé : 1) créer les apps et leurs secrets serveur ; 2) copier exactement les callbacks affichés ; 3) revenir ici et cliquer Connecter ; 4) conserver social_test_mode=TRUE jusqu’aux dry-runs et validations humaines. Le control plane complet vérifie en plus les variables serveur requises, les scopes accordés, les fallbacks webhook et synchronise l’état vers Airtable. Le domaine d4d5d6.com pourra remplacer l’alias Vercel après validation DNS sans bloquer les premiers OAuth. Snapchat reste séparé : la publication organique serveur dépend d’un accès produit/approbation Snap distinct.</p>
   </main></body></html>`;
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }

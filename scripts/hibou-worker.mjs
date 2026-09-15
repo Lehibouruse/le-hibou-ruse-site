@@ -416,9 +416,9 @@ async function main() {
   } catch (error) {
     outcome = { status: "failed", result: String(error.message || error), confidence: 0 };
   }
-  await api({ operation: "finalize", record_id: state.record_id, lock_token: state.lock_token, outcome, telemetry, external_id: state.external_id });
-  console.log(JSON.stringify({ job_id: state.job.fields.job_id, outcome, telemetry: { ...telemetry, response_ids: telemetry.response_ids.length } }));
-  if (outcome.status === "failed") process.exitCode = 1;
+  const finalized = await api({ operation: "finalize", record_id: state.record_id, lock_token: state.lock_token, outcome, telemetry, external_id: state.external_id });
+  console.log(JSON.stringify({ job_id: state.job.fields.job_id, outcome, finalized: { status: finalized.status, paused_credit: finalized.paused_credit === true }, telemetry: { ...telemetry, response_ids: telemetry.response_ids.length } }));
+  if (outcome.status === "failed" && finalized.paused_credit !== true) process.exitCode = 1;
 }
 
 await main();

@@ -4,6 +4,7 @@ import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { dispatchSocialPost } from "../../../lib/social-gateway.mjs";
 import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
 import { dispatchPinterestPost, pinterestStatus } from "../../../lib/pinterest-social.mjs";
+import { checkSocialAccount } from "../../../lib/social-account-check.mjs";
 import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -21,13 +22,11 @@ async function authenticate(request) {
   await verifyGithubActionsToken(token);
   return { kind: "github_oidc" };
 }
-
 async function runtimeConfiguration() {
   const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
   const config = configurationMap(records);
   return { config, policy: socialPolicy(config), env: socialRuntimeEnv(config) };
 }
-
 function dispatchExternalKey(provider, idempotencyKey) { return `social:${String(provider || "").toLowerCase()}:${idempotencyKey}`; }
 async function previousDispatch(provider, idempotencyKey) {
   const records = await queryRecords(TABLES.journal, { filterByFormula: `{ID externe}='${safeFormula(dispatchExternalKey(provider, idempotencyKey))}'`, pageSize: 1 });
@@ -61,7 +60,18 @@ export async function POST(request) {
       providers.push(await pinterestStatus({ ...process.env, ...env }));
       return NextResponse.json({ ok: true, authenticated_via: identity.kind, policy, providers });
     }
-    if (body.operation !== "dispatch") return NextResponse.json({ ok: false, error: "operation doit être status ou dispatch" }, { status: 400 });
+    if (body.operation === "check") {
+      if (!provider) return NextResponse.json({ ok: false, error: "provider requis" }, { status: 400 });
+      const result = await checkSocialAccount(provider, { ...process.env, ...env });
+      await createRecord(TABLES.journal, {
+        Workflow: "HIBOU_SOCIAL_CHECK_V1", Déclencheur: identity.kind, Action: `${provider} · read check`,
+        Statut: result.ok ? "Completed" : "Manual Review", "Dernière exécution": new Date().toISOString(),
+        "ID externe": `social-check:${provider}:${Date.now()}`, Erreur: result.ok ? "" : String(result.error || "").slice(0, 5000),
+        Notes: JSON.stringify({ provider, state: result.state, credential_source: result.credential_source || "", technical_id: result.technical_id || "" }).slice(0, 10000),
+      }).catch(() => {});
+      return NextResponse.json(result, { status: result.ok ? 200 : 422 });
+    }
+    if (body.operation !== "dispatch") return NextResponse.json({ ok: false, error: "operation doit être status, check ou dispatch" }, { status: 400 });
     if (!policy.gateway_enabled) return NextResponse.json({ ok: false, error: "Passerelle sociale désactivée par kill switch" }, { status: 423 });
 
     const humanApproved = body.human_approved === true;
@@ -76,8 +86,7 @@ export async function POST(request) {
       intent = await createDispatchIntent(provider, idempotencyKey, identity, body);
     }
 
-    let result;
-    let credentialSource = "";
+    let result; let credentialSource = "";
     if (provider === "pinterest") {
       const pstatus = await pinterestStatus({ ...process.env, ...env });
       credentialSource = pstatus.credential_source || "none";
@@ -88,16 +97,9 @@ export async function POST(request) {
       result = await dispatchSocialPost({ ...body, dry_run: !liveAllowed }, resolved.env);
     }
 
-    if (intent) {
-      await updateDispatchIntent(intent, {
-        Action: `${provider} · dispatched`, Erreur: "",
-        Notes: JSON.stringify({ state: "dispatched", provider, idempotency_key: idempotencyKey, credential_source: credentialSource, result, completed_at: new Date().toISOString() }).slice(0, 100000),
-      });
-    }
-
+    if (intent) await updateDispatchIntent(intent, { Action: `${provider} · dispatched`, Erreur: "", Notes: JSON.stringify({ state: "dispatched", provider, idempotency_key: idempotencyKey, credential_source: credentialSource, result, completed_at: new Date().toISOString() }).slice(0, 100000) });
     return NextResponse.json({
-      ...result, credential_source: credentialSource, policy, idempotency_key: idempotencyKey,
-      live_requested: requestedLive, live_allowed: liveAllowed,
+      ...result, credential_source: credentialSource, policy, idempotency_key: idempotencyKey, live_requested: requestedLive, live_allowed: liveAllowed,
       forced_dry_run_reason: liveAllowed ? "" : policy.test_mode ? "social_test_mode" : policy.review_required && !humanApproved ? "human_review_required" : "dry_run_requested",
     });
   } catch (error) {

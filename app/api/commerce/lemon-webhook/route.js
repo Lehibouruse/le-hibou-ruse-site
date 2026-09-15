@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { escapeFormula, lemonOrder, verifyLemonSignature } from "../../../../lib/commerce.mjs";
+import { saleAttribution } from "../../../../lib/attribution.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +105,7 @@ export async function POST(request) {
 
   const [product, edition] = await Promise.all([matchingProduct(order), currentEdition()]);
   const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
+  const attribution = saleAttribution(order.customData);
   const ready = Boolean(
     product
     && fileGuid
@@ -128,8 +130,13 @@ export async function POST(request) {
     Devise: order.currency,
     Statut: order.status || "paid",
     "ID commande externe": order.id,
-    Provenance: "Lemon Squeezy",
-    Campagne: String(order.customData?.campaign || order.customData?.utm_campaign || ""),
+    Provenance: attribution.utm_source || "Lemon Squeezy",
+    Campagne: attribution.utm_campaign || "",
+    "UTM Source": attribution.utm_source || "",
+    "UTM Medium": attribution.utm_medium || "",
+    "UTM Content": attribution.utm_content || "",
+    "Landing Page": attribution.landing_page || "",
+    Referrer: attribution.referrer || "",
     Remboursement: "",
     "Email client": order.email,
     Notes: [
@@ -137,8 +144,9 @@ export async function POST(request) {
       `product_id=${order.productId}`,
       `variant_id=${order.variantId}`,
       `test_mode=${order.testMode}`,
+      attribution.utm_term ? `utm_term=${attribution.utm_term}` : "",
       ...reasons,
-    ].join("; "),
+    ].filter(Boolean).join("; "),
     "Livraison statut": deliveryStatus,
     "Digify recipient email": order.email,
     "Digify File GUID": fileGuid,
@@ -148,5 +156,5 @@ export async function POST(request) {
   });
   const saleId = actionId(created);
   await journal(order, ready ? "Completed" : "Manual Review", ready ? `Commande enregistrée; livraison Digify en attente · édition ${edition}` : reasons.join("; "), saleId);
-  return NextResponse.json({ ok: true, sale_id: saleId, delivery_status: deliveryStatus });
+  return NextResponse.json({ ok: true, sale_id: saleId, delivery_status: deliveryStatus, attributed: Boolean(attribution.utm_source || attribution.utm_campaign || attribution.utm_content) });
 }

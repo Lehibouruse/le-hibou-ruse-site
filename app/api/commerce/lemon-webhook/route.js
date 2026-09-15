@@ -28,6 +28,19 @@ async function matchingProduct(order) {
   return products.find((record) => String(record.fields?.["Lemon Squeezy Variant ID"] || "") === order.variantId) || null;
 }
 
+async function currentEdition() {
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: "AND({Actif}=1,{Clé}='book_current_edition')",
+    pageSize: 1,
+  });
+  return String(records[0]?.fields?.Valeur || "").trim();
+}
+
+function finalEdition(value) {
+  const edition = String(value || "").trim();
+  return Boolean(edition && !edition.toLowerCase().includes("draft"));
+}
+
 async function journal(order, status, note, externalId = "") {
   await createRecord(TABLES.journal, {
     Workflow: "HIBOU_LEMON_WEBHOOK_V1",
@@ -89,15 +102,24 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, deduplicated: true, sale_id: existing.id });
   }
 
-  const product = await matchingProduct(order);
+  const [product, edition] = await Promise.all([matchingProduct(order), currentEdition()]);
   const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
-  const ready = Boolean(product && fileGuid && order.status === "paid" && !order.refunded);
+  const ready = Boolean(
+    product
+    && fileGuid
+    && order.status === "paid"
+    && !order.refunded
+    && !order.testMode
+    && finalEdition(edition)
+  );
   const deliveryStatus = ready ? "pending" : "manual_review";
   const reasons = [];
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
   if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);
-  if (order.testMode) reasons.push("commande Lemon en mode test");
+  if (order.refunded) reasons.push("commande déjà remboursée");
+  if (order.testMode) reasons.push("commande Lemon en mode test: livraison bloquée");
+  if (!finalEdition(edition)) reasons.push(`édition livre non finale: ${edition || "absente"}`);
 
   const created = await createRecord(TABLES.sales, {
     Produit: String(product?.fields?.Produit || order.productName || "Le Hibou Rusé"),
@@ -119,10 +141,12 @@ export async function POST(request) {
     ].join("; "),
     "Livraison statut": deliveryStatus,
     "Digify recipient email": order.email,
+    "Digify File GUID": fileGuid,
+    "Version livre livrée": edition,
     "Livraison tentatives": 0,
     "Livraison erreur": reasons.join("; "),
   });
   const saleId = actionId(created);
-  await journal(order, ready ? "Completed" : "Manual Review", ready ? "Commande enregistrée; livraison Digify en attente" : reasons.join("; "), saleId);
+  await journal(order, ready ? "Completed" : "Manual Review", ready ? `Commande enregistrée; livraison Digify en attente · édition ${edition}` : reasons.join("; "), saleId);
   return NextResponse.json({ ok: true, sale_id: saleId, delivery_status: deliveryStatus });
 }

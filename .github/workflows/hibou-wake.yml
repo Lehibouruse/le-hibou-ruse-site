@@ -78,8 +78,10 @@ jobs:
             https://le-hibou-ruse-site.vercel.app/api/commerce/revoke 2>&1 || true)
           printf 'revocation=%s\n' "$revocation"
 
+          # Retry transient HTTP/network failures only. A 409/422 business outcome
+          # is normalized to HTTP 200 by /api/wake and must never be replayed.
           response=$(curl --fail-with-body --silent --show-error \
-            --retry 2 --retry-all-errors \
+            --retry 2 --retry-delay 1 --retry-max-time 30 \
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "X-Hibou-Dry-Run: ${DRY_RUN}" \

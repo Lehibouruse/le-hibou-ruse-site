@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
-import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway.mjs";
+import { dispatchSocialPost } from "../../../lib/social-gateway.mjs";
+import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
 import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -89,7 +90,7 @@ export async function POST(request) {
         ok: true,
         authenticated_via: identity.kind,
         policy,
-        providers: socialGatewayStatus(env),
+        providers: await socialGatewayStatusWithVault(env),
       });
     }
 
@@ -129,10 +130,11 @@ export async function POST(request) {
       intent = await createDispatchIntent(body.provider, idempotencyKey, identity, body);
     }
 
+    const resolved = await resolveSocialEnv(body.provider, env);
     const result = await dispatchSocialPost({
       ...body,
       dry_run: !liveAllowed,
-    }, env);
+    }, resolved.env);
 
     if (intent) {
       await updateDispatchIntent(intent, {
@@ -142,6 +144,7 @@ export async function POST(request) {
           state: "dispatched",
           provider: String(body.provider || "").toLowerCase(),
           idempotency_key: idempotencyKey,
+          credential_source: resolved.source,
           result,
           completed_at: new Date().toISOString(),
         }).slice(0, 100000),
@@ -150,6 +153,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       ...result,
+      credential_source: resolved.source,
       policy,
       idempotency_key: idempotencyKey,
       live_requested: requestedLive,

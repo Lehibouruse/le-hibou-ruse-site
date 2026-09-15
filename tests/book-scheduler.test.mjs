@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 const scheduler = readFileSync(new URL("../app/api/book-scheduler/route.js", import.meta.url), "utf8");
+const editorial = readFileSync(new URL("../lib/book-editorial.mjs", import.meta.url), "utf8");
 const wake = readFileSync(new URL("../app/api/wake/route.js", import.meta.url), "utf8");
 const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
 const airtable = readFileSync(new URL("../lib/airtable.js", import.meta.url), "utf8");
@@ -24,10 +25,10 @@ test("le scheduler borne les lots et ne génère jamais tout le corpus en un app
   assert.match(scheduler, /source_end/);
 });
 
-test("le scheduler impose une ligne rouge non opérationnelle pour les fraudes", () => {
-  assert.match(scheduler, /ne doivent jamais devenir des tutoriels/);
-  assert.match(scheduler, /Ne donne pas d'étapes permettant de commettre ou dissimuler une fraude/);
-  assert.match(scheduler, /\[À VÉRIFIER\]/);
+test("le contrat éditorial impose une ligne rouge non opérationnelle pour les fraudes", () => {
+  assert.match(editorial, /ne doivent jamais devenir des tutoriels/);
+  assert.match(editorial, /Ne donne jamais de procédure pour contourner un contrôle/);
+  assert.match(editorial, /\[À VÉRIFIER\]/);
 });
 
 test("les changements du scheduler déclenchent les self-tests", () => {

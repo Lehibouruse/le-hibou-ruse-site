@@ -26,6 +26,7 @@ export default function Page() {
 
     <h2>Mesure d’audience et attribution</h2>
     <p>Le site utilise une mesure d’audience sobre pour comprendre la fréquentation et les interactions essentielles. Lorsqu’un visiteur arrive via un lien de campagne, des paramètres d’attribution tels que la source, la campagne ou l’identifiant d’un contenu peuvent être conservés localement dans son navigateur afin de relier, le cas échéant, l’ouverture du checkout à la campagne d’origine. Cette attribution est first-party : elle sert à mesurer l’efficacité des contenus du Hibou et n’a pas pour objet de suivre le visiteur sur d’autres sites.</p>
+    <p>Pour mesurer le funnel, le site peut enregistrer deux événements techniques : l’arrivée attribuée sur le site et le clic vers le checkout. Ces événements utilisent un identifiant de session aléatoire stocké localement, sans adresse IP enregistrée dans la table de conversion, sans fingerprinting et sans identifiant publicitaire tiers. Ils peuvent inclure la source, la campagne, l’identifiant du contenu, la page d’entrée et le référent lorsqu’ils sont disponibles.</p>
     <p>Si un achat est réalisé, les données d’attribution strictement nécessaires peuvent être transmises au checkout comme données techniques non affichées au client, puis rattachées à la vente dans Airtable. Aucun numéro de carte ni donnée de paiement sensible n’est ajouté à ces paramètres. Aucun traceur publicitaire tiers optionnel nécessitant un consentement ne doit être activé sans mécanisme adapté.</p>
 
     <h2>Durées de conservation</h2>

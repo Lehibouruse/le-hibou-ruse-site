@@ -3,23 +3,13 @@ import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 import { socialCampaignUrl } from "../../../lib/attribution.mjs";
+import { publicationFields } from "../../../lib/social-publication.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const LEASE_MS = 5 * 60 * 1000;
-
-const PUBLICATION_FIELDS = {
-  youtube: { id: "ID YouTube", url: "URL YouTube" },
-  tiktok: { id: "ID TikTok", url: "URL TikTok" },
-  instagram: { id: "ID Instagram", url: "URL Instagram" },
-  facebook: { id: "ID Facebook", url: "URL Facebook" },
-  linkedin: { id: "ID LinkedIn", url: "URL LinkedIn" },
-  x: { id: "ID X", url: "URL X" },
-  threads: { id: "ID Threads", url: "URL Threads" },
-  snapchat: { id: "ID Snapchat", url: "URL Snapchat" },
-};
 
 function parameters(job) {
   try { return JSON.parse(job?.fields?.parameters || "{}"); }
@@ -103,39 +93,12 @@ async function retry(job, message) {
   return true;
 }
 
-function publicationResult(provider, data = {}) {
-  const result = data?.result && typeof data.result === "object" ? data.result : {};
-  const idByProvider = {
-    youtube: result.video_id,
-    tiktok: result.video_id || result.post_id || result.publish_id,
-    instagram: result.media_id,
-    facebook: result.video_id,
-    linkedin: result.post_id,
-    x: result.post_id,
-    threads: result.thread_id,
-    snapchat: result.post_id || result.media_id,
-  };
-  const id = String(idByProvider[provider] || result.external_id || result.id || "").trim();
-  let url = String(result.url || result.permalink || result.share_url || "").trim();
-  if (!url && id) {
-    if (provider === "youtube") url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
-    if (provider === "x") url = `https://x.com/i/web/status/${encodeURIComponent(id)}`;
-    if (provider === "facebook") url = `https://www.facebook.com/watch/?v=${encodeURIComponent(id)}`;
-    if (provider === "linkedin") url = `https://www.linkedin.com/feed/update/${encodeURIComponent(id)}`;
-  }
-  return { id, url };
-}
-
 async function persistPublication(provider, contentRecordId, data) {
   if (!/^rec[A-Za-z0-9]{14}$/.test(String(contentRecordId || ""))) return { skipped: true, reason: "content_record_id_absent" };
-  const mapping = PUBLICATION_FIELDS[provider];
-  if (!mapping) return { skipped: true, reason: "provider_unmapped" };
-  const publication = publicationResult(provider, data);
-  if (!publication.id) return { skipped: true, reason: "external_id_absent" };
-  const fields = { [mapping.id]: publication.id };
-  if (publication.url) fields[mapping.url] = publication.url;
-  await updateRecord(TABLES.content, contentRecordId, fields);
-  return { skipped: false, ...publication };
+  const publication = publicationFields(provider, data);
+  if (!publication.id) return { skipped: true, reason: publication.reason || "external_id_absent" };
+  await updateRecord(TABLES.content, contentRecordId, publication.fields);
+  return { skipped: false, id: publication.id, url: publication.url };
 }
 
 export async function GET(request) {
@@ -229,8 +192,6 @@ export async function GET(request) {
       try {
         persisted = await persistPublication(provider, contentRecordId, data);
       } catch (error) {
-        // Publication already happened. Never retry the external post automatically because
-        // Airtable persistence failed after the side effect.
         const message = `Publié sur ${provider}, mais sauvegarde de l'ID externe impossible: ${String(error?.message || error)}`;
         const summary = JSON.stringify({ ...summaryBase, publication_persistence: { ok: false, error: message } });
         await finish(job, "Manual Review", summary, message);

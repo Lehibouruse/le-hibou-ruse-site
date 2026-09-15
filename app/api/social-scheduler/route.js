@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
-import { socialCampaignUrl } from "../../../lib/attribution.mjs";
+import { PUBLIC_SITE_URL, socialCampaignUrl } from "../../../lib/attribution.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,9 +125,10 @@ export async function GET(request) {
     const idempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${jobId}`);
     const campaign = String(params.utm_campaign || params.campaign || params.series || "hibou-organic").trim();
     const contentId = String(params.utm_content || params.content_id || params.video_id || jobId).trim();
-    const ctaUrl = socialCampaignUrl({ provider, campaign, contentId });
+    const publicBase = process.env.HIBOU_PUBLIC_BASE_URL || PUBLIC_SITE_URL;
+    const ctaUrl = socialCampaignUrl({ baseUrl: `${publicBase.replace(/\/$/, "")}/`, provider, campaign, contentId });
     let caption = String(params.caption || params.text || "");
-    if (params.append_site_link === true && !caption.includes("d4d5d6.com")) {
+    if (params.append_site_link === true && !caption.includes(ctaUrl)) {
       caption = `${caption.trim()}\n\n${ctaUrl}`.trim();
     }
 

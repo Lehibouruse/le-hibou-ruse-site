@@ -61,3 +61,5 @@ jobs:
             ${{ steps.export.outputs.html }}
           if-no-files-found: error
           retention-days: 1
+
+# one-off export retry after temporary OIDC authorization

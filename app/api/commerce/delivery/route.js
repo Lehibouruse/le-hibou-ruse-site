@@ -37,7 +37,12 @@ async function currentEdition() {
     filterByFormula: "AND({Actif}=1,{Clé}='book_current_edition')",
     pageSize: 1,
   });
-  return String(records[0]?.fields?.Valeur || "V1.0");
+  return String(records[0]?.fields?.Valeur || "V1.0").trim();
+}
+
+function finalEdition(value) {
+  const edition = String(value || "").trim();
+  return Boolean(edition && !edition.toLowerCase().includes("draft"));
 }
 
 export async function POST(request) {
@@ -84,21 +89,25 @@ export async function POST(request) {
   }
 
   const product = await productForSale(current);
-  const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
+  const fileGuid = String(current.fields?.["Digify File GUID"] || product?.fields?.["Digify File GUID"] || "").trim();
   const email = String(current.fields?.["Digify recipient email"] || current.fields?.["Email client"] || "").trim().toLowerCase();
   const orderId = String(current.fields?.["ID commande externe"] || "");
-  if (!product || !fileGuid || !email) {
-    const reason = !product ? "Produit actif introuvable" : !fileGuid ? "Digify File GUID absent" : "Email destinataire absent";
+  const snapshottedEdition = String(current.fields?.["Version livre livrée"] || "").trim();
+  const edition = snapshottedEdition || await currentEdition();
+
+  if (!fileGuid || !email || !finalEdition(edition)) {
+    const reason = !fileGuid
+      ? "Digify File GUID absent de la vente et du produit"
+      : !email
+        ? "Email destinataire absent"
+        : `Édition livre non finale: ${edition || "absente"}`;
     await updateRecord(TABLES.sales, current.id, { "Livraison statut": "manual_review", "Livraison erreur": reason });
     await journal(current, "Manual Review", reason);
     return NextResponse.json({ ok: true, processed: 1, status: "manual_review", reason });
   }
 
   try {
-    const [delivered, edition] = await Promise.all([
-      addDigifyRecipient({ fileGuid, email, orderId }),
-      currentEdition(),
-    ]);
+    const delivered = await addDigifyRecipient({ fileGuid, email, orderId });
     const url = delivered.accessUrl || String(process.env.DIGIFY_GENERIC_FILE_URL || "");
     await updateRecord(TABLES.sales, current.id, {
       "Livraison statut": "delivered",

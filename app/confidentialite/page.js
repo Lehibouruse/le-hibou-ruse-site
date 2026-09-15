@@ -24,11 +24,12 @@ export default function Page() {
     <h2>Lecture protégée du guide</h2>
     <p>Lorsque le guide sera commercialisé, l’adresse e-mail utilisée pour l’achat pourra être transmise au prestataire de lecture sécurisée afin de créer un accès nominatif. Selon les paramètres retenus, des événements de consultation tels que première ouverture, vues, impression ou téléchargement autorisé pourront être remontés afin d’assurer la fourniture, la sécurité du contenu et le support. Le paramétrage définitif sera indiqué avant lancement.</p>
 
-    <h2>Mesure d’audience et cookies</h2>
-    <p>Le site peut utiliser une mesure d’audience sobre pour comprendre la fréquentation et les interactions essentielles. Aucun traceur optionnel nécessitant un consentement ne doit être activé sans mécanisme adapté. Cette section devra être mise à jour si de nouveaux outils publicitaires ou de suivi sont ajoutés.</p>
+    <h2>Mesure d’audience et attribution</h2>
+    <p>Le site utilise une mesure d’audience sobre pour comprendre la fréquentation et les interactions essentielles. Lorsqu’un visiteur arrive via un lien de campagne, des paramètres d’attribution tels que la source, la campagne ou l’identifiant d’un contenu peuvent être conservés localement dans son navigateur afin de relier, le cas échéant, l’ouverture du checkout à la campagne d’origine. Cette attribution est first-party : elle sert à mesurer l’efficacité des contenus du Hibou et n’a pas pour objet de suivre le visiteur sur d’autres sites.</p>
+    <p>Si un achat est réalisé, les données d’attribution strictement nécessaires peuvent être transmises au checkout comme données techniques non affichées au client, puis rattachées à la vente dans Airtable. Aucun numéro de carte ni donnée de paiement sensible n’est ajouté à ces paramètres. Aucun traceur publicitaire tiers optionnel nécessitant un consentement ne doit être activé sans mécanisme adapté.</p>
 
     <h2>Durées de conservation</h2>
-    <p>Les données ne doivent pas être conservées plus longtemps que nécessaire au regard de leur finalité et des obligations légales. <strong>[À COMPLÉTER AVANT LANCEMENT : tableau ou critères de conservation pour demandes, commandes, facturation, accès Digify et journaux techniques.]</strong></p>
+    <p>Les données ne doivent pas être conservées plus longtemps que nécessaire au regard de leur finalité et des obligations légales. <strong>[À COMPLÉTER AVANT LANCEMENT : tableau ou critères de conservation pour demandes, commandes, facturation, accès Digify, attribution de campagne et journaux techniques.]</strong></p>
 
     <h2>Vos droits</h2>
     <p>Vous pouvez, lorsque les conditions légales sont réunies, demander l’accès à vos données, leur rectification, leur effacement, leur limitation, leur portabilité ou vous opposer à certains traitements. Vous pouvez également retirer un consentement lorsqu’un traitement repose sur celui-ci. Les demandes pourront être adressées à <strong>[e-mail vie privée à compléter]</strong>. Vous disposez par ailleurs du droit d’introduire une réclamation auprès de la CNIL.</p>

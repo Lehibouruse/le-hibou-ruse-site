@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+import { socialCampaignUrl } from "../../../lib/attribution.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +121,16 @@ export async function GET(request) {
 
     const requestedLive = params.publication_authorization === true || params.publish === true || params.dry_run === false;
     const humanApproved = params.human_approved === true || params.validation_humaine === true;
-    const idempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${job.fields?.job_id || job.id}`);
+    const jobId = String(job.fields?.job_id || job.id);
+    const idempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${jobId}`);
+    const campaign = String(params.utm_campaign || params.campaign || params.series || "hibou-organic").trim();
+    const contentId = String(params.utm_content || params.content_id || params.video_id || jobId).trim();
+    const ctaUrl = socialCampaignUrl({ provider, campaign, contentId });
+    let caption = String(params.caption || params.text || "");
+    if (params.append_site_link === true && !caption.includes("d4d5d6.com")) {
+      caption = `${caption.trim()}\n\n${ctaUrl}`.trim();
+    }
+
     const response = await fetch(`${baseUrl(request)}/api/social`, {
       method: "POST",
       headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
@@ -128,14 +138,23 @@ export async function GET(request) {
         operation: "dispatch",
         provider,
         media_url: mediaUrl,
-        caption: String(params.caption || params.text || ""),
+        caption,
         title: String(params.title || ""),
         privacy_level: String(params.privacy_level || ""),
         dry_run: !requestedLive,
         human_approved: humanApproved,
         idempotency_key: idempotencyKey,
         is_aigc: params.is_aigc !== false,
-        metadata: { ...(params.metadata || {}), job_id: job.fields?.job_id || job.id, idempotency_key: idempotencyKey },
+        metadata: {
+          ...(params.metadata || {}),
+          job_id: jobId,
+          idempotency_key: idempotencyKey,
+          cta_url: ctaUrl,
+          utm_source: provider,
+          utm_medium: "organic_social",
+          utm_campaign: campaign,
+          utm_content: contentId,
+        },
       }),
       cache: "no-store",
     });
@@ -150,14 +169,14 @@ export async function GET(request) {
       return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", error: message }, { status: 422 });
     }
 
-    const summary = JSON.stringify({ provider, requested_live: requestedLive, gateway: data });
+    const summary = JSON.stringify({ provider, requested_live: requestedLive, cta_url: ctaUrl, campaign, content_id: contentId, gateway: data });
     if (requestedLive && data.live_allowed !== true) {
       await finish(job, "Manual Review", summary, data.forced_dry_run_reason || "Publication live bloquée par politique");
-      return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, dry_run: true });
+      return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, dry_run: true, cta_url: ctaUrl });
     }
 
     await finish(job, "Completed", summary, "");
-    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true });
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true, cta_url: ctaUrl });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 1000) }, { status: 500 });
   }

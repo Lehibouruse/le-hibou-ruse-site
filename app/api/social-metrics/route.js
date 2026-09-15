@@ -41,6 +41,10 @@ async function persist(target, metrics, state = "active", error = "") {
     Comments: Number(metrics?.comments || 0),
     Shares: Number(metrics?.shares || 0),
     Saves: Number(metrics?.saves || 0),
+    "Watch Time Seconds": Number(metrics?.watch_time_seconds || 0),
+    "Completion %": Number(metrics?.completion || 0),
+    Clicks: Number(metrics?.clicks || 0),
+    "Followers Generated": Number(metrics?.followers_generated || 0),
     Status: state,
     "Last Error": String(error || "").slice(0, 4000),
   };

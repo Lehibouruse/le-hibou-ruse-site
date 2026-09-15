@@ -1,4 +1,6 @@
 import { completeSocialAuthorization } from "../../../../../../lib/social-oauth.mjs";
+import { queryRecords, TABLES } from "../../../../../../lib/airtable.js";
+import { configurationMap, socialRuntimeEnv } from "../../../../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,6 +9,15 @@ function adminUrl(request, params = {}) {
   const url = new URL("/admin/social", request.url);
   for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, String(value));
   return url;
+}
+
+async function oauthEnv() {
+  try {
+    const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
+    return socialRuntimeEnv(configurationMap(records), process.env);
+  } catch {
+    return process.env;
+  }
 }
 
 export async function GET(request, context) {
@@ -20,7 +31,7 @@ export async function GET(request, context) {
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
     if (!code || !state) return Response.redirect(adminUrl(request, { error: `${provider}:missing_code_or_state` }), 302);
-    const result = await completeSocialAuthorization(provider, { code, state });
+    const result = await completeSocialAuthorization(provider, { code, state }, await oauthEnv());
     return Response.redirect(adminUrl(request, { connected: result.provider }), 302);
   } catch (error) {
     const message = String(error?.message || error).replace(/[\r\n]+/g, " ").slice(0, 180);

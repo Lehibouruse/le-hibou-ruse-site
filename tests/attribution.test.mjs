@@ -5,6 +5,7 @@ import {
   checkoutWithAttribution,
   normalizeAttribution,
   saleAttribution,
+  socialCampaignUrl,
 } from "../lib/attribution.mjs";
 
 test("capture une campagne et conserve la landing initiale", () => {
@@ -42,6 +43,19 @@ test("normalisation supprime contrôles et borne les valeurs", () => {
   const normalized = normalizeAttribution({ utm_source: "  tik\u0000tok  ", utm_content: "a".repeat(500) });
   assert.equal(normalized.utm_source, "tiktok");
   assert.equal(normalized.utm_content.length, 160);
+});
+
+test("génère un lien social traçable par provider et création", () => {
+  const url = new URL(socialCampaignUrl({
+    provider: "instagram",
+    campaign: "serie-failles",
+    contentId: "reel-018-hook-b",
+  }));
+  assert.equal(url.origin, "https://d4d5d6.com");
+  assert.equal(url.searchParams.get("utm_source"), "instagram");
+  assert.equal(url.searchParams.get("utm_medium"), "organic_social");
+  assert.equal(url.searchParams.get("utm_campaign"), "serie-failles");
+  assert.equal(url.searchParams.get("utm_content"), "reel-018-hook-b");
 });
 
 test("les custom data Lemon deviennent une attribution vente", () => {

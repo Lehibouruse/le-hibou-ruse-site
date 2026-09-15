@@ -3,6 +3,7 @@ import { createRecord, getAllRecords, queryRecords, TABLES, updateRecord } from 
 import { escapeFormula } from "../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { contentMetricTargets, fetchSocialMetrics, performanceKey, selectMetricTargets } from "../../../lib/social-metrics-enhanced.mjs";
+import { configurationMap, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,12 +48,22 @@ function classify(error) {
   return "error";
 }
 
+async function metricsRuntimeEnv() {
+  try {
+    const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
+    return socialRuntimeEnv(configurationMap(records), process.env);
+  } catch {
+    return process.env;
+  }
+}
+
 export async function POST(request) {
   if (!(await authorized(request))) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   try {
-    const [contentRecords, performanceRecords] = await Promise.all([
+    const [contentRecords, performanceRecords, env] = await Promise.all([
       getAllRecords(TABLES.content, { maxRecords: 2000 }),
       getAllRecords(TABLES.socialPerformance, { maxRecords: 5000 }),
+      metricsRuntimeEnv(),
     ]);
     const targets = selectMetricTargets(contentRecords.flatMap(contentMetricTargets), performanceRecords, MAX_TARGETS_PER_RUN);
     if (!targets.length) return NextResponse.json({ ok: true, processed: 0, reason: "no_published_ids" });
@@ -60,7 +71,7 @@ export async function POST(request) {
     const results = [];
     for (const target of targets) {
       try {
-        const metrics = await fetchSocialMetrics(target.provider, target.external_id);
+        const metrics = await fetchSocialMetrics(target.provider, target.external_id, env);
         const saved = await persist(target, metrics, "active", "");
         results.push({ ...target, ok: true, metrics, ...saved });
       } catch (error) {

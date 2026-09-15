@@ -2,13 +2,12 @@
 
 Ce document liste uniquement les dépendances externes qui restent une fois le code prêt. Aucun secret ne doit être commité dans GitHub ou Airtable.
 
-## 1. Domaine
+## 1. URL publique
 
-- Ajouter `d4d5d6.com` et `www.d4d5d6.com` au projet Vercel.
-- Appliquer exactement les enregistrements DNS fournis par Vercel chez OVH.
-- Vérifier HTTPS et redirection canonique.
-- Vérifier `/api/site-identity` sur le domaine final.
-- Passer `domain_verified=true` dans Airtable uniquement après contrôle réel.
+- URL publique principale retenue : `https://le-hibou-ruse-site.vercel.app`.
+- Vérifier que `/api/site-identity` répond bien `site=Le Hibou Rusé` et `canonical=true` sur cet alias.
+- `d4d5d6.com` n’est plus le visage public du projet ; il peut rester un alias secondaire et rediriger vers le Vercel brandé si on décide de le raccorder plus tard.
+- Ne jamais activer une redirection canonique avant d’avoir vérifié l’alias de destination.
 
 ## 2. Lemon Squeezy
 
@@ -33,14 +32,14 @@ Ce document liste uniquement les dépendances externes qui restent une fois le c
 Le broker OAuth est accessible sur `/admin/social`. Les jetons sont stockés chiffrés dans Airtable `Social Credentials`; aucun jeton en clair ne doit être copié dans Airtable, GitHub ou un prompt.
 
 ### YouTube
-Callback : `https://d4d5d6.com/api/social/oauth/youtube/callback`
+Callback : `https://le-hibou-ruse-site.vercel.app/api/social/oauth/youtube/callback`
 - Créer/configurer l’app Google OAuth.
 - Variables serveur : client ID et client secret Google/YouTube.
 - Autoriser le compte une fois via `/admin/social`.
 - Vérifier que le refresh token est bien conservé et qu’un upload privé dry-run/test fonctionne avant publication publique.
 
 ### Meta — Instagram + Facebook
-Callback : `https://d4d5d6.com/api/social/oauth/meta/callback`
+Callback : `https://le-hibou-ruse-site.vercel.app/api/social/oauth/meta/callback`
 - Créer/configurer l’app Meta.
 - Demander les permissions nécessaires à la Page et au compte Instagram Business.
 - Variables serveur : app ID/client ID et secret Meta.
@@ -48,7 +47,7 @@ Callback : `https://d4d5d6.com/api/social/oauth/meta/callback`
 - Le broker doit résoudre Page ID, Page access token et Instagram Business Account ID.
 
 ### TikTok
-Callback : `https://d4d5d6.com/api/social/oauth/tiktok/callback`
+Callback : `https://le-hibou-ruse-site.vercel.app/api/social/oauth/tiktok/callback`
 - Créer l’app développeur TikTok.
 - Autoriser `user.info.basic`, `video.publish`, `video.upload` selon l’accès réellement accordé.
 - Variables serveur : client key et client secret.
@@ -56,21 +55,21 @@ Callback : `https://d4d5d6.com/api/social/oauth/tiktok/callback`
 - Avant audit TikTok, maintenir le direct en `SELF_ONLY`; ne pas contourner l’audit pour publier publiquement.
 
 ### LinkedIn
-Callback : `https://d4d5d6.com/api/social/oauth/linkedin/callback`
+Callback : `https://le-hibou-ruse-site.vercel.app/api/social/oauth/linkedin/callback`
 - Créer/configurer l’app LinkedIn.
 - Autoriser `w_member_social` et les scopes réellement disponibles.
 - Variables serveur : client ID, client secret, version API LinkedIn.
 - Autoriser via `/admin/social` puis vérifier l’URN auteur.
 
 ### X
-Callback : `https://d4d5d6.com/api/social/oauth/x/callback`
+Callback : `https://le-hibou-ruse-site.vercel.app/api/social/oauth/x/callback`
 - Créer/configurer l’app développeur X avec écriture et média.
 - Autoriser `tweet.read users.read tweet.write offline.access` selon le plan réellement disponible.
 - Variables serveur : client ID et, si nécessaire, client secret.
 - Autoriser via `/admin/social`; vérifier refresh et upload vidéo natif avant live.
 
 ### Threads
-Callback : `https://d4d5d6.com/api/social/oauth/threads/callback`
+Callback : `https://le-hibou-ruse-site.vercel.app/api/social/oauth/threads/callback`
 - Configurer l’app Threads/Meta.
 - Autoriser `threads_basic` et `threads_content_publish`.
 - Variables serveur : client ID/app ID et secret Threads/Meta.
@@ -80,14 +79,22 @@ Callback : `https://d4d5d6.com/api/social/oauth/threads/callback`
 - Aucun faux connecteur n’est utilisé.
 - La publication organique serveur reste conditionnée à l’accès Public Profile API / produit Snap et à l’approbation du compte.
 
-## 5. Livre
+## 5. Croissance et attribution
+
+- Chaque contenu social doit utiliser un `utm_source`, `utm_campaign` et `utm_content` distinct quand la plateforme permet un lien traçable.
+- L’URL de destination par défaut est `https://le-hibou-ruse-site.vercel.app`.
+- Le site conserve l’attribution first-party, journalise `landing` et `checkout_click`, puis transmet la campagne à Lemon Squeezy via les custom data du checkout.
+- Le webhook Lemon rattache ensuite la vente à son réseau/campagne/création dans Airtable.
+- `/admin/growth` sert de tableau privé d’arbitrage : la priorité est le revenu/visiteur et le taux visite→achat, pas le nombre de likes seul.
+
+## 6. Livre
 
 - Les 13 chapitres corpus sont générés par lots de 5 et réconciliés automatiquement.
 - Une fois 13/13 complets, le finaliseur génère automatiquement, un bloc par wake : ouverture → annexe lignes rouges → conclusion.
 - Aucun bloc n’est automatiquement marqué `Validation humaine=true` ni `Prêt export=true`.
 - Après relecture humaine, fixer une édition non-draft, exporter le PDF maître et le charger dans Digify.
 
-## 6. Juridique avant vente
+## 7. Juridique avant vente
 
 Compléter réellement avant ouverture commerciale :
 - identité de l’entité éditrice/vendeuse, forme, capital le cas échéant, siège, SIREN/RCS, email de contact ;
@@ -97,6 +104,6 @@ Compléter réellement avant ouverture commerciale :
 - mécanisme de consentement requis pour l’exécution immédiate du contenu numérique et traitement du droit de rétractation ;
 - validation finale des CGV, mentions légales et confidentialité.
 
-## 7. Go live
+## 8. Go live
 
-Le checkout ne doit s’ouvrir que lorsque le readiness strict est vert : domaine vérifié, paiement live, webhook, édition finale, 16/16 blocs livre prêts, Digify final, API Digify et documents juridiques validés. Réaliser au moins un achat réel contrôlé et une livraison/révocation réelle avant activation publique.
+Le checkout ne doit s’ouvrir que lorsque le readiness strict est vert : URL publique vérifiée, paiement live, webhook, édition finale, 16/16 blocs livre prêts, Digify final, API Digify et documents juridiques validés. Réaliser au moins un achat réel contrôlé et une livraison/révocation réelle avant activation publique.

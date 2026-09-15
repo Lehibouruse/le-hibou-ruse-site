@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { track } from "@vercel/analytics";
 import { ATTRIBUTION_STORAGE_KEY, captureAttribution } from "../lib/attribution.mjs";
+import { sendConversionEvent } from "../lib/conversion-client.mjs";
 
 function readStored() {
   try {
@@ -30,6 +31,7 @@ export default function AttributionCapture() {
           campaign: next.utm_campaign || "unknown",
           content: next.utm_content || "unknown",
         });
+        sendConversionEvent("landing", next, { dedupeKey: "landing" });
       }
     } catch {}
   }, []);

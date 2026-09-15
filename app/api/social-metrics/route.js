@@ -3,6 +3,7 @@ import { createRecord, getAllRecords, queryRecords, TABLES, updateRecord } from 
 import { escapeFormula } from "../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { contentMetricTargets, fetchSocialMetrics, performanceKey, selectMetricTargets } from "../../../lib/social-metrics-enhanced.mjs";
+import { buildSocialPerformanceFields } from "../../../lib/social-performance-fields.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -25,17 +26,9 @@ async function existingPerformance(key) {
   return records[0] || null;
 }
 
-async function persist(target, metrics, state = "active", error = "") {
+async function persist(target, metrics = null, state = "active", error = "") {
   const key = performanceKey(target.provider, target.external_id);
-  const fields = {
-    "Performance Key": key, Provider: target.provider, "External ID": target.external_id,
-    "Content Record ID": target.content_record_id, URL: metrics?.url || target.url || "",
-    "Captured At": new Date().toISOString(), Views: Number(metrics?.views || 0), Likes: Number(metrics?.likes || 0),
-    Comments: Number(metrics?.comments || 0), Shares: Number(metrics?.shares || 0), Saves: Number(metrics?.saves || 0),
-    "Watch Time Seconds": Number(metrics?.watch_time_seconds || 0), "Completion %": Number(metrics?.completion || 0),
-    Clicks: Number(metrics?.clicks || 0), "Followers Generated": Number(metrics?.followers_generated || 0),
-    Status: state, "Last Error": String(error || "").slice(0, 4000),
-  };
+  const fields = buildSocialPerformanceFields({ key, target, metrics, state, error });
   const existing = await existingPerformance(key);
   if (existing) { await updateRecord(TABLES.socialPerformance, existing.id, fields); return { id: existing.id, updated: true }; }
   const created = await createRecord(TABLES.socialPerformance, fields);
@@ -77,7 +70,8 @@ export async function POST(request) {
       } catch (error) {
         const state = classify(error);
         const message = String(error?.message || error).slice(0, 1000);
-        if (state !== "unavailable") await persist(target, {}, state, message).catch(() => {});
+        // Preserve the last successful counters when a refresh fails or needs re-auth.
+        if (state !== "unavailable") await persist(target, null, state, message).catch(() => {});
         results.push({ ...target, ok: false, state, error: message });
       }
     }

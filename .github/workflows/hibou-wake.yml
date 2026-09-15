@@ -16,6 +16,7 @@ on:
       - "app/api/orchestrator/**"
       - "app/api/social/**"
       - "app/api/social-scheduler/**"
+      - "app/api/book-scheduler/**"
       - "lib/airtable.js"
       - "lib/agent-capabilities.mjs"
       - "lib/agent-runtime.mjs"
@@ -66,8 +67,8 @@ jobs:
             -H "Content-Type: application/json" \
             https://le-hibou-ruse-site.vercel.app/api/wake)
           printf '%s\n' "$response"
-          worker_required=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if d.get("reason") == "github_worker_required" else "false")' <<< "$response")
-          action=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("action") or "")' <<< "$response")
+          worker_required=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if d.get("reason") == "github_worker_required" else "false" end="")' <<< "$response")
+          action=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("action") or "" end="")' <<< "$response")
           echo "worker_required=$worker_required" >> "$GITHUB_OUTPUT"
           echo "action=$action" >> "$GITHUB_OUTPUT"
 

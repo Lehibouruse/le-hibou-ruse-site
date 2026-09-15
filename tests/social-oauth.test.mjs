@@ -36,10 +36,12 @@ test("YouTube demande l'accès offline sans exposer le client secret", () => {
   assert.equal(auth.url.includes("yt-secret"), false);
 });
 
-test("TikTok utilise Login Kit v2 et les scopes de publication", () => {
+test("TikTok utilise Login Kit v2 avec publication et lecture des performances", () => {
   const auth = buildSocialAuthorization("tiktok", base);
   assert.match(auth.url, /^https:\/\/www\.tiktok\.com\/v2\/auth\/authorize\//);
-  assert.match(new URL(auth.url).searchParams.get("scope"), /video\.publish/);
+  const scopes = new URL(auth.url).searchParams.get("scope") || "";
+  assert.match(scopes, /video\.publish/);
+  assert.match(scopes, /video\.list/);
 });
 
 test("X utilise PKCE et conserve le verifier uniquement dans l'état chiffré", () => {

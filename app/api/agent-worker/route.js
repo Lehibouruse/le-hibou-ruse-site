@@ -6,6 +6,7 @@ import { toolsForAction, isAgenticAction, workerInstructions } from "../../../li
 import { estimateCost, getAgentConfig, HIBOU_AGENT_INSTRUCTIONS, HIBOU_AGENT_PROMPT_VERSION, routeJob } from "../../../lib/hibou-agent.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+import { creditPausePatch, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway.mjs";
 
 export const runtime = "nodejs";
@@ -76,6 +77,15 @@ function openAiError(response, data, label = "OpenAI Responses API") {
 }
 
 async function claim() {
+  const circuit = await readOpenAiCircuit();
+  if (circuit.active) {
+    return {
+      ok: true,
+      claimed: false,
+      reason: "openai_credit_circuit_open",
+      circuit: { active: true, until: circuit.until, reason: circuit.reason },
+    };
+  }
   const candidates = await queryRecords(TABLES.jobs, {
     filterByFormula: eligibleJobsFormula(process.env, { includeReserved: true }),
     sortField: "created_at", pageSize: 10,
@@ -256,13 +266,47 @@ async function finalize(body) {
   const job = await ownedJob(body.record_id, body.lock_token);
   const outcome = body.outcome || {};
   const now = Date.now();
+  const telemetry = body.telemetry || {};
+
+  if (outcome.status === "failed" && isCreditExhausted(outcome.result)) {
+    const circuit = await openOpenAiCircuit(outcome.result, now);
+    const paused = creditPausePatch(job.fields, circuit, outcome.result);
+    await updateRecord(TABLES.jobs, job.id, {
+      ...paused,
+      result: String(outcome.result || "").slice(0, 100000),
+      model_used: telemetry.model || "",
+      reasoning_effort: telemetry.reasoning || "",
+      input_tokens: Number(telemetry.input_tokens || 0),
+      cached_input_tokens: Number(telemetry.cached_input_tokens || 0),
+      output_tokens: Number(telemetry.output_tokens || 0),
+      estimated_cost_usd: Number(telemetry.cost || 0),
+      ai_calls: Number(telemetry.ai_calls || 0),
+      response_ids: (telemetry.response_ids || []).join("\n"),
+      external_id: String(body.external_id || "").slice(0, 1000),
+    });
+    await createRecord(TABLES.journal, {
+      Workflow: "HIBOU_AGENT_V1 — GitHub worker",
+      Déclencheur: "GitHub Actions OIDC",
+      Action: `${actionName(job)} · ${job.fields?.job_id || job.id} · PAUSED_CREDIT`,
+      Erreur: String(outcome.result || "").slice(0, 5000),
+      Notes: JSON.stringify({
+        executed_at: new Date(now).toISOString(),
+        circuit_until: circuit.until,
+        retry_count_preserved: paused.retry_count,
+        model: telemetry.model || "",
+        ai_calls: Number(telemetry.ai_calls || 0),
+        cost_usd: Number(telemetry.cost || 0),
+      }),
+    }).catch((error) => console.error("Agent credit pause journal write failed", error?.message || error));
+    return { ok: true, status: "Retry", paused_credit: true, until: circuit.until, retry_count: paused.retry_count };
+  }
+
   const terminal = outcome.status === "completed"
     ? { status: "Completed", completed_at: new Date(now).toISOString(), next_run_at: null, retry_count: Number(job.fields?.retry_count || 0) }
     : outcome.status === "waiting_for_human"
       ? { status: "Manual Review", completed_at: new Date(now).toISOString(), next_run_at: null, retry_count: Number(job.fields?.retry_count || 0) }
       : failureDisposition(job.fields, now);
   const status = terminal.status;
-  const telemetry = body.telemetry || {};
   await updateRecord(TABLES.jobs, job.id, {
     ...terminal,
     result: String(outcome.result || "").slice(0, 100000), error: ["Error", "Retry"].includes(status) ? String(outcome.result || "").slice(0, 5000) : "",

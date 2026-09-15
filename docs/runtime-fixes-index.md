@@ -1,0 +1,2 @@
+- Growth dashboard uses queryAllRecords.
+- Canonical disclaimer wording includes humour.

@@ -64,6 +64,22 @@ test("le webhook Lemon et les processeurs Digify sont séparés", () => {
   assert.match(revoke, /revocation_not_configured/);
 });
 
+test("une commande test ne peut jamais passer en livraison", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /&& !order\.testMode/);
+  assert.match(lemon, /commande Lemon en mode test: livraison bloquée/);
+});
+
+test("la vente fige le fichier Digify et l'édition exacte avant livraison", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /"Digify File GUID": fileGuid/);
+  assert.match(lemon, /"Version livre livrée": edition/);
+  assert.match(delivery, /current\.fields\?\.\["Digify File GUID"\]/);
+  assert.match(delivery, /snapshottedEdition/);
+  assert.match(delivery, /Édition livre non finale/);
+});
+
 test("le scheduler interroge livraison et révocation sans bloquer le Core", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
   assert.match(workflow, /api\/commerce\/delivery/);

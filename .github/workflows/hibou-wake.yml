@@ -62,15 +62,21 @@ jobs:
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
 
-          # E-book delivery is a separate queue: an external delivery problem must
-          # never block the Core. A missing route during a fresh deploy is retried
-          # naturally by the next scheduled wake.
+          # E-book delivery and refund revocation are separate queues: external
+          # commerce problems must never block the Core business worker.
           delivery=$(curl --silent --show-error \
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
             https://le-hibou-ruse-site.vercel.app/api/commerce/delivery 2>&1 || true)
           printf 'delivery=%s\n' "$delivery"
+
+          revocation=$(curl --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            https://le-hibou-ruse-site.vercel.app/api/commerce/revoke 2>&1 || true)
+          printf 'revocation=%s\n' "$revocation"
 
           response=$(curl --fail-with-body --silent --show-error \
             --retry 2 --retry-all-errors \

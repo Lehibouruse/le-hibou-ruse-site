@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { digifyRecipientRequest, lemonOrder, verifyLemonSignature } from "../lib/commerce.mjs";
+import { digifyRecipientRequest, digifyRevokeRequest, lemonOrder, verifyLemonSignature } from "../lib/commerce.mjs";
 
 test("la signature Lemon est vérifiée en HMAC SHA-256 sur le body brut", () => {
   const body = Buffer.from('{"meta":{"event_name":"order_created"}}');
@@ -29,26 +29,45 @@ test("le corps Digify est fourni par le schéma officiel configuré et exige ema
   assert.equal(request.url, "https://api.digify.com/v1/file/recipient/add");
   assert.equal(request.body.FileGUID, "file-1");
   assert.equal(request.body.RecipientEmail, "buyer@example.com");
-  assert.equal(JSON.stringify(request).includes("buyer@example.com"), true);
 });
 
 test("le pipeline refuse de deviner le schéma Digify", () => {
   assert.throws(() => digifyRecipientRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" }), /BODY_TEMPLATE absent/);
 });
 
-test("le webhook Lemon et le processeur Digify sont séparés", () => {
-  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
-  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
-  assert.match(lemon, /LEMON_SQUEEZY_WEBHOOK_SECRET/);
-  assert.match(lemon, /deliveryStatus = ready \? "pending" : "manual_review"/);
-  assert.doesNotMatch(lemon, /addDigifyRecipient/);
-  assert.match(delivery, /addDigifyRecipient/);
-  assert.match(delivery, /Livraison tentatives/);
+test("la révocation Digify est configurable mais verrouillée sur api.digify.com", () => {
+  const env = {
+    DIGIFY_KEY_ID: "key",
+    DIGIFY_SECRET: "secret",
+    DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/example/revoke",
+    DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: JSON.stringify({ FileGUID: "{{file_guid}}", RecipientEmail: "{{email}}", Reference: "{{order_id}}" }),
+  };
+  const request = digifyRevokeRequest({ fileGuid: "file-1", email: "buyer@example.com", orderId: "order-1" }, env);
+  assert.equal(new URL(request.url).hostname, "api.digify.com");
+  assert.equal(request.body.RecipientEmail, "buyer@example.com");
+  assert.throws(() => digifyRevokeRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { ...env, DIGIFY_REVOKE_RECIPIENT_URL: "https://example.com/revoke" }), /Endpoint Digify refusé/);
 });
 
-test("le scheduler interroge les livraisons sans bloquer le Core", () => {
+test("la révocation reste inactive tant que l'endpoint et le template officiels ne sont pas configurés", () => {
+  assert.throws(() => digifyRevokeRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" }), /REVOKE_RECIPIENT_URL absent/);
+});
+
+test("le webhook Lemon et les processeurs Digify sont séparés", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  const revoke = readFileSync(new URL("../app/api/commerce/revoke/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /LEMON_SQUEEZY_WEBHOOK_SECRET/);
+  assert.match(lemon, /revocation_pending/);
+  assert.doesNotMatch(lemon, /revokeDigifyRecipient/);
+  assert.match(delivery, /addDigifyRecipient/);
+  assert.match(revoke, /revokeDigifyRecipient/);
+  assert.match(revoke, /revocation_not_configured/);
+});
+
+test("le scheduler interroge livraison et révocation sans bloquer le Core", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
   assert.match(workflow, /api\/commerce\/delivery/);
+  assert.match(workflow, /api\/commerce\/revoke/);
   assert.match(workflow, /\|\| true/);
   assert.match(workflow, /app\/api\/commerce\/\*\*/);
 });

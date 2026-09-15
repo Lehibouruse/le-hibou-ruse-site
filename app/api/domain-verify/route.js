@@ -82,9 +82,8 @@ export async function POST(request) {
       Valeur: "true",
       Statut: "Actif",
       "Dernière vérification": new Date().toISOString().slice(0, 10),
-      Notes: "Validation automatique HIBOU_DOMAIN_VERIFIER_V1 : HTTPS répond, X-Hibou-Site=le-hibou-ruse et /api/site-identity confirme le host canonique.",
     });
   }
 
-  return NextResponse.json({ ok: true, verified: true, host: EXPECTED_HOST });
+  return NextResponse.json({ ok: true, verified: true, host: EXPECTED_HOST, marker });
 }

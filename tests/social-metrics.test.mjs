@@ -4,6 +4,7 @@ import {
   contentMetricTargets,
   normalizeInstagramMetrics,
   normalizeLinkedInMetrics,
+  normalizePinterestMetrics,
   normalizeThreadsMetrics,
   normalizeTikTokMetrics,
   normalizeXMetrics,
@@ -38,12 +39,31 @@ test("normalise Threads, Instagram et LinkedIn", () => {
   assert.equal(linkedin.clicks, 80); assert.equal(linkedin.followers_generated, 9);
 });
 
+test("normalise Pinterest à partir du résumé demandé, avec repli lifetime", () => {
+  const summary = normalizePinterestMetrics("987654321", {
+    organic: {
+      summary_metrics: { IMPRESSION: 12000, SAVE: 321, PIN_CLICK: 840, OUTBOUND_CLICK: 190 },
+      lifetime_metrics: { IMPRESSION: 99999, SAVE: 9999 },
+    },
+  });
+  assert.equal(summary.views, 12000);
+  assert.equal(summary.saves, 321);
+  assert.equal(summary.pin_clicks, 840);
+  assert.equal(summary.clicks, 190);
+  assert.equal(summary.url, "https://www.pinterest.com/pin/987654321/");
+
+  const lifetime = normalizePinterestMetrics("123", { all: { lifetime_metrics: { IMPRESSION: 77, SAVE: 8, PIN_CLICK: 6, OUTBOUND_CLICK: 2 } } });
+  assert.equal(lifetime.views, 77);
+  assert.equal(lifetime.saves, 8);
+  assert.equal(lifetime.clicks, 2);
+});
+
 test("une fiche multi-plateforme produit une cible distincte par réseau publié", () => {
   const targets = contentMetricTargets({ id: "recContent123", fields: {
-    "ID YouTube": "yt123", "ID TikTok": "tt123", "ID Instagram": "ig123", "ID LinkedIn": "urn:li:share:123", "ID X": "123", "ID Threads": "th123",
+    "ID YouTube": "yt123", "ID TikTok": "tt123", "ID Instagram": "ig123", "ID LinkedIn": "urn:li:share:123", "ID Pinterest": "pin123", "ID X": "123", "ID Threads": "th123",
   } });
-  assert.equal(targets.length, 6);
-  assert.deepEqual(targets.map((item) => item.provider), ["youtube", "tiktok", "instagram", "linkedin", "x", "threads"]);
+  assert.equal(targets.length, 7);
+  assert.deepEqual(targets.map((item) => item.provider), ["youtube", "tiktok", "instagram", "linkedin", "pinterest", "x", "threads"]);
 });
 
 test("la rotation mesure d'abord les publications jamais mesurées puis les plus anciennes", () => {

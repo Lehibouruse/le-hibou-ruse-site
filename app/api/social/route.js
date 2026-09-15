@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
-import { dispatchSocialPost } from "../../../lib/social-gateway.mjs";
+import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway.mjs";
+import { dispatchSocialWebhookFallback, safeDirectFallbackError } from "../../../lib/social-fallback.mjs";
 import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
 import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
@@ -131,20 +132,35 @@ export async function POST(request) {
     }
 
     const resolved = await resolveSocialEnv(body.provider, env);
-    const result = await dispatchSocialPost({
+    const dispatchInput = {
       ...body,
       dry_run: !liveAllowed,
-    }, resolved.env);
+    };
+    const gatewayPlan = socialGatewayStatus(resolved.env).find((item) => item.provider === String(body.provider || "").toLowerCase());
+    let result;
+    let fallbackUsed = false;
+    try {
+      result = await dispatchSocialPost(dispatchInput, resolved.env);
+    } catch (directError) {
+      const safeFallback = liveAllowed
+        && gatewayPlan?.mode === "direct"
+        && gatewayPlan?.webhook_configured === true
+        && safeDirectFallbackError(directError);
+      if (!safeFallback) throw directError;
+      result = await dispatchSocialWebhookFallback(body.provider, dispatchInput, resolved.env);
+      fallbackUsed = true;
+    }
 
     if (intent) {
       await updateDispatchIntent(intent, {
-        Action: `${String(body.provider || "").toLowerCase()} · dispatched`,
+        Action: `${String(body.provider || "").toLowerCase()} · ${fallbackUsed ? "webhook fallback dispatched" : "dispatched"}`,
         Erreur: "",
         Notes: JSON.stringify({
           state: "dispatched",
           provider: String(body.provider || "").toLowerCase(),
           idempotency_key: idempotencyKey,
           credential_source: resolved.source,
+          fallback_used: fallbackUsed,
           result,
           completed_at: new Date().toISOString(),
         }).slice(0, 100000),
@@ -154,6 +170,7 @@ export async function POST(request) {
     return NextResponse.json({
       ...result,
       credential_source: resolved.source,
+      fallback_used: fallbackUsed,
       policy,
       idempotency_key: idempotencyKey,
       live_requested: requestedLive,

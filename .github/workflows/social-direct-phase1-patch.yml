@@ -1,0 +1,106 @@
+name: Social direct API phase 1 patch
+
+on:
+  push:
+    branches:
+      - hibou-social-direct-api-20260915
+    paths:
+      - .github/workflows/social-direct-phase1-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hibou-social-direct-api-20260915
+          fetch-depth: 0
+
+      - name: Apply deterministic social infrastructure fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one anchor, got {count}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "lib/social-oauth.mjs",
+              '  const candidate = clean(env.HIBOU_PUBLIC_BASE_URL) || "https://d4d5d6.com";',
+              '  const candidate = clean(env.HIBOU_PUBLIC_BASE_URL) || (clean(env.VERCEL_PROJECT_PRODUCTION_URL) ? `https://${clean(env.VERCEL_PROJECT_PRODUCTION_URL)}` : "") || "https://le-hibou-ruse-site.vercel.app";'
+          )
+
+          replace_once(
+              "lib/social-gateway.mjs",
+              '  return webhook ? "webhook" : direct ? "direct" : "unconfigured";',
+              '  return direct ? "direct" : webhook ? "webhook" : "unconfigured";'
+          )
+
+          replace_once(
+              "scripts/hibou-worker.mjs",
+              '    case "site_write": {',
+              '    case "social_status":\n    case "social_prepare":\n      return api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: args });\n    case "site_write": {'
+          )
+
+          env_path = Path(".env.example")
+          env_text = env_path.read_text()
+          marker = "# Social direct API / OAuth (names only; never commit real values)"
+          if marker not in env_text:
+              env_text = env_text.rstrip() + "\n\n" + marker + "\n" + "\n".join([
+                  "HIBOU_PUBLIC_BASE_URL=https://le-hibou-ruse-site.vercel.app",
+                  "HIBOU_SOCIAL_VAULT_KEY=",
+                  "YOUTUBE_CLIENT_ID=",
+                  "YOUTUBE_CLIENT_SECRET=",
+                  "YOUTUBE_OAUTH_SCOPES=",
+                  "META_APP_ID=",
+                  "META_APP_SECRET=",
+                  "META_GRAPH_VERSION=",
+                  "META_OAUTH_SCOPES=",
+                  "TIKTOK_CLIENT_KEY=",
+                  "TIKTOK_CLIENT_SECRET=",
+                  "TIKTOK_OAUTH_SCOPES=",
+                  "THREADS_APP_ID=",
+                  "THREADS_APP_SECRET=",
+                  "THREADS_OAUTH_SCOPES=",
+                  "LINKEDIN_CLIENT_ID=",
+                  "LINKEDIN_CLIENT_SECRET=",
+                  "LINKEDIN_OAUTH_SCOPES=",
+                  "X_CLIENT_ID=",
+                  "X_CLIENT_SECRET=",
+                  "X_OAUTH_SCOPES=",
+              ]) + "\n"
+              env_path.write_text(env_text)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: Commit validated patch and remove one-off workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/social-direct-phase1-patch.yml
+          git config user.name "hibou-social-migration[bot]"
+          git config user.email "hibou-social-migration[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Fix direct-social routing and OAuth callback base"
+          git push origin HEAD:hibou-social-direct-api-20260915

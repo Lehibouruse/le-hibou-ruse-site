@@ -58,10 +58,4 @@ jobs:
             exit 1
           fi
 
-          python3 - <<'PY' <<< "$response"
-          import json, sys
-          data = json.load(sys.stdin)
-          if data.get("ok") is not True:
-              raise SystemExit("domain verifier returned ok=false")
-          print("verified=" + str(bool(data.get("verified"))).lower())
-          PY
+          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; print("verified=" + str(bool(d.get("verified"))).lower())' <<< "$response"

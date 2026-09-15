@@ -10,6 +10,10 @@
     {
       "path": "/api/health",
       "schedule": "37 5 * * *"
+    },
+    {
+      "path": "/api/domain-reconcile",
+      "schedule": "53 5 * * *"
     }
   ]
 }

@@ -147,6 +147,44 @@ async function createFanoutChildren(job, params, providers) {
   return { parent_job_id: parentJobId, providers, created, deduplicated };
 }
 
+async function finalizeTikTokPublish(request, secret, gatewayData) {
+  const publishId = String(gatewayData?.result?.publish_id || "").trim();
+  if (!publishId) return { gateway: gatewayData, status: null };
+  const response = await fetch(`${baseUrl(request)}/api/social`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      operation: "publication_status",
+      provider: "tiktok",
+      publish_id: publishId,
+      wait: true,
+      attempts: 8,
+      interval_ms: 2000,
+    }),
+    cache: "no-store",
+  });
+  const status = await response.json().catch(() => ({}));
+  if (!response.ok || status.ok === false) {
+    return { gateway: gatewayData, status: { final: false, error: status.error || `TikTok status ${response.status}`, publish_id: publishId } };
+  }
+  if (status.complete && status.post_id) {
+    return {
+      gateway: {
+        ...gatewayData,
+        result: {
+          ...(gatewayData.result || {}),
+          post_id: status.post_id,
+          video_id: status.post_id,
+          publish_id: publishId,
+          publish_status: status.status,
+        },
+      },
+      status,
+    };
+  }
+  return { gateway: gatewayData, status };
+}
+
 export async function GET(request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -229,7 +267,7 @@ export async function GET(request) {
       }),
       cache: "no-store",
     });
-    const data = await response.json().catch(() => ({}));
+    let data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) {
       const message = data.error || `Social gateway ${response.status}`;
       if (response.status >= 500) {
@@ -240,13 +278,32 @@ export async function GET(request) {
       return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", error: message }, { status: 422 });
     }
 
-    const summaryBase = { provider, requested_live: requestedLive, cta_url: ctaUrl, campaign, content_id: contentId, gateway: data };
     if (requestedLive && data.live_allowed !== true) {
-      const summary = JSON.stringify(summaryBase);
+      const summary = JSON.stringify({ provider, requested_live: requestedLive, cta_url: ctaUrl, campaign, content_id: contentId, gateway: data });
       await finish(job, "Manual Review", summary, data.forced_dry_run_reason || "Publication live bloquée par politique");
       return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, dry_run: true, cta_url: ctaUrl });
     }
 
+    let tiktokStatus = null;
+    if (provider === "tiktok" && requestedLive && data.live_allowed === true && data.dry_run !== true && data.fallback_used !== true && data?.result?.publish_id) {
+      const finalized = await finalizeTikTokPublish(request, secret, data);
+      data = finalized.gateway;
+      tiktokStatus = finalized.status;
+      if (tiktokStatus?.failed) {
+        const message = `TikTok publication échouée après upload: ${tiktokStatus.fail_reason || "raison inconnue"}`;
+        const summary = JSON.stringify({ provider, requested_live: true, gateway: data, tiktok_status: tiktokStatus, cta_url: ctaUrl });
+        await finish(job, "Manual Review", summary, message);
+        return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", provider, publish_id: tiktokStatus.publish_id, error: message }, { status: 422 });
+      }
+      if (tiktokStatus && !tiktokStatus.complete) {
+        const message = `TikTok a accepté l'upload mais la publication est encore en traitement (${tiktokStatus.status || "PROCESSING"}). Aucune republication automatique.`;
+        const summary = JSON.stringify({ provider, requested_live: true, gateway: data, tiktok_status: tiktokStatus, cta_url: ctaUrl });
+        await finish(job, "Manual Review", summary, message);
+        return NextResponse.json({ ok: true, processed: 1, status: "waiting_for_human", provider, published: "processing", publish_id: tiktokStatus.publish_id || data.result.publish_id, error: message });
+      }
+    }
+
+    const summaryBase = { provider, requested_live: requestedLive, cta_url: ctaUrl, campaign, content_id: contentId, gateway: data, tiktok_status: tiktokStatus };
     let persisted = { skipped: true, reason: data.dry_run === true ? "dry_run" : "not_live" };
     if (requestedLive && data.live_allowed === true && data.dry_run !== true) {
       try {
@@ -261,7 +318,7 @@ export async function GET(request) {
 
     const summary = JSON.stringify({ ...summaryBase, publication_persistence: persisted });
     await finish(job, "Completed", summary, "");
-    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true, cta_url: ctaUrl, publication: persisted });
+    return NextResponse.json({ ok: true, processed: 1, status: "completed", provider, dry_run: data.dry_run === true, cta_url: ctaUrl, publication: persisted, tiktok_status: tiktokStatus });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 1000) }, { status: 500 });
   }

@@ -1,15 +1,8 @@
 "use client";
 
 import { track } from "@vercel/analytics";
-import { ATTRIBUTION_STORAGE_KEY, checkoutWithAttribution } from "../lib/attribution.mjs";
-
-function storedAttribution() {
-  try {
-    return JSON.parse(localStorage.getItem(ATTRIBUTION_STORAGE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
+import { checkoutWithAttribution } from "../lib/attribution.mjs";
+import { sendGrowthEvent, storedAttribution } from "../lib/growth-client";
 
 export default function TrackedLink({ event, children, onClick, ...props }) {
   return (
@@ -19,7 +12,9 @@ export default function TrackedLink({ event, children, onClick, ...props }) {
         try {
           track(event);
           if (event === "checkout_opened" && props.href) {
-            clickEvent.currentTarget.href = checkoutWithAttribution(props.href, storedAttribution(), event);
+            const attribution = storedAttribution();
+            sendGrowthEvent("checkout_click", attribution);
+            clickEvent.currentTarget.href = checkoutWithAttribution(props.href, attribution, event);
           }
         } catch {}
         if (typeof onClick === "function") onClick(clickEvent);

@@ -6,10 +6,12 @@ test("Airtable peut piloter direct/webhook sans modifier les secrets", () => {
   const env = socialRuntimeEnv({
     social_mode_instagram: "direct",
     social_mode_youtube: "webhook",
+    social_mode_pinterest: "direct",
     social_mode_x: "invalid",
   }, { META_ACCESS_TOKEN: "secret" });
   assert.equal(env.HIBOU_SOCIAL_INSTAGRAM_MODE, "direct");
   assert.equal(env.HIBOU_SOCIAL_YOUTUBE_MODE, "webhook");
+  assert.equal(env.HIBOU_SOCIAL_PINTEREST_MODE, "direct");
   assert.equal(env.HIBOU_SOCIAL_X_MODE, undefined);
   assert.equal(env.META_ACCESS_TOKEN, "secret");
 });

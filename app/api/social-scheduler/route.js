@@ -4,6 +4,7 @@ import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 import { socialCampaignUrl } from "../../../lib/attribution.mjs";
 import { publicationFields } from "../../../lib/social-publication.mjs";
+import { fanoutChildSpec, requestedFanoutProviders } from "../../../lib/social-fanout.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,14 @@ function parameters(job) {
 
 function actionName(job) {
   return job?.fields?.action?.name || job?.fields?.action || "";
+}
+
+function selectName(value, fallback = "") {
+  return typeof value === "string" ? value : value?.name || fallback;
+}
+
+function safeFormula(value) {
+  return String(value ?? "").replaceAll("\\", "\\\\").replaceAll("'", "\\'");
 }
 
 function baseUrl(request) {
@@ -101,6 +110,43 @@ async function persistPublication(provider, contentRecordId, data) {
   return { skipped: false, id: publication.id, url: publication.url };
 }
 
+async function existingChildJob(jobId) {
+  const rows = await queryRecords(TABLES.jobs, {
+    filterByFormula: `{job_id}='${safeFormula(jobId)}'`,
+    pageSize: 1,
+    priorityAware: false,
+  });
+  return rows[0] || null;
+}
+
+async function createFanoutChildren(job, params, providers) {
+  const parentJobId = String(job.fields?.job_id || job.id);
+  const parentIdempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${parentJobId}`);
+  const created = [];
+  const deduplicated = [];
+
+  for (const provider of providers) {
+    const fields = fanoutChildSpec({
+      parentJobId,
+      parentIdempotencyKey,
+      provider,
+      params,
+      requestedBy: job.fields?.requested_by || "Jobs",
+      priority: selectName(job.fields?.priority, "Normal"),
+      requiresReview: job.fields?.requires_review === true,
+      maxRetries: job.fields?.max_retries ?? 2,
+    });
+    const previous = await existingChildJob(fields.job_id);
+    if (previous) {
+      deduplicated.push({ provider, job_id: fields.job_id, record_id: previous.id });
+      continue;
+    }
+    const result = await createRecord(TABLES.jobs, fields);
+    created.push({ provider, job_id: fields.job_id, record_id: result.records?.[0]?.id || "" });
+  }
+  return { parent_job_id: parentJobId, providers, created, deduplicated };
+}
+
 export async function GET(request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -120,8 +166,22 @@ export async function GET(request) {
     const job = await claim(candidate);
     if (!job) return NextResponse.json({ ok: true, processed: 0, reason: "lease_not_acquired" });
     const params = parameters(job);
-    const provider = String(params.provider || params.network || job.fields?.target || "").trim().toLowerCase();
     const mediaUrl = String(params.media_url || params.video_url || params.url || "").trim();
+    const fanoutProviders = requestedFanoutProviders(params);
+
+    if (fanoutProviders.length) {
+      if (!mediaUrl) {
+        const message = "SCHEDULE_POST fan-out requiert media_url/video_url";
+        await finish(job, "Manual Review", message, message);
+        return NextResponse.json({ ok: false, processed: 1, status: "waiting_for_human", error: message }, { status: 422 });
+      }
+      const fanout = await createFanoutChildren(job, params, fanoutProviders);
+      const summary = JSON.stringify({ type: "social_fanout", ...fanout });
+      await finish(job, "Completed", summary, "");
+      return NextResponse.json({ ok: true, processed: 1, status: "completed", fanout });
+    }
+
+    const provider = String(params.provider || params.network || job.fields?.target || "").trim().toLowerCase();
     if (!provider || !mediaUrl) {
       const message = "SCHEDULE_POST requiert provider/network et media_url/video_url";
       await finish(job, "Manual Review", message, message);

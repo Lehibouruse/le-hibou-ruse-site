@@ -233,6 +233,9 @@ async function executeTool(call, state) {
       }
       return { files };
     }
+    case "social_status":
+    case "social_prepare":
+      return api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: args });
     case "site_write": {
       const file = safePath(args.path, "site");
       mkdirSync(dirname(file.full), { recursive: true });

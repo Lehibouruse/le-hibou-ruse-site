@@ -5,7 +5,7 @@ import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const MAX_RECONCILIATIONS = 3;
 
@@ -43,9 +43,29 @@ function fullRangeCovered(covered, start, end) {
   return true;
 }
 
-export async function POST(request) {
+function origin(request) {
+  const configured = process.env.HIBOU_PUBLIC_BASE_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "");
+  return configured ? new URL(configured).origin : new URL(request.url).origin;
+}
+
+async function runFinalizer(request, authorization) {
   try {
-    const auth = request.headers.get("authorization") || "";
+    const response = await fetch(`${origin(request)}/api/book-finalizer`, {
+      method: "POST",
+      headers: { Authorization: authorization, "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    return { http: response.status, ...data };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error).slice(0, 500) };
+  }
+}
+
+export async function POST(request) {
+  const auth = request.headers.get("authorization") || "";
+  try {
     if (!auth.startsWith("Bearer ")) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     await verifyGithubActionsToken(auth.slice("Bearer ".length));
   } catch (error) {
@@ -107,5 +127,10 @@ export async function POST(request) {
     });
   }
 
-  return NextResponse.json({ ok: true, processed: reconciled.length, reconciled });
+  // The finalizer is deliberately chained to the existing 5-minute reconciliation wake.
+  // It is a no-op until all 13 corpus chapters are complete, and then generates at most
+  // one special block per wake (opening -> red-lines appendix -> conclusion).
+  const finalizer = await runFinalizer(request, auth);
+
+  return NextResponse.json({ ok: true, processed: reconciled.length, reconciled, finalizer });
 }

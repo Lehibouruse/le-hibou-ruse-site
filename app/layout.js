@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   metadataBase: new URL("https://d4d5d6.com"),
+  alternates: { canonical: "/" },
   title: { default: "Le Hibou Rusé", template: "%s — Le Hibou Rusé" },
   description: "Fiscalité, argent et patrimoine : comprendre les règles, exploiter les failles et explorer des montages du D4 au D6.",
   openGraph: {

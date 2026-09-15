@@ -1,3 +1,4 @@
+import { testVaultProviderConnections } from "../../../../../../lib/social-connection-health.mjs";
 import { completeSocialAuthorization } from "../../../../../../lib/social-oauth.mjs";
 
 export const runtime = "nodejs";
@@ -20,8 +21,14 @@ export async function GET(request, context) {
     const code = url.searchParams.get("code") || "";
     const state = url.searchParams.get("state") || "";
     if (!code || !state) return Response.redirect(adminUrl(request, { error: `${provider}:missing_code_or_state` }), 302);
+
     const result = await completeSocialAuthorization(provider, { code, state });
-    return Response.redirect(adminUrl(request, { connected: result.provider }), 302);
+    const tests = await testVaultProviderConnections(result.provider).catch((error) => [{ ok: false, error: String(error?.message || error).slice(0, 180) }]);
+    const readOk = tests.length > 0 && tests.every((item) => item.ok === true);
+    return Response.redirect(adminUrl(request, {
+      connected: result.provider,
+      tested: readOk ? "read_ok" : "read_failed",
+    }), 302);
   } catch (error) {
     const message = String(error?.message || error).replace(/[\r\n]+/g, " ").slice(0, 180);
     return Response.redirect(adminUrl(request, { error: message }), 302);

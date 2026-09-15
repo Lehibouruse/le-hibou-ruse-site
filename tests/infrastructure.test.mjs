@@ -90,6 +90,16 @@ test("le cron effectue un vrai wake et le dry-run reste manuel", () => {
   assert.match(workflow, /steps\.wake\.outputs\.action == 'CREATE_VIDEO'/);
 });
 
+test("un Manual Review métier ne casse ni ne rejoue le wake", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
+  const wake = readFileSync(new URL("../app/api/wake/route.js", import.meta.url), "utf8");
+  assert.doesNotMatch(workflow, /--retry-all-errors/);
+  assert.match(workflow, /--retry 2 --retry-delay 1 --retry-max-time 30/);
+  assert.match(wake, /HANDLED_BUSINESS_STATUSES = new Set\(\[409, 422\]\)/);
+  assert.match(wake, /handled: true/);
+  assert.match(wake, /delegated_status: response\.status/);
+});
+
 test("le worker autorise assez de tours pour les missions complexes tout en gardant des plafonds", () => {
   const worker = readFileSync(new URL("../scripts/hibou-worker.mjs", import.meta.url), "utf8");
   assert.match(worker, /const MAX_AI_CALLS = 32/);

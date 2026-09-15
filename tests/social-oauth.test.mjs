@@ -3,7 +3,7 @@ import test from "node:test";
 import { buildSocialAuthorization, oauthProviderReadiness } from "../lib/social-oauth.mjs";
 
 const base = {
-  HIBOU_PUBLIC_BASE_URL: "https://d4d5d6.com",
+  HIBOU_PUBLIC_BASE_URL: "https://le-hibou-ruse-site.vercel.app",
   HIBOU_SOCIAL_VAULT_KEY: Buffer.alloc(32, 9).toString("base64url"),
   YOUTUBE_CLIENT_ID: "yt-id",
   YOUTUBE_CLIENT_SECRET: "yt-secret",
@@ -21,11 +21,11 @@ const base = {
   THREADS_APP_SECRET: "threads-secret",
 };
 
-test("les six providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
+test("les six providers OAuth exposent un callback HTTPS sur le Vercel brandé", () => {
   const readiness = oauthProviderReadiness(base);
   assert.equal(readiness.length, 6);
   assert.equal(readiness.every((item) => item.ready), true);
-  assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
+  assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://le-hibou-ruse-site.vercel.app/api/social/oauth/")), true);
 });
 
 test("YouTube demande l'accès offline sans exposer le client secret", () => {
@@ -50,4 +50,11 @@ test("X utilise PKCE et conserve le verifier uniquement dans l'état chiffré", 
   assert.ok(url.searchParams.get("state"));
   assert.equal(url.searchParams.has("code_verifier"), false);
   assert.equal(auth.url.includes("x-secret"), false);
+});
+
+test("le fallback OAuth reste le Vercel brandé si HIBOU_PUBLIC_BASE_URL manque", () => {
+  const env = { ...base };
+  delete env.HIBOU_PUBLIC_BASE_URL;
+  const readiness = oauthProviderReadiness(env);
+  assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://le-hibou-ruse-site.vercel.app/api/social/oauth/")), true);
 });

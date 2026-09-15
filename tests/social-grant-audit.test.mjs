@@ -38,6 +38,27 @@ test("un OAuth connecté mais incomplet ne peut pas être présenté comme autor
   assert.deepEqual(meta.missing_publish_scopes.sort(), ["instagram_content_publish", "pages_manage_posts"].sort());
 });
 
+test("Meta distingue publication prête et analytics Instagram incomplètes", () => {
+  const partial = auditSocialGrants(ready, [{
+    provider: "meta",
+    status: "Connected",
+    scopes: "pages_manage_posts instagram_content_publish pages_read_engagement read_insights",
+  }]).find((item) => item.provider === "meta");
+  assert.equal(partial.authorization_ready, true);
+  assert.equal(partial.analytics_scope_ok, false);
+  assert.equal(partial.fully_ready, false);
+  assert.deepEqual(partial.missing_analytics_scopes, ["instagram_manage_insights"]);
+
+  const complete = auditSocialGrants(ready, [{
+    provider: "meta",
+    status: "Connected",
+    scopes: "pages_manage_posts instagram_content_publish pages_read_engagement read_insights instagram_manage_insights",
+  }]).find((item) => item.provider === "meta");
+  assert.equal(complete.authorization_ready, true);
+  assert.equal(complete.analytics_scope_ok, true);
+  assert.equal(complete.fully_ready, true);
+});
+
 test("YouTube distingue publication least-privilege et Analytics complète", () => {
   const partial = auditSocialGrants(ready, [{
     provider: "youtube",

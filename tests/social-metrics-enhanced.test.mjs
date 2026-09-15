@@ -69,12 +69,13 @@ test("un insight Facebook retiré peut tomber sur le métrique suivant sans cass
   const fakeFetch = async (url) => {
     const target = String(url);
     if (target.includes("/page_123?") && target.includes("fields=")) return response({ id: "page_123", comments: { summary: { total_count: 0 } }, reactions: { summary: { total_count: 0 } } });
-    if (target.includes("metric=post_media_view")) return response({ error: { message: "metric unavailable" } }, 400);
-    if (target.includes("metric=post_video_views")) return response({ error: { message: "metric unavailable" } }, 400);
-    if (target.includes("metric=post_impressions")) return response({ data: [{ values: [{ value: 44 }] }] });
-    if (target.includes("metric=post_clicks_by_type")) return response({ data: [{ values: [{ value: { link: 4, other: 2 } }] }] });
-    if (target.includes("metric=post_clicks")) return response({ error: { message: "metric unavailable" } }, 400);
-    if (target.includes("metric=post_impressions_unique")) return response({ error: { message: "metric unavailable" } }, 400);
+    const metric = new URL(target).searchParams.get("metric");
+    if (metric === "post_impressions_unique") return response({ error: { message: "metric unavailable" } }, 400);
+    if (metric === "post_media_view") return response({ error: { message: "metric unavailable" } }, 400);
+    if (metric === "post_video_views") return response({ error: { message: "metric unavailable" } }, 400);
+    if (metric === "post_impressions") return response({ data: [{ values: [{ value: 44 }] }] });
+    if (metric === "post_clicks_by_type") return response({ data: [{ values: [{ value: { link: 4, other: 2 } }] }] });
+    if (metric === "post_clicks") return response({ error: { message: "metric unavailable" } }, 400);
     throw new Error(`unexpected ${target}`);
   };
   const metrics = await fetchFacebookMetrics(

@@ -11,7 +11,7 @@ import {
 test("capture une campagne et conserve la landing initiale", () => {
   const captured = captureAttribution({
     search: "?utm_source=tiktok&utm_medium=organic_social&utm_campaign=launch&utm_content=video_042",
-    href: "https://d4d5d6.com/?utm_source=tiktok&utm_content=video_042",
+    href: "https://le-hibou-ruse-site.vercel.app/?utm_source=tiktok&utm_content=video_042",
     referrer: "https://www.tiktok.com/@lehibouruse",
   });
   assert.equal(captured.utm_source, "tiktok");
@@ -35,7 +35,7 @@ test("un checkout Lemon reçoit uniquement des custom data bornées", () => {
 });
 
 test("aucune donnée n'est ajoutée à un lien non Lemon", () => {
-  const raw = "https://d4d5d6.com/merci";
+  const raw = "https://le-hibou-ruse-site.vercel.app/merci";
   assert.equal(checkoutWithAttribution(raw, { utm_source: "x" }), raw);
 });
 
@@ -45,13 +45,13 @@ test("normalisation supprime contrôles et borne les valeurs", () => {
   assert.equal(normalized.utm_content.length, 160);
 });
 
-test("génère un lien social traçable par provider et création", () => {
+test("génère un lien social traçable vers le Vercel brandé", () => {
   const url = new URL(socialCampaignUrl({
     provider: "instagram",
     campaign: "serie-failles",
     contentId: "reel-018-hook-b",
   }));
-  assert.equal(url.origin, "https://d4d5d6.com");
+  assert.equal(url.origin, "https://le-hibou-ruse-site.vercel.app");
   assert.equal(url.searchParams.get("utm_source"), "instagram");
   assert.equal(url.searchParams.get("utm_medium"), "organic_social");
   assert.equal(url.searchParams.get("utm_campaign"), "serie-failles");

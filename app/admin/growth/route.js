@@ -1,5 +1,5 @@
 import { adminAuthorized, adminUnauthorized } from "../../../lib/admin-auth.mjs";
-import { getAllRecords, TABLES } from "../../../lib/airtable";
+import { queryAllRecords, TABLES } from "../../../lib/airtable";
 import { funnelSummary } from "../../../lib/growth-summary.mjs";
 import { contentEfficiencySummary, providerEfficiencySummary } from "../../../lib/content-efficiency.mjs";
 
@@ -67,10 +67,10 @@ function contentLabels(records) {
 export async function GET(request) {
   if (!adminAuthorized(request)) return adminUnauthorized();
   const [sales, events, performances, contents] = await Promise.all([
-    getAllRecords(TABLES.sales, { maxRecords: 3000 }),
-    getAllRecords(TABLES.conversionEvents, { maxRecords: 5000 }),
-    getAllRecords(TABLES.socialPerformance, { maxRecords: 5000 }),
-    getAllRecords(TABLES.content, { maxRecords: 2000 }),
+    queryAllRecords(TABLES.sales, {}, { maxRecords: 3000 }),
+    queryAllRecords(TABLES.conversionEvents, {}, { maxRecords: 5000 }),
+    queryAllRecords(TABLES.socialPerformance, {}, { maxRecords: 5000 }),
+    queryAllRecords(TABLES.content, {}, { maxRecords: 2000 }),
   ]);
   const summary = funnelSummary(sales, events);
   const efficiency = contentEfficiencySummary(sales, performances);

@@ -4,6 +4,7 @@ import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../
 import { BOOK_EDITORIAL_VERSION, bookInstructions } from "../../../lib/book-editorial.mjs";
 import { bookQualityGate } from "../../../lib/book-quality.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+import { creditPausePatch, isCreditExhausted, openOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,21 @@ async function retry(job, message) {
     lease_expires_at: null,
   });
   return true;
+}
+
+async function pauseForCredit(job, message) {
+  if (!(await owns(job))) throw new Error("Lease perdue avant pause crédit");
+  const circuit = await openOpenAiCircuit(message);
+  await updateRecord(TABLES.jobs, job.id, creditPausePatch(job.fields || {}, circuit, message));
+  await createRecord(TABLES.journal, {
+    Workflow: "HIBOU_BOOK_SCHEDULER_V3",
+    Déclencheur: job.fields?.requested_by || "Jobs",
+    Action: `CREATE_BOOK · ${job.fields?.job_id || job.id} · PAUSED_CREDIT`,
+    "Dernière exécution": new Date().toISOString(),
+    Erreur: String(message || "").slice(0, 5000),
+    Notes: `${BOOK_EDITORIAL_VERSION}; circuit OpenAI ouvert jusqu'au ${circuit.until}; retry_count conservé à ${Number(job.fields?.retry_count || 0)}.`,
+  }).catch(() => {});
+  return circuit;
 }
 
 function outputText(response) {
@@ -312,6 +328,28 @@ export async function GET(request) {
     return NextResponse.json({ ok: true, processed: 1, status: "completed", editorial_version: BOOK_EDITORIAL_VERSION, chapter: bookRecordId, range: [start, end], replace_existing: params.replace_existing === true, characters: generated.text.length, part_qc: partQc, chapter_qc: chapterQc, chapter_progress: [progress.montageCount, expectedChapterMontages] });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 5000);
+    if (claimedJob && isCreditExhausted(message)) {
+      try {
+        const circuit = await pauseForCredit(claimedJob, message);
+        return NextResponse.json({
+          ok: false,
+          processed: 1,
+          status: "paused_for_credit",
+          error: message,
+          circuit: { active: true, until: circuit.until, reason: circuit.reason },
+          retry_count_preserved: Number(claimedJob.fields?.retry_count || 0),
+        }, { status: 409 });
+      } catch (pauseError) {
+        return NextResponse.json({
+          ok: false,
+          processed: 1,
+          status: "credit_pause_failed",
+          error: message,
+          pause_error: String(pauseError?.message || pauseError).slice(0, 1000),
+        }, { status: 503 });
+      }
+    }
+
     const retryable = error?.retryable !== false;
     if (claimedJob) {
       if (retryable) await retry(claimedJob, message).catch(() => {});

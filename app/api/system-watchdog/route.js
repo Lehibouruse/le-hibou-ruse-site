@@ -4,11 +4,22 @@ import { configMap, createRecord, queryAllRecords, queryRecords, TABLES, updateR
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 import { clearOpenAiCircuit, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
+import { testVaultProviderConnections } from "../../../lib/social-connection-health.mjs";
 import { healthFingerprint, systemHealthSnapshot } from "../../../lib/system-health.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+const SOCIAL_READ_TEST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const PROVIDER_PLATFORMS = {
+  youtube: ["YouTube"],
+  tiktok: ["TikTok"],
+  meta: ["Facebook", "Instagram"],
+  linkedin: ["LinkedIn"],
+  x: ["X"],
+  threads: ["Threads"],
+};
 
 function text(value) { return String(value ?? "").trim(); }
 function select(value) { return value?.name || value || ""; }
@@ -23,11 +34,12 @@ async function authenticate(request) {
 }
 
 async function loadState() {
-  const [jobs, sales, book, socialCredentials, configuration, products, legal] = await Promise.all([
+  const [jobs, sales, book, socialCredentials, socialAccounts, configuration, products, legal] = await Promise.all([
     queryAllRecords(TABLES.jobs, { sortField: "created_at", sortDirection: "desc" }, { maxRecords: 800 }),
     queryAllRecords(TABLES.sales, {}, { maxRecords: 1000 }),
     queryAllRecords(TABLES.book, {}, { maxRecords: 100 }),
     queryAllRecords(TABLES.socialCredentials, {}, { maxRecords: 50 }),
+    queryAllRecords(TABLES.socialAccounts, {}, { maxRecords: 50 }),
     queryAllRecords(TABLES.configuration, {}, { maxRecords: 200 }),
     queryAllRecords(TABLES.products, {}, { maxRecords: 50 }),
     queryAllRecords(TABLES.legal, {}, { maxRecords: 100 }),
@@ -35,7 +47,7 @@ async function loadState() {
   const config = configMap(configuration);
   const product = products.find((row) => row.fields?.Actif)?.fields || {};
   const readiness = commercialReadiness({ config, product, chapters: book, legal });
-  return { jobs, sales, book, socialCredentials, configuration, config, readiness };
+  return { jobs, sales, book, socialCredentials, socialAccounts, configuration, config, readiness };
 }
 
 function latestCreditError(jobs) {
@@ -69,6 +81,33 @@ async function postponeCreditRetries(jobs, until) {
     changed += 1;
   }
   return changed;
+}
+
+function staleSocialProvider(state, now) {
+  const connected = state.socialCredentials
+    .filter((row) => text(select(row.fields?.Status)).toLowerCase() === "connected")
+    .map((row) => text(row.fields?.Provider).toLowerCase())
+    .filter((provider) => PROVIDER_PLATFORMS[provider]);
+  const candidates = [];
+  for (const provider of connected) {
+    const platforms = PROVIDER_PLATFORMS[provider];
+    const accounts = state.socialAccounts.filter((row) => platforms.includes(select(row.fields?.Plateforme)));
+    if (!accounts.length) continue;
+    const last = Math.min(...accounts.map((row) => dateMs(row.fields?.["Dernier test API"]) || 0));
+    if (!last || now - last >= SOCIAL_READ_TEST_MAX_AGE_MS) candidates.push({ provider, last });
+  }
+  return candidates.sort((a, b) => a.last - b.last)[0]?.provider || "";
+}
+
+async function reconcileOneSocialConnection(state, now, actions) {
+  const provider = staleSocialProvider(state, now);
+  if (!provider) return;
+  try {
+    const results = await testVaultProviderConnections(provider);
+    actions.push({ action: "social_read_health_test", provider, ok: results.every((item) => item.ok), results: results.map((item) => ({ provider: item.provider, ok: item.ok, state: item.state, error: item.error || "" })) });
+  } catch (error) {
+    actions.push({ action: "social_read_health_test", provider, ok: false, error: String(error?.message || error).slice(0, 500) });
+  }
 }
 
 async function journalSnapshot(snapshot, actions) {
@@ -105,7 +144,6 @@ export async function POST(request) {
     const success = latestAiSuccess(state.jobs);
     const previousUntil = dateMs(circuit.until);
 
-    // Only a NEW credit failure after the last circuit window can reopen it.
     if (!circuit.active && credit?.at && (!previousUntil || credit.at >= previousUntil)) {
       circuit = await openOpenAiCircuit(credit.job.fields?.error || "credit_balance_exhausted", now);
       actions.push({ action: "open_openai_credit_circuit", until: circuit.until, job_id: credit.job.fields?.job_id || credit.job.id });
@@ -119,6 +157,9 @@ export async function POST(request) {
       circuit = { ...circuit, active: false, until: "", reason: "" };
       actions.push({ action: "clear_openai_credit_circuit", job_id: success.job.fields?.job_id || success.job.id });
     }
+
+    // Read-only social health is deterministic and remains useful during an AI outage.
+    await reconcileOneSocialConnection(state, now, actions);
 
     const snapshot = systemHealthSnapshot({
       jobs: state.jobs,

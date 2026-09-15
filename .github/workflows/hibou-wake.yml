@@ -17,7 +17,9 @@ on:
       - "app/api/social/**"
       - "app/api/social-scheduler/**"
       - "app/api/book-scheduler/**"
+      - "app/api/commerce/**"
       - "lib/airtable.js"
+      - "lib/commerce.mjs"
       - "lib/agent-capabilities.mjs"
       - "lib/agent-runtime.mjs"
       - "lib/github-oidc.mjs"
@@ -59,6 +61,17 @@ jobs:
           token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
+
+          # E-book delivery is a separate queue: an external delivery problem must
+          # never block the Core. A missing route during a fresh deploy is retried
+          # naturally by the next scheduled wake.
+          delivery=$(curl --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            https://le-hibou-ruse-site.vercel.app/api/commerce/delivery 2>&1 || true)
+          printf 'delivery=%s\n' "$delivery"
+
           response=$(curl --fail-with-body --silent --show-error \
             --retry 2 --retry-all-errors \
             -X POST \

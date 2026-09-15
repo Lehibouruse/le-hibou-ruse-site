@@ -24,6 +24,9 @@ function readyInput() {
       commerce_launch_authorized: "true",
       commerce_readiness_mode: "strict",
       book_current_edition: "V1.0-2026-09",
+      public_site_url: "https://d4d5d6.com",
+      public_site_host_expected: "d4d5d6.com",
+      domain_verified: "true",
     },
     product: {
       "Lemon Squeezy Variant ID": "123",
@@ -54,6 +57,23 @@ test("le kill switch bloque même une configuration technique complète", () => 
   assert.equal(result.ready, false);
   assert.equal(result.checkoutUrl, "");
   assert.ok(result.blockers.some((item) => item.key === "launch_authorized"));
+});
+
+test("un domaine non vérifié bloque toute ouverture commerciale", () => {
+  const input = readyInput();
+  input.config.domain_verified = "false";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.equal(result.checkoutUrl, "");
+  assert.ok(result.blockers.some((item) => item.key === "domain_verified"));
+});
+
+test("un domaine déclaré vérifié mais pointant vers un autre host reste bloqué", () => {
+  const input = readyInput();
+  input.config.public_site_url = "https://example.com";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "domain_verified"));
 });
 
 test("une édition draft ou un seul chapitre non validé bloque la vente", () => {

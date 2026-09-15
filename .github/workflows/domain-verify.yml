@@ -28,10 +28,33 @@ jobs:
           token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
-          response=$(curl --fail-with-body --silent --show-error \
+
+          response_file=$(mktemp)
+          set +e
+          http_code=$(curl --silent --show-error \
+            -o "$response_file" -w '%{http_code}' \
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
             "${HIBOU_BASE_URL}/api/domain-verify")
+          curl_rc=$?
+          set -e
+          response=$(cat "$response_file")
+          rm -f "$response_file"
           printf '%s\n' "$response"
-          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True' <<< "$response"
+          printf 'domain_verify_http=%s curl_rc=%s\n' "$http_code" "$curl_rc"
+
+          if [ "$curl_rc" -ne 0 ]; then
+            echo "Domain verifier transport failure" >&2
+            exit "$curl_rc"
+          fi
+          if [ "$http_code" = "404" ]; then
+            echo "Domain verifier endpoint not deployed yet; status=pending"
+            exit 0
+          fi
+          if [ "$http_code" != "200" ]; then
+            echo "Domain verifier HTTP failure: $http_code" >&2
+            exit 1
+          fi
+
+          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; print("verified=" + str(bool(d.get("verified"))).lower())' <<< "$response"

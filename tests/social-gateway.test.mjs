@@ -54,3 +54,19 @@ test("social gateway refuses non-HTTPS media URLs", async () => {
     /HTTPS/,
   );
 });
+
+
+test("Pinterest utilise l API directe avant le webhook en mode auto et reste en dry-run", async () => {
+  const env = {
+    PINTEREST_ACCESS_TOKEN: "pin-token",
+    PINTEREST_BOARD_ID: "12345",
+    HIBOU_SOCIAL_PINTEREST_WEBHOOK_URL: "https://example.com/pinterest",
+  };
+  const status = socialGatewayStatus(env).find((item) => item.provider === "pinterest");
+  assert.equal(status.mode, "direct");
+  assert.deepEqual(status.direct_capabilities, ["image_native", "video_native"]);
+  assert.equal(JSON.stringify(status).includes("pin-token"), false);
+  const plan = await dispatchSocialPost({ provider: "pinterest", media_url: "https://example.com/video.mp4", caption: "Test", dry_run: true }, env);
+  assert.equal(plan.dry_run, true);
+  assert.equal(plan.gateway.mode, "direct");
+});

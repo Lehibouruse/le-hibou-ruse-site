@@ -19,11 +19,13 @@ const base = {
   META_GRAPH_VERSION: "v24.0",
   THREADS_APP_ID: "threads-id",
   THREADS_APP_SECRET: "threads-secret",
+  PINTEREST_APP_ID: "pin-id",
+  PINTEREST_APP_SECRET: "pin-secret",
 };
 
-test("les six providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
+test("les sept providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
   const readiness = oauthProviderReadiness(base);
-  assert.equal(readiness.length, 6);
+  assert.equal(readiness.length, 7);
   assert.equal(readiness.every((item) => item.ready), true);
   assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
 });
@@ -52,4 +54,14 @@ test("X utilise PKCE et conserve le verifier uniquement dans l'état chiffré", 
   assert.ok(url.searchParams.get("state"));
   assert.equal(url.searchParams.has("code_verifier"), false);
   assert.equal(auth.url.includes("x-secret"), false);
+});
+
+
+test("Pinterest prépare OAuth avec les scopes organiques sans exposer le secret", () => {
+  const auth = buildSocialAuthorization("pinterest", base);
+  const url = new URL(auth.url);
+  assert.equal(url.origin, "https://www.pinterest.com");
+  assert.match(url.searchParams.get("scope") || "", /pins:write/);
+  assert.match(url.searchParams.get("scope") || "", /boards:read/);
+  assert.equal(auth.url.includes("pin-secret"), false);
 });

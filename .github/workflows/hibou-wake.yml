@@ -17,8 +17,10 @@ on:
       - "app/api/social/**"
       - "app/api/social-scheduler/**"
       - "app/api/book-scheduler/**"
+      - "app/api/book-export/**"
       - "app/api/commerce/**"
       - "lib/airtable.js"
+      - "lib/book-renderer.mjs"
       - "lib/commerce.mjs"
       - "lib/agent-capabilities.mjs"
       - "lib/agent-runtime.mjs"
@@ -34,15 +36,29 @@ on:
         required: true
         type: boolean
         default: true
+      export_book:
+        description: Generate a versioned PDF artifact from the Airtable book
+        required: true
+        type: boolean
+        default: false
+      export_draft:
+        description: Allow a partial draft export even if chapters are not ready for sale
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: write
   pull-requests: write
   id-token: write
 
+env:
+  # Keep a stable fallback while the custom domain is being connected.
+  # Once the repository variable is set to https://d4d5d6.com, every scheduler endpoint
+  # switches together without another code change.
+  HIBOU_BASE_URL: ${{ vars.HIBOU_PUBLIC_BASE_URL || 'https://le-hibou-ruse-site.vercel.app' }}
+
 concurrency:
-  # A long business Job must never prevent an infrastructure push self-test.
-  # Leases in Airtable still prevent two workers from owning the same Job.
   group: hibou-agent-wake-${{ github.event_name == 'push' && 'self-test' || 'scheduler' }}
   cancel-in-progress: false
 
@@ -54,7 +70,7 @@ jobs:
       - name: Wake scheduler and inspect queue
         id: wake
         env:
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.export_book) && 'true' || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -62,41 +78,107 @@ jobs:
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
 
-          # E-book delivery and refund revocation are separate queues: external
-          # commerce problems must never block the Core business worker.
           delivery=$(curl --silent --show-error \
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
-            https://le-hibou-ruse-site.vercel.app/api/commerce/delivery 2>&1 || true)
+            "${HIBOU_BASE_URL}/api/commerce/delivery" 2>&1 || true)
           printf 'delivery=%s\n' "$delivery"
 
           revocation=$(curl --silent --show-error \
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
-            https://le-hibou-ruse-site.vercel.app/api/commerce/revoke 2>&1 || true)
+            "${HIBOU_BASE_URL}/api/commerce/revoke" 2>&1 || true)
           printf 'revocation=%s\n' "$revocation"
 
-          response=$(curl --fail-with-body --silent --show-error \
-            --retry 2 --retry-all-errors \
+          response_file=$(mktemp)
+          set +e
+          http_code=$(curl --silent --show-error \
+            --retry 2 --retry-delay 1 --retry-max-time 30 \
+            -o "$response_file" -w '%{http_code}' \
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "X-Hibou-Dry-Run: ${DRY_RUN}" \
             -H "Content-Type: application/json" \
-            https://le-hibou-ruse-site.vercel.app/api/wake)
+            "${HIBOU_BASE_URL}/api/wake")
+          curl_rc=$?
+          set -e
+          response=$(cat "$response_file")
+          rm -f "$response_file"
           printf '%s\n' "$response"
+          printf 'wake_http=%s curl_rc=%s\n' "$http_code" "$curl_rc"
+
+          if [ "$curl_rc" -ne 0 ]; then
+            echo "Wake transport failure" >&2
+            exit "$curl_rc"
+          fi
+          case "$http_code" in
+            200|201|202|204|409|422) ;;
+            *) echo "Wake HTTP failure: $http_code" >&2; exit 1 ;;
+          esac
+
           worker_required=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if d.get("reason") == "github_worker_required" else "false")' <<< "$response")
           action=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("action") or "")' <<< "$response")
           echo "worker_required=$worker_required" >> "$GITHUB_OUTPUT"
           echo "action=$action" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - name: Export private book source and render PDF
+        id: book_export
+        if: github.event_name == 'workflow_dispatch' && inputs.export_book
+        env:
+          DRAFT: ${{ inputs.export_draft && 'true' || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
+          token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
+          echo "::add-mask::$token"
+          out="$RUNNER_TEMP/hibou-book"
+          mkdir -p "$out"
+          headers="$out/headers.txt"
+          curl --fail-with-body --silent --show-error \
+            -D "$headers" \
+            -H "Authorization: Bearer ${token}" \
+            -H "X-Hibou-Book-Draft: ${DRAFT}" \
+            "${HIBOU_BASE_URL}/api/book-export" \
+            -o "$out/book.html"
+          edition=$(awk -F ': ' 'tolower($1)=="x-hibou-book-edition" {gsub("\r", "", $2); print $2}' "$headers" | tail -1)
+          safe=$(printf '%s' "${edition:-draft}" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//;s/-*$//')
+          [ -n "$safe" ] || safe="draft"
+          html="$out/le-hibou-ruse-${safe}.html"
+          pdf="$out/le-hibou-ruse-${safe}.pdf"
+          mv "$out/book.html" "$html"
+          browser=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+          if [ -z "$browser" ]; then
+            echo "Aucun navigateur Chromium disponible sur le runner" >&2
+            exit 1
+          fi
+          "$browser" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
+            --print-to-pdf="$pdf" --no-pdf-header-footer "file://$html"
+          test -s "$pdf"
+          printf 'edition=%s\n' "$safe" >> "$GITHUB_OUTPUT"
+          printf 'pdf=%s\n' "$pdf" >> "$GITHUB_OUTPUT"
+          printf 'html=%s\n' "$html" >> "$GITHUB_OUTPUT"
+          printf 'Generated %s (%s bytes)\n' "$pdf" "$(wc -c < "$pdf")"
+
+      - name: Upload private book artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.export_book
+        uses: actions/upload-artifact@v4
+        with:
+          name: hibou-book-${{ steps.book_export.outputs.edition }}
+          path: |
+            ${{ steps.book_export.outputs.pdf }}
+            ${{ steps.book_export.outputs.html }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/checkout@v5
         if: steps.wake.outputs.worker_required == 'true'
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.wake.outputs.worker_required == 'true'
         with:
           node-version: 22
@@ -127,5 +209,4 @@ jobs:
         if: steps.wake.outputs.worker_required == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          HIBOU_WORKER_URL: https://le-hibou-ruse-site.vercel.app/api/agent-worker
-        run: node scripts/hibou-worker.mjs
+        run: HIBOU_WORKER_URL="${HIBOU_BASE_URL}/api/agent-worker" node scripts/hibou-worker.mjs

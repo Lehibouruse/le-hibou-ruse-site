@@ -2,6 +2,7 @@ import { getRecords, TABLES, configMap } from "../../../lib/airtable";
 import { renderBookDocument } from "../../../lib/book-renderer.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
+// Private master export. This comment intentionally triggers a fresh deployment check after a prior Vercel build-rate limit.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

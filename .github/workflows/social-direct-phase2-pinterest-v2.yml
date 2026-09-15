@@ -1,0 +1,43 @@
+name: Social direct API phase 2 Pinterest v2
+
+on:
+  push:
+    branches:
+      - hibou-social-direct-api-20260915
+    paths:
+      - .github/workflows/social-direct-phase2-pinterest-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hibou-social-direct-api-20260915
+          fetch-depth: 0
+      - name: Apply Pinterest integration patch
+        run: python scripts/social-phase2-patch.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Commit only after tests and build pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/social-direct-phase2-pinterest.yml
+          rm -f .github/workflows/social-direct-phase2-pinterest-v2.yml
+          rm -f scripts/social-phase2-patch.py
+          git config user.name "hibou-social-migration[bot]"
+          git config user.email "hibou-social-migration[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Add Pinterest direct OAuth and native publishing"
+          git push origin HEAD:hibou-social-direct-api-20260915

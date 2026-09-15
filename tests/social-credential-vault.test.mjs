@@ -20,6 +20,21 @@ test("le coffre chiffre puis déchiffre un credential sans exposer le token", ()
   }, env), payload);
 });
 
+test("le coffre accepte Pinterest comme provider OAuth officiel", () => {
+  const payload = { env: { PINTEREST_ACCESS_TOKEN: "pin-secret", PINTEREST_REFRESH_TOKEN: "pin-refresh" } };
+  const encrypted = encryptSocialCredential("pinterest", "primary", payload, env);
+  assert.equal(encrypted.provider, "pinterest");
+  assert.equal(encrypted.ciphertext.includes("pin-secret"), false);
+  assert.deepEqual(decryptSocialCredential({
+    Provider: "pinterest",
+    "Account key": "primary",
+    Ciphertext: encrypted.ciphertext,
+    IV: encrypted.iv,
+    "Auth tag": encrypted.authTag,
+    "Vault version": encrypted.version,
+  }, env), payload);
+});
+
 test("le coffre lie cryptographiquement le provider et le compte", () => {
   const encrypted = encryptSocialCredential("tiktok", "primary", { access_token: "secret" }, env);
   assert.throws(() => decryptSocialCredential({

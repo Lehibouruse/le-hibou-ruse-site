@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const ORCHESTRATOR_PATH = "/api/orchestrator";
 const SOCIAL_SCHEDULER_PATH = "/api/social-scheduler";
+const BOOK_SCHEDULER_PATH = "/api/book-scheduler";
 const MAX_BATCH = 1;
 
 function baseUrl(request) {
@@ -77,6 +78,9 @@ export async function POST(request) {
     const action = actionName(candidate);
     if (action === "SCHEDULE_POST") {
       return delegate(request, cronSecret, SOCIAL_SCHEDULER_PATH, "social_scheduler");
+    }
+    if (action === "CREATE_BOOK") {
+      return delegate(request, cronSecret, BOOK_SCHEDULER_PATH, "book_scheduler");
     }
     if (!isAgenticAction(action, parameters(candidate))) {
       return delegate(request, cronSecret, ORCHESTRATOR_PATH, "orchestrator");

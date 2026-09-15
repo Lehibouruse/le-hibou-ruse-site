@@ -16,6 +16,7 @@ on:
       - "app/api/orchestrator/**"
       - "app/api/social/**"
       - "app/api/social-scheduler/**"
+      - "app/api/book-scheduler/**"
       - "lib/airtable.js"
       - "lib/agent-capabilities.mjs"
       - "lib/agent-runtime.mjs"

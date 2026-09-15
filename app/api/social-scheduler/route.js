@@ -124,7 +124,9 @@ export async function GET(request) {
     const jobId = String(job.fields?.job_id || job.id);
     const idempotencyKey = safeIdempotency(job.fields?.idempotency_key || params.idempotency_key || `job:${jobId}`);
     const campaign = String(params.utm_campaign || params.campaign || params.series || "hibou-organic").trim();
-    const contentId = String(params.utm_content || params.content_id || params.video_id || jobId).trim();
+    // Prefer the Airtable Content Pipeline record id so sales can be joined exactly
+    // to per-platform performance rows. Explicit utm_content still has priority.
+    const contentId = String(params.utm_content || params.content_record_id || params.content_id || params.video_id || jobId).trim();
     const ctaUrl = socialCampaignUrl({ provider, campaign, contentId });
     let caption = String(params.caption || params.text || "");
     if (params.append_site_link === true && !caption.includes("d4d5d6.com")) {
@@ -148,6 +150,7 @@ export async function GET(request) {
         metadata: {
           ...(params.metadata || {}),
           job_id: jobId,
+          content_record_id: String(params.content_record_id || ""),
           idempotency_key: idempotencyKey,
           cta_url: ctaUrl,
           utm_source: provider,

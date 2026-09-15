@@ -47,8 +47,10 @@ test("un insight Facebook retiré peut tomber sur le métrique suivant sans cass
     if (target.includes("metric=post_media_view")) return response({ error: { message: "metric unavailable" } }, 400);
     if (target.includes("metric=post_video_views")) return response({ error: { message: "metric unavailable" } }, 400);
     if (target.includes("metric=post_impressions")) return response({ data: [{ values: [{ value: 44 }] }] });
-    if (target.includes("metric=post_clicks")) return response({ error: { message: "metric unavailable" } }, 400);
+    // Vérifier la variante la plus spécifique avant le préfixe générique :
+    // "metric=post_clicks" est aussi une sous-chaîne de "metric=post_clicks_by_type".
     if (target.includes("metric=post_clicks_by_type")) return response({ data: [{ values: [{ value: { link: 4, other: 2 } }] }] });
+    if (target.includes("metric=post_clicks")) return response({ error: { message: "metric unavailable" } }, 400);
     throw new Error(`unexpected ${target}`);
   };
   const metrics = await fetchFacebookMetrics("page_123", { META_ACCESS_TOKEN: "token", META_GRAPH_VERSION: "v26.0" }, fakeFetch, "pages_read_engagement");

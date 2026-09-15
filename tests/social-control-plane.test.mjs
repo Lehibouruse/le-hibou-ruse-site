@@ -11,7 +11,7 @@ const baseEnv = {
 const youtubeReady = [{
   provider: "youtube",
   ready: true,
-  scopes: "https://www.googleapis.com/auth/youtube",
+  scopes: "https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
   redirect_uri: "https://le-hibou-ruse-site.vercel.app/api/social/oauth/youtube/callback",
   error: "",
 }];
@@ -42,11 +42,11 @@ test("un secret serveur manquant expose le blocage externe exact sans révéler 
   assert.equal(JSON.stringify(youtube).includes("yt-secret"), false);
 });
 
-test("les scopes réellement accordés font passer YouTube à AUTHORIZED", () => {
+test("les scopes publication + Analytics font passer YouTube à AUTHORIZED", () => {
   const credentials = [{
     provider: "youtube",
     status: "Connected",
-    scopes: "https://www.googleapis.com/auth/youtube",
+    scopes: "https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
   }];
   const snapshot = buildSocialControlPlane({ readiness: youtubeReady, credentials, env: baseEnv });
   const youtube = snapshot.providers.find((item) => item.provider === "youtube");
@@ -54,6 +54,19 @@ test("les scopes réellement accordés font passer YouTube à AUTHORIZED", () =>
   assert.equal(youtube.publish_scope_ok, true);
   assert.equal(youtube.analytics_scope_ok, true);
   assert.equal(youtube.phase, "AUTHORIZED");
+});
+
+test("YouTube distingue publication autorisée et scopes Analytics incomplets", () => {
+  const credentials = [{ provider: "youtube", status: "Connected", scopes: "https://www.googleapis.com/auth/youtube" }];
+  const snapshot = buildSocialControlPlane({ readiness: youtubeReady, credentials, env: baseEnv });
+  const youtube = snapshot.providers.find((item) => item.provider === "youtube");
+  assert.equal(youtube.publish_scope_ok, true);
+  assert.equal(youtube.analytics_scope_ok, false);
+  assert.equal(youtube.phase, "ANALYTICS_SCOPE_REVIEW_REQUIRED");
+  assert.deepEqual(youtube.missing_analytics_scopes, [
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+  ]);
 });
 
 test("Meta expose séparément les fallbacks Instagram et Facebook et reste pilotable via Metricool", () => {

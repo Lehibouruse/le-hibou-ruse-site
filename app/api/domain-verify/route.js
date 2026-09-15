@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { assessDomainIdentity, domainConfigPatch } from "../../../lib/domain-verification.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,40 +51,38 @@ export async function POST(request) {
   let response;
   try {
     response = await fetch(`${origin}/api/site-identity`, {
-      headers: { Accept: "application/json", "User-Agent": "HIBOU_DOMAIN_VERIFIER_V1" },
+      headers: { Accept: "application/json", "User-Agent": "HIBOU_DOMAIN_VERIFIER_V2" },
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });
   } catch (error) {
-    return NextResponse.json({ ok: true, verified: false, reason: `fetch_failed:${String(error?.name || "error")}` });
+    // Timeout/DNS/network errors are inconclusive: preserve the previous verification state.
+    return NextResponse.json({ ok: true, verified: false, state: "pending", reason: `fetch_failed:${String(error?.name || "error")}` });
   }
 
   const data = await response.json().catch(() => ({}));
   const marker = response.headers.get("x-hibou-site") || "";
-  const verified = response.ok
-    && marker === "le-hibou-ruse"
-    && data?.site === "Le Hibou Rusé"
-    && data?.canonical === true
-    && [EXPECTED_HOST, `www.${EXPECTED_HOST}`].includes(String(data?.received_host || "").toLowerCase());
+  const assessment = assessDomainIdentity({ status: response.status, ok: response.ok, marker, data });
+  const previousVerified = String(domainRecord.fields?.Valeur || "").toLowerCase() === "true";
+  const patch = domainConfigPatch(assessment.state, assessment.reason);
 
-  if (!verified) {
-    return NextResponse.json({
-      ok: true,
-      verified: false,
-      status: response.status,
-      marker: marker || null,
-      received_host: data?.received_host || null,
-      canonical: data?.canonical === true,
-    });
+  if (patch) {
+    const changesState = assessment.state === "verified" ? !previousVerified : previousVerified;
+    const hasErrorChange = assessment.state === "mismatch" || String(domainRecord.fields?.Erreur || "") !== "";
+    if (changesState || hasErrorChange) {
+      await updateRecord(TABLES.configuration, domainRecord.id, patch);
+    }
   }
 
-  if (String(domainRecord.fields?.Valeur || "").toLowerCase() !== "true") {
-    await updateRecord(TABLES.configuration, domainRecord.id, {
-      Valeur: "true",
-      Statut: "Actif",
-      "Dernière vérification": new Date().toISOString().slice(0, 10),
-    });
-  }
-
-  return NextResponse.json({ ok: true, verified: true, host: EXPECTED_HOST, marker });
+  return NextResponse.json({
+    ok: true,
+    verified: assessment.verified,
+    state: assessment.state,
+    reason: assessment.reason,
+    status: response.status,
+    marker: marker || null,
+    received_host: data?.received_host || null,
+    canonical: data?.canonical === true,
+    previous_verified: previousVerified,
+  });
 }

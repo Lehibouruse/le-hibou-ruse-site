@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
-import { addDigifyRecipient, escapeFormula } from "../../../../lib/commerce.mjs";
+import { addDigifyRecipient, canonicalSale, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
 import { clearCommerceLease, commerceClaimPatch, commercePendingFormula, commerceStaleFormula, ownsCommerceLease } from "../../../../lib/commerce-lease.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
@@ -51,6 +51,36 @@ async function clearStaleDelivery() {
   return sale.id;
 }
 
+async function deliveryOrderGuard(current) {
+  const orderId = String(current.fields?.["ID commande externe"] || "").trim();
+  if (!orderId) return { safe: false, reason: "ID commande externe absent" };
+  const safe = escapeFormula(orderId);
+  const matches = await queryRecords(TABLES.sales, {
+    filterByFormula: `{ID commande externe}='${safe}'`,
+    pageSize: 10,
+  });
+  const refunded = matches.find((record) => saleIsRefunded(record.fields));
+  if (refunded) {
+    return {
+      safe: false,
+      refunded: true,
+      refundAt: String(refunded.fields?.Remboursement || "").trim(),
+      reason: `Commande ${orderId} remboursée sur ${refunded.id}; livraison bloquée`,
+      duplicates: Math.max(0, matches.length - 1),
+    };
+  }
+  const canonical = canonicalSale(matches);
+  if (matches.length > 1 && canonical?.id !== current.id) {
+    return {
+      safe: false,
+      refunded: false,
+      reason: `Doublon de vente ${orderId}; seul ${canonical?.id || "le record canonique"} peut être livré`,
+      duplicates: matches.length - 1,
+    };
+  }
+  return { safe: true, duplicates: Math.max(0, matches.length - 1), canonical_id: canonical?.id || current.id };
+}
+
 export async function POST(request) {
   try {
     const auth = request.headers.get("authorization") || "";
@@ -84,6 +114,27 @@ export async function POST(request) {
   const current = await getRecord(TABLES.sales, candidate.id);
   if (!ownsCommerceLease(current, token, "processing")) {
     return NextResponse.json({ ok: true, processed: 0, reason: "delivery_claim_lost" });
+  }
+
+  const guard = await deliveryOrderGuard(current);
+  if (!guard.safe) {
+    const patch = guard.refunded
+      ? {
+          Statut: "refunded",
+          Remboursement: guard.refundAt || new Date().toISOString(),
+          "Livraison statut": "revoked",
+          "Livraison erreur": guard.reason,
+        }
+      : { "Livraison statut": "manual_review", "Livraison erreur": guard.reason };
+    await updateRecord(TABLES.sales, current.id, clearCommerceLease(patch));
+    await journal(current, guard.refunded ? "Completed" : "Manual Review", guard.reason);
+    return NextResponse.json({
+      ok: true,
+      processed: 1,
+      status: guard.refunded ? "revoked" : "manual_review",
+      reason: guard.refunded ? "refund_guard" : "duplicate_order_guard",
+      duplicate_records: guard.duplicates || 0,
+    });
   }
 
   const product = await productForSale(current);

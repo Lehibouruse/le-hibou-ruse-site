@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { digifyRecipientRequest, digifyRevokeRequest, lemonOrder, verifyLemonSignature } from "../lib/commerce.mjs";
+import { canonicalSale, digifyRecipientRequest, digifyRevokeRequest, lemonOrder, saleIsRefunded, verifyLemonSignature } from "../lib/commerce.mjs";
 
 test("la signature Lemon est vérifiée en HMAC SHA-256 sur le body brut", () => {
   const body = Buffer.from('{"meta":{"event_name":"order_created"}}');
@@ -18,6 +18,23 @@ test("une commande Lemon est normalisée sans dépendre de son nom public", () =
   assert.equal(order.email, "test@example.com");
   assert.equal(order.total, 29);
   assert.equal(order.variantId, "10");
+});
+
+test("la détection de remboursement couvre les statuts canonique et historique", () => {
+  assert.equal(saleIsRefunded({ Statut: "refunded" }), true);
+  assert.equal(saleIsRefunded({ Statut: "Remboursée" }), true);
+  assert.equal(saleIsRefunded({ Statut: "paid", Remboursement: "2026-09-16T08:00:00Z" }), true);
+  assert.equal(saleIsRefunded({ Statut: "paid", Remboursement: "Non" }), false);
+});
+
+test("la vente canonique est stable entre doublons concurrents", () => {
+  const records = [
+    { id: "recB", createdTime: "2026-09-16T08:00:02.000Z" },
+    { id: "recA", createdTime: "2026-09-16T08:00:01.000Z" },
+    { id: "recC", createdTime: "2026-09-16T08:00:01.000Z" },
+  ];
+  assert.equal(canonicalSale(records).id, "recA");
+  assert.equal(canonicalSale([]), null);
 });
 
 test("le corps Digify est fourni par le schéma officiel configuré et exige email + file GUID", () => {
@@ -62,6 +79,30 @@ test("le webhook Lemon et les processeurs Digify sont séparés", () => {
   assert.match(delivery, /addDigifyRecipient/);
   assert.match(revoke, /revokeDigifyRecipient/);
   assert.match(revoke, /revocation_not_configured/);
+});
+
+test("l'ancien endpoint Lemon délègue au handler canonique", () => {
+  const legacy = readFileSync(new URL("../app/api/webhooks/lemonsqueezy/route.js", import.meta.url), "utf8");
+  assert.match(legacy, /commerce\/lemon-webhook\/route/);
+  assert.doesNotMatch(legacy, /createRecord|updateRecord|validSignature/);
+});
+
+test("un remboursement hors ordre crée un tombstone et order_created ne réactive jamais la livraison", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /refund_before_order_created=true/);
+  assert.match(lemon, /order_created_after_refund=true/);
+  assert.match(lemon, /"Livraison statut": "revoked"/);
+  assert.match(lemon, /priorRefundMarker/);
+});
+
+test("la livraison vérifie les doublons et remboursements avant l'effet externe Digify", () => {
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  const guardAt = delivery.indexOf("deliveryOrderGuard(current)");
+  const effectAt = delivery.indexOf("addDigifyRecipient({ fileGuid, email, orderId })");
+  assert.ok(guardAt >= 0);
+  assert.ok(effectAt > guardAt);
+  assert.match(delivery, /duplicate_order_guard/);
+  assert.match(delivery, /refund_guard/);
 });
 
 test("une commande test ne peut jamais passer en livraison", () => {

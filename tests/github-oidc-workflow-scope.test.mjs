@@ -40,6 +40,21 @@ test("sans option, la compatibilité historique reste limitée à hibou-wake", (
   assert.throws(() => validateGithubActionsClaims(claims("system-watchdog.yml"), NOW), /workflow/);
 });
 
+test("les routes OIDC dédiées refusent push tandis que hibou-wake conserve son self-test push", () => {
+  assert.throws(
+    () => validateGithubActionsClaims(
+      claims("system-watchdog.yml", { event_name: "push" }),
+      NOW,
+      { allowedWorkflowFiles: ["system-watchdog.yml"] },
+    ),
+    /event/,
+  );
+  assert.equal(
+    validateGithubActionsClaims(claims("hibou-wake.yml", { event_name: "push" }), NOW).event_name,
+    "push",
+  );
+});
+
 test("un nom de workflow injecté hors dossier GitHub Actions est refusé", () => {
   assert.throws(
     () => validateGithubActionsClaims(claims("system-watchdog.yml"), NOW, { allowedWorkflowFiles: ["../system-watchdog.yml"] }),

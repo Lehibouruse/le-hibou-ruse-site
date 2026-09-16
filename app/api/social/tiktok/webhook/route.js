@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES, updateRecord } from "../../../../../lib/airtable.js";
 import { loadSocialCredential, storeSocialCredential } from "../../../../../lib/social-credential-vault.mjs";
-import { journalFieldsForTikTokWebhook, parseTikTokWebhook, tikTokWebhookAlreadyApplied, verifyTikTokWebhookSignature } from "../../../../../lib/tiktok-webhook.mjs";
+import { journalFieldsForTikTokWebhook, parseTikTokWebhook, tikTokWebhookAlreadyApplied, tikTokWebhookDisposition, verifyTikTokWebhookSignature } from "../../../../../lib/tiktok-webhook.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export async function POST(request) {
 
   let event;
   try {
-    event = parseTikTokWebhook(rawBody);
+    event = { ...parseTikTokWebhook(rawBody), signature_time: verification.timestamp };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
@@ -83,9 +83,15 @@ export async function POST(request) {
   const records = await socialJournalForPublishId(event.publish_id);
   let updated = 0;
   let duplicates = 0;
+  const ignored = {};
   for (const record of records) {
     if (tikTokWebhookAlreadyApplied(record, event)) {
       duplicates += 1;
+      continue;
+    }
+    const disposition = tikTokWebhookDisposition(record, event);
+    if (!disposition.apply) {
+      ignored[disposition.reason] = Number(ignored[disposition.reason] || 0) + 1;
       continue;
     }
     const fields = journalFieldsForTikTokWebhook(record, event);
@@ -104,5 +110,6 @@ export async function POST(request) {
     matched: records.length,
     updated,
     duplicates,
+    ignored,
   });
 }

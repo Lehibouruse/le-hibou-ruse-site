@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const webhook = readFileSync(new URL("../app/api/commerce/digify-webhook/route.js", import.meta.url), "utf8");
 const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+const watchdog = readFileSync(new URL("../app/api/system-watchdog/route.js", import.meta.url), "utf8");
 const envExample = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
 const workRunbook = readFileSync(new URL("../docs/WORK_LEMON_TEST_RUNBOOK.md", import.meta.url), "utf8");
 const launchRunbook = readFileSync(new URL("../docs/COMMERCE_LAUNCH_RUNBOOK.md", import.meta.url), "utf8");
@@ -56,6 +57,12 @@ test("Print et Download sont des alertes de politique, pas une activité normale
   assert.match(webhook, /"Policy Alert"/);
   assert.match(webhook, /désactive impression\/téléchargement/);
   assert.match(webhook, /policy_alert: policyViolation/);
+});
+
+test("le Watchdog remonte les Policy Alert Digify dans le heartbeat", () => {
+  assert.match(watchdog, /\{Statut\}='Policy Alert'/);
+  assert.match(watchdog, /policyAlerts: state\.policyAlerts/);
+  assert.match(watchdog, /pageSize: 20/);
 });
 
 test("une livraison mémorise le fichier et l'édition exacts", () => {

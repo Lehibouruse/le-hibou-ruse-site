@@ -3,6 +3,7 @@ import { queryRecords, TABLES } from "../../../../lib/airtable.js";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 import { testVaultProviderConnections } from "../../../../lib/social-connection-health.mjs";
 import { socialCredentialStatuses } from "../../../../lib/social-credential-vault.mjs";
+import { syncSocialRoutingPlanToAirtable } from "../../../../lib/social-routing-airtable.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -50,12 +51,16 @@ export async function POST(request) {
     const env = await runtimeEnv();
     const results = [];
     for (const provider of unique) results.push(...await testVaultProviderConnections(provider, env));
+    const routing = unique.length
+      ? await syncSocialRoutingPlanToAirtable(env).catch((error) => ({ error: String(error?.message || error).slice(0, 500) }))
+      : { skipped: true, reason: "no_connected_provider" };
     const failed = results.filter((item) => !item.ok);
     return NextResponse.json({
       ok: failed.length === 0,
       authenticated_via: authenticatedVia,
       tested_vault_providers: unique,
       results,
+      routing,
       checked_at: new Date().toISOString(),
       safety: { read_only_remote_calls: true, publication_triggered: false, secrets_exposed: false },
     }, { status: failed.length ? 207 : 200 });

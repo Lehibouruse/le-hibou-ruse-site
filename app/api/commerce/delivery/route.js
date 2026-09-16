@@ -116,6 +116,9 @@ export async function POST(request) {
   if (!(await commerceLaunchAuthorized())) {
     return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured });
   }
+  if (!configured) {
+    return NextResponse.json({ ok: true, processed: 0, reason: "delivery_not_configured", configured: false });
+  }
 
   const pending = await queryRecords(TABLES.sales, { filterByFormula: commercePendingFormula("delivery"), pageSize: 1 });
   const candidate = pending[0];

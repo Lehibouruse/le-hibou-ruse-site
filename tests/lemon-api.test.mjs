@@ -5,6 +5,7 @@ import {
   buildTestCheckoutPayload,
   buildTestWebhookPayload,
   lemonRequest,
+  retrieveLemonCheckout,
 } from "../lib/lemon-api.mjs";
 
 const route = readFileSync(new URL("../app/api/commerce/lemon-bootstrap/route.js", import.meta.url), "utf8");
@@ -21,7 +22,7 @@ function jsonResponse(body, status = 200) {
   };
 }
 
-test("le checkout Lemon bootstrap est toujours test_mode et borné au variant choisi", () => {
+test("le checkout Lemon bootstrap est toujours test_mode, français et borné au variant choisi", () => {
   const payload = buildTestCheckoutPayload({
     storeId: "12",
     variantId: "34",
@@ -32,6 +33,7 @@ test("le checkout Lemon bootstrap est toujours test_mode et borné au variant ch
   });
   assert.equal(payload.data.attributes.test_mode, true);
   assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [34]);
+  assert.equal(payload.data.attributes.checkout_options.locale, "fr");
   assert.equal(payload.data.relationships.store.data.id, "12");
   assert.equal(payload.data.relationships.variant.data.id, "34");
   assert.match(payload.data.attributes.product_options.redirect_url, /order=\[order_identifier\]/);
@@ -64,6 +66,23 @@ test("le client Lemon envoie les en-têtes JSON:API et le Bearer sans changer d'
   );
 });
 
+test("un checkout stocké est relu chez Lemon avant réutilisation", async () => {
+  let seenUrl = "";
+  const id = "5e8b546c-c561-4a2c-a586-40c18bb2a195";
+  const fetchImpl = async (url) => {
+    seenUrl = url;
+    return jsonResponse({ data: { id, attributes: { test_mode: true } } });
+  };
+  const checkout = await retrieveLemonCheckout(id, { apiKey: "secret-test-key", fetchImpl });
+  assert.equal(checkout.id, id);
+  assert.equal(checkout.attributes.test_mode, true);
+  assert.match(seenUrl, new RegExp(`/v1/checkouts/${id}$`));
+  await assert.rejects(
+    retrieveLemonCheckout("not-a-checkout", { apiKey: "x", fetchImpl }),
+    /Checkout ID Lemon invalide/,
+  );
+});
+
 test("la route bootstrap refuse toute action live et n'accepte que le workflow manuel OIDC dédié", () => {
   assert.match(route, /OIDC_WORKFLOW = "lemon-commerce-test\.yml"/);
   assert.match(route, /ALLOWED_ACTIONS = new Set\(\["inspect", "checkout_test", "webhook_test"\]\)/);
@@ -74,12 +93,14 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
   assert.doesNotMatch(route, /checkout_live|webhook_live|action === "live"/);
 });
 
-test("le checkout test est réutilisé au lieu d'être recréé aveuglément", () => {
-  assert.match(route, /function existingTestCheckout/);
-  assert.match(route, /lemon_test_checkout_id/);
-  assert.match(route, /lemon_test_checkout_url/);
+test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () => {
+  assert.match(route, /async function existingTestCheckout/);
+  assert.match(route, /retrieveLemonCheckout\(id\)/);
+  assert.match(route, /attrs\.test_mode !== true/);
+  assert.match(route, /Store ID différent/);
+  assert.match(route, /Variant ID différent/);
   assert.match(route, /test_checkout_reused/);
-  assert.match(route, /host !== "lemonsqueezy\.com" && !host\.endsWith\("\.lemonsqueezy\.com"\)/);
+  assert.match(route, /Number\(error\?\.status\) === 404/);
 });
 
 test("le workflow Lemon est manuel, borné aux actions de test et échoue sur un 404 persistant", () => {

@@ -1,28 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HIBOU_SESSION_KEY, sessionId } from "../lib/conversion-client.mjs";
+import { readFileSync } from "node:fs";
+import { sessionId } from "../lib/conversion-client.mjs";
 
-function withStorage(run) {
-  const data = new Map();
-  const previous = globalThis.localStorage;
-  globalThis.localStorage = {
-    getItem(key) { return data.has(key) ? data.get(key) : null; },
-    setItem(key, value) { data.set(key, String(value)); },
-    removeItem(key) { data.delete(key); },
-  };
-  try { return run(data); }
-  finally {
-    if (previous === undefined) delete globalThis.localStorage;
-    else globalThis.localStorage = previous;
+const conversionClient = readFileSync(new URL("../lib/conversion-client.mjs", import.meta.url), "utf8");
+const attributionCapture = readFileSync(new URL("../components/AttributionCapture.js", import.meta.url), "utf8");
+const trackedLink = readFileSync(new URL("../components/TrackedLink.js", import.meta.url), "utf8");
+
+test("sessionId reste stable uniquement en mémoire pour la page courante", () => {
+  const first = sessionId();
+  const second = sessionId();
+  assert.ok(first.length >= 8);
+  assert.equal(second, first);
+});
+
+test("attribution et session de conversion n'utilisent aucun stockage navigateur persistant", () => {
+  for (const source of [conversionClient, attributionCapture, trackedLink]) {
+    assert.doesNotMatch(source, /localStorage|sessionStorage|document\.cookie/);
   }
-}
-
-test("sessionId reste stable pour une session locale", () => {
-  withStorage((data) => {
-    const first = sessionId();
-    const second = sessionId();
-    assert.ok(first.length >= 8);
-    assert.equal(second, first);
-    assert.equal(data.get(HIBOU_SESSION_KEY), first);
-  });
+  assert.match(conversionClient, /let inMemorySessionId = ""/);
+  assert.match(trackedLink, /captureAttribution/);
 });

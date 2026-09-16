@@ -41,15 +41,25 @@ export async function GET(request) {
     filterByFormula: `OR({Identifiant commande public}='${safeIdentifier}',FIND('${safeLegacyMarker}',{Notes}))`,
     pageSize: 10,
   });
-  const sale = canonicalSale(matches);
 
   // Do not reveal whether an arbitrary identifier exists. A legitimate checkout
   // can simply keep polling while the signed Lemon webhook is still propagating.
-  if (!sale) return response({ ok: true, status: "processing" }, 202);
+  if (!matches.length) return response({ ok: true, status: "processing" }, 202);
 
-  if (saleIsRefunded(sale.fields)) {
+  // Refund always wins across duplicate/racing records. Never expose an access URL
+  // if any record for the public order identifier says the purchase was refunded.
+  if (matches.some((record) => saleIsRefunded(record.fields))) {
     return response({ ok: true, status: "revoked", reason: "refunded" });
   }
+
+  // Delivery already has a canonical duplicate guard. The public read path must be
+  // at least as strict: ambiguity is manual review, never "pick one and serve".
+  if (matches.length !== 1) {
+    return response({ ok: true, status: "manual_review" });
+  }
+
+  const sale = canonicalSale(matches);
+  if (!sale) return response({ ok: true, status: "processing" }, 202);
 
   const deliveryStatus = String(sale.fields?.["Livraison statut"] || "pending").trim().toLowerCase();
   const edition = String(sale.fields?.["Version livre livrée"] || "").trim();

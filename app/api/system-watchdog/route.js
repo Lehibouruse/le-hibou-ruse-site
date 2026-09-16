@@ -5,8 +5,10 @@ import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 import { clearOpenAiCircuit, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 import { testVaultProviderConnections } from "../../../lib/social-connection-health.mjs";
+import { resolveSocialEnv } from "../../../lib/social-credentials-runtime.mjs";
 import { syncSocialRoutingPlanToAirtable } from "../../../lib/social-routing-airtable.mjs";
 import { socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
+import { pendingTikTokJournalFormula, reconcilePendingTikTokJournal } from "../../../lib/tiktok-pending-reconcile.mjs";
 import { healthFingerprint, systemHealthSnapshot } from "../../../lib/system-health.mjs";
 
 export const runtime = "nodejs";
@@ -123,6 +125,47 @@ async function reconcileOneSocialConnection(state, now, actions) {
   }
 }
 
+async function reconcileOnePendingTikTokPublication(state, actions) {
+  try {
+    const pending = await queryRecords(TABLES.journal, {
+      filterByFormula: pendingTikTokJournalFormula(),
+      sortField: "Dernière exécution",
+      sortDirection: "asc",
+      pageSize: 5,
+      priorityAware: false,
+    });
+    if (!pending.length) return false;
+
+    const env = socialRuntimeEnv(state.config, process.env);
+    const resolved = await resolveSocialEnv("tiktok", env);
+    const token = text(resolved.env?.TIKTOK_ACCESS_TOKEN);
+    if (!token) {
+      actions.push({ action: "tiktok_publication_reconcile", ok: false, reason: "access_token_missing", pending_count: pending.length });
+      return false;
+    }
+
+    for (const record of pending) {
+      const result = await reconcilePendingTikTokJournal(record, token);
+      if (result.reason === "not_pending_tiktok") continue;
+      if (result.changed) await updateRecord(TABLES.journal, record.id, result.fields);
+      actions.push({
+        action: "tiktok_publication_reconcile",
+        ok: true,
+        record_id: record.id,
+        publish_id: result.publish_id,
+        state: result.state || result.reason,
+        status: result.status?.status || "",
+        changed: result.changed === true,
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    actions.push({ action: "tiktok_publication_reconcile", ok: false, error: String(error?.message || error).slice(0, 500) });
+    return false;
+  }
+}
+
 async function journalSnapshot(snapshot, actions) {
   if (snapshot.severity === "ok" && !actions.length) return;
   const fingerprint = healthFingerprint(snapshot);
@@ -171,6 +214,10 @@ export async function POST(request) {
       circuit = { ...circuit, active: false, until: "", reason: "" };
       actions.push({ action: "clear_openai_credit_circuit", job_id: success.job.fields?.job_id || success.job.id });
     }
+
+    // TikTok Direct Post is asynchronous. Reconcile one already-submitted pending
+    // publish_id per pass before any new social health work. This never creates a post.
+    await reconcileOnePendingTikTokPublication(state, actions);
 
     // Read-only social health remains deterministic even when OpenAI is paused.
     // One stale vault provider per pass bounds external calls and avoids rate-limit bursts.

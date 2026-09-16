@@ -7,6 +7,9 @@ import { isAgenticAction, toolsForAction } from "../lib/agent-capabilities.mjs";
 import { failureDisposition, vercelCommitState } from "../lib/agent-runtime.mjs";
 
 const NOW = 2_000_000_000;
+const CHECKOUT_SHA = "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09";
+const SETUP_NODE_SHA = "a0853c24544627f65ddf259abe73b1d18a591444";
+const UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02";
 
 function validClaims(overrides = {}) {
   return {
@@ -91,8 +94,22 @@ test("le cron effectue un vrai wake et le dry-run/export restent manuels", () =>
   assert.match(workflow, /HIBOU_BASE_URL:/);
   assert.match(workflow, /vars\.HIBOU_PUBLIC_BASE_URL/);
   assert.match(workflow, /\$\{HIBOU_BASE_URL\}\/api\/wake/);
-  assert.match(workflow, /actions\/checkout@v5/);
-  assert.match(workflow, /actions\/setup-node@v5/);
+  assert.match(workflow, new RegExp(`actions/checkout@${CHECKOUT_SHA}`));
+  assert.match(workflow, new RegExp(`actions/setup-node@${SETUP_NODE_SHA}`));
+});
+
+test("les actions GitHub exécutables sont figées sur des commits immuables", () => {
+  const ci = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const wake = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
+  for (const workflow of [ci, wake]) {
+    assert.doesNotMatch(workflow, /uses:\s+actions\/[\w-]+@v\d+/);
+    for (const line of workflow.split(/\r?\n/).filter((item) => item.includes("uses: actions/"))) {
+      assert.match(line, /uses:\s+actions\/[\w-]+@[a-f0-9]{40}(?:\s+#\s+v\d+)?$/);
+    }
+  }
+  assert.match(ci, new RegExp(`actions/checkout@${CHECKOUT_SHA}`));
+  assert.match(ci, new RegExp(`actions/setup-node@${SETUP_NODE_SHA}`));
+  assert.match(wake, new RegExp(`actions/upload-artifact@${UPLOAD_ARTIFACT_SHA}`));
 });
 
 test("un Manual Review métier ne casse ni ne rejoue le wake", () => {

@@ -87,6 +87,26 @@ test("les revues commerce sont dégradées et comptées", () => {
   assert.equal(snapshot.counts.commerce_manual_review, 1);
 });
 
+test("une alerte Digify Print/Download récente dégrade le heartbeat", () => {
+  const snapshot = systemHealthSnapshot({
+    now,
+    policyAlerts: [{ fields: { "Dernière exécution": "2026-09-15T11:45:00Z" } }],
+  });
+  assert.equal(snapshot.severity, "degraded");
+  assert.equal(snapshot.counts.digify_policy_alerts_24h, 1);
+  assert(snapshot.issues.some((item) => item.code === "digify_policy_alert"));
+});
+
+test("une ancienne alerte Digify ne laisse pas le système dégradé indéfiniment", () => {
+  const snapshot = systemHealthSnapshot({
+    now,
+    policyAlerts: [{ fields: { "Dernière exécution": "2026-09-14T10:00:00Z" } }],
+  });
+  assert.equal(snapshot.severity, "ok");
+  assert.equal(snapshot.counts.digify_policy_alerts_24h, 0);
+  assert.equal(snapshot.issues.some((item) => item.code === "digify_policy_alert"), false);
+});
+
 test("le progrès du livre et les OAuth sont comptés sans inventer de readiness", () => {
   const snapshot = systemHealthSnapshot({
     now,

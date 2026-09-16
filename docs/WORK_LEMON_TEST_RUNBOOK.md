@@ -1,6 +1,6 @@
-# Work — Lemon Squeezy + Digify test flows
+# Work — Lemon Squeezy + Digify test E2E
 
-Objectif : configurer et tester séparément le tunnel Lemon Squeezy → webhook Hibou → Airtable et la livraison Digify, sans ouvrir les ventes publiques et sans paiement réel. L’intégration complète Lemon → Digify sera testée seulement avec un achat réel contrôlé juste avant le lancement public.
+Objectif : configurer et tester le tunnel Lemon Squeezy → webhook Hibou → Airtable et, séparément, la sécurité Digify, sans ouvrir les ventes publiques et sans paiement réel.
 
 ## Garde-fous non négociables
 
@@ -11,7 +11,8 @@ Objectif : configurer et tester séparément le tunnel Lemon Squeezy → webhook
 - Les secrets Lemon/Webhook/Digify sont saisis directement dans Vercel.
 - Tout CAPTCHA, nouvelle 2FA, validation bancaire, consentement contractuel personnel, upgrade payant ou action irréversible impose un arrêt et une demande à Marc.
 - Le PDF partiel est uniquement un fichier de test et ne doit jamais être livré via une vente live.
-- Une commande Lemon `test_mode=true` ne doit jamais déclencher de livraison Digify. Elle reste volontairement en `manual_review`.
+- Un achat Lemon `test_mode=true` ne doit jamais créer ni révoquer un accès Digify réel.
+- Aucun lien Digify générique/public ne doit servir de mécanisme de livraison : uniquement un Quick Access Link nominatif ou la notification Digify individuelle.
 
 ## Actif de test
 
@@ -106,14 +107,14 @@ La route doit créer uniquement un checkout `test_mode=true` avec :
 
 - produit `Le guide du Hibou Rusé` ;
 - variant exact 29 € ;
-- langue : français ;
+- locale française ;
 - redirection temporaire : `https://le-hibou-ruse-site.vercel.app/merci?order=[order_identifier]` ;
 - bouton reçu : `Lire mon guide` ;
 - lien reçu identique ;
 - description Airtable ;
 - aucun code promo affiché.
 
-Le checkout de test est stocké uniquement dans Configuration (`lemon_test_checkout_id`, `lemon_test_checkout_url`). Ne pas remplir le champ de checkout LIVE du produit. Si un checkout test est déjà enregistré, la route le relit chez Lemon et vérifie `test_mode`, Store ID, Variant ID et URL avant réutilisation. Un checkout disparu (404) peut être recréé ; un checkout incompatible bloque le workflow.
+Le checkout de test est stocké uniquement dans Configuration (`lemon_test_checkout_id`, `lemon_test_checkout_url`). Ne pas remplir le champ de checkout LIVE du produit. Si un checkout de test est déjà enregistré, la route le relit chez Lemon et ne le réutilise que si `test_mode`, Store ID, Variant ID et URL HTTPS Lemon correspondent encore ; un 404 permet une recréation, une incohérence bloque le workflow.
 
 ## Phase 8 — Webhook TEST par API
 
@@ -130,7 +131,7 @@ Résultat attendu : webhook `test_mode=true` vers :
 
 Si un webhook identique existe, le réutiliser. Si le même endpoint existe avec une configuration incompatible, arrêter plutôt que créer des doublons.
 
-## Phase 9 — Digify test sécurisé, séparé de Lemon
+## Phase 9 — Digify test sécurisé
 
 ### Compte et API
 
@@ -155,7 +156,7 @@ Enregistrer uniquement le File GUID/ID non secret dans `Produits site > Digify F
 
 ### Schéma API actuel
 
-Dans le Developer Portal 2026, relever les endpoints et payloads officiels actuels pour :
+Dans le Developer Portal 2026, relever **sans extrapoler d'une ancienne doc** les endpoints et payloads officiels actuels pour :
 
 - ajouter un destinataire Quick Access au fichier ;
 - récupérer son lien personnalisé ;
@@ -163,62 +164,40 @@ Dans le Developer Portal 2026, relever les endpoints et payloads officiels actue
 
 Configurer directement dans Vercel :
 
+- `DIGIFY_ADD_RECIPIENT_URL`
 - `DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE`
 - `DIGIFY_REVOKE_RECIPIENT_URL`
 - `DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE`
 
-Ne jamais inventer un endpoint ou un payload Digify à partir d'une ancienne documentation.
+Les deux URLs doivent être HTTPS sur `api.digify.com`. Le runtime les refusera sinon. Ne jamais inventer un endpoint ou un payload Digify à partir d'une ancienne documentation.
 
-### Test destinataire Digify
+### Test destinataire
 
-1. Ajouter une adresse de test contrôlée directement via Digify/API.
-2. Récupérer son Quick Access Link.
+1. Ajouter une adresse de test contrôlée.
+2. Récupérer son Quick Access Link individuel.
 3. Ouvrir dans un navigateur privé.
 4. Vérifier lecture immédiate, watermark, absence de download/print.
 5. Révoquer l'accès.
 6. Vérifier que le même lien ne permet plus la lecture.
 
-Ce test Digify est indépendant de la commande Lemon de test.
-
-## Phase 10 — Achat de test Lemon, sans Digify
+## Phase 10 — Achat de test Lemon
 
 1. Ouvrir exclusivement `lemon_test_checkout_url`.
 2. Utiliser le mode/moyen de paiement de test Lemon ; ne jamais utiliser un moyen de paiement réel pour cette phase.
 3. Terminer une commande de test.
 4. Vérifier le webhook `order_created`.
-5. Vérifier dans Airtable Ventes : commande créée/dédupliquée, `Identifiant commande public`, email de test, montant/devise.
-6. Vérifier explicitement `test_mode=true` dans l'audit de commande.
-7. Vérifier `Livraison statut=manual_review` : aucune livraison Digify ne doit être créée pour cette commande test.
-8. Vérifier que `/merci?order=[order_identifier]` ne révèle aucun lien Digify et reste en traitement/revue.
-9. Effectuer un remboursement de test.
-10. Vérifier la transition `refunded/revoked` sans qu'aucune livraison Digify n'ait eu lieu.
+5. Vérifier dans Airtable Ventes : commande créée/dédupliquée, `Identifiant commande public`, email de test, montant/devise, état de livraison.
+6. Le webhook Hibou doit détecter `test_mode=true` et fixer `Livraison statut=manual_review` avec la mention que la livraison est bloquée.
+7. `/merci?order=[order_identifier]` ne doit jamais révéler de lien Digify pour cette commande test.
+8. Effectuer ensuite un remboursement Lemon de test et vérifier l'état remboursé/révoqué dans Airtable, sans appeler l'API Digify.
 
-## Phase 11 — Remplacement par la V1 finale
+## Phase 11 — Test Digify séparé
 
-Après validation humaine par Marc de la première V1 vendable :
+Le test Digify de la phase 9 est indépendant du faux achat Lemon. Il valide techniquement ajout, Quick Access Link et révocation avec un destinataire contrôlé, mais ne doit pas être relié à une commande `test_mode=true`.
 
-- remplacer le PDF temporaire du produit Lemon existant sans recréer Product/Variant IDs ;
-- remplacer le fichier Digify ou mettre à jour le File GUID correspondant ;
-- mettre à jour `book_current_edition` ;
-- rejouer le test Digify lecture/révocation ;
-- rejouer `inspect`, `checkout_test` et `webhook_test` si nécessaire ;
-- conserver `commerce_launch_authorized=false`.
+## Phase 12 — Passage live ultérieur, séparé
 
-## Phase 12 — Intégration complète contrôlée avant lancement
-
-Seulement quand le livre final, Digify, domaine, juridique, payout/store Lemon et configuration live sont prêts :
-
-1. créer un webhook LIVE séparé ;
-2. créer un checkout LIVE séparé non encore publié ;
-3. effectuer un unique achat réel contrôlé ;
-4. vérifier Lemon → webhook signé → Airtable → Digify → `/merci` → `Lire mon guide` ;
-5. effectuer un remboursement réel contrôlé ;
-6. vérifier la révocation Digify ;
-7. corriger toute anomalie avant ouverture publique.
-
-## Phase 13 — Passage public
-
-Ne publier le checkout sur le site qu'après tous les contrôles précédents et une autorisation explicite de lancement.
+Ne pas exécuter dans cette session de test.
 
 Préconditions :
 
@@ -232,4 +211,4 @@ Préconditions :
 - checkout live séparé ;
 - achat/remboursement live contrôlé.
 
-Seulement alors : `commerce_launch_authorized=true` et publication du checkout LIVE sur le site.
+Le seul test complet Lemon → Digify se fait alors avec un achat réel contrôlé juste avant l'ouverture publique. Si ce test réussit, et seulement après vérification de tous les contrôles stricts : `commerce_launch_authorized=true` et publication du checkout LIVE sur le site.

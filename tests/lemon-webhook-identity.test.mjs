@@ -16,8 +16,8 @@ test("le webhook Lemon exige le même order_identifier UUID que le parcours /mer
 test("l'identité publique est validée avant toute lecture ou mutation de vente", () => {
   const identityGuard = webhook.indexOf("!UUID_RE.test(order.identifier)");
   const findSales = webhook.indexOf("const matches = await findSales(order.id)");
-  const earlyRefund = webhook.indexOf("recordEarlyRefund(order)");
+  const earlyRefundCall = webhook.indexOf("const saleId = await recordEarlyRefund(order)");
   assert.ok(identityGuard >= 0);
   assert.ok(findSales > identityGuard);
-  assert.ok(earlyRefund > identityGuard);
+  assert.ok(earlyRefundCall > identityGuard);
 });

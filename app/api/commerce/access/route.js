@@ -35,9 +35,10 @@ export async function GET(request) {
     return response({ ok: false, status: "invalid_order" }, 400);
   }
 
-  const safe = escapeFormula(`identifier=${orderIdentifier}`);
+  const safeIdentifier = escapeFormula(orderIdentifier);
+  const safeLegacyMarker = escapeFormula(`identifier=${orderIdentifier}`);
   const matches = await queryRecords(TABLES.sales, {
-    filterByFormula: `FIND('${safe}',{Notes})`,
+    filterByFormula: `OR({Identifiant commande public}='${safeIdentifier}',FIND('${safeLegacyMarker}',{Notes}))`,
     pageSize: 10,
   });
   const sale = canonicalSale(matches);

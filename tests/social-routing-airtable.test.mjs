@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { routeFieldsForProvider } from "../lib/social-routing-airtable.mjs";
+import { routeFieldsForProvider, routeTransition } from "../lib/social-routing-airtable.mjs";
 
 test("projette les trois routes opérationnelles dans les champs Airtable", () => {
   const plans = {
@@ -21,4 +21,27 @@ test("une route absente reste bloquée par défaut", () => {
     "Route publication": "blocked",
     "Route analytics": "blocked",
   });
+});
+
+test("détecte uniquement les transitions réelles pour éviter les écritures périodiques inutiles", () => {
+  assert.deepEqual(routeTransition({
+    "Route lecture": "chatgpt_metricool",
+    "Route publication": "chatgpt_metricool",
+    "Route analytics": "blocked",
+  }, {
+    "Route lecture": "direct_api",
+    "Route publication": "chatgpt_metricool",
+    "Route analytics": "blocked",
+  }), {
+    "Route lecture": { from: "chatgpt_metricool", to: "direct_api" },
+  });
+});
+
+test("un état identique est idempotent", () => {
+  const current = {
+    "Route lecture": "blocked",
+    "Route publication": "blocked",
+    "Route analytics": "blocked",
+  };
+  assert.deepEqual(routeTransition(current, current), {});
 });

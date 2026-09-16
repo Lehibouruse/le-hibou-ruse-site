@@ -5,6 +5,7 @@ import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 import { clearOpenAiCircuit, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 import { testVaultProviderConnections } from "../../../lib/social-connection-health.mjs";
+import { syncSocialRoutingPlanToAirtable } from "../../../lib/social-routing-airtable.mjs";
 import { socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 import { healthFingerprint, systemHealthSnapshot } from "../../../lib/system-health.mjs";
 
@@ -103,7 +104,7 @@ function staleSocialProvider(state, now) {
 
 async function reconcileOneSocialConnection(state, now, actions) {
   const provider = staleSocialProvider(state, now);
-  if (!provider) return;
+  if (!provider) return false;
   try {
     const env = socialRuntimeEnv(state.config, process.env);
     const results = await testVaultProviderConnections(provider, env);
@@ -113,8 +114,12 @@ async function reconcileOneSocialConnection(state, now, actions) {
       ok: results.every((item) => item.ok),
       results: results.map((item) => ({ provider: item.provider, ok: item.ok, state: item.state, error: item.error || "" })),
     });
+    const routing = await syncSocialRoutingPlanToAirtable(env).catch((error) => ({ error: String(error?.message || error).slice(0, 500) }));
+    actions.push({ action: "social_route_reconcile", provider, routing });
+    return true;
   } catch (error) {
     actions.push({ action: "social_read_health_test", provider, ok: false, error: String(error?.message || error).slice(0, 500) });
+    return false;
   }
 }
 

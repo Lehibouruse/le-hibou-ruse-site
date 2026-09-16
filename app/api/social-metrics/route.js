@@ -5,6 +5,7 @@ import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { markSocialAnalyticsValidated } from "../../../lib/social-account-validation.mjs";
 import { contentMetricTargets, fetchSocialMetrics, performanceKey, selectMetricTargets } from "../../../lib/social-metrics-enhanced.mjs";
 import { buildSocialPerformanceFields } from "../../../lib/social-performance-fields.mjs";
+import { syncSocialRoutingPlanToAirtable } from "../../../lib/social-routing-airtable.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -63,12 +64,14 @@ export async function POST(request) {
     if (!targets.length) return NextResponse.json({ ok: true, processed: 0, reason: "no_published_ids" });
 
     const results = [];
+    let routingDirty = false;
     for (const target of targets) {
       try {
         const metrics = await fetchSocialMetrics(target.provider, target.external_id, env);
         const saved = await persist(target, metrics, "active", "");
         const analyticsValidation = await markSocialAnalyticsValidated(target.provider, metrics)
           .catch((error) => ({ updated: false, reason: `airtable_state_error:${String(error?.message || error).slice(0, 300)}` }));
+        if (analyticsValidation.updated) routingDirty = true;
         results.push({ ...target, ok: true, metrics, analytics_validation: analyticsValidation, ...saved });
       } catch (error) {
         const state = classify(error);
@@ -78,7 +81,11 @@ export async function POST(request) {
         results.push({ ...target, ok: false, state, error: message });
       }
     }
-    return NextResponse.json({ ok: true, processed: results.length, succeeded: results.filter((item) => item.ok).length, results }, { headers: { "Cache-Control": "no-store" } });
+
+    const routing = routingDirty
+      ? await syncSocialRoutingPlanToAirtable(env).catch((error) => ({ error: String(error?.message || error).slice(0, 500) }))
+      : { skipped: true, reason: "no_social_route_state_change" };
+    return NextResponse.json({ ok: true, processed: results.length, succeeded: results.filter((item) => item.ok).length, routing, results }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || error).slice(0, 1000) }, { status: 500 });
   }

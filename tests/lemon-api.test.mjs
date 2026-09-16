@@ -9,6 +9,8 @@ import {
 
 const route = readFileSync(new URL("../app/api/commerce/lemon-bootstrap/route.js", import.meta.url), "utf8");
 const workflow = readFileSync(new URL("../.github/workflows/lemon-commerce-test.yml", import.meta.url), "utf8");
+const webhookRoute = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+const accessRoute = readFileSync(new URL("../app/api/commerce/access/route.js", import.meta.url), "utf8");
 
 function jsonResponse(body, status = 200) {
   return {
@@ -76,4 +78,10 @@ test("le workflow Lemon est manuel et n'expose que des actions de test", () => {
   assert.match(workflow, /inspect\|checkout_test\|webhook_test/);
   assert.doesNotMatch(workflow, /checkout_live|webhook_live/);
   assert.match(workflow, /id-token: write/);
+});
+
+test("le webhook persiste l'order_identifier dans le champ dédié et /merci le privilégie", () => {
+  assert.match(webhookRoute, /"Identifiant commande public": order\.identifier/);
+  assert.match(accessRoute, /\{Identifiant commande public\}='\$\{safeIdentifier\}'/);
+  assert.match(accessRoute, /safeLegacyMarker/);
 });

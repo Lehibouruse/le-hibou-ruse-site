@@ -27,9 +27,11 @@ async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
-  if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return;
   try {
-    await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] });
+    await verifyGithubActionsToken(token, {
+      allowedWorkflowFiles: [OIDC_WORKFLOW],
+      allowedEvents: ["workflow_dispatch"],
+    });
   } catch {
     throw new Error("Unauthorized");
   }
@@ -108,6 +110,20 @@ function testBaseUrl(config) {
   const url = new URL(raw);
   if (url.protocol !== "https:") throw new Error("lemon_test_base_url doit être HTTPS");
   return url.origin;
+}
+
+function existingTestCheckout(config) {
+  const id = text(config.lemon_test_checkout_id);
+  const raw = text(config.lemon_test_checkout_url);
+  if (!id || !raw) return null;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || (host !== "lemonsqueezy.com" && !host.endsWith(".lemonsqueezy.com"))) return null;
+    return { id, url: url.toString(), reused: true };
+  } catch {
+    return null;
+  }
 }
 
 async function inspectLemon(state) {
@@ -203,7 +219,8 @@ export async function POST(request) {
     };
 
     if (action === "checkout_test") {
-      const checkout = await createTestLemonCheckout({
+      const existing = existingTestCheckout(state.config);
+      const checkout = existing || await createTestLemonCheckout({
         storeId: inspected.storeId,
         variantId: inspected.variantId,
         productName: text(state.config.lemon_product_name || "Le guide du Hibou Rusé"),
@@ -215,10 +232,11 @@ export async function POST(request) {
       });
       result.test_checkout_id = checkout.id;
       result.test_checkout_url = checkout.url;
+      result.test_checkout_reused = Boolean(checkout.reused);
       await Promise.all([
         upsertConfig("lemon_test_checkout_id", checkout.id, "Identifiant du checkout Lemon de test. Ne pas utiliser pour le lancement live."),
         upsertConfig("lemon_test_checkout_url", checkout.url, "Checkout Lemon test_mode=true. Ne jamais publier sur le site."),
-        upsertConfig("lemon_checkout_status", "TEST_READY", "Checkout de test créé; checkout live toujours non configuré.", "En attente"),
+        upsertConfig("lemon_checkout_status", "TEST_READY", "Checkout de test disponible; checkout live toujours non configuré.", "En attente"),
       ]);
     }
 

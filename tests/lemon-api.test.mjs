@@ -64,20 +64,32 @@ test("le client Lemon envoie les en-têtes JSON:API et le Bearer sans changer d'
   );
 });
 
-test("la route bootstrap refuse toute action live et exige le workflow OIDC dédié", () => {
+test("la route bootstrap refuse toute action live et n'accepte que le workflow manuel OIDC dédié", () => {
   assert.match(route, /OIDC_WORKFLOW = "lemon-commerce-test\.yml"/);
   assert.match(route, /ALLOWED_ACTIONS = new Set\(\["inspect", "checkout_test", "webhook_test"\]\)/);
+  assert.match(route, /allowedEvents: \["workflow_dispatch"\]/);
+  assert.doesNotMatch(route, /CRON_SECRET/);
   assert.match(route, /lemon_test_mode_only/);
   assert.match(route, /mode: "test_only"/);
   assert.doesNotMatch(route, /checkout_live|webhook_live|action === "live"/);
 });
 
-test("le workflow Lemon est manuel et n'expose que des actions de test", () => {
+test("le checkout test est réutilisé au lieu d'être recréé aveuglément", () => {
+  assert.match(route, /function existingTestCheckout/);
+  assert.match(route, /lemon_test_checkout_id/);
+  assert.match(route, /lemon_test_checkout_url/);
+  assert.match(route, /test_checkout_reused/);
+  assert.match(route, /host !== "lemonsqueezy\.com" && !host\.endsWith\("\.lemonsqueezy\.com"\)/);
+});
+
+test("le workflow Lemon est manuel, borné aux actions de test et échoue sur un 404 persistant", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /schedule:/);
   assert.match(workflow, /inspect\|checkout_test\|webhook_test/);
   assert.doesNotMatch(workflow, /checkout_live|webhook_live/);
   assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /for attempt in 1 2 3/);
+  assert.match(workflow, /Persistent 404 after deployment grace window/);
 });
 
 test("le webhook persiste l'order_identifier dans le champ dédié et /merci le privilégie", () => {

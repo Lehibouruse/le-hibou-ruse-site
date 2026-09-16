@@ -172,8 +172,8 @@ async function reconcileOnePendingTikTokPublication(state, actions) {
   }
 }
 
-async function persistSystemHeartbeat(configuration, snapshot, circuit, checkedAt) {
-  const values = systemHealthConfigValues(snapshot, circuit, checkedAt);
+async function persistSystemHeartbeat(configuration, snapshot, circuit, checkedAt, actions = []) {
+  const values = systemHealthConfigValues(snapshot, circuit, checkedAt, actions);
   const descriptions = healthConfigDescriptions();
   const byKey = new Map(configuration.map((row) => [text(row.fields?.Clé), row]));
   for (const [key, value] of Object.entries(values)) {
@@ -261,7 +261,7 @@ export async function POST(request) {
       now,
     });
     const checkedAt = new Date(now).toISOString();
-    const heartbeat = await persistSystemHeartbeat(state.configuration, snapshot, circuit, checkedAt);
+    const heartbeat = await persistSystemHeartbeat(state.configuration, snapshot, circuit, checkedAt, actions);
     await journalSnapshot(snapshot, actions);
     return NextResponse.json({ ...snapshot, circuit: { active: circuit.active, until: circuit.until, reason: circuit.reason }, actions, checked_at: checkedAt, heartbeat: { status: heartbeat.system_health_status, persisted: true } });
   } catch (error) {

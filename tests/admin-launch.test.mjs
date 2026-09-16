@@ -8,13 +8,28 @@ const watchdog = readFileSync(new URL("../app/api/system-watchdog/route.js", imp
 test("le dashboard de lancement reste privé et utilise la readiness réelle", () => {
   assert.match(source, /adminAuthorized/);
   assert.match(source, /commercialReadiness/);
+  assert.match(source, /commerceTestReadiness/);
   assert.match(source, /TABLES\.configuration/);
   assert.match(source, /TABLES\.products/);
   assert.match(source, /TABLES\.book/);
   assert.match(source, /TABLES\.legal/);
-  assert.match(source, /Blocages restants/);
+  assert.match(source, /Blocages restants avant vente publique/);
   assert.match(source, /\/admin\/social/);
   assert.match(source, /\/admin\/growth/);
+});
+
+test("le dashboard sépare explicitement test Lemon, test Digify et vente publique", () => {
+  assert.match(source, /Lemon test/);
+  assert.match(source, /Digify test/);
+  assert.match(source, /Tests commerce non-live/);
+  assert.match(source, /un test prêt ne vaut jamais autorisation de vendre/);
+  assert.match(source, /testReadiness\.lemon/);
+  assert.match(source, /testReadiness\.digify/);
+});
+
+test("les tableaux de contrôles affichent les clés réelles et non les index du tableau", () => {
+  assert.match(source, /Array\.isArray\(checks\)/);
+  assert.match(source, /item\?\.key/);
 });
 
 test("le dashboard privé réutilise le heartbeat au lieu de fabriquer un second état", () => {

@@ -38,7 +38,10 @@ function readyInput() {
       LEMON_SQUEEZY_WEBHOOK_SECRET: "secret",
       DIGIFY_KEY_ID: "key",
       DIGIFY_SECRET: "secret",
+      DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add",
       DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/example/revoke",
+      DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
     },
   };
 }
@@ -68,6 +71,7 @@ function testReadyInput() {
       LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret",
       DIGIFY_KEY_ID: "key",
       DIGIFY_SECRET: "digify-secret",
+      DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients",
       DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
       DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients/test",
       DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
@@ -153,10 +157,12 @@ test("un checkout Lemon de test hors domaine Lemon ne peut pas rendre le test pr
   assert.ok(result.lemon.blockers.some((item) => item.key === "test_checkout"));
 });
 
-test("Digify test reste bloqué si la révocation n'est pas entièrement configurée", () => {
+test("Digify test reste bloqué si l'ajout ou la révocation ne sont pas entièrement configurés", () => {
   const input = testReadyInput();
+  delete input.env.DIGIFY_ADD_RECIPIENT_URL;
   delete input.env.DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE;
   const result = commerceTestReadiness(input);
   assert.equal(result.digify.ready, false);
+  assert.ok(result.digify.blockers.some((item) => item.key === "add_recipient_endpoint"));
   assert.ok(result.digify.blockers.some((item) => item.key === "revoke_template"));
 });

@@ -68,7 +68,7 @@ jobs:
       - name: Wake scheduler and inspect queue
         id: wake
         env:
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.export_book) && 'true' || 'false' }}
+          DRY_RUN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.export_book))) && 'true' || 'false' }}
         shell: bash
         run: |
           set -euo pipefail

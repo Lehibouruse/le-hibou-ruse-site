@@ -38,7 +38,11 @@ Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé pe
    - `DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE`
    - `DIGIFY_REVOKE_RECIPIENT_URL`
    - `DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE`
-7. Activer la notification Digify au destinataire comme secours à la page post-achat.
+   - `DIGIFY_WEBHOOK_USERNAME`
+   - `DIGIFY_WEBHOOK_PASSWORD`
+7. Configurer le webhook d'activité Digify vers `https://d4d5d6.com/api/commerce/digify-webhook` avec la Basic Auth dédiée ci-dessus. Ne jamais réutiliser les credentials API Digify pour ce webhook.
+8. Activer la notification Digify au destinataire comme secours à la page post-achat.
+9. Vérifier qu'un événement `View` est rattaché au bon email et qu'un éventuel `Print`/`Download` remonte comme **Policy Alert**, puisque ces actions doivent rester désactivées.
 
 ## Domaine et juridique
 
@@ -55,13 +59,14 @@ Avant ouverture publique :
 2. Tester Lemon en `test_mode=true` et Digify séparément avec un destinataire de test.
 3. Une commande Lemon de test ne doit jamais provoquer une livraison ou une révocation Digify réelle.
 4. Le checkout de test ne doit jamais être utilisé comme `checkout_url` public.
+5. Vérifier le webhook d'activité Digify avec la Basic Auth dédiée avant toute phase live ; aucun événement sans email destinataire ne doit être rattaché à une vente.
 
 ### 2. Achat live contrôlé de bout en bout
 
 Cette phase n'a lieu qu'après validation de toutes les autres dépendances live.
 
 1. Créer/configurer le checkout et le webhook live dans Lemon, mais **ne pas renseigner `Configuration.checkout_url` et ne pas publier le checkout sur le site**.
-2. Vérifier que le PDF final, le File GUID, les endpoints Digify officiels, le domaine, le juridique et le payout/store sont prêts.
+2. Vérifier que le PDF final, le File GUID, les endpoints Digify officiels, le webhook d'activité Digify, le domaine, le juridique et le payout/store sont prêts.
 3. Ouvrir une fenêtre de validation courte en passant explicitement `commerce_launch_authorized=true`.
 4. Accéder manuellement au checkout live privé depuis Lemon et effectuer un seul achat contrôlé à 29 €.
 5. Vérifier : vente Airtable unique, webhook signé, livraison Digify nominative, bouton `Lire mon guide`, email Digify, attribution et absence de doublon.

@@ -19,8 +19,8 @@ test("un dry-run ne peut jamais appeler les routes Digify à effet externe", () 
   assert.match(workflow, /delivery=%s\\n' "skipped_dry_run"/);
   assert.match(workflow, /revocation=%s\\n' "skipped_dry_run"/);
   const guardIndex = workflow.indexOf('if [ "$DRY_RUN" = "true" ]; then');
-  const deliveryIndex = workflow.indexOf('"${HIBOU_BASE_URL}/api/commerce/delivery"');
-  const revokeIndex = workflow.indexOf('"${HIBOU_BASE_URL}/api/commerce/revoke"');
+  const deliveryIndex = workflow.indexOf('post_commerce_effect "delivery" "/api/commerce/delivery"');
+  const revokeIndex = workflow.indexOf('post_commerce_effect "revocation" "/api/commerce/revoke"');
   const elseIndex = workflow.indexOf("else", guardIndex);
   assert(guardIndex >= 0 && elseIndex > guardIndex);
   assert(deliveryIndex > elseIndex);
@@ -35,4 +35,13 @@ test("delivery et revoke refusent explicitement l'événement push même si le w
     assert.match(source, /allowedEvents: ALLOWED_EVENTS/);
     assert.doesNotMatch(source, /allowedEvents:.*push/);
   }
+});
+
+test("les effets commerce réels échouent franchement sur panne transport ou HTTP", () => {
+  assert.match(workflow, /post_commerce_effect\(\)/);
+  assert.match(workflow, /commerce\/delivery/);
+  assert.match(workflow, /commerce\/revoke/);
+  assert.match(workflow, /transport failure/);
+  assert.match(workflow, /HTTP failure/);
+  assert.match(workflow, /200\|201\|202\|204\|409\|422/);
 });

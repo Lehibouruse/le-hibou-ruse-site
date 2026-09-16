@@ -26,11 +26,12 @@ test("publication directe exige un OAuth réellement testé et une publication t
   assert.equal(route.direct_ready, true);
 });
 
-test("un compte Metricool vérifié reste pilotable depuis ChatGPT avant OAuth direct", () => {
+test("un compte Metricool réellement testé reste pilotable depuis ChatGPT avant OAuth direct", () => {
   const route = socialRouteFor("instagram", {
     operation: "publish",
     accounts: [account("Instagram", {
       "Metricool vérifié": true,
+      "Metricool test réel": true,
       "Pilotable depuis ChatGPT": true,
       "OAuth Hibou connecté": false,
       "Phase autorisation": "SERVER_SECRETS_REQUIRED",
@@ -41,12 +42,28 @@ test("un compte Metricool vérifié reste pilotable depuis ChatGPT avant OAuth d
   assert.equal(route.ready, true);
   assert.equal(route.autonomous_runtime, false);
   assert.equal(route.execution_context, "chatgpt_connector");
+  assert.equal(route.metricool_real_tested, true);
+});
+
+test("une simple déclaration Metricool ne suffit plus sans preuve réelle du connecteur", () => {
+  const route = socialRouteFor("instagram", {
+    operation: "publish",
+    accounts: [account("Instagram", {
+      "Metricool vérifié": true,
+      "Metricool test réel": false,
+      "Pilotable depuis ChatGPT": true,
+    })],
+    gateways: [gateway("instagram")],
+  });
+  assert.equal(route.metricool_declared_verified, true);
+  assert.equal(route.metricool_real_tested, false);
+  assert.equal(route.route, "blocked");
 });
 
 test("un webhook HTTPS configuré prime sur Metricool pour le runtime autonome", () => {
   const route = socialRouteFor("facebook", {
     operation: "publish",
-    accounts: [account("Facebook", { "Metricool vérifié": true, "Pilotable depuis ChatGPT": true })],
+    accounts: [account("Facebook", { "Metricool vérifié": true, "Metricool test réel": true, "Pilotable depuis ChatGPT": true })],
     gateways: [gateway("facebook", { webhook_configured: true })],
   });
   assert.equal(route.route, "webhook_fallback");
@@ -78,6 +95,7 @@ test("analytics direct exige Analytics OK et sinon peut utiliser Metricool", () 
       "Lecture API OK": true,
       "Analytics OK": false,
       "Metricool vérifié": true,
+      "Metricool test réel": true,
       "Pilotable depuis ChatGPT": true,
     })],
     gateways: [gateway("youtube", { direct_configured: true })],
@@ -101,7 +119,7 @@ test("le résumé distingue direct, webhook, Metricool et blocages", () => {
     operation: "publish",
     accounts: [
       account("YouTube", { "OAuth Hibou connecté": true, "Auth direct OK": true, "Publication testée": true }),
-      account("Instagram", { "Metricool vérifié": true, "Pilotable depuis ChatGPT": true }),
+      account("Instagram", { "Metricool vérifié": true, "Metricool test réel": true, "Pilotable depuis ChatGPT": true }),
     ],
     gateways: [
       gateway("youtube", { direct_configured: true }),

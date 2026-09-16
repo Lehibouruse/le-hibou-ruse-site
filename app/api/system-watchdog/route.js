@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { configMap, createRecord, queryAllRecords, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { healthConfigDescriptions, systemHealthConfigValues } from "../../../lib/infrastructure-observability.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 import { clearOpenAiCircuit, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 import { testVaultProviderConnections } from "../../../lib/social-connection-health.mjs";
@@ -166,6 +167,28 @@ async function reconcileOnePendingTikTokPublication(state, actions) {
   }
 }
 
+async function persistSystemHeartbeat(configuration, snapshot, circuit, checkedAt) {
+  const values = systemHealthConfigValues(snapshot, circuit, checkedAt);
+  const descriptions = healthConfigDescriptions();
+  const byKey = new Map(configuration.map((row) => [text(row.fields?.Clé), row]));
+  for (const [key, value] of Object.entries(values)) {
+    const row = byKey.get(key);
+    const fields = {
+      Valeur: value,
+      Actif: true,
+      Description: descriptions[key] || "Diagnostic système non sensible.",
+    };
+    if (row?.id) {
+      await updateRecord(TABLES.configuration, row.id, fields);
+    } else {
+      const created = await createRecord(TABLES.configuration, { Clé: key, ...fields });
+      const recordId = created?.records?.[0]?.id;
+      if (recordId) byKey.set(key, { id: recordId, fields: { Clé: key, ...fields } });
+    }
+  }
+  return values;
+}
+
 async function journalSnapshot(snapshot, actions) {
   if (snapshot.severity === "ok" && !actions.length) return;
   const fingerprint = healthFingerprint(snapshot);
@@ -232,8 +255,10 @@ export async function POST(request) {
       readiness: state.readiness,
       now,
     });
+    const checkedAt = new Date(now).toISOString();
+    const heartbeat = await persistSystemHeartbeat(state.configuration, snapshot, circuit, checkedAt);
     await journalSnapshot(snapshot, actions);
-    return NextResponse.json({ ...snapshot, circuit: { active: circuit.active, until: circuit.until, reason: circuit.reason }, actions, checked_at: new Date().toISOString() });
+    return NextResponse.json({ ...snapshot, circuit: { active: circuit.active, until: circuit.until, reason: circuit.reason }, actions, checked_at: checkedAt, heartbeat: { status: heartbeat.system_health_status, persisted: true } });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 1000);
     return NextResponse.json({ ok: false, severity: "critical", error: message, checked_at: new Date().toISOString() }, { status: message === "Unauthorized" ? 401 : 500 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { oauthHealthFields, routeFieldsForProvider, routeTransition, stateTransition } from "../lib/social-routing-airtable.mjs";
+import { oauthHealthFields, oauthLifecycleFields, routeFieldsForProvider, routeTransition, stateTransition } from "../lib/social-routing-airtable.mjs";
 
 test("projette les trois routes opérationnelles dans les champs Airtable", () => {
   const plans = {
@@ -39,6 +39,22 @@ test("projette la santé OAuth sans exposer le credential", () => {
   assert.equal(JSON.stringify(fields).includes("secret-like"), false);
 });
 
+test("Needs reauth devient une étape humaine explicite dans Airtable", () => {
+  const fields = oauthLifecycleFields("youtube", [{
+    provider: "youtube",
+    vault_status: "Needs reauth",
+    vault_last_error: "invalid_grant",
+  }]);
+  assert.equal(fields["Phase autorisation"], "HUMAN_OAUTH_REAUTH_REQUIRED");
+  assert.equal(fields["Prêt validation humaine"], true);
+  assert.match(fields["Action humaine restante"], /Reconnecter youtube/);
+  assert.match(fields["Action humaine restante"], /invalid_grant/);
+});
+
+test("un credential normal ne remplace pas la phase calculée par le control plane", () => {
+  assert.deepEqual(oauthLifecycleFields("youtube", [{ provider: "youtube", vault_status: "Connected" }]), {});
+});
+
 test("détecte uniquement les transitions réelles pour éviter les écritures périodiques inutiles", () => {
   assert.deepEqual(routeTransition({
     "Route lecture": "chatgpt_metricool",
@@ -68,9 +84,15 @@ test("les changements OAuth déclenchent une réconciliation même sans changeme
     "Statut OAuth coffre": "Needs reauth",
     "Expiration OAuth": "2026-09-20T10:00:00.000Z",
     "Erreur OAuth": "invalid_grant",
+    "Phase autorisation": "HUMAN_OAUTH_REAUTH_REQUIRED",
+    "Prêt validation humaine": true,
+    "Action humaine restante": "Reconnecter youtube via /admin/social. Motif: invalid_grant",
   }), {
     "Statut OAuth coffre": { from: "Connected", to: "Needs reauth" },
     "Erreur OAuth": { from: "", to: "invalid_grant" },
+    "Phase autorisation": { from: "", to: "HUMAN_OAUTH_REAUTH_REQUIRED" },
+    "Prêt validation humaine": { from: "false", to: "true" },
+    "Action humaine restante": { from: "", to: "Reconnecter youtube via /admin/social. Motif: invalid_grant" },
   });
 });
 

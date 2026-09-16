@@ -24,6 +24,18 @@ test("un provider prêt pour OAuth passe avant une configuration externe", () =>
   assert.equal(queue.next.state, "READY_FOR_USER");
 });
 
+test("une reconnexion OAuth expirée est identifiée et priorisée", () => {
+  const queue = buildSocialAuthorizationQueue({ providers: [
+    provider("meta", "AUTHORIZED", { credential_needs_reauth: true, credential_status: "Needs reauth", next_action: "Reconnecter Meta." }),
+    provider("youtube", "HUMAN_OAUTH_APPROVAL_REQUIRED"),
+  ] });
+  assert.equal(queue.next.provider, "meta");
+  assert.equal(queue.next.phase, "HUMAN_OAUTH_REAUTH_REQUIRED");
+  assert.equal(queue.next.reauth_required, true);
+  assert.equal(queue.next.instruction, "Reconnecter Meta.");
+  assert.equal(queue.summary.reauth_required, 1);
+});
+
 test("les providers autorisés vont en fin de file", () => {
   const queue = buildSocialAuthorizationQueue({ providers: [
     provider("meta", "AUTHORIZED", { credential_connected: true }),

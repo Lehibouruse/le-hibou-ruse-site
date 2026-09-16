@@ -13,8 +13,19 @@ test("l'accès post-achat exige un order_identifier Lemon de forme UUID", () => 
 });
 
 test("une vente inconnue ne révèle pas l'existence d'une commande", () => {
-  assert.match(route, /if \(!sale\) return response\(\{ ok: true, status: "processing" \}, 202\)/);
+  assert.match(route, /if \(!matches\.length\) return response\(\{ ok: true, status: "processing" \}, 202\)/);
   assert.doesNotMatch(route, /Email client/);
+});
+
+test("remboursement et doublons gagnent avant toute exposition de lien", () => {
+  const refundAt = route.indexOf("matches.some((record) => saleIsRefunded(record.fields))");
+  const duplicateAt = route.indexOf("matches.length !== 1");
+  const deliveredAt = route.indexOf('deliveryStatus === "delivered"');
+  assert.ok(refundAt >= 0);
+  assert.ok(duplicateAt > refundAt);
+  assert.ok(deliveredAt > duplicateAt);
+  assert.match(route, /status: "revoked", reason: "refunded"/);
+  assert.match(route, /status: "manual_review"/);
 });
 
 test("le lien lecteur n'est rendu qu'après livraison et reste borné à Digify HTTPS", () => {

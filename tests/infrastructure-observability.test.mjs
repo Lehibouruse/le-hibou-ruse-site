@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { githubInfrastructureStatus, systemHealthConfigValues, systemHealthHeartbeat } from "../lib/infrastructure-observability.mjs";
 
 const NOW = Date.parse("2026-09-16T10:00:00.000Z");
@@ -28,6 +29,12 @@ test("le heartbeat persistant reste compact et n'enregistre pas les erreurs brut
   assert.equal(report.openai.circuit_active, true);
   const serialized = JSON.stringify(report);
   assert.doesNotMatch(serialized, /SUPER_SECRET_TOKEN|sk-secret|token-secret|recSecret/);
+});
+
+test("le watchdog transmet ses actions au heartbeat persistant", () => {
+  const route = readFileSync(new URL("../app/api/system-watchdog/route.js", import.meta.url), "utf8");
+  assert.match(route, /systemHealthConfigValues\(snapshot, circuit, checkedAt, actions\)/);
+  assert.match(route, /persistSystemHeartbeat\(state\.configuration, snapshot, circuit, checkedAt, actions\)/);
 });
 
 test("un heartbeat de moins de 30 minutes est frais", () => {

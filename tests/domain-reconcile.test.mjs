@@ -19,7 +19,7 @@ test("un échec de résolution ne promeut pas le domaine", () => {
 });
 
 test("le reconcileur est planifié sans réactiver les previews de branches", () => {
-  assert.equal(vercel.git.deploymentEnabled["*"], false);
+  assert.equal(vercel.git.deploymentEnabled["**"], false);
   assert.equal(vercel.git.deploymentEnabled.main, true);
   assert.equal(vercel.crons.some((item) => item.path === "/api/domain-reconcile"), true);
 });

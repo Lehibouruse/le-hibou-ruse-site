@@ -12,6 +12,10 @@ export const maxDuration = 60;
 const OIDC_WORKFLOW = "hibou-wake.yml";
 const ALLOWED_EVENTS = ["schedule", "workflow_dispatch"];
 
+function truthy(value) {
+  return ["1", "true", "yes", "oui", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
 async function journal(sale, status, note, url = "") {
   await createRecord(TABLES.journal, {
     Workflow: "HIBOU_DIGIFY_DELIVERY_V2",
@@ -37,6 +41,15 @@ async function productForSale(sale) {
 async function currentEdition() {
   const records = await queryRecords(TABLES.configuration, { filterByFormula: "AND({Actif}=1,{Clé}='book_current_edition')", pageSize: 1 });
   return String(records[0]?.fields?.Valeur || "V1.0").trim();
+}
+
+async function commerceLaunchAuthorized() {
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: "AND({Actif}=1,{Clé}='commerce_launch_authorized')",
+    pageSize: 1,
+    priorityAware: false,
+  });
+  return truthy(records[0]?.fields?.Valeur);
 }
 
 function finalEdition(value) {
@@ -99,13 +112,15 @@ export async function POST(request) {
   const staleId = await clearStaleDelivery();
   if (staleId) return NextResponse.json({ ok: true, processed: 1, status: "manual_review", reason: "stale_delivery_ambiguous", sale_id: staleId });
 
+  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_URL && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE);
+  if (!(await commerceLaunchAuthorized())) {
+    return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured });
+  }
+
   const pending = await queryRecords(TABLES.sales, { filterByFormula: commercePendingFormula("delivery"), pageSize: 1 });
   const candidate = pending[0];
   if (!candidate) {
-    return NextResponse.json({
-      ok: true, processed: 0, reason: "no_pending_delivery",
-      configured: Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_URL && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE),
-    });
+    return NextResponse.json({ ok: true, processed: 0, reason: "no_pending_delivery", configured });
   }
 
   const attempts = Number(candidate.fields?.["Livraison tentatives"] || 0) + 1;

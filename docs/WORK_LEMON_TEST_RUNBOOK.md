@@ -140,7 +140,10 @@ Si un webhook identique existe, le réutiliser. Si le même endpoint existe avec
 3. Saisir directement dans Vercel :
    - `DIGIFY_KEY_ID`
    - `DIGIFY_SECRET`
-4. Ne jamais recopier `DIGIFY_SECRET` dans Airtable/GitHub/chat.
+4. Créer deux valeurs longues et uniques, indépendantes des credentials API Digify, et les saisir uniquement dans Vercel :
+   - `DIGIFY_WEBHOOK_USERNAME`
+   - `DIGIFY_WEBHOOK_PASSWORD`
+5. Ne jamais recopier `DIGIFY_SECRET`, le username webhook ou le password webhook dans Airtable/GitHub/chat.
 
 ### Fichier temporaire
 
@@ -171,14 +174,26 @@ Configurer directement dans Vercel :
 
 Les deux URLs doivent être HTTPS sur `api.digify.com`. Le runtime les refusera sinon. Ne jamais inventer un endpoint ou un payload Digify à partir d'une ancienne documentation.
 
+### Webhook d'activité Digify
+
+Configurer côté Digify le webhook d'activité vers :
+
+`https://le-hibou-ruse-site.vercel.app/api/commerce/digify-webhook`
+
+Protection obligatoire : Basic Auth utilisant exactement `DIGIFY_WEBHOOK_USERNAME` et `DIGIFY_WEBHOOK_PASSWORD`. Ces credentials sont indépendants de `DIGIFY_KEY_ID` / `DIGIFY_SECRET`.
+
+Le runtime n'accepte que les événements `View`, `Print` et `Download`, exige `RecipientUserEmail` pour rattacher l'événement à une vente et refuse tout lien qui n'est pas HTTPS sur `digify.com` ou un sous-domaine. `Print` et `Download` doivent être journalisés comme **Policy Alert**, car la politique du Hibou les désactive.
+
 ### Test destinataire
 
 1. Ajouter une adresse de test contrôlée.
 2. Récupérer son Quick Access Link individuel.
 3. Ouvrir dans un navigateur privé.
 4. Vérifier lecture immédiate, watermark, absence de download/print.
-5. Révoquer l'accès.
-6. Vérifier que le même lien ne permet plus la lecture.
+5. Vérifier qu'un événement `View` atteint le webhook d'activité et se rattache à l'email nominatif attendu.
+6. Révoquer l'accès.
+7. Vérifier que le même lien ne permet plus la lecture.
+8. Ne pas provoquer volontairement un `Print`/`Download` si Digify les bloque correctement ; si un tel événement apparaît malgré tout, il doit remonter en **Policy Alert** et déclencher une revue de configuration.
 
 ## Phase 10 — Achat de test Lemon
 
@@ -193,7 +208,7 @@ Les deux URLs doivent être HTTPS sur `api.digify.com`. Le runtime les refusera 
 
 ## Phase 11 — Test Digify séparé
 
-Le test Digify de la phase 9 est indépendant du faux achat Lemon. Il valide techniquement ajout, Quick Access Link et révocation avec un destinataire contrôlé, mais ne doit pas être relié à une commande `test_mode=true`.
+Le test Digify de la phase 9 est indépendant du faux achat Lemon. Il valide techniquement ajout, Quick Access Link, activité nominative et révocation avec un destinataire contrôlé, mais ne doit pas être relié à une commande `test_mode=true`.
 
 ## Phase 12 — Passage live ultérieur, séparé
 
@@ -204,6 +219,7 @@ Préconditions :
 - PDF final V1 ;
 - validation humaine du livre ;
 - fichier Digify final et test de révocation réussi ;
+- webhook d'activité Digify protégé et testé ;
 - domaine `d4d5d6.com` vérifié ;
 - juridique validé ;
 - payout/store Lemon confirmé ;

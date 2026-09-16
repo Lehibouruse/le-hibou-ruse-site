@@ -189,7 +189,7 @@ export async function POST(request) {
     await journal(current, "Completed", `Accès Digify nominatif créé · édition ${edition}${url ? " · Quick Access Link enregistré" : " · notification Digify requise"}`, url);
     return NextResponse.json({ ok: true, processed: 1, status: "delivered", edition, access_url_recorded: Boolean(url) });
   } catch (error) {
-    const retryable = error?.retryable !== false && attempts < 3;
+    const retryable = error?.retryable === true && attempts < 3;
     const message = String(error?.message || error).slice(0, 5000);
     await updateRecord(TABLES.sales, current.id, clearCommerceLease({
       "Livraison statut": retryable ? "pending" : "manual_review",

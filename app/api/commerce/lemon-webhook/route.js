@@ -7,6 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function actionId(response) {
   return response?.records?.[0]?.id || "";
 }
@@ -147,9 +149,9 @@ export async function POST(request) {
     await journal(order, "Ignored", `Événement non traité: ${order.event || "unknown"}`);
     return NextResponse.json({ ok: true, ignored: true });
   }
-  if (!order.id || !order.email) {
-    await journal(order, "Error", "Commande sans identifiant ou email");
-    return NextResponse.json({ ok: false, error: "Missing order identity" }, { status: 422 });
+  if (!order.id || !order.email || !UUID_RE.test(order.identifier)) {
+    await journal(order, "Error", "Commande sans identifiant interne, email ou order_identifier UUID valide");
+    return NextResponse.json({ ok: false, error: "Missing or invalid order identity" }, { status: 422 });
   }
 
   const matches = await findSales(order.id);

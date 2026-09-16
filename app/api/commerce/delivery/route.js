@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
-import { addDigifyRecipient, canonicalSale, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
+import { addDigifyRecipient, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
 import { clearCommerceLease, commerceClaimPatch, commercePendingFormula, commerceStaleFormula, ownsCommerceLease } from "../../../../lib/commerce-lease.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
@@ -85,16 +85,15 @@ async function deliveryOrderGuard(current) {
       duplicates: Math.max(0, matches.length - 1),
     };
   }
-  const canonical = canonicalSale(matches);
-  if (matches.length > 1 && canonical?.id !== current.id) {
+  if (matches.length !== 1) {
     return {
       safe: false,
       refunded: false,
-      reason: `Doublon de vente ${orderId}; seul ${canonical?.id || "le record canonique"} peut être livré`,
-      duplicates: matches.length - 1,
+      reason: `Commande ${orderId}: ${matches.length} enregistrements trouvés; livraison bloquée jusqu'à réconciliation`,
+      duplicates: Math.max(0, matches.length - 1),
     };
   }
-  return { safe: true, duplicates: Math.max(0, matches.length - 1), canonical_id: canonical?.id || current.id };
+  return { safe: true, duplicates: 0, canonical_id: current.id };
 }
 
 export async function POST(request) {

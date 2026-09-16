@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { routeFieldsForProvider, routeTransition } from "../lib/social-routing-airtable.mjs";
+import { oauthHealthFields, routeFieldsForProvider, routeTransition, stateTransition } from "../lib/social-routing-airtable.mjs";
 
 test("projette les trois routes opérationnelles dans les champs Airtable", () => {
   const plans = {
@@ -23,6 +23,22 @@ test("une route absente reste bloquée par défaut", () => {
   });
 });
 
+test("projette la santé OAuth sans exposer le credential", () => {
+  const fields = oauthHealthFields("youtube", [{
+    provider: "youtube",
+    vault_status: "Needs reauth",
+    credential_expires_at: "2026-09-20T10:00:00.000Z",
+    vault_last_error: "invalid_grant",
+    credential_scopes: "secret-like-but-not-requested-here",
+  }]);
+  assert.deepEqual(fields, {
+    "Statut OAuth coffre": "Needs reauth",
+    "Expiration OAuth": "2026-09-20T10:00:00.000Z",
+    "Erreur OAuth": "invalid_grant",
+  });
+  assert.equal(JSON.stringify(fields).includes("secret-like"), false);
+});
+
 test("détecte uniquement les transitions réelles pour éviter les écritures périodiques inutiles", () => {
   assert.deepEqual(routeTransition({
     "Route lecture": "chatgpt_metricool",
@@ -37,11 +53,35 @@ test("détecte uniquement les transitions réelles pour éviter les écritures p
   });
 });
 
+test("les changements OAuth déclenchent une réconciliation même sans changement de route", () => {
+  assert.deepEqual(stateTransition({
+    "Route lecture": "chatgpt_metricool",
+    "Route publication": "chatgpt_metricool",
+    "Route analytics": "chatgpt_metricool",
+    "Statut OAuth coffre": "Connected",
+    "Expiration OAuth": "2026-09-20T10:00:00.000Z",
+    "Erreur OAuth": "",
+  }, {
+    "Route lecture": "chatgpt_metricool",
+    "Route publication": "chatgpt_metricool",
+    "Route analytics": "chatgpt_metricool",
+    "Statut OAuth coffre": "Needs reauth",
+    "Expiration OAuth": "2026-09-20T10:00:00.000Z",
+    "Erreur OAuth": "invalid_grant",
+  }), {
+    "Statut OAuth coffre": { from: "Connected", to: "Needs reauth" },
+    "Erreur OAuth": { from: "", to: "invalid_grant" },
+  });
+});
+
 test("un état identique est idempotent", () => {
   const current = {
     "Route lecture": "blocked",
     "Route publication": "blocked",
     "Route analytics": "blocked",
+    "Statut OAuth coffre": "",
+    "Expiration OAuth": null,
+    "Erreur OAuth": "",
   };
-  assert.deepEqual(routeTransition(current, current), {});
+  assert.deepEqual(stateTransition(current, current), {});
 });

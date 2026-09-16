@@ -85,20 +85,26 @@ jobs:
             "${HIBOU_BASE_URL}/api/book-reconcile" 2>&1 || true)
           printf 'book_reconcile=%s\n' "$reconciliation"
 
-          # Commerce queues are independent from the Core business worker.
-          delivery=$(curl --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            "${HIBOU_BASE_URL}/api/commerce/delivery" 2>&1 || true)
-          printf 'delivery=%s\n' "$delivery"
+          # Delivery/revocation are real external effects. Push self-tests and manual
+          # dry-runs must never touch Digify even when pending commerce records exist.
+          if [ "$DRY_RUN" = "true" ]; then
+            printf 'delivery=%s\n' "skipped_dry_run"
+            printf 'revocation=%s\n' "skipped_dry_run"
+          else
+            delivery=$(curl --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              "${HIBOU_BASE_URL}/api/commerce/delivery" 2>&1 || true)
+            printf 'delivery=%s\n' "$delivery"
 
-          revocation=$(curl --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            "${HIBOU_BASE_URL}/api/commerce/revoke" 2>&1 || true)
-          printf 'revocation=%s\n' "$revocation"
+            revocation=$(curl --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              "${HIBOU_BASE_URL}/api/commerce/revoke" 2>&1 || true)
+            printf 'revocation=%s\n' "$revocation"
+          fi
 
           response_file=$(mktemp)
           set +e

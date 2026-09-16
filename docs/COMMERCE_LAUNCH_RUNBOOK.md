@@ -15,7 +15,7 @@ Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé pe
    - `Lemon Squeezy Product ID`
    - `Lemon Squeezy Variant ID`
    - `Lemon Squeezy Checkout URL`
-3. Renseigner `Configuration.checkout_url` avec l'URL live.
+3. Renseigner `Configuration.checkout_url` avec l'URL live uniquement au moment de l'ouverture publique, pas pendant le test live contrôlé.
 4. Configurer le redirect de confirmation et le bouton du reçu vers :
    `https://d4d5d6.com/merci?order=[order_identifier]`
 5. Créer le webhook live vers :
@@ -34,8 +34,10 @@ Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé pe
 6. Configurer côté serveur :
    - `DIGIFY_KEY_ID`
    - `DIGIFY_SECRET`
+   - `DIGIFY_ADD_RECIPIENT_URL`
    - `DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE`
-   - endpoint/template de révocation si disponible
+   - `DIGIFY_REVOKE_RECIPIENT_URL`
+   - `DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE`
 7. Activer la notification Digify au destinataire comme secours à la page post-achat.
 
 ## Domaine et juridique
@@ -45,14 +47,36 @@ Avant ouverture publique :
 - CGV, mentions légales, confidentialité/cookies et avertissement éditorial doivent être `Validé` ;
 - `commerce_readiness_mode=strict` reste actif.
 
-## Test de lancement
+## Tests avant ouverture
+
+### 1. Tests sandbox / test mode
 
 1. Laisser `commerce_launch_authorized=false`.
-2. Tester les webhooks en mode test : aucune livraison réelle ne doit partir.
-3. Une fois toutes les dépendances live, effectuer un achat réel contrôlé à 29 €.
-4. Vérifier : vente Airtable, accès Digify, bouton `Lire mon guide`, email Digify, attribution, absence de doublon.
-5. Effectuer ensuite un remboursement contrôlé et vérifier la révocation.
-6. Seulement après ces tests, passer `commerce_launch_authorized=true`.
+2. Tester Lemon en `test_mode=true` et Digify séparément avec un destinataire de test.
+3. Une commande Lemon de test ne doit jamais provoquer une livraison ou une révocation Digify réelle.
+4. Le checkout de test ne doit jamais être utilisé comme `checkout_url` public.
+
+### 2. Achat live contrôlé de bout en bout
+
+Cette phase n'a lieu qu'après validation de toutes les autres dépendances live.
+
+1. Créer/configurer le checkout et le webhook live dans Lemon, mais **ne pas renseigner `Configuration.checkout_url` et ne pas publier le checkout sur le site**.
+2. Vérifier que le PDF final, le File GUID, les endpoints Digify officiels, le domaine, le juridique et le payout/store sont prêts.
+3. Ouvrir une fenêtre de validation courte en passant explicitement `commerce_launch_authorized=true`.
+4. Accéder manuellement au checkout live privé depuis Lemon et effectuer un seul achat contrôlé à 29 €.
+5. Vérifier : vente Airtable unique, webhook signé, livraison Digify nominative, bouton `Lire mon guide`, email Digify, attribution et absence de doublon.
+6. Refermer immédiatement la fenêtre en remettant `commerce_launch_authorized=false` après confirmation de la livraison.
+7. Effectuer ensuite le remboursement contrôlé et vérifier la révocation Digify ; la révocation doit fonctionner même avec le lancement public refermé.
+8. Si un contrôle échoue, conserver le switch à `false`, ne pas publier le checkout et corriger avant tout nouveau test.
+
+### 3. Ouverture publique ultérieure
+
+Seulement après le test live contrôlé réussi et la revue finale :
+
+1. renseigner `Configuration.checkout_url` avec le checkout LIVE validé ;
+2. vérifier à nouveau tous les contrôles stricts ;
+3. passer explicitement `commerce_launch_authorized=true` pour l'ouverture publique ;
+4. vérifier que le bouton public du site pointe bien vers le checkout LIVE attendu.
 
 ## Règle de sécurité
 

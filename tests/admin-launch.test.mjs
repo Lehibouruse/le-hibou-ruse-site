@@ -31,6 +31,13 @@ test("le dashboard privé réutilise le heartbeat au lieu de fabriquer un second
   assert.match(source, /UNKNOWN, STALE ou PENDING/);
 });
 
+test("UNKNOWN STALE et PENDING ne peuvent jamais être rendus verts", () => {
+  assert.match(source, /\["ok", "success", "healthy"\]\.includes\(state\).*return "ok"/);
+  assert.match(source, /return "warn"/);
+  assert.match(source, /github\.vercel\.status === "failure" \? "failure"/);
+  assert.match(source, /github\.vercel\.status === "success" && github\.vercel\.aligned_with_main === true \? "success"/);
+});
+
 test("le watchdog persiste un heartbeat même lorsqu'il n'a aucun incident à journaliser", () => {
   assert.match(watchdog, /persistSystemHeartbeat/);
   assert.match(watchdog, /systemHealthConfigValues/);

@@ -29,28 +29,41 @@ jobs:
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
 
-          response_file=$(mktemp)
-          set +e
-          http_code=$(curl --silent --show-error \
-            -o "$response_file" -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            "${HIBOU_BASE_URL}/api/domain-verify")
-          curl_rc=$?
-          set -e
-          response=$(cat "$response_file")
-          rm -f "$response_file"
-          printf '%s\n' "$response"
-          printf 'domain_verify_http=%s curl_rc=%s\n' "$http_code" "$curl_rc"
+          response=""
+          http_code=""
+          curl_rc=0
+          for attempt in 1 2 3; do
+            response_file=$(mktemp)
+            set +e
+            http_code=$(curl --silent --show-error \
+              -o "$response_file" -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              "${HIBOU_BASE_URL}/api/domain-verify")
+            curl_rc=$?
+            set -e
+            response=$(cat "$response_file")
+            rm -f "$response_file"
+            printf '%s\n' "$response"
+            printf 'domain_verify_http=%s curl_rc=%s attempt=%s\n' "$http_code" "$curl_rc" "$attempt"
 
-          if [ "$curl_rc" -ne 0 ]; then
-            echo "Domain verifier transport failure" >&2
-            exit "$curl_rc"
-          fi
+            if [ "$curl_rc" -ne 0 ]; then
+              echo "Domain verifier transport failure" >&2
+              exit "$curl_rc"
+            fi
+            if [ "$http_code" != "404" ]; then
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Domain verifier returned 404; allowing brief deployment propagation before retry"
+              sleep 15
+            fi
+          done
+
           if [ "$http_code" = "404" ]; then
-            echo "Domain verifier endpoint not deployed yet; status=pending"
-            exit 0
+            echo "Persistent 404 after deployment grace window: domain verifier route missing" >&2
+            exit 1
           fi
           if [ "$http_code" != "200" ]; then
             echo "Domain verifier HTTP failure: $http_code" >&2

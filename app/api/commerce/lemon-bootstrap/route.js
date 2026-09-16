@@ -11,6 +11,7 @@ import {
   listLemonStores,
   listLemonVariants,
   listLemonWebhooks,
+  retrieveLemonCheckout,
 } from "../../../../lib/lemon-api.mjs";
 
 export const runtime = "nodejs";
@@ -112,17 +113,32 @@ function testBaseUrl(config) {
   return url.origin;
 }
 
-function existingTestCheckout(config) {
-  const id = text(config.lemon_test_checkout_id);
-  const raw = text(config.lemon_test_checkout_url);
-  if (!id || !raw) return null;
+function safeLemonCheckoutUrl(value) {
   try {
-    const url = new URL(raw);
+    const url = new URL(text(value));
     const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" || (host !== "lemonsqueezy.com" && !host.endsWith(".lemonsqueezy.com"))) return null;
-    return { id, url: url.toString(), reused: true };
+    if (url.protocol !== "https:" || (host !== "lemonsqueezy.com" && !host.endsWith(".lemonsqueezy.com"))) return "";
+    return url.toString();
   } catch {
-    return null;
+    return "";
+  }
+}
+
+async function existingTestCheckout(config, storeId, variantId) {
+  const id = text(config.lemon_test_checkout_id);
+  if (!id) return null;
+  try {
+    const checkout = await retrieveLemonCheckout(id);
+    const attrs = checkout?.attributes || {};
+    if (attrs.test_mode !== true) throw new Error("Checkout Lemon enregistré incompatible: test_mode=false");
+    if (String(attrs.store_id ?? "") !== String(storeId)) throw new Error("Checkout Lemon enregistré incompatible: Store ID différent");
+    if (String(attrs.variant_id ?? "") !== String(variantId)) throw new Error("Checkout Lemon enregistré incompatible: Variant ID différent");
+    const url = safeLemonCheckoutUrl(attrs.url);
+    if (!url) throw new Error("Checkout Lemon enregistré incompatible: URL invalide");
+    return { id: text(checkout?.id || id), url, reused: true };
+  } catch (error) {
+    if (Number(error?.status) === 404) return null;
+    throw error;
   }
 }
 
@@ -219,7 +235,7 @@ export async function POST(request) {
     };
 
     if (action === "checkout_test") {
-      const existing = existingTestCheckout(state.config);
+      const existing = await existingTestCheckout(state.config, inspected.storeId, inspected.variantId);
       const checkout = existing || await createTestLemonCheckout({
         storeId: inspected.storeId,
         variantId: inspected.variantId,

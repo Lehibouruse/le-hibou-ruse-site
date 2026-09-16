@@ -75,6 +75,8 @@ function testReadyInput() {
       DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
       DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients/test",
       DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_WEBHOOK_USERNAME: "hibou-digify",
+      DIGIFY_WEBHOOK_PASSWORD: "long-test-password",
     },
   };
 }
@@ -165,4 +167,12 @@ test("Digify test reste bloqué si l'ajout ou la révocation ne sont pas entièr
   assert.equal(result.digify.ready, false);
   assert.ok(result.digify.blockers.some((item) => item.key === "add_recipient_endpoint"));
   assert.ok(result.digify.blockers.some((item) => item.key === "revoke_template"));
+});
+
+test("Digify test exige aussi l'authentification indépendante de son webhook d'activité", () => {
+  const input = testReadyInput();
+  delete input.env.DIGIFY_WEBHOOK_PASSWORD;
+  const result = commerceTestReadiness(input);
+  assert.equal(result.digify.ready, false);
+  assert.ok(result.digify.blockers.some((item) => item.key === "activity_webhook_auth"));
 });

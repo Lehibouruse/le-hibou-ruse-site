@@ -5,6 +5,7 @@ import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gat
 import { dispatchSocialWebhookFallback, safeDirectFallbackError } from "../../../lib/social-fallback.mjs";
 import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
 import { configurationMap, socialPolicy, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
+import { socialDispatchJournalOutcome } from "../../../lib/tiktok-dispatch-confirmation.mjs";
 import { fetchTikTokPublishStatus, pollTikTokPublishStatus } from "../../../lib/tiktok-publish-status.mjs";
 
 export const runtime = "nodejs";
@@ -155,6 +156,7 @@ export async function POST(request) {
           policy,
           live_requested: true,
           live_allowed: true,
+          retry_policy: "do_not_redispatch_check_previous_state",
           message: "Dispatch déjà tenté avec cette clé; aucune republication automatique.",
         });
       }
@@ -166,7 +168,8 @@ export async function POST(request) {
       ...body,
       dry_run: !liveAllowed,
     };
-    const gatewayPlan = socialGatewayStatus(resolved.env).find((item) => item.provider === String(body.provider || "").toLowerCase());
+    const provider = String(body.provider || "").toLowerCase();
+    const gatewayPlan = socialGatewayStatus(resolved.env).find((item) => item.provider === provider);
     let result;
     let fallbackUsed = false;
     try {
@@ -181,16 +184,23 @@ export async function POST(request) {
       fallbackUsed = true;
     }
 
+    const outcome = liveAllowed
+      ? socialDispatchJournalOutcome(provider, result, { fallbackUsed })
+      : { state: "dry_run", action: `${provider} · dry run`, error: "", retry_policy: "not_applicable" };
+
     if (intent) {
       await updateDispatchIntent(intent, {
-        Action: `${String(body.provider || "").toLowerCase()} · ${fallbackUsed ? "webhook fallback dispatched" : "dispatched"}`,
-        Erreur: "",
+        Action: outcome.action,
+        Erreur: outcome.error,
         Notes: JSON.stringify({
-          state: "dispatched",
-          provider: String(body.provider || "").toLowerCase(),
+          state: outcome.state,
+          provider,
           idempotency_key: idempotencyKey,
           credential_source: resolved.source,
           fallback_used: fallbackUsed,
+          retry_policy: outcome.retry_policy,
+          publish_id: String(result?.publish_id || result?.result?.publish_id || ""),
+          publication_status: String(result?.publication_status || ""),
           result,
           completed_at: new Date().toISOString(),
         }).slice(0, 100000),
@@ -199,6 +209,9 @@ export async function POST(request) {
 
     return NextResponse.json({
       ...result,
+      ok: outcome.state === "publication_failed" ? false : result?.ok !== false,
+      dispatch_state: outcome.state,
+      retry_policy: outcome.retry_policy,
       credential_source: resolved.source,
       fallback_used: fallbackUsed,
       policy,

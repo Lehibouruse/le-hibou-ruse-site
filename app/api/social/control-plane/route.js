@@ -2,6 +2,7 @@ import { adminOrServiceAuthorized, serviceUnauthorized } from "../../../../lib/a
 import { queryRecords, TABLES } from "../../../../lib/airtable.js";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 import { socialControlPlaneSnapshot, syncSocialControlPlaneToAirtable } from "../../../../lib/social-control-plane.mjs";
+import { syncSocialRoutingPlanToAirtable } from "../../../../lib/social-routing-airtable.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -49,7 +50,8 @@ export async function POST(request) {
     const env = await controlPlaneEnv();
     const snapshot = await socialControlPlaneSnapshot(env);
     const airtable = await syncSocialControlPlaneToAirtable(snapshot, env);
-    return Response.json({ ok: true, summary: snapshot.summary, airtable, safety: snapshot.safety }, { headers: { "Cache-Control": "no-store" } });
+    const routing = await syncSocialRoutingPlanToAirtable(env);
+    return Response.json({ ok: true, summary: snapshot.summary, airtable, routing, safety: snapshot.safety }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ ok: false, error: String(error?.message || error).slice(0, 1000) }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }

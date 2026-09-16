@@ -1,6 +1,8 @@
 import { completeSocialAuthorization } from "../../../../../../lib/social-oauth.mjs";
 import { queryRecords, TABLES } from "../../../../../../lib/airtable.js";
 import { testVaultProviderConnections } from "../../../../../../lib/social-connection-health.mjs";
+import { socialControlPlaneSnapshot, syncSocialControlPlaneToAirtable } from "../../../../../../lib/social-control-plane.mjs";
+import { syncSocialRoutingPlanToAirtable } from "../../../../../../lib/social-routing-airtable.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../../../../lib/social-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -21,6 +23,17 @@ async function oauthEnv() {
   }
 }
 
+async function refreshControlPlane(env) {
+  try {
+    const snapshot = await socialControlPlaneSnapshot(env);
+    await syncSocialControlPlaneToAirtable(snapshot, env);
+    await syncSocialRoutingPlanToAirtable(env);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request, context) {
   try {
     const { provider } = await context.params;
@@ -38,9 +51,11 @@ export async function GET(request, context) {
     const tests = await testVaultProviderConnections(result.provider, env)
       .catch((error) => [{ ok: false, error: String(error?.message || error).slice(0, 180) }]);
     const readOk = tests.length > 0 && tests.every((item) => item.ok === true);
+    const synced = await refreshControlPlane(env);
     return Response.redirect(adminUrl(request, {
       connected: result.provider,
       tested: readOk ? "read_ok" : "read_failed",
+      synced: synced ? "1" : "",
     }), 302);
   } catch (error) {
     const message = String(error?.message || error).replace(/[\r\n]+/g, " ").slice(0, 180);

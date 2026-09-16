@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const workflowPaths = [
   "domain-verify.yml",
+  "social-control-plane-sync.yml",
   "social-metrics.yml",
   "system-watchdog.yml",
 ];
@@ -22,10 +23,12 @@ test("les endpoints planifiés tolèrent seulement une propagation 404 bornée",
 });
 
 test("un 404 persistant n'est jamais classé comme succès", () => {
+  const controlPlane = workflow("social-control-plane-sync.yml");
   const domain = workflow("domain-verify.yml");
   const metrics = workflow("social-metrics.yml");
   const watchdog = workflow("system-watchdog.yml");
 
+  assert.match(controlPlane, /if \[ "\$http_code" = "404" \]; then[\s\S]*?exit 1/);
   assert.match(domain, /if \[ "\$http_code" = "404" \]; then[\s\S]*?exit 1/);
   assert.match(watchdog, /if \[ "\$code" = "404" \]; then[\s\S]*?exit 1/);
   assert.doesNotMatch(metrics, /200\|201\|202\|204\|404/);

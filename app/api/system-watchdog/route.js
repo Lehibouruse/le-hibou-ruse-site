@@ -36,7 +36,11 @@ async function authenticate(request) {
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
   if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return;
-  await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] });
+  try {
+    await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] });
+  } catch {
+    throw new Error("Unauthorized");
+  }
 }
 
 async function loadState() {

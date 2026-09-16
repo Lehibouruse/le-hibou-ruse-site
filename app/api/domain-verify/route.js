@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const EXPECTED_HOST = "d4d5d6.com";
+const OIDC_WORKFLOW = "domain-verify.yml";
 
 async function configRecord(key) {
   const safe = String(key).replaceAll("'", "\\'");
@@ -21,7 +22,7 @@ async function configRecord(key) {
 async function authorized(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return false;
-  await verifyGithubActionsToken(auth.slice("Bearer ".length));
+  await verifyGithubActionsToken(auth.slice("Bearer ".length), { allowedWorkflowFiles: [OIDC_WORKFLOW] });
   return true;
 }
 

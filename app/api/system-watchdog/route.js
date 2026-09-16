@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const SOCIAL_READ_TEST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const OIDC_WORKFLOW = "system-watchdog.yml";
 const PROVIDER_PLATFORMS = {
   youtube: ["YouTube"],
   tiktok: ["TikTok"],
@@ -35,7 +36,7 @@ async function authenticate(request) {
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
   if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return;
-  await verifyGithubActionsToken(token);
+  await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] });
 }
 
 async function loadState() {

@@ -98,6 +98,7 @@ async function recordEarlyRefund(order) {
     Devise: order.currency,
     Statut: "refunded",
     "ID commande externe": order.id,
+    "Identifiant commande public": order.identifier,
     Provenance: attribution.Provenance,
     Campagne: attribution.Campagne,
     "UTM Source": attribution["UTM Source"],
@@ -154,6 +155,7 @@ export async function POST(request) {
     const delivered = String(existing.fields?.["Livraison statut"] || "") === "delivered";
     await updateRecord(TABLES.sales, existing.id, {
       Statut: "refunded",
+      "Identifiant commande public": order.identifier,
       Remboursement: order.refundedAt || new Date().toISOString(),
       "Livraison statut": delivered ? "revocation_pending" : "revoked",
       "Livraison erreur": delivered ? "Accès Digify à révoquer; automatisation de révocation non activée tant que le schéma API officiel n'est pas configuré." : "",
@@ -172,6 +174,7 @@ export async function POST(request) {
       Montant: Number(order.total || 0),
       Devise: order.currency,
       Statut: "refunded",
+      "Identifiant commande public": order.identifier,
       Provenance: attribution.Provenance,
       Campagne: attribution.Campagne,
       "UTM Source": attribution["UTM Source"],
@@ -191,6 +194,9 @@ export async function POST(request) {
   }
 
   if (existing) {
+    if (order.identifier && String(existing.fields?.["Identifiant commande public"] || "") !== order.identifier) {
+      await updateRecord(TABLES.sales, existing.id, { "Identifiant commande public": order.identifier });
+    }
     await journal(order, "Completed", matches.length > 1 ? `Commande déjà enregistrée; ${matches.length} enregistrements détectés, la livraison appliquera la garde anti-doublon` : "Commande déjà enregistrée (dédupliquée)", existing.id);
     return NextResponse.json({ ok: true, deduplicated: true, sale_id: existing.id, duplicate_records: Math.max(0, matches.length - 1) });
   }
@@ -225,6 +231,7 @@ export async function POST(request) {
     Devise: order.currency,
     Statut: refundedBeforeCreate ? "refunded" : (order.status || "paid"),
     "ID commande externe": order.id,
+    "Identifiant commande public": order.identifier,
     Provenance: attribution.Provenance,
     Campagne: attribution.Campagne,
     "UTM Source": attribution["UTM Source"],

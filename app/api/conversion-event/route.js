@@ -7,17 +7,30 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const EVENTS = new Set(["landing", "checkout_click"]);
+const MAX_BODY_BYTES = 10_000;
+const ALLOWED_ORIGINS = new Set([
+  "https://d4d5d6.com",
+  "https://www.d4d5d6.com",
+  "https://le-hibou-ruse-site.vercel.app",
+]);
 
 function clean(value, max = 120) {
   return String(value || "").replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, max);
+}
+
+function json(body, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store, max-age=0" },
+  });
 }
 
 function allowedOrigin(request) {
   const origin = request.headers.get("origin") || "";
   if (!origin) return false;
   try {
-    const host = new URL(origin).hostname.toLowerCase();
-    return host === "d4d5d6.com" || host === "www.d4d5d6.com" || host === "le-hibou-ruse-site.vercel.app" || host.endsWith(".vercel.app");
+    const url = new URL(origin);
+    return ALLOWED_ORIGINS.has(url.origin);
   } catch {
     return false;
   }
@@ -34,20 +47,27 @@ async function exists(eventId) {
 }
 
 export async function POST(request) {
-  if (!allowedOrigin(request)) return NextResponse.json({ ok: false, error: "Origin refused" }, { status: 403 });
+  if (!allowedOrigin(request)) return json({ ok: false, error: "Origin refused" }, 403);
+  const contentType = request.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) return json({ ok: false, error: "Format invalid" }, 415);
+  const declaredLength = Number(request.headers.get("content-length") || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return json({ ok: false, error: "Payload too large" }, 413);
+
+  const raw = await request.text();
+  if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) return json({ ok: false, error: "Payload too large" }, 413);
   let body = {};
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
+  try { body = JSON.parse(raw); }
+  catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
 
   const event = clean(body.event, 40);
   const eventId = clean(body.event_id, 180);
   const sessionId = clean(body.session_id, 120);
   if (!EVENTS.has(event) || !eventId || !sessionId) {
-    return NextResponse.json({ ok: false, error: "Invalid event" }, { status: 422 });
+    return json({ ok: false, error: "Invalid event" }, 422);
   }
 
   if (event === "landing" && await exists(eventId)) {
-    return NextResponse.json({ ok: true, deduplicated: true });
+    return json({ ok: true, deduplicated: true });
   }
 
   const attribution = normalizeAttribution(body.attribution || {});
@@ -63,5 +83,5 @@ export async function POST(request) {
     "Landing Page": attribution.landing_page || "",
     Referrer: attribution.referrer || "",
   });
-  return NextResponse.json({ ok: true });
+  return json({ ok: true });
 }

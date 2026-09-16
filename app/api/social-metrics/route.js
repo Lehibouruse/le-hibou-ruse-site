@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createRecord, getAllRecords, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { escapeFormula } from "../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { markSocialAnalyticsValidated } from "../../../lib/social-account-validation.mjs";
 import { contentMetricTargets, fetchSocialMetrics, performanceKey, selectMetricTargets } from "../../../lib/social-metrics-enhanced.mjs";
 import { buildSocialPerformanceFields } from "../../../lib/social-performance-fields.mjs";
 import { configurationMap, socialRuntimeEnv } from "../../../lib/social-runtime.mjs";
@@ -66,7 +67,9 @@ export async function POST(request) {
       try {
         const metrics = await fetchSocialMetrics(target.provider, target.external_id, env);
         const saved = await persist(target, metrics, "active", "");
-        results.push({ ...target, ok: true, metrics, ...saved });
+        const analyticsValidation = await markSocialAnalyticsValidated(target.provider, metrics)
+          .catch((error) => ({ updated: false, reason: `airtable_state_error:${String(error?.message || error).slice(0, 300)}` }));
+        results.push({ ...target, ok: true, metrics, analytics_validation: analyticsValidation, ...saved });
       } catch (error) {
         const state = classify(error);
         const message = String(error?.message || error).slice(0, 1000);

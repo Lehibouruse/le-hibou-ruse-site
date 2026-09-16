@@ -29,6 +29,21 @@ test("Pinterest devient pleinement autorisé avec lecture analytics et publicati
   assert.deepEqual(pinterest.missing_publish_scopes, []);
 });
 
+test("un credential Needs reauth est distingué d'un premier consentement", () => {
+  const audit = auditSocialGrants(ready, [{
+    provider: "youtube",
+    status: "Needs reauth",
+    scopes: "https://www.googleapis.com/auth/youtube.upload",
+    last_error: "refresh token rejected",
+  }]);
+  const youtube = audit.find((item) => item.provider === "youtube");
+  assert.equal(youtube.credential_connected, false);
+  assert.equal(youtube.credential_needs_reauth, true);
+  assert.equal(youtube.credential_status, "Needs reauth");
+  assert.match(youtube.next_action, /Reconnecter OAuth/);
+  assert.equal(socialGrantSummary(audit).oauth_reauth_required, 1);
+});
+
 test("un OAuth connecté mais incomplet ne peut pas être présenté comme autorisé", () => {
   const audit = auditSocialGrants(ready, [{ provider: "meta", status: "Connected", scopes: "pages_read_engagement" }]);
   const meta = audit.find((item) => item.provider === "meta");

@@ -56,7 +56,10 @@ test("le client Lemon envoie les en-têtes JSON:API et le Bearer sans changer d'
   assert.match(seen.url, /^https:\/\/api\.lemonsqueezy\.com\/v1\/stores/);
   assert.equal(seen.options.headers.Authorization, "Bearer secret-test-key");
   assert.equal(seen.options.headers.Accept, "application/vnd.api+json");
-  assert.throws(() => lemonRequest("https://evil.example/v1/stores", { apiKey: "x", fetchImpl }), /Chemin Lemon refusé/);
+  await assert.rejects(
+    lemonRequest("https://evil.example/v1/stores", { apiKey: "x", fetchImpl }),
+    /Chemin Lemon refusé/,
+  );
 });
 
 test("la route bootstrap refuse toute action live et exige le workflow OIDC dédié", () => {

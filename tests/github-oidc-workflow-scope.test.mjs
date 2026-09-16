@@ -77,3 +77,9 @@ test("chaque route planifiée est liée à son workflow exact", () => {
     assert.match(source, /allowedWorkflowFiles: \[OIDC_WORKFLOW\]/);
   }
 });
+
+test("le watchdog normalise un refus OIDC en Unauthorized pour répondre 401", () => {
+  const source = readFileSync(new URL("../app/api/system-watchdog/route.js", import.meta.url), "utf8");
+  assert.match(source, /catch \{\s*throw new Error\("Unauthorized"\);\s*\}/);
+  assert.match(source, /status: message === "Unauthorized" \? 401 : 500/);
+});

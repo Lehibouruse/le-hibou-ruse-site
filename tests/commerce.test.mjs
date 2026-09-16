@@ -129,6 +129,17 @@ test("le kill switch commerce bloque le webhook et est revérifié avant tout ef
   assert.match(delivery, /commerce_launch_not_authorized/);
 });
 
+test("une configuration Digify incomplète n'entame aucune tentative de livraison", () => {
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  const configuredAt = delivery.indexOf("if (!configured)");
+  const attemptsAt = delivery.indexOf("const attempts = Number");
+  const claimAt = delivery.indexOf("commerceClaimPatch({ token, status: \"processing\", attempts })");
+  assert.ok(configuredAt >= 0);
+  assert.ok(attemptsAt > configuredAt);
+  assert.ok(claimAt > attemptsAt);
+  assert.match(delivery, /delivery_not_configured/);
+});
+
 test("la vente fige le fichier Digify et l'édition exacte avant livraison", () => {
   const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
   const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");

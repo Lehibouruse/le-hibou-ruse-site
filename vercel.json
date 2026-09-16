@@ -3,6 +3,7 @@
   "git": {
     "deploymentEnabled": {
       "**": false,
+      "hibou-agent/**": true,
       "main": true
     }
   },

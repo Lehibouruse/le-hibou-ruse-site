@@ -25,21 +25,42 @@ jobs:
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
 
-          response_file=$(mktemp)
-          http_code=$(curl --silent --show-error \
-            -o "$response_file" -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            --data '{"action":"sync_airtable"}' \
-            "${HIBOU_BASE_URL}/api/social/control-plane")
-          response=$(cat "$response_file")
-          rm -f "$response_file"
-          echo "$response"
+          response=""
+          http_code=""
+          curl_rc=0
+          for attempt in 1 2 3; do
+            response_file=$(mktemp)
+            set +e
+            http_code=$(curl --silent --show-error \
+              -o "$response_file" -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              --data '{"action":"sync_airtable"}' \
+              "${HIBOU_BASE_URL}/api/social/control-plane")
+            curl_rc=$?
+            set -e
+            response=$(cat "$response_file")
+            rm -f "$response_file"
+            echo "$response"
+            printf 'social_control_plane_http=%s curl_rc=%s attempt=%s\n' "$http_code" "$curl_rc" "$attempt"
+
+            if [ "$curl_rc" -ne 0 ]; then
+              echo "Social control plane transport failure" >&2
+              exit "$curl_rc"
+            fi
+            if [ "$http_code" != "404" ]; then
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Social control plane returned 404; allowing brief deployment propagation before retry"
+              sleep 15
+            fi
+          done
 
           if [ "$http_code" = "404" ]; then
-            echo "Control plane not deployed yet; next schedule will retry."
-            exit 0
+            echo "Persistent 404 after deployment grace window: social control plane route missing" >&2
+            exit 1
           fi
           if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
             echo "Social control plane sync failed: HTTP $http_code" >&2

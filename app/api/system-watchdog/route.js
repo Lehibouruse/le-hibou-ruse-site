@@ -45,7 +45,7 @@ async function authenticate(request) {
 }
 
 async function loadState() {
-  const [jobs, sales, book, socialCredentials, socialAccounts, configuration, products, legal] = await Promise.all([
+  const [jobs, sales, book, socialCredentials, socialAccounts, configuration, products, legal, policyAlerts] = await Promise.all([
     queryAllRecords(TABLES.jobs, { sortField: "created_at", sortDirection: "desc" }, { maxRecords: 800 }),
     queryAllRecords(TABLES.sales, {}, { maxRecords: 1000 }),
     queryAllRecords(TABLES.book, {}, { maxRecords: 100 }),
@@ -54,11 +54,18 @@ async function loadState() {
     queryAllRecords(TABLES.configuration, {}, { maxRecords: 200 }),
     queryAllRecords(TABLES.products, {}, { maxRecords: 50 }),
     queryAllRecords(TABLES.legal, {}, { maxRecords: 100 }),
+    queryRecords(TABLES.journal, {
+      filterByFormula: "{Statut}='Policy Alert'",
+      sortField: "Dernière exécution",
+      sortDirection: "desc",
+      pageSize: 20,
+      priorityAware: false,
+    }),
   ]);
   const config = configMap(configuration);
   const product = products.find((row) => row.fields?.Actif)?.fields || {};
   const readiness = commercialReadiness({ config, product, chapters: book, legal });
-  return { jobs, sales, book, socialCredentials, socialAccounts, configuration, config, readiness };
+  return { jobs, sales, book, socialCredentials, socialAccounts, configuration, config, readiness, policyAlerts };
 }
 
 function latestCreditError(jobs) {
@@ -256,6 +263,7 @@ export async function POST(request) {
       sales: state.sales,
       book: state.book,
       socialCredentials: state.socialCredentials,
+      policyAlerts: state.policyAlerts,
       circuit,
       readiness: state.readiness,
       now,

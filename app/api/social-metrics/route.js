@@ -13,13 +13,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const MAX_TARGETS_PER_RUN = 6;
+const OIDC_WORKFLOW = "social-metrics.yml";
 
 async function authorized(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return false;
   const token = auth.slice("Bearer ".length);
   if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return true;
-  try { await verifyGithubActionsToken(token); return true; } catch { return false; }
+  try { await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] }); return true; } catch { return false; }
 }
 
 async function existingPerformance(key) {

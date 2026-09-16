@@ -104,7 +104,7 @@ export async function POST(request) {
   if (!candidate) {
     return NextResponse.json({
       ok: true, processed: 0, reason: "no_pending_delivery",
-      configured: Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE),
+      configured: Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_URL && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE),
     });
   }
 
@@ -159,7 +159,7 @@ export async function POST(request) {
 
   try {
     const delivered = await addDigifyRecipient({ fileGuid, email, orderId });
-    const url = delivered.accessUrl || String(process.env.DIGIFY_GENERIC_FILE_URL || "");
+    const url = delivered.accessUrl || "";
     await updateRecord(TABLES.sales, current.id, clearCommerceLease({
       "Livraison statut": "delivered",
       "Digify recipient email": email,
@@ -167,9 +167,9 @@ export async function POST(request) {
       "Version livre livrée": edition,
       ...(url ? { "Digify access URL": url } : {}),
       "Livré le": new Date().toISOString(),
-      "Livraison erreur": url ? "" : "Accès créé; l'API n'a pas renvoyé de lien individuel. La notification Digify doit être activée dans le template API.",
+      "Livraison erreur": url ? "" : "Accès nominatif créé; l'API n'a pas renvoyé de Quick Access Link. La notification Digify doit être activée pour ce destinataire.",
     }));
-    await journal(current, "Completed", `Accès Digify créé · édition ${edition}${url ? " · URL enregistrée" : ""}`, url);
+    await journal(current, "Completed", `Accès Digify nominatif créé · édition ${edition}${url ? " · Quick Access Link enregistré" : " · notification Digify requise"}`, url);
     return NextResponse.json({ ok: true, processed: 1, status: "delivered", edition, access_url_recorded: Boolean(url) });
   } catch (error) {
     const retryable = error?.retryable !== false && attempts < 3;

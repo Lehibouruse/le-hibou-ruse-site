@@ -20,7 +20,7 @@ test("les mentions légales restent pré-lancement et n'inventent aucune identit
   assert.match(mentions, /médiateur[^\n]*(?:adhéré|adhésion)/i);
 });
 
-test("la politique de confidentialité documente prestataires, bases, durées, droits et consentement", () => {
+test("la politique de confidentialité documente prestataires, bases, durées, droits et attribution sans stockage persistant", () => {
   for (const item of ["Vercel", "Airtable", "Lemon Squeezy", "Digify", "CNIL"]) assert.match(privacy, new RegExp(item));
   assert.match(privacy, /Version de pré-lancement/);
   assert.match(privacy, /DÉNOMINATION(?: SOCIALE)? \/ NOM À CONFIRMER/);
@@ -29,7 +29,9 @@ test("la politique de confidentialité documente prestataires, bases, durées, d
   assert.match(privacy, /13 mois/);
   assert.match(privacy, /12 mois/);
   assert.match(privacy, /10 ans/);
-  assert.match(privacy, /stockage ou accès dans le terminal[^\n]*consentement préalable conforme/i);
+  assert.match(privacy, /aucun cookie, localStorage ou sessionStorage/i);
+  assert.match(privacy, /uniquement en mémoire de la page/i);
+  assert.match(privacy, /stockage persistant[^\n]*consentement préalable conforme/i);
   assert.match(privacy, /mécanismes de purge et d’archivage[^\n]*alignés/i);
 });
 

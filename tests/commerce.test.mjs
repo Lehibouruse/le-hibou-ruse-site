@@ -116,6 +116,19 @@ test("une commande test ne peut jamais passer en livraison", () => {
   assert.match(lemon, /commande Lemon en mode test: livraison bloquée/);
 });
 
+test("le kill switch commerce bloque le webhook et est revérifié avant tout effet Digify", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /commerce_launch_authorized/);
+  assert.match(lemon, /launchAuthorized/);
+  assert.match(lemon, /commerce_launch_authorized=false: livraison bloquée par kill switch/);
+  const launchGuardAt = delivery.indexOf("commerceLaunchAuthorized()");
+  const effectAt = delivery.indexOf("addDigifyRecipient({ fileGuid, email, orderId })");
+  assert.ok(launchGuardAt >= 0);
+  assert.ok(effectAt > launchGuardAt);
+  assert.match(delivery, /commerce_launch_not_authorized/);
+});
+
 test("la vente fige le fichier Digify et l'édition exacte avant livraison", () => {
   const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
   const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");

@@ -4,12 +4,28 @@ import { readFileSync } from "node:fs";
 
 const webhook = readFileSync(new URL("../app/api/commerce/digify-webhook/route.js", import.meta.url), "utf8");
 const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+const envExample = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
+const workRunbook = readFileSync(new URL("../docs/WORK_LEMON_TEST_RUNBOOK.md", import.meta.url), "utf8");
+const launchRunbook = readFileSync(new URL("../docs/COMMERCE_LAUNCH_RUNBOOK.md", import.meta.url), "utf8");
+const readiness = readFileSync(new URL("../lib/launch-readiness.mjs", import.meta.url), "utf8");
 
 test("le webhook Digify exige une Basic Auth indépendante de la clé API", () => {
   assert.match(webhook, /DIGIFY_WEBHOOK_USERNAME/);
   assert.match(webhook, /DIGIFY_WEBHOOK_PASSWORD/);
   assert.doesNotMatch(webhook, /DIGIFY_KEY_ID/);
   assert.doesNotMatch(webhook, /DIGIFY_SECRET/);
+});
+
+test("la configuration du webhook d'activité reste documentée et visible dans la readiness", () => {
+  for (const text of [envExample, workRunbook, launchRunbook]) {
+    assert.match(text, /DIGIFY_WEBHOOK_USERNAME/);
+    assert.match(text, /DIGIFY_WEBHOOK_PASSWORD/);
+  }
+  assert.match(workRunbook, /\/api\/commerce\/digify-webhook/);
+  assert.match(workRunbook, /Basic Auth/);
+  assert.match(readiness, /activity_webhook_auth/);
+  assert.match(readiness, /DIGIFY_WEBHOOK_USERNAME/);
+  assert.match(readiness, /DIGIFY_WEBHOOK_PASSWORD/);
 });
 
 test("seuls View Print Download sont journalisés comme activité lecteur", () => {

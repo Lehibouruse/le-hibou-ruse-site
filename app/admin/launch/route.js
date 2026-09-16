@@ -1,7 +1,7 @@
 import { adminAuthorized, adminUnauthorized } from "../../../lib/admin-auth.mjs";
 import { configMap, getRecords, queryRecords, TABLES } from "../../../lib/airtable";
 import { githubInfrastructureStatus, systemHealthHeartbeat } from "../../../lib/infrastructure-observability.mjs";
-import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
+import { commerceTestReadiness, commercialReadiness } from "../../../lib/launch-readiness.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,8 +10,11 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 }
 
-function checkRows(checks = {}) {
-  return Object.entries(checks).map(([key, value]) => {
+function checkRows(checks = []) {
+  const entries = Array.isArray(checks)
+    ? checks.map((item) => [item?.key || "contrôle", item])
+    : Object.entries(checks || {});
+  return entries.map(([key, value]) => {
     const ok = value === true || value?.ok === true;
     const detail = typeof value === "object" && value !== null ? (value.detail || value.value || "") : "";
     return `<tr><td><strong>${esc(key)}</strong></td><td class="${ok ? "ok" : "bad"}">${ok ? "OK" : "BLOQUÉ"}</td><td>${esc(detail)}</td></tr>`;
@@ -31,6 +34,14 @@ function fmtDate(value) {
 }
 function infraRow(label, state, detail) {
   return `<tr><td><strong>${esc(label)}</strong></td><td class="${statusClass(state)}">${esc(String(state || "UNKNOWN").toUpperCase())}</td><td>${esc(detail || "")}</td></tr>`;
+}
+function testStateCard(label, group) {
+  const ready = group?.ready === true;
+  return `<div class="card"><span>${esc(label)}</span><strong class="${ready ? "ok" : "warn"}">${ready ? "PRÊT" : "À CONFIGURER"}</strong></div>`;
+}
+function testBlockers(group) {
+  const blockers = (group?.blockers || []).map((item) => `<li>${esc(blockerText(item))}</li>`).join("");
+  return blockers || '<li class="ok">Aucun blocage de test.</li>';
 }
 
 export async function GET(request) {
@@ -53,6 +64,7 @@ export async function GET(request) {
   const config = configMap(configuration);
   const product = products.find((record) => record.fields.Actif)?.fields || {};
   const readiness = commercialReadiness({ config, product, chapters, legal });
+  const testReadiness = commerceTestReadiness({ config, product });
   const heartbeat = systemHealthHeartbeat(config);
   const report = heartbeat.report || {};
   const counts = report.counts || {};
@@ -86,22 +98,25 @@ export async function GET(request) {
     : `<p class="warn">Aucun événement watchdog journalisé. Le heartbeat ci-dessus est la source de vérité pour distinguer un système sain d’un watchdog arrêté.</p>`;
 
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Lancement · Le Hibou Rusé</title><style>
-    :root{color-scheme:dark}body{margin:0;background:#102d25;color:#f8f0df;font-family:ui-sans-serif,system-ui;padding:40px}main{max-width:1120px;margin:auto}h1{font-family:Georgia,serif;font-size:44px;margin:0 0 8px}.sub{color:#d6c8a7;line-height:1.5;margin-bottom:28px}.hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card{background:#15352d;border:1px solid #2f5146;border-radius:16px;padding:18px}.card span{display:block;color:#adc0b8;font-size:13px}.card strong{display:block;font-size:24px;margin-top:7px}.ok{color:#8ee5aa}.bad{color:#ff9e8f}.warn{color:#eac887}.box{margin-top:28px;background:#15352d;border:1px solid #2f5146;border-radius:16px;padding:20px}.box h2{margin-top:0}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid #2d4d43;font-size:14px}th{color:#d9b875}ul{line-height:1.65;padding-left:22px}.links{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.links a{background:#d5a84c;color:#102d25;text-decoration:none;padding:9px 13px;border-radius:999px;font-weight:700}.foot{color:#adbea9;font-size:13px;margin-top:24px}@media(max-width:760px){body{padding:22px}.hero{grid-template-columns:1fr 1fr}h1{font-size:36px}.box{overflow-x:auto}}
+    :root{color-scheme:dark}body{margin:0;background:#102d25;color:#f8f0df;font-family:ui-sans-serif,system-ui;padding:40px}main{max-width:1120px;margin:auto}h1{font-family:Georgia,serif;font-size:44px;margin:0 0 8px}.sub{color:#d6c8a7;line-height:1.5;margin-bottom:28px}.hero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.card{background:#15352d;border:1px solid #2f5146;border-radius:16px;padding:18px}.card span{display:block;color:#adc0b8;font-size:13px}.card strong{display:block;font-size:24px;margin-top:7px}.ok{color:#8ee5aa}.bad{color:#ff9e8f}.warn{color:#eac887}.box{margin-top:28px;background:#15352d;border:1px solid #2f5146;border-radius:16px;padding:20px}.box h2{margin-top:0}.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}.split h3{margin:0 0 10px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid #2d4d43;font-size:14px}th{color:#d9b875}ul{line-height:1.65;padding-left:22px}.links{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.links a{background:#d5a84c;color:#102d25;text-decoration:none;padding:9px 13px;border-radius:999px;font-weight:700}.foot{color:#adbea9;font-size:13px;margin-top:24px}@media(max-width:760px){body{padding:22px}.hero,.split{grid-template-columns:1fr 1fr}h1{font-size:36px}.box{overflow-x:auto}}@media(max-width:520px){.hero,.split{grid-template-columns:1fr}}
   </style></head><body><main>
-    <h1>Prêt au lancement ?</h1><p class="sub">Tableau privé de vérité. La readiness commerciale et la santé technique restent séparées : aucune panne d’observabilité ne peut être transformée en faux vert.</p>
+    <h1>Prêt au lancement ?</h1><p class="sub">Tableau privé de vérité. La readiness commerciale, la capacité à tester Lemon/Digify et la santé technique restent séparées : un test prêt ne vaut jamais autorisation de vendre.</p>
     <div class="hero">
       <div class="card"><span>État commercial</span><strong class="${readiness.ready ? "ok" : "bad"}">${readiness.ready ? "PRÊT" : "BLOQUÉ"}</strong></div>
-      <div class="card"><span>Santé Core</span><strong class="${statusClass(watchdogState)}">${esc(watchdogState.toUpperCase())}</strong></div>
+      ${testStateCard("Lemon test", testReadiness.lemon)}
+      ${testStateCard("Digify test", testReadiness.digify)}
+      <div class="card"><span>Santé Core</span><strong class="${statusClass(watchdogState)}">${esc(String(watchdogState || "unknown").toUpperCase())}</strong></div>
       <div class="card"><span>Livre</span><strong>${Number(readiness.readyBookChapters || 0)}/${Number(readiness.totalBookChapters || 0)}</strong></div>
       <div class="card"><span>Édition</span><strong>${esc(readiness.edition || "—")}</strong></div>
     </div>
+    <section class="box"><h2>Tests commerce non-live</h2><div class="split"><div><h3>Lemon Squeezy</h3><table><thead><tr><th>Contrôle</th><th>État</th><th>Détail</th></tr></thead><tbody>${checkRows(testReadiness.lemon.checks)}</tbody></table><ul>${testBlockers(testReadiness.lemon)}</ul></div><div><h3>Digify</h3><table><thead><tr><th>Contrôle</th><th>État</th><th>Détail</th></tr></thead><tbody>${checkRows(testReadiness.digify.checks)}</tbody></table><ul>${testBlockers(testReadiness.digify)}</ul></div></div></section>
     <section class="box"><h2>Infrastructure réelle</h2><table><thead><tr><th>Composant</th><th>État</th><th>Preuve / détail</th></tr></thead><tbody>${infraRows}</tbody></table></section>
     <section class="box"><h2>Incidents actifs</h2>${activeIssues}</section>
     <section class="box"><h2>Derniers événements watchdog</h2>${recentWatchdog}</section>
     <section class="box"><h2>Contrôles commerciaux stricts</h2><table><thead><tr><th>Contrôle</th><th>État</th><th>Détail</th></tr></thead><tbody>${checkRows(readiness.checks)}</tbody></table></section>
-    <section class="box"><h2>Blocages restants</h2>${blockers ? `<ul>${blockers}</ul>` : '<p class="ok"><strong>Aucun blocage commercial déclaré.</strong></p>'}</section>
+    <section class="box"><h2>Blocages restants avant vente publique</h2>${blockers ? `<ul>${blockers}</ul>` : '<p class="ok"><strong>Aucun blocage commercial déclaré.</strong></p>'}</section>
     <div class="links"><a href="/admin/social">Connexions sociales détaillées</a><a href="/admin/growth">Growth</a></div>
-    <p class="foot">Ne pas activer manuellement le commerce pour contourner ce tableau. Les états UNKNOWN, STALE ou PENDING ne valent jamais validation.</p>
+    <p class="foot">Ne pas activer manuellement le commerce pour contourner ce tableau. Les états UNKNOWN, STALE ou PENDING ne valent jamais validation, et un état « test prêt » n'autorise jamais une vente live.</p>
   </main></body></html>`;
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }

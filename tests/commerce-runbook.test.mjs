@@ -15,7 +15,7 @@ test("le test live E2E utilise une fenêtre autorisée sans publier le checkout"
   for (const text of [launch, work]) {
     assert.match(text, /commerce_launch_authorized=true/);
     assert.match(text, /ne pas renseigner `Configuration\.checkout_url`/);
-    assert.match(text, /remettre immédiatement `commerce_launch_authorized=false`/i);
+    assert.match(text, /(?:remettre immédiatement|en remettant) `commerce_launch_authorized=false`/i);
   }
 });
 

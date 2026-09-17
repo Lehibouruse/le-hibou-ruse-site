@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { createRecord, TABLES } from "../../../lib/airtable";
+import { createRecord, updateRecord, TABLES } from "../../../lib/airtable";
+import { sendWithdrawalReceipt } from "../../../lib/withdrawal-receipt.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,17 @@ function receiptText({ requestId, submittedAt, firstName, lastName, email, contr
   ].join("\n");
 }
 
+async function recordReceiptDelivery(recordId, fields, requestId) {
+  if (!recordId) return false;
+  try {
+    await updateRecord(TABLES.withdrawals, recordId, fields);
+    return true;
+  } catch {
+    console.error("Withdrawal receipt tracking update failed", requestId);
+    return false;
+  }
+}
+
 export async function POST(request) {
   if (!allowedOrigin(request)) return json({ ok: false, error: "Origin refused" }, 403);
   const contentType = request.headers.get("content-type") || "";
@@ -75,7 +87,8 @@ export async function POST(request) {
 
   const requestId = randomUUID();
   const submittedAt = new Date().toISOString();
-  await createRecord(TABLES.withdrawals, {
+  const receipt = receiptText({ requestId, submittedAt, firstName, lastName, email, contractReference });
+  const created = await createRecord(TABLES.withdrawals, {
     "Demande ID": requestId,
     "Date demande": submittedAt,
     Nom: lastName,
@@ -83,13 +96,42 @@ export async function POST(request) {
     "E-mail accusé": email,
     "Référence contrat": contractReference,
     Statut: "Reçue",
-    Notes: "Déclaration reçue via /retractation. Accusé téléchargeable rendu au navigateur. Aucun remboursement ni retrait d’accès automatique. Envoi durable externe à confirmer avant lancement.",
+    Notes: "Déclaration reçue via /retractation. Accusé téléchargeable rendu au navigateur. Aucun remboursement ni retrait d’accès automatique. L’accusé durable e-mail n’est marqué envoyé qu’après confirmation 2xx du webhook transactionnel.",
   });
+  const recordId = created?.records?.[0]?.id || "";
+
+  const delivery = await sendWithdrawalReceipt({
+    request_id: requestId,
+    submitted_at: submittedAt,
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    contract_reference: contractReference,
+    receipt_text: receipt,
+  });
+
+  let trackingRecorded = false;
+  if (delivery.ok) {
+    const sentAt = new Date().toISOString();
+    trackingRecorded = await recordReceiptDelivery(recordId, {
+      Statut: "Accusé envoyé",
+      "Accusé envoyé le": sentAt,
+      "Canal accusé": "E-mail",
+      Notes: "Déclaration reçue via /retractation. Accusé durable transmis par le webhook transactionnel configuré ; réponse 2xx reçue. Aucun remboursement ni retrait d’accès automatique.",
+    }, requestId);
+  } else if (delivery.configured) {
+    trackingRecorded = await recordReceiptDelivery(recordId, {
+      Statut: "À vérifier",
+      Notes: `Déclaration reçue via /retractation. Échec de l’accusé durable transactionnel (${delivery.code}). La demande reste enregistrée et le reçu téléchargeable reste disponible. Vérification humaine requise ; aucun remboursement ni retrait d’accès automatique.`,
+    }, requestId);
+  }
 
   return json({
     ok: true,
     request_id: requestId,
     submitted_at: submittedAt,
-    receipt_text: receiptText({ requestId, submittedAt, firstName, lastName, email, contractReference }),
+    receipt_text: receipt,
+    durable_receipt: delivery.ok ? "sent" : delivery.configured ? "delivery_failed" : "not_configured",
+    durable_receipt_tracking: delivery.ok ? (trackingRecorded ? "recorded" : "tracking_failed") : "not_sent",
   }, 201);
 }

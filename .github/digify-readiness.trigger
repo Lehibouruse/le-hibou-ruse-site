@@ -1,2 +1,2 @@
-2026-09-17T22:40:00+02:00
-Purpose: trigger side-effect-free Digify readiness verification after Vercel secrets were added.
+2026-09-17T22:52:00+02:00
+Purpose: retrigger side-effect-free Digify readiness verification with per-secret diagnostics.

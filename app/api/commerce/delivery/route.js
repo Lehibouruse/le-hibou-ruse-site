@@ -1,13 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
-import { addDigifyRecipient, canonicalSale, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
+import { addDigifyRecipient, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
 import { clearCommerceLease, commerceClaimPatch, commercePendingFormula, commerceStaleFormula, ownsCommerceLease } from "../../../../lib/commerce-lease.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const OIDC_WORKFLOW = "hibou-wake.yml";
+const ALLOWED_EVENTS = ["schedule", "workflow_dispatch"];
+
+function truthy(value) {
+  return ["1", "true", "yes", "oui", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
 
 async function journal(sale, status, note, url = "") {
   await createRecord(TABLES.journal, {
@@ -34,6 +41,15 @@ async function productForSale(sale) {
 async function currentEdition() {
   const records = await queryRecords(TABLES.configuration, { filterByFormula: "AND({Actif}=1,{Clé}='book_current_edition')", pageSize: 1 });
   return String(records[0]?.fields?.Valeur || "V1.0").trim();
+}
+
+async function commerceLaunchAuthorized() {
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: "AND({Actif}=1,{Clé}='commerce_launch_authorized')",
+    pageSize: 1,
+    priorityAware: false,
+  });
+  return truthy(records[0]?.fields?.Valeur);
 }
 
 function finalEdition(value) {
@@ -69,23 +85,25 @@ async function deliveryOrderGuard(current) {
       duplicates: Math.max(0, matches.length - 1),
     };
   }
-  const canonical = canonicalSale(matches);
-  if (matches.length > 1 && canonical?.id !== current.id) {
+  if (matches.length !== 1) {
     return {
       safe: false,
       refunded: false,
-      reason: `Doublon de vente ${orderId}; seul ${canonical?.id || "le record canonique"} peut être livré`,
-      duplicates: matches.length - 1,
+      reason: `Commande ${orderId}: ${matches.length} enregistrements trouvés; livraison bloquée jusqu'à réconciliation`,
+      duplicates: Math.max(0, matches.length - 1),
     };
   }
-  return { safe: true, duplicates: Math.max(0, matches.length - 1), canonical_id: canonical?.id || current.id };
+  return { safe: true, duplicates: 0, canonical_id: current.id };
 }
 
 export async function POST(request) {
   try {
     const auth = request.headers.get("authorization") || "";
     if (!auth.startsWith("Bearer ")) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    await verifyGithubActionsToken(auth.slice("Bearer ".length));
+    await verifyGithubActionsToken(auth.slice("Bearer ".length), {
+      allowedWorkflowFiles: [OIDC_WORKFLOW],
+      allowedEvents: ALLOWED_EVENTS,
+    });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || "Unauthorized").slice(0, 300) }, { status: 401 });
   }
@@ -93,13 +111,18 @@ export async function POST(request) {
   const staleId = await clearStaleDelivery();
   if (staleId) return NextResponse.json({ ok: true, processed: 1, status: "manual_review", reason: "stale_delivery_ambiguous", sale_id: staleId });
 
+  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_URL && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE);
+  if (!(await commerceLaunchAuthorized())) {
+    return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured });
+  }
+  if (!configured) {
+    return NextResponse.json({ ok: true, processed: 0, reason: "delivery_not_configured", configured: false });
+  }
+
   const pending = await queryRecords(TABLES.sales, { filterByFormula: commercePendingFormula("delivery"), pageSize: 1 });
   const candidate = pending[0];
   if (!candidate) {
-    return NextResponse.json({
-      ok: true, processed: 0, reason: "no_pending_delivery",
-      configured: Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE),
-    });
+    return NextResponse.json({ ok: true, processed: 0, reason: "no_pending_delivery", configured });
   }
 
   const attempts = Number(candidate.fields?.["Livraison tentatives"] || 0) + 1;
@@ -153,7 +176,7 @@ export async function POST(request) {
 
   try {
     const delivered = await addDigifyRecipient({ fileGuid, email, orderId });
-    const url = delivered.accessUrl || String(process.env.DIGIFY_GENERIC_FILE_URL || "");
+    const url = delivered.accessUrl || "";
     await updateRecord(TABLES.sales, current.id, clearCommerceLease({
       "Livraison statut": "delivered",
       "Digify recipient email": email,
@@ -161,12 +184,12 @@ export async function POST(request) {
       "Version livre livrée": edition,
       ...(url ? { "Digify access URL": url } : {}),
       "Livré le": new Date().toISOString(),
-      "Livraison erreur": url ? "" : "Accès créé; l'API n'a pas renvoyé de lien individuel. La notification Digify doit être activée dans le template API.",
+      "Livraison erreur": url ? "" : "Accès nominatif créé; l'API n'a pas renvoyé de Quick Access Link. La notification Digify doit être activée pour ce destinataire.",
     }));
-    await journal(current, "Completed", `Accès Digify créé · édition ${edition}${url ? " · URL enregistrée" : ""}`, url);
+    await journal(current, "Completed", `Accès Digify nominatif créé · édition ${edition}${url ? " · Quick Access Link enregistré" : " · notification Digify requise"}`, url);
     return NextResponse.json({ ok: true, processed: 1, status: "delivered", edition, access_url_recorded: Boolean(url) });
   } catch (error) {
-    const retryable = error?.retryable !== false && attempts < 3;
+    const retryable = error?.retryable === true && attempts < 3;
     const message = String(error?.message || error).slice(0, 5000);
     await updateRecord(TABLES.sales, current.id, clearCommerceLease({
       "Livraison statut": retryable ? "pending" : "manual_review",

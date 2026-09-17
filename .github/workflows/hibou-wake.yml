@@ -76,6 +76,8 @@ jobs:
           token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
           echo "::add-mask::$token"
 
+          # Non-destructive editorial reconciliation: it only updates metrics/QC for
+          # chapters whose current V2B Jobs already cover the complete source range.
           reconciliation=$(curl --silent --show-error \
             -X POST \
             -H "Authorization: Bearer ${token}" \
@@ -83,19 +85,43 @@ jobs:
             "${HIBOU_BASE_URL}/api/book-reconcile" 2>&1 || true)
           printf 'book_reconcile=%s\n' "$reconciliation"
 
-          delivery=$(curl --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            "${HIBOU_BASE_URL}/api/commerce/delivery" 2>&1 || true)
-          printf 'delivery=%s\n' "$delivery"
+          post_commerce_effect() {
+            local label="$1"
+            local path="$2"
+            local response_file http_code curl_rc response
+            response_file=$(mktemp)
+            set +e
+            http_code=$(curl --silent --show-error \
+              -o "$response_file" -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              "${HIBOU_BASE_URL}${path}")
+            curl_rc=$?
+            set -e
+            response=$(cat "$response_file")
+            rm -f "$response_file"
+            printf '%s=%s\n' "$label" "$response"
+            printf '%s_http=%s curl_rc=%s\n' "$label" "$http_code" "$curl_rc"
+            if [ "$curl_rc" -ne 0 ]; then
+              echo "${label} transport failure" >&2
+              exit "$curl_rc"
+            fi
+            case "$http_code" in
+              200|201|202|204|409|422) ;;
+              *) echo "${label} HTTP failure: $http_code" >&2; exit 1 ;;
+            esac
+          }
 
-          revocation=$(curl --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            "${HIBOU_BASE_URL}/api/commerce/revoke" 2>&1 || true)
-          printf 'revocation=%s\n' "$revocation"
+          # Delivery/revocation are real external effects. Push self-tests and manual
+          # dry-runs must never touch Digify even when pending commerce records exist.
+          if [ "$DRY_RUN" = "true" ]; then
+            printf 'delivery=%s\n' "skipped_dry_run"
+            printf 'revocation=%s\n' "skipped_dry_run"
+          else
+            post_commerce_effect "delivery" "/api/commerce/delivery"
+            post_commerce_effect "revocation" "/api/commerce/revoke"
+          fi
 
           response_file=$(mktemp)
           set +e

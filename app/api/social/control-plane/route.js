@@ -8,12 +8,14 @@ import { configurationMap, socialRuntimeEnv } from "../../../../lib/social-runti
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const OIDC_WORKFLOW = "social-control-plane-sync.yml";
+
 async function authorized(request) {
   if (adminOrServiceAuthorized(request)) return true;
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return false;
   try {
-    await verifyGithubActionsToken(auth.slice("Bearer ".length));
+    await verifyGithubActionsToken(auth.slice("Bearer ".length), { allowedWorkflowFiles: [OIDC_WORKFLOW] });
     return true;
   } catch {
     return false;

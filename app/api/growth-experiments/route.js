@@ -9,10 +9,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const OIDC_WORKFLOW = "social-metrics.yml";
+
 async function authorized(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) return false;
-  await verifyGithubActionsToken(auth.slice("Bearer ".length));
+  await verifyGithubActionsToken(auth.slice("Bearer ".length), { allowedWorkflowFiles: [OIDC_WORKFLOW] });
   return true;
 }
 

@@ -7,8 +7,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function actionId(response) {
   return response?.records?.[0]?.id || "";
+}
+
+function truthy(value) {
+  return ["1", "true", "yes", "oui", "on"].includes(String(value ?? "").trim().toLowerCase());
 }
 
 async function findSales(orderId) {
@@ -28,12 +34,17 @@ async function matchingProduct(order) {
   return products.find((record) => String(record.fields?.["Lemon Squeezy Variant ID"] || "") === order.variantId) || null;
 }
 
-async function currentEdition() {
+async function currentCommerceState() {
   const records = await queryRecords(TABLES.configuration, {
-    filterByFormula: "AND({Actif}=1,{Clé}='book_current_edition')",
-    pageSize: 1,
+    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized'))",
+    pageSize: 10,
+    priorityAware: false,
   });
-  return String(records[0]?.fields?.Valeur || "").trim();
+  const values = Object.fromEntries(records.map((record) => [String(record.fields?.Clé || ""), record.fields?.Valeur]));
+  return {
+    edition: String(values.book_current_edition || "").trim(),
+    launchAuthorized: truthy(values.commerce_launch_authorized),
+  };
 }
 
 async function priorRefundMarker(orderId) {
@@ -98,6 +109,7 @@ async function recordEarlyRefund(order) {
     Devise: order.currency,
     Statut: "refunded",
     "ID commande externe": order.id,
+    "Identifiant commande public": order.identifier,
     Provenance: attribution.Provenance,
     Campagne: attribution.Campagne,
     "UTM Source": attribution["UTM Source"],
@@ -137,9 +149,9 @@ export async function POST(request) {
     await journal(order, "Ignored", `Événement non traité: ${order.event || "unknown"}`);
     return NextResponse.json({ ok: true, ignored: true });
   }
-  if (!order.id || !order.email) {
-    await journal(order, "Error", "Commande sans identifiant ou email");
-    return NextResponse.json({ ok: false, error: "Missing order identity" }, { status: 422 });
+  if (!order.id || !order.email || !UUID_RE.test(order.identifier)) {
+    await journal(order, "Error", "Commande sans identifiant interne, email ou order_identifier UUID valide");
+    return NextResponse.json({ ok: false, error: "Missing or invalid order identity" }, { status: 422 });
   }
 
   const matches = await findSales(order.id);
@@ -154,6 +166,7 @@ export async function POST(request) {
     const delivered = String(existing.fields?.["Livraison statut"] || "") === "delivered";
     await updateRecord(TABLES.sales, existing.id, {
       Statut: "refunded",
+      "Identifiant commande public": order.identifier,
       Remboursement: order.refundedAt || new Date().toISOString(),
       "Livraison statut": delivered ? "revocation_pending" : "revoked",
       "Livraison erreur": delivered ? "Accès Digify à révoquer; automatisation de révocation non activée tant que le schéma API officiel n'est pas configuré." : "",
@@ -163,7 +176,8 @@ export async function POST(request) {
   }
 
   if (existing && saleIsRefunded(existing.fields)) {
-    const [product, edition] = await Promise.all([matchingProduct(order), currentEdition()]);
+    const [product, commerce] = await Promise.all([matchingProduct(order), currentCommerceState()]);
+    const edition = commerce.edition;
     const attribution = attributionFields(order);
     const fileGuid = String(product?.fields?.["Digify File GUID"] || existing.fields?.["Digify File GUID"] || "").trim();
     await updateRecord(TABLES.sales, existing.id, {
@@ -172,6 +186,7 @@ export async function POST(request) {
       Montant: Number(order.total || 0),
       Devise: order.currency,
       Statut: "refunded",
+      "Identifiant commande public": order.identifier,
       Provenance: attribution.Provenance,
       Campagne: attribution.Campagne,
       "UTM Source": attribution["UTM Source"],
@@ -191,16 +206,22 @@ export async function POST(request) {
   }
 
   if (existing) {
+    if (order.identifier && String(existing.fields?.["Identifiant commande public"] || "") !== order.identifier) {
+      await updateRecord(TABLES.sales, existing.id, { "Identifiant commande public": order.identifier });
+    }
     await journal(order, "Completed", matches.length > 1 ? `Commande déjà enregistrée; ${matches.length} enregistrements détectés, la livraison appliquera la garde anti-doublon` : "Commande déjà enregistrée (dédupliquée)", existing.id);
     return NextResponse.json({ ok: true, deduplicated: true, sale_id: existing.id, duplicate_records: Math.max(0, matches.length - 1) });
   }
 
-  const [product, edition, refundMarker] = await Promise.all([matchingProduct(order), currentEdition(), priorRefundMarker(order.id)]);
+  const [product, commerce, refundMarker] = await Promise.all([matchingProduct(order), currentCommerceState(), priorRefundMarker(order.id)]);
+  const edition = commerce.edition;
+  const launchAuthorized = commerce.launchAuthorized;
   const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
   const attribution = attributionFields(order);
   const refundedBeforeCreate = Boolean(refundMarker);
   const ready = Boolean(
-    product
+    launchAuthorized
+    && product
     && fileGuid
     && order.status === "paid"
     && !order.refunded
@@ -210,6 +231,7 @@ export async function POST(request) {
   );
   const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? "pending" : "manual_review";
   const reasons = [];
+  if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
   if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);
@@ -225,6 +247,7 @@ export async function POST(request) {
     Devise: order.currency,
     Statut: refundedBeforeCreate ? "refunded" : (order.status || "paid"),
     "ID commande externe": order.id,
+    "Identifiant commande public": order.identifier,
     Provenance: attribution.Provenance,
     Campagne: attribution.Campagne,
     "UTM Source": attribution["UTM Source"],

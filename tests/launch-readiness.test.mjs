@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { commercialReadiness, CRITICAL_LEGAL } from "../lib/launch-readiness.mjs";
+import { commerceTestReadiness, commercialReadiness, CRITICAL_LEGAL } from "../lib/launch-readiness.mjs";
 
 function legal(valid = true) {
   return CRITICAL_LEGAL.map((name) => ({ fields: { Élément: name, Statut: { name: valid ? "Validé" : "À faire" } } }));
@@ -38,7 +38,45 @@ function readyInput() {
       LEMON_SQUEEZY_WEBHOOK_SECRET: "secret",
       DIGIFY_KEY_ID: "key",
       DIGIFY_SECRET: "secret",
+      DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add",
       DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/example/revoke",
+      DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
+    },
+  };
+}
+
+function testReadyInput() {
+  return {
+    config: {
+      lemon_test_mode_only: "TRUE",
+      lemon_store_id: "1",
+      lemon_product_id: "2",
+      lemon_variant_id: "3",
+      lemon_test_checkout_id: "4",
+      lemon_test_checkout_url: "https://store.lemonsqueezy.com/buy/test",
+      lemon_checkout_status: "TEST_READY",
+      lemon_test_webhook_id: "5",
+      lemon_webhook_status: "TEST_READY",
+      digify_test_access_mode: "QUICK_ACCESS_LINK",
+      digify_test_permissions: "download=false; print=false",
+    },
+    product: {
+      "Lemon Squeezy Product ID": "2",
+      "Lemon Squeezy Variant ID": "3",
+      "Digify File GUID": "file-guid",
+    },
+    env: {
+      LEMON_SQUEEZY_API_KEY: "api-key",
+      LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret",
+      DIGIFY_KEY_ID: "key",
+      DIGIFY_SECRET: "digify-secret",
+      DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients",
+      DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients/test",
+      DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_WEBHOOK_USERNAME: "hibou-digify",
+      DIGIFY_WEBHOOK_PASSWORD: "long-test-password",
     },
   };
 }
@@ -102,4 +140,39 @@ test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de sec
   assert.equal(result.ready, false);
   assert.ok(result.blockers.some((item) => item.key === "digify_api"));
   assert.equal(JSON.stringify(result).includes("secret"), false);
+});
+
+test("la readiness de test Lemon et Digify est séparée de l'autorisation de vente live", () => {
+  const input = testReadyInput();
+  const result = commerceTestReadiness(input);
+  assert.equal(result.lemon.ready, true);
+  assert.equal(result.digify.ready, true);
+  assert.equal(result.lemon.blockers.length, 0);
+  assert.equal(result.digify.blockers.length, 0);
+});
+
+test("un checkout Lemon de test hors domaine Lemon ne peut pas rendre le test prêt", () => {
+  const input = testReadyInput();
+  input.config.lemon_test_checkout_url = "https://evil.example/checkout";
+  const result = commerceTestReadiness(input);
+  assert.equal(result.lemon.ready, false);
+  assert.ok(result.lemon.blockers.some((item) => item.key === "test_checkout"));
+});
+
+test("Digify test reste bloqué si l'ajout ou la révocation ne sont pas entièrement configurés", () => {
+  const input = testReadyInput();
+  delete input.env.DIGIFY_ADD_RECIPIENT_URL;
+  delete input.env.DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE;
+  const result = commerceTestReadiness(input);
+  assert.equal(result.digify.ready, false);
+  assert.ok(result.digify.blockers.some((item) => item.key === "add_recipient_endpoint"));
+  assert.ok(result.digify.blockers.some((item) => item.key === "revoke_template"));
+});
+
+test("Digify test exige aussi l'authentification indépendante de son webhook d'activité", () => {
+  const input = testReadyInput();
+  delete input.env.DIGIFY_WEBHOOK_PASSWORD;
+  const result = commerceTestReadiness(input);
+  assert.equal(result.digify.ready, false);
+  assert.ok(result.digify.blockers.some((item) => item.key === "activity_webhook_auth"));
 });

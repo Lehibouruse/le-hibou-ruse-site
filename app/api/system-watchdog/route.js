@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { configMap, createRecord, queryAllRecords, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { healthConfigDescriptions, systemHealthConfigValues } from "../../../lib/infrastructure-observability.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 import { clearOpenAiCircuit, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
 import { testVaultProviderConnections } from "../../../lib/social-connection-health.mjs";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const SOCIAL_READ_TEST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const OIDC_WORKFLOW = "system-watchdog.yml";
 const PROVIDER_PLATFORMS = {
   youtube: ["YouTube"],
   tiktok: ["TikTok"],
@@ -35,11 +37,15 @@ async function authenticate(request) {
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
   if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return;
-  await verifyGithubActionsToken(token);
+  try {
+    await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] });
+  } catch {
+    throw new Error("Unauthorized");
+  }
 }
 
 async function loadState() {
-  const [jobs, sales, book, socialCredentials, socialAccounts, configuration, products, legal] = await Promise.all([
+  const [jobs, sales, book, socialCredentials, socialAccounts, configuration, products, legal, policyAlerts] = await Promise.all([
     queryAllRecords(TABLES.jobs, { sortField: "created_at", sortDirection: "desc" }, { maxRecords: 800 }),
     queryAllRecords(TABLES.sales, {}, { maxRecords: 1000 }),
     queryAllRecords(TABLES.book, {}, { maxRecords: 100 }),
@@ -48,11 +54,18 @@ async function loadState() {
     queryAllRecords(TABLES.configuration, {}, { maxRecords: 200 }),
     queryAllRecords(TABLES.products, {}, { maxRecords: 50 }),
     queryAllRecords(TABLES.legal, {}, { maxRecords: 100 }),
+    queryRecords(TABLES.journal, {
+      filterByFormula: "{Statut}='Policy Alert'",
+      sortField: "Dernière exécution",
+      sortDirection: "desc",
+      pageSize: 20,
+      priorityAware: false,
+    }),
   ]);
   const config = configMap(configuration);
   const product = products.find((row) => row.fields?.Actif)?.fields || {};
   const readiness = commercialReadiness({ config, product, chapters: book, legal });
-  return { jobs, sales, book, socialCredentials, socialAccounts, configuration, config, readiness };
+  return { jobs, sales, book, socialCredentials, socialAccounts, configuration, config, readiness, policyAlerts };
 }
 
 function latestCreditError(jobs) {
@@ -166,6 +179,28 @@ async function reconcileOnePendingTikTokPublication(state, actions) {
   }
 }
 
+async function persistSystemHeartbeat(configuration, snapshot, circuit, checkedAt, actions = []) {
+  const values = systemHealthConfigValues(snapshot, circuit, checkedAt, actions);
+  const descriptions = healthConfigDescriptions();
+  const byKey = new Map(configuration.map((row) => [text(row.fields?.Clé), row]));
+  for (const [key, value] of Object.entries(values)) {
+    const row = byKey.get(key);
+    const fields = {
+      Valeur: value,
+      Actif: true,
+      Description: descriptions[key] || "Diagnostic système non sensible.",
+    };
+    if (row?.id) {
+      await updateRecord(TABLES.configuration, row.id, fields);
+    } else {
+      const created = await createRecord(TABLES.configuration, { Clé: key, ...fields });
+      const recordId = created?.records?.[0]?.id;
+      if (recordId) byKey.set(key, { id: recordId, fields: { Clé: key, ...fields } });
+    }
+  }
+  return values;
+}
+
 async function journalSnapshot(snapshot, actions) {
   if (snapshot.severity === "ok" && !actions.length) return;
   const fingerprint = healthFingerprint(snapshot);
@@ -228,12 +263,15 @@ export async function POST(request) {
       sales: state.sales,
       book: state.book,
       socialCredentials: state.socialCredentials,
+      policyAlerts: state.policyAlerts,
       circuit,
       readiness: state.readiness,
       now,
     });
+    const checkedAt = new Date(now).toISOString();
+    const heartbeat = await persistSystemHeartbeat(state.configuration, snapshot, circuit, checkedAt, actions);
     await journalSnapshot(snapshot, actions);
-    return NextResponse.json({ ...snapshot, circuit: { active: circuit.active, until: circuit.until, reason: circuit.reason }, actions, checked_at: new Date().toISOString() });
+    return NextResponse.json({ ...snapshot, circuit: { active: circuit.active, until: circuit.until, reason: circuit.reason }, actions, checked_at: checkedAt, heartbeat: { status: heartbeat.system_health_status, persisted: true } });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 1000);
     return NextResponse.json({ ok: false, severity: "critical", error: message, checked_at: new Date().toISOString() }, { status: message === "Unauthorized" ? 401 : 500 });

@@ -46,7 +46,19 @@ test("les états Jobs sont comptés séparément sans confondre revue humaine et
   assert.equal(snapshot.counts.jobs_retry, 1);
   assert.equal(snapshot.counts.jobs_manual_review, 1);
   assert.equal(snapshot.counts.jobs_error, 1);
+  assert.equal(snapshot.counts.jobs_error_recent_24h, 1);
   assert(snapshot.issues.some((item) => item.code === "job_error"));
+});
+
+test("un ancien Job Error reste dans l'historique sans dégrader la santé actuelle", () => {
+  const snapshot = systemHealthSnapshot({
+    now,
+    jobs: [{ fields: { status: select("Error"), completed_at: "2026-09-13T10:00:00Z" } }],
+  });
+  assert.equal(snapshot.counts.jobs_error, 1);
+  assert.equal(snapshot.counts.jobs_error_recent_24h, 0);
+  assert.equal(snapshot.issues.some((item) => item.code === "job_error"), false);
+  assert.equal(snapshot.severity, "ok");
 });
 
 test("un crédit épuisé protégé par circuit dégrade sans rendre le système critique", () => {

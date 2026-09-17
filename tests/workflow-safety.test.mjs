@@ -6,12 +6,15 @@ const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", imp
 const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
 const revoke = readFileSync(new URL("../app/api/commerce/revoke/route.js", import.meta.url), "utf8");
 
-test("un push main d'infrastructure self-teste le wake en dry-run tandis que le schedule reste réel", () => {
+test("un push main d'infrastructure self-teste le wake en dry-run tandis que le wake payant reste manuel", () => {
   const dryRunLine = workflow.split(/\r?\n/).find((line) => line.includes("DRY_RUN:")) || "";
   assert.match(dryRunLine, /github\.event_name == 'push'/);
   assert.match(dryRunLine, /github\.event_name == 'workflow_dispatch'/);
   assert.doesNotMatch(dryRunLine, /github\.event_name == 'schedule'/);
-  assert.match(workflow, /- cron: "\*\/5 \* \* \* \*"/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /\n\s*schedule:\s*\n/);
+  assert.doesNotMatch(workflow, /\*\/5 \* \* \* \*/);
+  assert.match(workflow, /Automatic paid-agent scheduling is intentionally disabled/);
 });
 
 test("un dry-run ne peut jamais appeler les routes Digify à effet externe", () => {

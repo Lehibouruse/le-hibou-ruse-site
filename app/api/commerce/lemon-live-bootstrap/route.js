@@ -19,8 +19,10 @@ export const maxDuration = 60;
 const OIDC_WORKFLOW = "lemon-live-bootstrap.yml";
 const ALLOWED_ACTIONS = new Set(["inspect_live", "webhook_live"]);
 const REQUIRED_EVENTS = ["order_created", "order_refunded"];
+const VERCEL_FALLBACK = "https://le-hibou-ruse-site.vercel.app";
 
 function text(value) { return String(value ?? "").trim(); }
+function truthy(value) { return ["1", "true", "yes", "oui", "on"].includes(text(value).toLowerCase()); }
 
 async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
@@ -105,9 +107,11 @@ function chooseVariant(variants, configuredId) {
 }
 
 function publicBaseUrl(config) {
-  const raw = text(config.public_site_url || "https://le-hibou-ruse-site.vercel.app");
+  const raw = truthy(config.domain_verified) && text(config.public_site_url)
+    ? text(config.public_site_url)
+    : VERCEL_FALLBACK;
   const url = new URL(raw);
-  if (url.protocol !== "https:") throw new Error("public_site_url doit être HTTPS");
+  if (url.protocol !== "https:") throw new Error("URL webhook Lemon doit être HTTPS");
   return url.origin;
 }
 
@@ -153,7 +157,7 @@ async function ensureLiveWebhook(storeId, baseUrl) {
   const sameEndpoint = existing.filter((item) => text(item?.attributes?.url) === endpoint);
   const exact = sameEndpoint.find((item) => item?.attributes?.test_mode !== true
     && REQUIRED_EVENTS.every((event) => (item?.attributes?.events || []).includes(event)));
-  if (exact) return { id: lemonResourceId(exact), reused: true };
+  if (exact) return { id: lemonResourceId(exact), reused: true, endpoint };
 
   const incompatibleLive = sameEndpoint.find((item) => item?.attributes?.test_mode !== true);
   if (incompatibleLive) {
@@ -180,7 +184,7 @@ async function ensureLiveWebhook(storeId, baseUrl) {
   const created = await lemonRequest("/v1/webhooks", { method: "POST", body });
   const webhook = created?.data || {};
   if (webhook?.attributes?.test_mode === true) throw new Error("Webhook Lemon live refusé: test_mode=true");
-  return { id: text(webhook?.id), reused: false };
+  return { id: text(webhook?.id), reused: false, endpoint };
 }
 
 async function journal(action, status, notes, externalId = "") {
@@ -221,8 +225,10 @@ export async function POST(request) {
       const webhook = await ensureLiveWebhook(inspected.storeId, publicBaseUrl(state.config));
       result.live_webhook_id = webhook.id;
       result.live_webhook_reused = webhook.reused;
+      result.live_webhook_endpoint = webhook.endpoint;
       await Promise.all([
         upsertConfig("lemon_live_webhook_id", webhook.id, "Webhook Lemon live order_created/order_refunded; aucun secret stocké dans Airtable."),
+        upsertConfig("lemon_live_webhook_endpoint", webhook.endpoint, "Endpoint public réellement utilisé par Lemon pour les événements live."),
         upsertConfig("lemon_webhook_status", "LIVE_INFRA_READY", "Webhook live opérationnel. Checkout public et livraison automatique restent bloqués tant que les prérequis de lancement ne sont pas validés.", "En attente"),
       ]);
     }

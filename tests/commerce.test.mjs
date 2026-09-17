@@ -37,7 +37,7 @@ test("la vente canonique est stable entre doublons concurrents", () => {
   assert.equal(canonicalSale([]), null);
 });
 
-test("l'ajout destinataire Digify exige endpoint et schéma officiels configurés", () => {
+test("l'ajout destinataire Digify accepte l'endpoint officiel ou une surcharge sûre", () => {
   const env = {
     DIGIFY_KEY_ID: "key",
     DIGIFY_SECRET: "secret",
@@ -51,9 +51,9 @@ test("l'ajout destinataire Digify exige endpoint et schéma officiels configuré
   assert.throws(() => digifyRecipientRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { ...env, DIGIFY_ADD_RECIPIENT_URL: "https://example.com/add" }), /Endpoint Digify refusé/);
 });
 
-test("le pipeline refuse de deviner endpoint ou schéma Digify", () => {
+test("le pipeline connaît l'endpoint officiel mais refuse de deviner le schéma Digify", () => {
   const context = { fileGuid: "f", email: "e@x.com", orderId: "o" };
-  assert.throws(() => digifyRecipientRequest(context, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" }), /ADD_RECIPIENT_URL absent/);
+  assert.throws(() => digifyRecipientRequest(context, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" }), /BODY_TEMPLATE absent/);
   assert.throws(() => digifyRecipientRequest(context, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret", DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add" }), /BODY_TEMPLATE absent/);
 });
 

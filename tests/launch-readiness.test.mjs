@@ -27,6 +27,7 @@ function readyInput() {
       public_site_url: "https://d4d5d6.com",
       public_site_host_expected: "d4d5d6.com",
       domain_verified: "true",
+      withdrawal_durable_receipt_tested: "true",
     },
     product: {
       "Lemon Squeezy Variant ID": "123",
@@ -131,6 +132,15 @@ test("un document juridique critique non validé bloque la vente", () => {
   const result = commercialReadiness(input);
   assert.equal(result.ready, false);
   assert.ok(result.blockers.some((item) => item.key === "legal:CGV produit numérique"));
+});
+
+test("un accusé durable de rétractation non testé bloque toute ouverture commerciale", () => {
+  const input = readyInput();
+  input.config.withdrawal_durable_receipt_tested = "false";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.equal(result.checkoutUrl, "");
+  assert.ok(result.blockers.some((item) => item.key === "withdrawal_durable_receipt"));
 });
 
 test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de secret", () => {

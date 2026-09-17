@@ -35,6 +35,8 @@ export async function POST(request) {
   const config = configMap(configuration);
   const product = products[0] || null;
   const runtime = digifyReadiness(process.env);
+  const keyIdPresent = Boolean(text(process.env.DIGIFY_KEY_ID));
+  const secretPresent = Boolean(text(process.env.DIGIFY_SECRET));
   const fileGuid = text(product?.fields?.["Digify File GUID"]);
   const launchAuthorized = truthy(config.commerce_launch_authorized);
 
@@ -43,6 +45,8 @@ export async function POST(request) {
     mode: "readiness_only",
     side_effects_enabled: false,
     credentials_present: runtime.credentials_present,
+    key_id_present: keyIdPresent,
+    secret_present: secretPresent,
     add_recipient_endpoint: runtime.add_recipient_endpoint || DIGIFY_ADD_RECIPIENT_DEFAULT_URL,
     add_template_present: runtime.add_template_present,
     revoke_endpoint_present: runtime.revoke_endpoint_present,

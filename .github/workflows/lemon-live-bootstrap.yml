@@ -1,0 +1,75 @@
+name: Hibou Lemon Live Infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Safe Lemon live infrastructure action"
+        required: true
+        default: "inspect_live"
+        type: choice
+        options:
+          - inspect_live
+          - webhook_live
+          - full_live_infra
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: hibou-lemon-live-infra
+  cancel-in-progress: false
+
+env:
+  HIBOU_BASE_URL: ${{ vars.HIBOU_PUBLIC_BASE_URL || 'https://le-hibou-ruse-site.vercel.app' }}
+
+jobs:
+  lemon-live-infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run safe Lemon live infrastructure bootstrap
+        shell: bash
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          case "$ACTION" in
+            inspect_live) actions=(inspect_live) ;;
+            webhook_live) actions=(webhook_live) ;;
+            full_live_infra) actions=(inspect_live webhook_live) ;;
+            *) echo "Unsupported action" >&2; exit 2 ;;
+          esac
+
+          token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
+          token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
+          echo "::add-mask::$token"
+
+          for current_action in "${actions[@]}"; do
+            response_file=$(mktemp)
+            set +e
+            http_code=$(curl --silent --show-error \
+              -o "$response_file" -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              --data "{\"action\":\"${current_action}\"}" \
+              "${HIBOU_BASE_URL}/api/commerce/lemon-live-bootstrap")
+            curl_rc=$?
+            set -e
+            response=$(cat "$response_file")
+            rm -f "$response_file"
+
+            printf '%s\n' "$response"
+            printf 'lemon_live_http=%s curl_rc=%s action=%s\n' "$http_code" "$curl_rc" "$current_action"
+            if [ "$curl_rc" -ne 0 ]; then
+              echo "Lemon live bootstrap transport failure" >&2
+              exit "$curl_rc"
+            fi
+            if [ "$http_code" != "200" ]; then
+              echo "Lemon live bootstrap HTTP failure: $http_code" >&2
+              exit 1
+            fi
+            python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; assert d.get("mode") == "live_infra_only"; assert d.get("public_checkout_enabled") is False; print("lemon_live_ok=true")' <<< "$response"
+          done

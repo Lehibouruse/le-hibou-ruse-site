@@ -29,8 +29,8 @@ test("la configuration du webhook d'activité reste documentée et visible dans 
   assert.match(workRunbook, /\/api\/commerce\/digify-webhook/);
   assert.match(workRunbook, /Basic Auth/);
   assert.match(readiness, /activity_webhook_auth/);
-  assert.match(readiness, /DIGIFY_WEBHOOK_USERNAME/);
-  assert.match(readiness, /DIGIFY_WEBHOOK_PASSWORD/);
+  assert.match(readiness, /digifyReadiness/);
+  assert.match(readiness, /webhook_auth_ready/);
 });
 
 test("seuls View Print Download sont journalisés comme activité lecteur", () => {

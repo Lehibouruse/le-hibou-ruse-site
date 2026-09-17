@@ -17,7 +17,7 @@ async function authenticate(request) {
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   await verifyGithubActionsToken(auth.slice("Bearer ".length), {
     allowedWorkflowFiles: [OIDC_WORKFLOW],
-    allowedEvents: ["workflow_dispatch"],
+    allowedEvents: ["workflow_dispatch", "push"],
   });
 }
 

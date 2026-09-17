@@ -1,9 +1,9 @@
 name: Hibou Agent Wake
 
 # Core infrastructure changes self-test the wake path on main.
+# Automatic paid-agent scheduling is intentionally disabled. Use workflow_dispatch
+# when a manual wake is explicitly wanted.
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   push:
     branches:
       - main
@@ -57,7 +57,7 @@ env:
   HIBOU_BASE_URL: ${{ vars.HIBOU_PUBLIC_BASE_URL || 'https://le-hibou-ruse-site.vercel.app' }}
 
 concurrency:
-  group: hibou-agent-wake-${{ github.event_name == 'push' && 'self-test' || 'scheduler' }}
+  group: hibou-agent-wake-${{ github.event_name == 'push' && 'self-test' || 'manual' }}
   cancel-in-progress: false
 
 jobs:

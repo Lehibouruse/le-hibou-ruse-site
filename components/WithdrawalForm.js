@@ -16,6 +16,17 @@ function downloadReceipt(receipt) {
   } catch {}
 }
 
+function confirmationMessage(confirmation) {
+  const base = `Demande reçue le ${confirmation.submitted_at}. Référence : ${confirmation.request_id}. Un accusé téléchargeable vient d’être généré.`;
+  if (confirmation.durable_receipt === "sent") {
+    return `${base} Un accusé de réception a également été transmis à l’adresse e-mail indiquée.`;
+  }
+  if (confirmation.durable_receipt === "delivery_failed") {
+    return `${base} L’envoi de l’accusé par e-mail n’a pas pu être confirmé ; conservez la copie téléchargée.`;
+  }
+  return `${base} L’envoi e-mail durable n’est pas encore activé ; conservez la copie téléchargée.`;
+}
+
 export default function WithdrawalForm() {
   const [state, setState] = useState("idle");
   const [confirmation, setConfirmation] = useState(null);
@@ -55,7 +66,7 @@ export default function WithdrawalForm() {
       <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Confirmer la rétractation"}</button>
       <p role="status" aria-live="polite">
         {state === "error" && "L’envoi a échoué. Réessayez dans quelques instants."}
-        {state === "sent" && confirmation && `Demande reçue le ${confirmation.submitted_at}. Référence : ${confirmation.request_id}. Un accusé téléchargeable vient d’être généré.`}
+        {state === "sent" && confirmation && confirmationMessage(confirmation)}
       </p>
       {state === "sent" && confirmation?.receipt_text && <button type="button" className="text-link" onClick={() => downloadReceipt(confirmation.receipt_text)}>Télécharger à nouveau l’accusé</button>}
     </form>

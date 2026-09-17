@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { createRecord, updateRecord, TABLES } from "../../../lib/airtable";
+import { createRecord, queryRecords, updateRecord, TABLES } from "../../../lib/airtable";
+import { escapeFormula } from "../../../lib/commerce.mjs";
 import { sendWithdrawalReceipt } from "../../../lib/withdrawal-receipt.mjs";
 
 export const runtime = "nodejs";
@@ -62,6 +63,21 @@ async function recordReceiptDelivery(recordId, fields, requestId) {
   }
 }
 
+async function referencedSales(contractReference) {
+  const safe = escapeFormula(contractReference);
+  return queryRecords(TABLES.sales, {
+    filterByFormula: `OR({ID commande externe}='${safe}',{Identifiant commande public}='${safe}')`,
+    pageSize: 5,
+    priorityAware: false,
+  });
+}
+
+function uniqueSaleForEmail(sales, email) {
+  const expected = String(email || "").trim().toLowerCase();
+  const matches = (sales || []).filter((sale) => String(sale?.fields?.["Email client"] || "").trim().toLowerCase() === expected);
+  return matches.length === 1 ? matches[0] : null;
+}
+
 export async function POST(request) {
   if (!allowedOrigin(request)) return json({ ok: false, error: "Origin refused" }, 403);
   const contentType = request.headers.get("content-type") || "";
@@ -96,9 +112,31 @@ export async function POST(request) {
     "E-mail accusé": email,
     "Référence contrat": contractReference,
     Statut: "Reçue",
-    Notes: "Déclaration reçue via /retractation. Accusé téléchargeable rendu au navigateur. Aucun remboursement ni retrait d’accès automatique. L’accusé durable e-mail n’est marqué envoyé qu’après confirmation 2xx du webhook transactionnel.",
+    Notes: "Déclaration reçue via /retractation. Accusé téléchargeable rendu au navigateur. Aucun remboursement ni retrait d’accès automatique. L’accusé durable e-mail n’est marqué envoyé qu’après vérification vente/e-mail et confirmation 2xx du webhook transactionnel.",
   });
   const recordId = created?.records?.[0]?.id || "";
+
+  let sale = null;
+  try {
+    sale = uniqueSaleForEmail(await referencedSales(contractReference), email);
+  } catch {
+    console.error("Withdrawal sale verification unavailable", requestId);
+  }
+
+  if (!sale) {
+    await recordReceiptDelivery(recordId, {
+      Statut: "À vérifier",
+      Notes: "Déclaration reçue via /retractation. L’envoi durable automatique est retenu car la référence de contrat et l’e-mail n’ont pas pu être rattachés sans ambiguïté à une vente. La demande reste enregistrée et le reçu téléchargeable reste disponible. Vérification humaine requise ; aucun remboursement ni retrait d’accès automatique.",
+    }, requestId);
+    return json({
+      ok: true,
+      request_id: requestId,
+      submitted_at: submittedAt,
+      receipt_text: receipt,
+      durable_receipt: "verification_required",
+      durable_receipt_tracking: "not_sent",
+    }, 201);
+  }
 
   const delivery = await sendWithdrawalReceipt({
     request_id: requestId,
@@ -117,12 +155,12 @@ export async function POST(request) {
       Statut: "Accusé envoyé",
       "Accusé envoyé le": sentAt,
       "Canal accusé": "E-mail",
-      Notes: "Déclaration reçue via /retractation. Accusé durable transmis par le webhook transactionnel configuré ; réponse 2xx reçue. Aucun remboursement ni retrait d’accès automatique.",
+      Notes: "Déclaration reçue via /retractation. Référence et e-mail rattachés à une vente. Accusé durable transmis par le webhook transactionnel configuré ; réponse 2xx reçue. Aucun remboursement ni retrait d’accès automatique.",
     }, requestId);
   } else if (delivery.configured) {
     trackingRecorded = await recordReceiptDelivery(recordId, {
       Statut: "À vérifier",
-      Notes: `Déclaration reçue via /retractation. Échec de l’accusé durable transactionnel (${delivery.code}). La demande reste enregistrée et le reçu téléchargeable reste disponible. Vérification humaine requise ; aucun remboursement ni retrait d’accès automatique.`,
+      Notes: `Déclaration reçue via /retractation. Référence et e-mail rattachés à une vente, mais échec de l’accusé durable transactionnel (${delivery.code}). La demande reste enregistrée et le reçu téléchargeable reste disponible. Vérification humaine requise ; aucun remboursement ni retrait d’accès automatique.`,
     }, requestId);
   }
 

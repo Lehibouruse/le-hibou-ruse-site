@@ -111,7 +111,7 @@ export async function POST(request) {
   const staleId = await clearStaleDelivery();
   if (staleId) return NextResponse.json({ ok: true, processed: 1, status: "manual_review", reason: "stale_delivery_ambiguous", sale_id: staleId });
 
-  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_URL && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE);
+  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE);
   if (!(await commerceLaunchAuthorized())) {
     return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured });
   }

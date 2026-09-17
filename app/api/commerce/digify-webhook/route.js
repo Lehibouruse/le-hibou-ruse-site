@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { escapeFormula } from "../../../../lib/commerce.mjs";
+import { resolveDigifyWebhookAuth } from "../../../../lib/digify-config.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,16 +15,17 @@ function secureEqual(a, b) {
 }
 
 function basicAuthorized(request) {
-  const expectedUser = process.env.DIGIFY_WEBHOOK_USERNAME || "";
-  const expectedPassword = process.env.DIGIFY_WEBHOOK_PASSWORD || "";
-  if (!expectedUser || !expectedPassword) return false;
+  let expected;
+  try { expected = resolveDigifyWebhookAuth(process.env); }
+  catch { return false; }
+  if (!expected.username || !expected.password) return false;
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Basic ")) return false;
   let decoded = "";
   try { decoded = Buffer.from(auth.slice(6), "base64").toString("utf8"); } catch { return false; }
   const split = decoded.indexOf(":");
   if (split < 0) return false;
-  return secureEqual(decoded.slice(0, split), expectedUser) && secureEqual(decoded.slice(split + 1), expectedPassword);
+  return secureEqual(decoded.slice(0, split), expected.username) && secureEqual(decoded.slice(split + 1), expected.password);
 }
 
 function safeEventTime(value) {

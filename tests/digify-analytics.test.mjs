@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 const webhook = readFileSync(new URL("../app/api/commerce/digify-webhook/route.js", import.meta.url), "utf8");
+const digifyConfig = readFileSync(new URL("../lib/digify-config.mjs", import.meta.url), "utf8");
 const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
 const watchdog = readFileSync(new URL("../app/api/system-watchdog/route.js", import.meta.url), "utf8");
 const envExample = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
@@ -10,11 +11,14 @@ const workRunbook = readFileSync(new URL("../docs/WORK_LEMON_TEST_RUNBOOK.md", i
 const launchRunbook = readFileSync(new URL("../docs/COMMERCE_LAUNCH_RUNBOOK.md", import.meta.url), "utf8");
 const readiness = readFileSync(new URL("../lib/launch-readiness.mjs", import.meta.url), "utf8");
 
-test("le webhook Digify exige une Basic Auth indépendante de la clé API", () => {
-  assert.match(webhook, /DIGIFY_WEBHOOK_USERNAME/);
-  assert.match(webhook, /DIGIFY_WEBHOOK_PASSWORD/);
+test("le webhook Digify utilise une Basic Auth dédiée sans réutiliser la clé API", () => {
+  assert.match(webhook, /resolveDigifyWebhookAuth/);
   assert.doesNotMatch(webhook, /DIGIFY_KEY_ID/);
   assert.doesNotMatch(webhook, /DIGIFY_SECRET/);
+  assert.match(digifyConfig, /DIGIFY_WEBHOOK_USERNAME/);
+  assert.match(digifyConfig, /DIGIFY_WEBHOOK_PASSWORD/);
+  assert.match(digifyConfig, /CRON_SECRET/);
+  assert.match(digifyConfig, /hibou:digify:webhook-basic:v1/);
 });
 
 test("la configuration du webhook d'activité reste documentée et visible dans la readiness", () => {
@@ -25,8 +29,8 @@ test("la configuration du webhook d'activité reste documentée et visible dans 
   assert.match(workRunbook, /\/api\/commerce\/digify-webhook/);
   assert.match(workRunbook, /Basic Auth/);
   assert.match(readiness, /activity_webhook_auth/);
-  assert.match(readiness, /DIGIFY_WEBHOOK_USERNAME/);
-  assert.match(readiness, /DIGIFY_WEBHOOK_PASSWORD/);
+  assert.match(readiness, /digifyReadiness/);
+  assert.match(readiness, /webhook_auth_ready/);
 });
 
 test("seuls View Print Download sont journalisés comme activité lecteur", () => {

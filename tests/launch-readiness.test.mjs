@@ -37,6 +37,7 @@ function readyInput() {
     legal: legal(),
     env: {
       LEMON_SQUEEZY_WEBHOOK_SECRET: "secret",
+      CRON_SECRET: "server-root-secret",
       DIGIFY_KEY_ID: "key",
       DIGIFY_SECRET: "secret",
       DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add",
@@ -149,7 +150,7 @@ test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de sec
   const result = commercialReadiness(input);
   assert.equal(result.ready, false);
   assert.ok(result.blockers.some((item) => item.key === "digify_api"));
-  assert.equal(JSON.stringify(result).includes("secret"), false);
+  assert.equal(JSON.stringify(result).includes("server-root-secret"), false);
 });
 
 test("la readiness de test Lemon et Digify est séparée de l'autorisation de vente live", () => {
@@ -169,13 +170,15 @@ test("un checkout Lemon de test hors domaine Lemon ne peut pas rendre le test pr
   assert.ok(result.lemon.blockers.some((item) => item.key === "test_checkout"));
 });
 
-test("Digify test reste bloqué si l'ajout ou la révocation ne sont pas entièrement configurés", () => {
+test("Digify test reste bloqué si le payload d'ajout ou la révocation ne sont pas entièrement configurés", () => {
   const input = testReadyInput();
   delete input.env.DIGIFY_ADD_RECIPIENT_URL;
+  delete input.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE;
   delete input.env.DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE;
   const result = commerceTestReadiness(input);
   assert.equal(result.digify.ready, false);
-  assert.ok(result.digify.blockers.some((item) => item.key === "add_recipient_endpoint"));
+  assert.equal(result.digify.blockers.some((item) => item.key === "add_recipient_endpoint"), false);
+  assert.ok(result.digify.blockers.some((item) => item.key === "add_recipient_template"));
   assert.ok(result.digify.blockers.some((item) => item.key === "revoke_template"));
 });
 

@@ -21,10 +21,9 @@ export default async function Home() {
   const ebook = block(cms, "ebook");
   const strategy = block(cms, "strategie");
   const footer = block(cms, "footer");
-  const logo = block(cms, "logo");
   const config = configMap(configuration);
   const product = productRecords.find((record) => record.fields.Actif)?.fields || {};
-  const logoUrl = logo["Image URL"] || product["Image URL"] || "/hibou.svg";
+  const logoUrl = "/hibou-monocle.webp";
   const readiness = commercialReadiness({ config, product, chapters: bookRecords, legal: legalRecords });
   const checkoutUrl = readiness.checkoutUrl;
   const ctaText = config.ebook_cta || product["CTA texte"] || "Découvrir le guide — 29 €";

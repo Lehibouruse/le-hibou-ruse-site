@@ -29,8 +29,8 @@ export default function LeadForm() {
         <label>Nom ou prénom <span className="optional">(facultatif)</span><input name="contact" maxLength={120} autoComplete="name" /></label>
         <label>E-mail<input name="email" type="email" required maxLength={160} autoComplete="email" /></label>
       </div>
-      <label>Votre situation<textarea name="context" required maxLength={3500} rows={6} placeholder="Revenus, société, patrimoine, dettes, projets, contraintes… Donnez seulement les éléments utiles." /></label>
-      <label>Votre besoin et vos objectifs<textarea name="need" required maxLength={2500} rows={5} placeholder="Ce que vous cherchez à comprendre, optimiser ou structurer — et le résultat que vous visez." /></label>
+      <label>Thèmes et contexte<textarea name="context" required maxLength={3500} rows={6} placeholder="Entreprise, immobilier, rémunération, fiscalité, patrimoine, crédit… Indiquez les sujets et contraintes que vous souhaitez explorer." /></label>
+      <label>Ce que vous souhaitez comprendre<textarea name="need" required maxLength={2500} rows={5} placeholder="Les mécanismes, questions ou scénarios que vous souhaitez voir expliqués ou approfondis." /></label>
       <label className="honeypot" aria-hidden="true"><input name="company" tabIndex={-1} autoComplete="off" /></label>
       <div className="form-footer">
         <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Envoyer"}</button>

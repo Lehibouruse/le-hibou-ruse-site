@@ -3,10 +3,16 @@ import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { escapeFormula } from "../../../../lib/commerce.mjs";
 import { resolveDigifyWebhookAuth } from "../../../../lib/digify-config.mjs";
+import {
+  digifyWebhookAction,
+  normalizeDigifyWebhookPayload,
+} from "../../../../lib/digify-webhook.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+
+const DIGIFY_WEBHOOK_WORKFLOW = "HIBOU_DIGIFY_WEBHOOK_V2";
 
 function secureEqual(a, b) {
   const left = Buffer.from(String(a || ""), "utf8");
@@ -28,36 +34,30 @@ function basicAuthorized(request) {
   return secureEqual(decoded.slice(0, split), expected.username) && secureEqual(decoded.slice(split + 1), expected.password);
 }
 
-function safeEventTime(value) {
-  const ms = Date.parse(String(value || ""));
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : new Date().toISOString();
-}
-
-function safeDigifyLink(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  try {
-    const url = new URL(raw);
-    const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" || (host !== "digify.com" && !host.endsWith(".digify.com"))) return "";
-    return url.toString();
-  } catch {
-    return "";
-  }
+async function priorJournal(action) {
+  const safeAction = escapeFormula(action);
+  const safeWorkflow = escapeFormula(DIGIFY_WEBHOOK_WORKFLOW);
+  const rows = await queryRecords(TABLES.journal, {
+    filterByFormula: `AND({Workflow}='${safeWorkflow}',{Action}='${safeAction}',OR({Statut}='Completed',{Statut}='Policy Alert'))`,
+    pageSize: 1,
+    priorityAware: false,
+  });
+  return rows[0] || null;
 }
 
 async function journal(event, status, note, saleId = "") {
-  await createRecord(TABLES.journal, {
-    Workflow: "HIBOU_DIGIFY_WEBHOOK_V1",
+  const action = digifyWebhookAction(event);
+  return createRecord(TABLES.journal, {
+    Workflow: DIGIFY_WEBHOOK_WORKFLOW,
     Déclencheur: "Digify",
-    Action: `${event.type || "Event"} · ${event.fileGuid || "no-file"}`,
+    Action: action,
     Statut: status,
     "Dernière exécution": event.eventTime || new Date().toISOString(),
     "ID externe": saleId,
     "URL résultat": event.link || "",
     Erreur: ["Unmatched", "Rejected", "Policy Alert"].includes(status) ? String(note).slice(0, 5000) : "",
     Notes: String(note).slice(0, 10000),
-  }).catch(() => {});
+  }).catch(() => null);
 }
 
 export async function POST(request) {
@@ -69,27 +69,33 @@ export async function POST(request) {
   try { payload = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
 
-  const rawLink = String(payload?.Link || "").trim();
-  const link = safeDigifyLink(rawLink);
-  const event = {
-    type: String(payload?.Type || ""),
-    eventTime: safeEventTime(payload?.EventTime),
-    fileGuid: String(payload?.FileGUID || "").trim(),
-    fileName: String(payload?.FileName || ""),
-    email: String(payload?.RecipientUserEmail || "").trim().toLowerCase(),
-    link,
-    accessType: String(payload?.AccessType || ""),
-  };
-  if (!event.fileGuid || !["View", "Print", "Download"].includes(event.type)) {
-    return NextResponse.json({ ok: false, error: "Unsupported Digify event" }, { status: 422 });
-  }
-  if (rawLink && !link) {
+  const { event, errors } = normalizeDigifyWebhookPayload(payload);
+  if (errors.includes("invalid_link")) {
     await journal(event, "Rejected", "Lien Digify webhook hors domaine HTTPS Digify refusé");
     return NextResponse.json({ ok: false, error: "Invalid Digify link" }, { status: 422 });
+  }
+  if (errors.includes("invalid_event_time")) {
+    await journal(event, "Rejected", "EventTime Digify absent ou invalide");
+    return NextResponse.json({ ok: false, error: "Invalid Digify EventTime" }, { status: 422 });
+  }
+  if (errors.length) {
+    return NextResponse.json({ ok: false, error: "Unsupported Digify event", reasons: errors }, { status: 422 });
   }
   if (!event.email) {
     await journal(event, "Unmatched", "Événement Digify sans RecipientUserEmail; rattachement refusé");
     return NextResponse.json({ ok: true, matched: false, reason: "missing_recipient_email" });
+  }
+
+  const action = digifyWebhookAction(event);
+  const duplicate = await priorJournal(action);
+  if (duplicate) {
+    return NextResponse.json({
+      ok: true,
+      duplicate: true,
+      matched: Boolean(duplicate.fields?.["ID externe"]),
+      sale_id: duplicate.fields?.["ID externe"] || "",
+      type: event.type,
+    });
   }
 
   const clauses = [
@@ -120,10 +126,18 @@ export async function POST(request) {
   } else if (event.type === "Download") {
     fields["Téléchargements Digify"] = Number(sale.fields?.["Téléchargements Digify"] || 0) + 1;
   }
+
   await updateRecord(TABLES.sales, sale.id, fields);
   const note = policyViolation
     ? `${event.type} reçu alors que la politique Hibou désactive impression/téléchargement; vérifier immédiatement la configuration Digify · vente ${sale.id}`
     : `${event.type} rattaché à la vente ${sale.id}; access=${event.accessType}; file=${event.fileName}`;
   await journal(event, policyViolation ? "Policy Alert" : "Completed", note, sale.id);
-  return NextResponse.json({ ok: true, matched: true, sale_id: sale.id, type: event.type, policy_alert: policyViolation });
+  return NextResponse.json({
+    ok: true,
+    matched: true,
+    duplicate: false,
+    sale_id: sale.id,
+    type: event.type,
+    policy_alert: policyViolation,
+  });
 }

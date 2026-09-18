@@ -5,24 +5,25 @@ import { publicSiteOrigin, VERCEL_PUBLIC_ORIGIN } from "../lib/site-origin.mjs";
 import robots from "../app/robots.js";
 import sitemap from "../app/sitemap.js";
 
-test("Vercel reste la référence SEO jusqu'à changement explicite du code", () => {
+test("d4d5d6.com est la référence SEO canonique", () => {
   assert.equal(publicSiteOrigin(), VERCEL_PUBLIC_ORIGIN);
-  assert.equal(publicSiteOrigin({ HIBOU_CANONICAL_DOMAIN_VERIFIED: "true", HIBOU_CANONICAL_HOST: "d4d5d6.com" }), VERCEL_PUBLIC_ORIGIN);
-  assert.equal(VERCEL_PUBLIC_ORIGIN, "https://le-hibou-ruse-site.vercel.app");
+  assert.equal(publicSiteOrigin(), "https://d4d5d6.com");
+  assert.equal(VERCEL_PUBLIC_ORIGIN, "https://d4d5d6.com");
 });
 
-test("robots autorise l'indexation publique et expose le sitemap", () => {
+test("robots autorise l'indexation publique et expose le sitemap canonique", () => {
   const value = robots();
   assert.equal(value.rules[0].allow, "/");
   assert.ok(value.rules[0].disallow.includes("/admin/"));
   assert.ok(value.rules[0].disallow.includes("/api/"));
-  assert.equal(value.host, VERCEL_PUBLIC_ORIGIN);
-  assert.equal(value.sitemap, `${VERCEL_PUBLIC_ORIGIN}/sitemap.xml`);
+  assert.equal(value.host, "https://d4d5d6.com");
+  assert.equal(value.sitemap, "https://d4d5d6.com/sitemap.xml");
 });
 
-test("le sitemap contient la page d'accueil et les pages publiques principales sur Vercel", () => {
+test("le sitemap contient les pages publiques principales sur d4d5d6.com", () => {
   const entries = sitemap();
-  assert.ok(entries.every((entry) => entry.url.startsWith(VERCEL_PUBLIC_ORIGIN)));
+  assert.ok(entries.every((entry) => entry.url.startsWith("https://d4d5d6.com")));
+  assert.ok(entries.every((entry) => !entry.url.includes("vercel.app")));
   const urls = entries.map((entry) => new URL(entry.url).pathname);
   assert.ok(urls.includes("/"));
   assert.ok(urls.includes("/mentions-legales"));
@@ -36,5 +37,4 @@ test("les métadonnées de marque restent indexables et contiennent un WebSite J
   assert.match(layout, /googleBot/);
   assert.match(layout, /"@type": "WebSite"/);
   assert.match(layout, /metadataBase: new URL\(publicOrigin\)/);
-  assert.doesNotMatch(layout, /metadataBase: new URL\("https:\/\/d4d5d6\.com"\)/);
 });

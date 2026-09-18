@@ -53,10 +53,13 @@ jobs:
             exit 1
           fi
 
-          python3 - "$GITHUB_STEP_SUMMARY" <<< "$valid_response" <<'PY'
+          response_json=$(mktemp)
+          printf '%s\n' "$valid_response" > "$response_json"
+          python3 - "$GITHUB_STEP_SUMMARY" "$response_json" <<'PY'
           import json, sys
           summary_path = sys.argv[1]
-          data = json.load(sys.stdin)
+          with open(sys.argv[2], encoding="utf-8") as source:
+              data = json.load(source)
           blockers = data.get("blockers") or []
           lines = [
               "## Digify readiness",
@@ -79,3 +82,4 @@ jobs:
           print(f"digify_blocker_count={len(blockers)}")
           print(f"digify_next_action={data.get('next_action') or ''}")
           PY
+          rm -f "$response_json"

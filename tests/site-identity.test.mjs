@@ -13,8 +13,10 @@ test("le site expose une identité publique non sensible pour diagnostiquer le d
   assert.match(route, /no-store/);
 });
 
-test("le domaine acheté est la canonique SEO même avant redirection stricte", () => {
-  assert.match(layout, /metadataBase: new URL\("https:\/\/d4d5d6\.com"\)/);
+test("un domaine acheté mais non vérifié ne devient pas canonique SEO prématurément", () => {
+  assert.match(layout, /metadataBase: new URL\(publicOrigin\)/);
   assert.match(layout, /alternates: \{ canonical: "\/" \}/);
-  assert.match(layout, /robots: \{ index: true, follow: true \}/);
+  assert.match(layout, /index: true/);
+  assert.match(layout, /follow: true/);
+  assert.doesNotMatch(layout, /metadataBase: new URL\("https:\/\/d4d5d6\.com"\)/);
 });

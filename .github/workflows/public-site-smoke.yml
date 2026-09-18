@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Verify public Vercel access
+      - name: Verify branded public access
         shell: bash
         env:
-          SITE: https://le-hibou-ruse-site.vercel.app
+          SITE: https://d4d5d6.com
         run: |
           set -euo pipefail
 
@@ -64,6 +64,31 @@ jobs:
           check_url "$SITE/robots.txt" "User-agent"
           check_url "$SITE/sitemap.xml" "<urlset"
 
+          homepage=$(mktemp)
+          curl --location --silent --show-error --connect-timeout 10 --max-time 20 "$SITE/" -o "$homepage"
+          if ! grep -Fq 'https://d4d5d6.com/' "$homepage"; then
+            echo "Canonical branded origin not found in rendered homepage metadata." >&2
+            rm -f "$homepage"
+            exit 1
+          fi
+          rm -f "$homepage"
+
+          sitemap=$(mktemp)
+          curl --location --silent --show-error --connect-timeout 10 --max-time 20 "$SITE/sitemap.xml" -o "$sitemap"
+          if grep -Fq 'le-hibou-ruse-site.vercel.app' "$sitemap"; then
+            echo "Sitemap still exposes the Vercel alias instead of the branded domain." >&2
+            cat "$sitemap"
+            rm -f "$sitemap"
+            exit 1
+          fi
+          if ! grep -Fq 'https://d4d5d6.com/' "$sitemap"; then
+            echo "Branded origin missing from sitemap." >&2
+            cat "$sitemap"
+            rm -f "$sitemap"
+            exit 1
+          fi
+          rm -f "$sitemap"
+
           image_headers=$(mktemp)
           image_body=$(mktemp)
           image_code=$(curl --silent --show-error --connect-timeout 10 --max-time 20 -D "$image_headers" -o "$image_body" -w '%{http_code}' "$SITE/hibou-monocle.webp" || true)
@@ -81,4 +106,4 @@ jobs:
           echo "PASS $SITE/hibou-monocle.webp (HTTP 200, image/webp)"
           rm -f "$image_headers" "$image_body"
 
-          echo "Public Vercel site is reachable from an unauthenticated GitHub runner."
+          echo "Branded public site is reachable and exposes d4d5d6.com as its public origin."

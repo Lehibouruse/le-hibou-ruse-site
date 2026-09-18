@@ -38,7 +38,7 @@ async function priorJournal(action) {
   const safeAction = escapeFormula(action);
   const safeWorkflow = escapeFormula(DIGIFY_WEBHOOK_WORKFLOW);
   const rows = await queryRecords(TABLES.journal, {
-    filterByFormula: `AND({Workflow}='${safeWorkflow}',{Action}='${safeAction}')`,
+    filterByFormula: `AND({Workflow}='${safeWorkflow}',{Action}='${safeAction}',OR({Statut}='Completed',{Statut}='Policy Alert'))`,
     pageSize: 1,
     priorityAware: false,
   });

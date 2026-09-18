@@ -5,25 +5,23 @@ import { publicSiteOrigin, VERCEL_PUBLIC_ORIGIN } from "../lib/site-origin.mjs";
 import robots from "../app/robots.js";
 import sitemap from "../app/sitemap.js";
 
-test("d4d5d6.com est la référence SEO canonique", () => {
+test("Vercel reste la référence SEO tant que le domaine de marque n'est pas joignable", () => {
   assert.equal(publicSiteOrigin(), VERCEL_PUBLIC_ORIGIN);
-  assert.equal(publicSiteOrigin(), "https://d4d5d6.com");
-  assert.equal(VERCEL_PUBLIC_ORIGIN, "https://d4d5d6.com");
+  assert.equal(VERCEL_PUBLIC_ORIGIN, "https://le-hibou-ruse-site.vercel.app");
 });
 
-test("robots autorise l'indexation publique et expose le sitemap canonique", () => {
+test("robots autorise l'indexation publique et expose le sitemap de l'origine active", () => {
   const value = robots();
   assert.equal(value.rules[0].allow, "/");
   assert.ok(value.rules[0].disallow.includes("/admin/"));
   assert.ok(value.rules[0].disallow.includes("/api/"));
-  assert.equal(value.host, "https://d4d5d6.com");
-  assert.equal(value.sitemap, "https://d4d5d6.com/sitemap.xml");
+  assert.equal(value.host, VERCEL_PUBLIC_ORIGIN);
+  assert.equal(value.sitemap, `${VERCEL_PUBLIC_ORIGIN}/sitemap.xml`);
 });
 
-test("le sitemap contient les pages publiques principales sur d4d5d6.com", () => {
+test("le sitemap contient les pages publiques principales sur l'origine active", () => {
   const entries = sitemap();
-  assert.ok(entries.every((entry) => entry.url.startsWith("https://d4d5d6.com")));
-  assert.ok(entries.every((entry) => !entry.url.includes("vercel.app")));
+  assert.ok(entries.every((entry) => entry.url.startsWith(VERCEL_PUBLIC_ORIGIN)));
   const urls = entries.map((entry) => new URL(entry.url).pathname);
   assert.ok(urls.includes("/"));
   assert.ok(urls.includes("/mentions-legales"));

@@ -21,6 +21,27 @@ async function authenticate(request) {
   });
 }
 
+function selectCommerceProduct(products = []) {
+  return products.find((record) => text(record?.fields?.["Lemon Product ID"]))
+    || products.find((record) => /guide du hibou rusé/i.test(text(record?.fields?.Produit)))
+    || products[0]
+    || null;
+}
+
+function nextAction(blockers) {
+  const first = blockers[0] || "";
+  const messages = {
+    missing_DIGIFY_KEY_ID: "Vérifier que DIGIFY_KEY_ID est lié au projet Vercel en Production.",
+    missing_DIGIFY_SECRET: "Vérifier que DIGIFY_SECRET est lié au projet Vercel en Production.",
+    missing_add_recipient_template: "Capturer le payload officiel /v1/file/recipient/add depuis le Developer Portal Digify.",
+    missing_file_guid: "Charger le PDF dans Digify puis enregistrer son File GUID dans Produits site.",
+    missing_revoke_endpoint: "Capturer l'endpoint officiel de révocation destinataire depuis le Developer Portal Digify.",
+    missing_revoke_template: "Capturer le payload officiel de révocation destinataire depuis le Developer Portal Digify.",
+    webhook_auth_not_ready: "Vérifier CRON_SECRET ou le couple DIGIFY_WEBHOOK_USERNAME/DIGIFY_WEBHOOK_PASSWORD.",
+  };
+  return messages[first] || "Aucun blocage technique détecté. Conserver commerce_launch_authorized=false jusqu'au test contrôlé.";
+}
+
 export async function POST(request) {
   try {
     await authenticate(request);
@@ -33,12 +54,30 @@ export async function POST(request) {
     queryRecords(TABLES.products, { filterByFormula: "{Actif}=1", pageSize: 20, priorityAware: false }),
   ]);
   const config = configMap(configuration);
-  const product = products[0] || null;
+  const product = selectCommerceProduct(products);
   const runtime = digifyReadiness(process.env);
   const keyIdPresent = Boolean(text(process.env.DIGIFY_KEY_ID));
   const secretPresent = Boolean(text(process.env.DIGIFY_SECRET));
   const fileGuid = text(product?.fields?.["Digify File GUID"]);
   const launchAuthorized = truthy(config.commerce_launch_authorized);
+
+  const blockers = [];
+  if (!keyIdPresent) blockers.push("missing_DIGIFY_KEY_ID");
+  if (!secretPresent) blockers.push("missing_DIGIFY_SECRET");
+  if (!runtime.add_template_present) blockers.push("missing_add_recipient_template");
+  if (!fileGuid) blockers.push("missing_file_guid");
+  if (!runtime.revoke_endpoint_present) blockers.push("missing_revoke_endpoint");
+  if (!runtime.revoke_template_present) blockers.push("missing_revoke_template");
+  if (!runtime.webhook_auth_ready) blockers.push("webhook_auth_not_ready");
+
+  const recipientContractReady = Boolean(runtime.credentials_present && runtime.add_template_present);
+  const revocationContractReady = Boolean(
+    runtime.credentials_present
+      && runtime.revoke_endpoint_present
+      && runtime.revoke_template_present
+  );
+  const deliveryRuntimeReady = Boolean(recipientContractReady && fileGuid);
+  const revocationRuntimeReady = Boolean(revocationContractReady && fileGuid);
 
   const result = {
     ok: true,
@@ -55,9 +94,17 @@ export async function POST(request) {
     webhook_auth_source: runtime.webhook_auth_source,
     webhook_endpoint: "https://le-hibou-ruse-site.vercel.app/api/commerce/digify-webhook",
     file_guid_present: Boolean(fileGuid),
+    selected_product: text(product?.fields?.Produit),
+    recipient_contract_ready: recipientContractReady,
+    revocation_contract_ready: revocationContractReady,
+    delivery_runtime_ready: deliveryRuntimeReady,
+    revocation_runtime_ready: revocationRuntimeReady,
     commerce_launch_authorized: launchAuthorized,
-    delivery_ready: Boolean(runtime.credentials_present && runtime.add_template_present && fileGuid && launchAuthorized),
-    revocation_ready: Boolean(runtime.credentials_present && runtime.revoke_endpoint_present && runtime.revoke_template_present && fileGuid),
+    delivery_ready: Boolean(deliveryRuntimeReady && launchAuthorized),
+    revocation_ready: revocationRuntimeReady,
+    blockers,
+    blocker_count: blockers.length,
+    next_action: nextAction(blockers),
   };
 
   return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });

@@ -1,0 +1,66 @@
+name: Hibou Public Site Smoke
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'lib/site-origin.mjs'
+      - 'proxy.js'
+      - 'vercel.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hibou-public-site-smoke
+  cancel-in-progress: true
+
+jobs:
+  public-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify public Vercel access
+        shell: bash
+        env:
+          SITE: https://le-hibou-ruse-site.vercel.app
+        run: |
+          set -euo pipefail
+
+          check_url() {
+            url="$1"
+            expected="$2"
+            for attempt in $(seq 1 24); do
+              headers=$(mktemp)
+              body=$(mktemp)
+              code=$(curl --location --silent --show-error                 --connect-timeout 10 --max-time 20                 -D "$headers" -o "$body" -w '%{http_code}'                 "$url" || true)
+
+              if [ "$code" = "200" ] && grep -Fq "$expected" "$body"; then
+                if grep -Eiq '^x-robots-tag:.*noindex' "$headers"; then
+                  echo "Public URL answers 200 but sends X-Robots-Tag noindex: $url" >&2
+                  cat "$headers"
+                  rm -f "$headers" "$body"
+                  return 1
+                fi
+                echo "PASS $url (HTTP 200, public content found)"
+                rm -f "$headers" "$body"
+                return 0
+              fi
+
+              echo "Waiting for public deployment: $url -> HTTP $code (attempt $attempt/24)"
+              rm -f "$headers" "$body"
+              sleep 10
+            done
+            echo "Public accessibility failed for $url" >&2
+            return 1
+          }
+
+          check_url "$SITE/" "Le Hibou"
+          check_url "$SITE/robots.txt" "User-agent"
+          check_url "$SITE/sitemap.xml" "<urlset"
+
+          echo "Public Vercel site is reachable from an unauthenticated GitHub runner."

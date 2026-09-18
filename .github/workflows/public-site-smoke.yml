@@ -10,6 +10,7 @@ on:
       - 'lib/site-origin.mjs'
       - 'proxy.js'
       - 'vercel.json'
+      - 'public/hibou-monocle.webp'
   workflow_dispatch:
 
 permissions:
@@ -62,5 +63,22 @@ jobs:
           check_url "$SITE/" "Le Hibou"
           check_url "$SITE/robots.txt" "User-agent"
           check_url "$SITE/sitemap.xml" "<urlset"
+
+          image_headers=$(mktemp)
+          image_body=$(mktemp)
+          image_code=$(curl --silent --show-error --connect-timeout 10 --max-time 20 -D "$image_headers" -o "$image_body" -w '%{http_code}' "$SITE/hibou-monocle.webp" || true)
+          if [ "$image_code" != "200" ] || ! grep -Eiq '^content-type: *image/webp' "$image_headers"; then
+            echo "Hibou monocle asset is not publicly served as WebP." >&2
+            cat "$image_headers"
+            rm -f "$image_headers" "$image_body"
+            exit 1
+          fi
+          if [ ! -s "$image_body" ]; then
+            echo "Hibou monocle asset is empty." >&2
+            rm -f "$image_headers" "$image_body"
+            exit 1
+          fi
+          echo "PASS $SITE/hibou-monocle.webp (HTTP 200, image/webp)"
+          rm -f "$image_headers" "$image_body"
 
           echo "Public Vercel site is reachable from an unauthenticated GitHub runner."

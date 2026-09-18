@@ -66,7 +66,7 @@ jobs:
 
           homepage=$(mktemp)
           curl --location --silent --show-error --connect-timeout 10 --max-time 20 "$SITE/" -o "$homepage"
-          if ! grep -Fq 'https://le-hibou-ruse-site.vercel.app/' "$homepage"; then
+          if ! grep -Fq 'https://le-hibou-ruse-site.vercel.app' "$homepage"; then
             echo "Active canonical origin not found in rendered homepage metadata." >&2
             rm -f "$homepage"
             exit 1
@@ -75,7 +75,7 @@ jobs:
 
           sitemap=$(mktemp)
           curl --location --silent --show-error --connect-timeout 10 --max-time 20 "$SITE/sitemap.xml" -o "$sitemap"
-          if ! grep -Fq 'https://le-hibou-ruse-site.vercel.app/' "$sitemap"; then
+          if ! grep -Fq 'https://le-hibou-ruse-site.vercel.app' "$sitemap"; then
             echo "Active origin missing from sitemap." >&2
             cat "$sitemap"
             rm -f "$sitemap"

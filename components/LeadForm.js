@@ -31,13 +31,11 @@ export default function LeadForm() {
       </div>
       <label>Votre situation<textarea name="context" required maxLength={3500} rows={6} placeholder="Revenus, société, patrimoine, dettes, projets, contraintes… Donnez seulement les éléments utiles." /></label>
       <label>Votre besoin et vos objectifs<textarea name="need" required maxLength={2500} rows={5} placeholder="Ce que vous cherchez à comprendre, optimiser ou structurer — et le résultat que vous visez." /></label>
-      <p className="form-privacy"><strong>Ne transmettez aucun secret :</strong> mot de passe, numéro complet de carte bancaire, identifiant fiscal, code d’accès ou document d’identité. Les informations utiles à l’étude de votre demande sont suffisantes.</p>
-      <label className="honeypot" aria-hidden="true">Société<input name="company" tabIndex={-1} autoComplete="off" /></label>
+      <label className="honeypot" aria-hidden="true"><input name="company" tabIndex={-1} autoComplete="off" /></label>
       <div className="form-footer">
-        <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Présenter ma situation"}</button>
+        <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Envoyer"}</button>
         <p role="status" aria-live="polite">{state === "sent" && "Demande reçue. Le Hibou va l’étudier."}{state === "error" && "L’envoi a échoué. Réessayez dans quelques instants."}</p>
       </div>
-      <p className="form-privacy">En envoyant ce formulaire, vous nous transmettez ces informations afin que nous étudiions et répondions à votre demande. Consultez la <a href="/confidentialite">politique de confidentialité</a> pour connaître les finalités, durées de conservation et vos droits.</p>
     </form>
   );
 }

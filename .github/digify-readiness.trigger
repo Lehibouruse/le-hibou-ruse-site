@@ -1,2 +1,2 @@
-2026-09-17T22:52:00+02:00
-Purpose: retrigger side-effect-free Digify readiness verification with per-secret diagnostics.
+2026-09-19
+Purpose: retrigger Digify readiness after Production DIGIFY_KEY_ID + DIGIFY_SECRET setup and redeploy.

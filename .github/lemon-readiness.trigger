@@ -1,1 +1,1 @@
-2026-09-19 verify Lemon API key after Digify env correction
+2026-09-19 verify Lemon readiness after Digify correction and diagnostic fix

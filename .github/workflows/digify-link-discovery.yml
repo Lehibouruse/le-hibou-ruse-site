@@ -1,4 +1,4 @@
-name: Digify Read API Discovery
+name: Digify File Search Contract Discovery
 
 on:
   push:
@@ -11,9 +11,9 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     steps:
-      - name: Extract safe read endpoints and auth definition
+      - name: Extract file search/settings contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -22,20 +22,22 @@ jobs:
           python3 - "$spec" <<'PY'
           import json,sys
           data=json.load(open(sys.argv[1],encoding='utf-8'))
-          print("COLLECTION AUTH", json.dumps(data.get('auth'), ensure_ascii=False)[:5000])
           def walk(items,path=()):
               for item in items or []:
                   p=path+(item.get('name',''),)
-                  if 'request' in item:
-                      req=item['request']; method=req.get('method')
-                      url=req.get('url')
+                  if 'request' in item and ('search for sent file' in ' '.join(p).lower() or 'get file settings' in ' '.join(p).lower()):
+                      req=item['request']; url=req.get('url')
                       if isinstance(url,dict): url=url.get('raw') or ''
-                      if method == 'GET' or any(k in ' '.join(p).lower() for k in ['account','profile','sent file','file list','retrieve file']):
-                          print("\n###",' > '.join(p))
-                          print("METHOD",method)
-                          print("URL",url)
-                          print("AUTH",json.dumps(req.get('auth'),ensure_ascii=False)[:3000])
-                          print("HEADERS",json.dumps(req.get('header'),ensure_ascii=False)[:3000])
+                      print("\n###",' > '.join(p)); print("METHOD",req.get('method')); print("URL",url)
+                      body=req.get('body') or {}; print("MODE",body.get('mode'))
+                      for mode in ('urlencoded','formdata','raw'):
+                          v=body.get(mode)
+                          if isinstance(v,list):
+                              for f in v: print(json.dumps({k:f.get(k) for k in ('key','value','description','type')},ensure_ascii=False))
+                          elif isinstance(v,str): print(v[:5000])
+                      for resp in item.get('response') or []:
+                          print("RESPONSE",resp.get('name'),resp.get('code'))
+                          print(str(resp.get('body') or '')[:10000])
                   walk(item.get('item'),p)
           walk(data.get('item'))
           PY

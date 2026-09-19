@@ -1,0 +1,54 @@
+name: Public Commerce Smoke
+
+on:
+  push:
+    paths:
+      - 'docs/.public-commerce-smoke'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commerce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify public checkout is exposed and reachable
+        shell: bash
+        env:
+          SITE: https://d4d5d6.com
+          CHECKOUT_HOST: lehibouruse.lemonsqueezy.com
+        run: |
+          set -euo pipefail
+          home=$(mktemp)
+          code=""
+          for attempt in $(seq 1 18); do
+            code=$(curl --location --silent --show-error --connect-timeout 10 --max-time 20 -o "$home" -w '%{http_code}' "$SITE/" || true)
+            if [ "$code" = "200" ]               && grep -Fq "$CHECKOUT_HOST/checkout/buy/" "$home"               && grep -Fq "V1 en cours d’enrichissement" "$home"               && ! grep -Fiq "bientôt disponible" "$home"; then
+              break
+            fi
+            echo "Waiting for public commerce deployment (attempt $attempt/18, HTTP $code)"
+            sleep 10
+          done
+
+          test "$code" = "200"
+          grep -Fq "$CHECKOUT_HOST/checkout/buy/" "$home"
+          grep -Fq "Acheter le guide" "$home"
+          grep -Fq "V1 en cours d’enrichissement" "$home"
+          ! grep -Fiq "bientôt disponible" "$home"
+
+          checkout=$(grep -Eo "https://$CHECKOUT_HOST/checkout/buy/[A-Za-z0-9-]+" "$home" | head -1)
+          test -n "$checkout"
+          checkout_code=$(curl --location --silent --show-error --connect-timeout 10 --max-time 25 -o /dev/null -w '%{http_code}' "$checkout")
+          final=$(curl --location --silent --show-error --connect-timeout 10 --max-time 25 -o /dev/null -w '%{url_effective}' "$checkout")
+          echo "homepage_http=$code"
+          echo "checkout_http=$checkout_code"
+          echo "checkout_final=$final"
+          test "$checkout_code" = "200"
+          case "$final" in
+            https://*.lemonsqueezy.com/*) ;;
+            *) echo "Unexpected checkout redirect" >&2; exit 1 ;;
+          esac
+          echo "public_commerce_ready=true"
+          rm -f "$home"

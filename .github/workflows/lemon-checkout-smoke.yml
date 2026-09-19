@@ -1,0 +1,43 @@
+name: Lemon Checkout Smoke
+
+on:
+  push:
+    paths:
+      - 'docs/.lemon-checkout-smoke'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  checkout-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create or reuse Lemon test checkout
+        shell: bash
+        env:
+          HIBOU_BASE_URL: https://d4d5d6.com
+        run: |
+          set -euo pipefail
+          token_json=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hibou-orchestrator")
+          token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<< "$token_json")
+          echo "::add-mask::$token"
+          response_file=$(mktemp)
+          code=$(curl --silent --show-error -o "$response_file" -w '%{http_code}'             -X POST             -H "Authorization: Bearer ${token}"             -H "Content-Type: application/json"             --data '{"action":"checkout_test"}'             "${HIBOU_BASE_URL}/api/commerce/lemon-bootstrap")
+          echo "HTTP ${code}"
+          cat "$response_file"
+          echo
+          test "$code" = "200"
+          python3 - "$response_file" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d.get("ok") is True
+          assert d.get("mode") == "test_only"
+          assert d.get("test_checkout_id")
+          assert str(d.get("test_checkout_url","")).startswith("https://")
+          print("test_checkout_ready=true")
+          print("test_checkout_reused=", d.get("test_checkout_reused"))
+          PY
+          rm -f "$response_file"

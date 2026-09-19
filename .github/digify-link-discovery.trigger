@@ -1,1 +1,1 @@
-2026-09-19 discover safe read APIs and auth
+2026-09-19 discover file search/settings contracts

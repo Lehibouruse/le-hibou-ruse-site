@@ -9,7 +9,7 @@ const home = readFileSync(new URL("../app/page.js", import.meta.url), "utf8");
 
 test("les mentions légales early-access restent factuelles sur la structure non encore immatriculée", () => {
   assert.match(mentions, /Version en vigueur/);
-  assert.match(mentions, /LLC de droit du Nouveau-Mexique/i);
+  assert.match(mentions, /LLC\) de droit du Nouveau-Mexique/i);
   assert.match(mentions, /en cours de formation et non encore immatriculée/i);
   assert.match(mentions, /ne signifie pas qu’une personne morale existe déjà/i);
   assert.match(mentions, /contact@d4d5d6\.fr/);

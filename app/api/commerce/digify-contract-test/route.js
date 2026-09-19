@@ -48,16 +48,39 @@ export async function POST(request) {
   const configuredFileGuid = text(product?.fields?.["Digify File GUID"]);
 
   let searchFiles = [];
+  let authOrientation = "normal";
+  let digifyEnv = process.env;
   try {
-    const searched = await searchDigifyFiles({ searchQuery: "Hibou", pageIndex: 0, pageSize: 40 });
+    const searched = await searchDigifyFiles({ searchQuery: "Hibou", pageIndex: 0, pageSize: 40 }, digifyEnv);
     searchFiles = searched.files || [];
-  } catch (error) {
-    return NextResponse.json({
-      ok: false,
-      stage: "search",
-      search_ok: false,
-      error: String(error?.message || error).slice(0, 500),
-    }, { status: 422 });
+  } catch (normalError) {
+    const keyId = text(process.env.DIGIFY_KEY_ID);
+    const secret = text(process.env.DIGIFY_SECRET);
+    if (!keyId || !secret) {
+      return NextResponse.json({
+        ok: false,
+        stage: "search",
+        search_ok: false,
+        auth_orientation: "missing",
+        error: String(normalError?.message || normalError).slice(0, 500),
+      }, { status: 422 });
+    }
+    const swappedEnv = { ...process.env, DIGIFY_KEY_ID: secret, DIGIFY_SECRET: keyId };
+    try {
+      const searched = await searchDigifyFiles({ searchQuery: "Hibou", pageIndex: 0, pageSize: 40 }, swappedEnv);
+      searchFiles = searched.files || [];
+      digifyEnv = swappedEnv;
+      authOrientation = "swapped";
+    } catch (swappedError) {
+      return NextResponse.json({
+        ok: false,
+        stage: "search",
+        search_ok: false,
+        auth_orientation: "neither",
+        normal_error: String(normalError?.message || normalError).slice(0, 300),
+        swapped_error: String(swappedError?.message || swappedError).slice(0, 300),
+      }, { status: 422 });
+    }
   }
 
   const exact = searchFiles.find((item) => text(item?.Guid) === configuredFileGuid);
@@ -88,7 +111,7 @@ export async function POST(request) {
       fileGuid,
       email: PROBE_EMAIL,
       orderId: "DIGIFY-CONTRACT-PROBE",
-    });
+    }, digifyEnv);
     addOk = true;
     accessUrlRecorded = Boolean(added.accessUrl);
     addStatus = text(added?.data?.Status?.StatusMessage || "ok");
@@ -106,7 +129,7 @@ export async function POST(request) {
       fileGuid,
       email: PROBE_EMAIL,
       orderId: "DIGIFY-CONTRACT-PROBE",
-    });
+    }, digifyEnv);
     removeOk = true;
     removeStatus = text(removed?.data?.Status?.StatusMessage || "ok");
   } catch (error) {
@@ -128,5 +151,6 @@ export async function POST(request) {
     configured_file_guid: configuredFileGuid,
     file_guid_matches: Boolean(configuredFileGuid && configuredFileGuid === fileGuid),
     discovered_file_name: fileName,
+    auth_orientation: authOrientation,
   }, { status: addOk && removeOk ? 200 : 502, headers: { "Cache-Control": "no-store" } });
 }

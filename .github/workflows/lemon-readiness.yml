@@ -39,6 +39,7 @@ jobs:
           print("api_key_present=", data.get("api_key_present"))
           print("api_authenticated=", data.get("api_authenticated"))
           print("webhook_secret_present=", data.get("webhook_secret_present"))
+          print("webhook_secret_ready=", data.get("webhook_secret_ready"))
           print("store_id=", data.get("store_id"))
           print("product_id=", data.get("product_id"))
           print("variant_id=", data.get("variant_id"))

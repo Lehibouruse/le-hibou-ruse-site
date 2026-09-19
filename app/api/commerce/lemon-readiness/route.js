@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { configMap, queryRecords, TABLES } from "../../../../lib/airtable";
 import { listLemonProducts, listLemonStores, listLemonVariants, lemonResourceId, lemonResourceName } from "../../../../lib/lemon-api.mjs";
+import { resolveLemonWebhookSecret } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
@@ -29,6 +30,7 @@ export async function POST(request) {
 
   const keyPresent = Boolean(text(process.env.LEMON_SQUEEZY_API_KEY));
   const webhookSecretPresent = Boolean(text(process.env.LEMON_SQUEEZY_WEBHOOK_SECRET));
+  const webhookSecretReady = Boolean(text(resolveLemonWebhookSecret(process.env)));
   if (!keyPresent) {
     return NextResponse.json({
       ok: true,
@@ -36,6 +38,7 @@ export async function POST(request) {
       api_key_present: false,
       api_authenticated: false,
       webhook_secret_present: webhookSecretPresent,
+      webhook_secret_ready: webhookSecretReady,
       blockers: ["missing_LEMON_SQUEEZY_API_KEY"],
     }, { headers: { "Cache-Control": "no-store" } });
   }
@@ -86,6 +89,7 @@ export async function POST(request) {
       api_key_present: true,
       api_authenticated: true,
       webhook_secret_present: webhookSecretPresent,
+      webhook_secret_ready: webhookSecretReady,
       store_count: stores.length,
       store_id: storeId,
       product_id: productId,
@@ -104,6 +108,7 @@ export async function POST(request) {
       api_key_present: true,
       api_authenticated: false,
       webhook_secret_present: webhookSecretPresent,
+      webhook_secret_ready: webhookSecretReady,
       error: String(error?.message || error).slice(0, 500),
       blockers: ["lemon_api_auth_failed"],
     }, { headers: { "Cache-Control": "no-store" } });

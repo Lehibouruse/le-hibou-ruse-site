@@ -1,0 +1,27 @@
+name: Meta Runtime Smoke
+
+on:
+  push:
+    paths:
+      - 'docs/.meta-runtime-smoke'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe canonical and Vercel alias
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in https://d4d5d6.com https://le-hibou-ruse-site.vercel.app; do
+            echo "BASE=$base"
+            code=$(curl --silent --show-error --location -o body.json -w '%{http_code}' "$base/api/social/meta-readiness-public" || true)
+            echo "HTTP=$code"
+            cat body.json || true
+            echo
+          done

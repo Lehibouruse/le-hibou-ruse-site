@@ -1,1 +1,1 @@
-2026-09-19 inspect https://digify.com/s/ydZRRg
+2026-09-19 inspect Digify FileGUID and recipient API markers

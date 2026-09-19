@@ -60,6 +60,9 @@ export async function POST(request) {
     let productName = "";
     let variantId = "";
     let variantPriceCents = null;
+    let productStatus = "";
+    let productTestMode = null;
+    let buyNowUrl = "";
 
     if (storeId) {
       const lemonProducts = await listLemonProducts(storeId);
@@ -70,6 +73,15 @@ export async function POST(request) {
         || null;
       productId = lemonResourceId(lemonProduct);
       productName = lemonResourceName(lemonProduct);
+      productStatus = text(lemonProduct?.attributes?.status);
+      productTestMode = lemonProduct?.attributes?.test_mode === true;
+      const candidateBuyNow = text(lemonProduct?.attributes?.buy_now_url);
+      try {
+        const url = new URL(candidateBuyNow);
+        if (url.protocol === "https:" && (url.hostname === "lemonsqueezy.com" || url.hostname.endsWith(".lemonsqueezy.com"))) {
+          buyNowUrl = url.toString();
+        }
+      } catch {}
 
       if (productId) {
         const variants = await listLemonVariants(productId);
@@ -96,6 +108,9 @@ export async function POST(request) {
       product_name: productName,
       variant_id: variantId,
       variant_price_cents: variantPriceCents,
+      product_status: productStatus,
+      product_test_mode: productTestMode,
+      buy_now_url: buyNowUrl,
       expected_store_id: configuredStoreId,
       expected_product_id: text(productRecord?.fields?.["Lemon Squeezy Product ID"] || config.lemon_product_id),
       expected_variant_id: text(productRecord?.fields?.["Lemon Squeezy Variant ID"] || config.lemon_variant_id),

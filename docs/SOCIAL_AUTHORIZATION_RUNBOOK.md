@@ -73,11 +73,13 @@ Aucun plan, crédit ou paiement n'est activé automatiquement.
 
 ## Callbacks canoniques
 
-Tant que `d4d5d6.com` n'est pas validé, utiliser l'origine canonique suivante :
+Le domaine public canonique est désormais `https://d4d5d6.com`.
 
-`https://le-hibou-ruse-site.vercel.app`
+Pour Meta (Facebook + Instagram), le callback est :
 
-Les callbacks exacts sont générés par le control plane et synchronisés dans Airtable. Ne pas les retaper à la main si le control plane affiche une valeur différente.
+`https://d4d5d6.com/api/social/oauth/meta/callback`
+
+Les callbacks exacts sont générés par le control plane et synchronisés dans Airtable. Ne pas utiliser un autre callback sans modifier d'abord la configuration serveur.
 
 ## Control plane
 
@@ -120,3 +122,19 @@ Un `publish_id` n'est pas un `post_id`. Le gateway expose le statut TikTok via `
 ## Frontière d'automatisation
 
 À ce stade, le code peut préparer les adapters, callbacks, scopes, stockage chiffré, refresh supporté, dry-runs, métriques, idempotence, synchronisation Airtable et diagnostics. Les étapes qui restent volontairement humaines ou externes sont : création/approbation des apps chez les fournisseurs, saisie des Client Secrets dans l'environnement serveur, consentement OAuth/2FA, validation de domaines exigée par un fournisseur, rôle administrateur lorsque le fournisseur l'impose, approbation produit/API et tout engagement financier.
+
+
+## Meta — session humaine minimale
+
+Pour Facebook + Instagram, le backend Hibou est déjà prêt : OAuth, échange long-lived token, découverte de la Page, récupération du Page Access Token, découverte du compte Instagram professionnel lié, chiffrement des tokens, test de lecture et synchronisation Airtable.
+
+Actions humaines restantes :
+1. vérifier que le compte Instagram du Hibou est Professionnel (Business ou Creator) et lié à la Page Facebook du Hibou ;
+2. créer une app Meta de type Business, nom conseillé : `Le Hibou Rusé — Social API` ;
+3. ajouter/configurer les cas d'usage Facebook Pages + Instagram API avec Facebook Login ;
+4. déclarer le callback exact `https://d4d5d6.com/api/social/oauth/meta/callback` ;
+5. dans App Settings > Basic, utiliser `https://d4d5d6.com`, `https://d4d5d6.com/confidentialite` et `https://d4d5d6.com/suppression-donnees` lorsque Meta demande site, politique de confidentialité et suppression des données ;
+6. copier l'App ID et l'App Secret dans Vercel sous `META_APP_ID` et `META_APP_SECRET` ; ne jamais les mettre dans Airtable ou un chat ;
+7. ouvrir ensuite le lien OAuth Hibou et approuver personnellement les permissions demandées.
+
+Le runtime utilise Graph API `v26.0` via Airtable. Les scopes cibles sont également fournis par Airtable. Le coffre OAuth peut utiliser `HIBOU_SOCIAL_VAULT_KEY` lorsqu'une clé dédiée existe ; sinon il dérive une clé séparée à partir de `CRON_SECRET`, déjà secret serveur, avec séparation de domaine cryptographique.

@@ -1,1 +1,1 @@
-2026-09-19 extract official recipient/revocation contracts
+2026-09-19 discover Document Security file read endpoints

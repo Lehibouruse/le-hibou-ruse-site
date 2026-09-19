@@ -52,3 +52,20 @@ test("le fingerprint ne révèle pas la clé maître", () => {
   assert.match(fp, /^[0-9a-f]{12}$/);
   assert.equal(fp.includes(env.HIBOU_SOCIAL_VAULT_KEY), false);
 });
+
+
+test("le coffre peut dériver une clé dédiée depuis CRON_SECRET sans secret social supplémentaire", () => {
+  const cronEnv = { CRON_SECRET: "cron-root-secret-long-enough-for-tests" };
+  const payload = { env: { META_ACCESS_TOKEN: "meta-secret-token" } };
+  const encrypted = encryptSocialCredential("meta", "primary", payload, cronEnv);
+  assert.equal(encrypted.ciphertext.includes("meta-secret-token"), false);
+  assert.deepEqual(decryptSocialCredential({
+    Provider: "meta",
+    "Account key": "primary",
+    Ciphertext: encrypted.ciphertext,
+    IV: encrypted.iv,
+    "Auth tag": encrypted.authTag,
+    "Vault version": encrypted.version,
+  }, cronEnv), payload);
+  assert.match(vaultFingerprint(cronEnv), /^[0-9a-f]{12}$/);
+});

@@ -16,7 +16,7 @@ const base = {
   X_CLIENT_SECRET: "x-secret",
   META_APP_ID: "meta-id",
   META_APP_SECRET: "meta-secret",
-  META_GRAPH_VERSION: "v24.0",
+  META_GRAPH_VERSION: "v26.0",
   THREADS_APP_ID: "threads-id",
   THREADS_APP_SECRET: "threads-secret",
   PINTEREST_APP_ID: "pin-id",
@@ -64,4 +64,24 @@ test("Pinterest prépare OAuth avec les scopes organiques sans exposer le secret
   assert.match(url.searchParams.get("scope") || "", /pins:write/);
   assert.match(url.searchParams.get("scope") || "", /boards:read/);
   assert.equal(auth.url.includes("pin-secret"), false);
+});
+
+
+test("Meta OAuth peut préparer l'autorisation avec CRON_SECRET comme coffre serveur", () => {
+  const env = {
+    HIBOU_PUBLIC_BASE_URL: "https://d4d5d6.com",
+    CRON_SECRET: "cron-root-secret-long-enough-for-tests",
+    META_APP_ID: "meta-id",
+    META_APP_SECRET: "meta-secret",
+    META_GRAPH_VERSION: "v26.0",
+    META_OAUTH_SCOPES: "pages_show_list,pages_manage_posts,pages_read_engagement,read_insights,instagram_basic,instagram_content_publish,instagram_manage_insights",
+  };
+  const auth = buildSocialAuthorization("meta", env);
+  const url = new URL(auth.url);
+  assert.equal(url.origin, "https://www.facebook.com");
+  assert.equal(url.pathname, "/v26.0/dialog/oauth");
+  assert.equal(url.searchParams.get("redirect_uri"), "https://d4d5d6.com/api/social/oauth/meta/callback");
+  assert.match(url.searchParams.get("scope") || "", /pages_manage_posts/);
+  assert.match(url.searchParams.get("scope") || "", /instagram_content_publish/);
+  assert.equal(auth.url.includes("meta-secret"), false);
 });

@@ -1,1 +1,1 @@
-2026-09-19 discover Document Security file read endpoints
+2026-09-19 discover safe read APIs and auth

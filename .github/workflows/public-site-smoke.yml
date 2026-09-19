@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Verify active public origin
+      - name: Verify branded public access
         shell: bash
         env:
-          SITE: https://le-hibou-ruse-site.vercel.app
+          SITE: https://d4d5d6.com
         run: |
           set -euo pipefail
 
@@ -52,11 +52,11 @@ jobs:
                 return 0
               fi
 
-              echo "Waiting for public deployment: $url -> HTTP $code (attempt $attempt/24)"
+              echo "Waiting for branded deployment: $url -> HTTP $code (attempt $attempt/24)"
               rm -f "$headers" "$body"
               sleep 10
             done
-            echo "Public accessibility failed for $url" >&2
+            echo "Branded public accessibility failed for $url" >&2
             return 1
           }
 
@@ -66,8 +66,8 @@ jobs:
 
           homepage=$(mktemp)
           curl --location --silent --show-error --connect-timeout 10 --max-time 20 "$SITE/" -o "$homepage"
-          if ! grep -Fq 'https://le-hibou-ruse-site.vercel.app' "$homepage"; then
-            echo "Active canonical origin not found in rendered homepage metadata." >&2
+          if ! grep -Fq 'https://d4d5d6.com' "$homepage"; then
+            echo "Branded canonical origin not found in rendered homepage metadata." >&2
             rm -f "$homepage"
             exit 1
           fi
@@ -75,8 +75,14 @@ jobs:
 
           sitemap=$(mktemp)
           curl --location --silent --show-error --connect-timeout 10 --max-time 20 "$SITE/sitemap.xml" -o "$sitemap"
-          if ! grep -Fq 'https://le-hibou-ruse-site.vercel.app' "$sitemap"; then
-            echo "Active origin missing from sitemap." >&2
+          if grep -Fq 'le-hibou-ruse-site.vercel.app' "$sitemap"; then
+            echo "Sitemap still exposes the Vercel alias instead of the branded domain." >&2
+            cat "$sitemap"
+            rm -f "$sitemap"
+            exit 1
+          fi
+          if ! grep -Fq 'https://d4d5d6.com' "$sitemap"; then
+            echo "Branded origin missing from sitemap." >&2
             cat "$sitemap"
             rm -f "$sitemap"
             exit 1
@@ -100,4 +106,4 @@ jobs:
           echo "PASS $SITE/hibou-monocle.webp (HTTP 200, image/webp)"
           rm -f "$image_headers" "$image_body"
 
-          echo "Active public origin is reachable and indexable."
+          echo "Branded public site is reachable and exposes d4d5d6.com as its public origin."

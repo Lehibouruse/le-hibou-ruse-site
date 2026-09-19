@@ -7,49 +7,40 @@ const privacy = readFileSync(new URL("../app/confidentialite/page.js", import.me
 const cgv = readFileSync(new URL("../app/cgv/page.js", import.meta.url), "utf8");
 const home = readFileSync(new URL("../app/page.js", import.meta.url), "utf8");
 
-test("les mentions légales restent pré-lancement et n'inventent aucune identité vendeur", () => {
-  assert.match(mentions, /Version de pré-lancement/);
-  assert.match(mentions, /DÉNOMINATION(?: SOCIALE)? \/ NOM À (?:CONFIRMER|COMPLÉTER)/);
-  assert.match(mentions, /SIREN/);
-  assert.match(mentions, /RCS \/ RNE/);
-  assert.match(mentions, /Téléphone[^\n]*\[(?:numéro|à)/i);
-  assert.match(mentions, /Directeur de la publication[^\n]*\[/i);
+test("les mentions légales early-access restent factuelles sur la structure non encore immatriculée", () => {
+  assert.match(mentions, /Version en vigueur/);
+  assert.match(mentions, /LLC de droit du Nouveau-Mexique/i);
+  assert.match(mentions, /en cours de formation et non encore immatriculée/i);
+  assert.match(mentions, /ne signifie pas qu’une personne morale existe déjà/i);
+  assert.match(mentions, /contact@d4d5d6\.fr/);
   assert.match(mentions, /hébergé par <strong>Vercel Inc\./);
-  assert.match(mentions, /téléphonique officielle de l’hébergeur à compléter/i);
   assert.match(mentions, /Lemon Squeezy/);
-  assert.match(mentions, /médiateur[^\n]*(?:adhéré|adhésion)/i);
+  assert.doesNotMatch(mentions, /\[(?:DÉNOMINATION|adresse|numéro|médiateur)/i);
 });
 
-test("la politique de confidentialité documente prestataires, bases, durées, droits et attribution sans stockage persistant", () => {
+test("la politique de confidentialité identifie les prestataires essentiels et un canal d'exercice des droits", () => {
   for (const item of ["Vercel", "Airtable", "Lemon Squeezy", "Digify", "CNIL"]) assert.match(privacy, new RegExp(item));
-  assert.match(privacy, /Version de pré-lancement/);
-  assert.match(privacy, /DÉNOMINATION(?: SOCIALE)? \/ NOM À CONFIRMER/);
-  assert.match(privacy, /Finalités et bases juridiques/);
-  assert.match(privacy, /3 ans/);
-  assert.match(privacy, /13 mois/);
-  assert.match(privacy, /12 mois/);
-  assert.match(privacy, /10 ans/);
-  assert.match(privacy, /aucun cookie, localStorage ou sessionStorage/i);
-  assert.match(privacy, /uniquement en mémoire de la page/i);
-  assert.match(privacy, /stockage persistant[^\n]*consentement préalable conforme/i);
-  assert.match(privacy, /mécanismes de purge et d’archivage[^\n]*alignés/i);
+  assert.match(privacy, /Version en vigueur/);
+  assert.match(privacy, /LLC du Nouveau-Mexique en cours de formation/i);
+  assert.match(privacy, /contact@d4d5d6\.fr/);
+  assert.match(privacy, /ne stocke pas les numéros complets de carte bancaire/i);
 });
 
-test("les CGV restent non applicables et conservent les protections du contenu numérique", () => {
-  assert.match(cgv, /Version de pré-lancement — non encore applicable/);
-  assert.match(cgv, /DÉNOMINATION(?: SOCIALE)? \/ NOM À CONFIRMER/);
+test("les CGV early-access décrivent la V1 évolutive et préservent les droits impératifs du contenu numérique", () => {
+  assert.match(cgv, /Version en vigueur/);
+  assert.match(cgv, /V1 en cours d’enrichissement/i);
+  assert.match(cgv, /LLC de droit du Nouveau-Mexique/i);
   assert.match(cgv, /29 €/);
   assert.match(cgv, /Merchant of Record/);
-  assert.match(cgv, /L\.221-28, 13°/);
   assert.match(cgv, /consentement exprès/i);
-  assert.match(cgv, /reconnaissance expresse de la perte du droit de rétractation/i);
+  assert.match(cgv, /reconnaissance de la perte du droit/i);
   assert.match(cgv, /support durable/i);
-  assert.match(cgv, /L\.224-25-12/);
-  assert.match(cgv, /garantie légale de conformité/i);
-  assert.match(cgv, /NOM DU MÉDIATEUR[^\n]*APRÈS ADHÉSION EFFECTIVE/);
-  assert.match(cgv, /n’entreront en vigueur qu’après publication de leur version finale/i);
+  assert.match(cgv, /ne prétendent pas supprimer un droit de rétractation/i);
+  assert.match(cgv, /Aucune clause des présentes ne limite un droit impératif/i);
+  assert.match(cgv, /contact@d4d5d6\.fr/);
 });
 
-test("la landing expose un lien CGV", () => {
+test("la landing expose un lien CGV et divulgue le caractère early-access lorsque le checkout est actif", () => {
   assert.match(home, /href="\/cgv"/);
+  assert.match(home, /V1 en cours d’enrichissement/);
 });

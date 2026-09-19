@@ -84,7 +84,7 @@ export async function POST(request) {
   try {
     await revokeDigifyRecipient({ fileGuid, email, orderId });
     await updateRecord(TABLES.sales, sale.id, clearCommerceLease({ "Livraison statut": "revoked", "Révoqué le": new Date().toISOString(), "Livraison erreur": "" }));
-    await journal(current, "Completed", "Accès Digify révoqué après remboursement");
+    await journal(current, "Completed", "Destinataire Digify retiré après remboursement (suppression API officielle; analytics destinataire supprimés côté Digify)");
     return NextResponse.json({ ok: true, processed: 1, status: "revoked" });
   } catch (error) {
     const retryable = error?.retryable === true && attempts < 3;

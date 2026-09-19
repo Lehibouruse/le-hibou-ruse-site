@@ -1,4 +1,4 @@
-name: Digify API Contract Discovery
+name: Digify File API Discovery
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Extract recipient endpoints from official Postman collection
+      - name: Extract Document Security file endpoints
         shell: bash
         run: |
           set -euo pipefail
@@ -22,35 +22,24 @@ jobs:
           python3 - "$spec" <<'PY'
           import json, sys
           data=json.load(open(sys.argv[1], encoding='utf-8'))
-
           def walk(items, path=()):
               for item in items or []:
                   p=path+(item.get('name',''),)
-                  if 'request' in item:
-                      req=item['request']
-                      url=req.get('url')
-                      if isinstance(url, dict):
-                          url=url.get('raw') or ''
-                      url=str(url or '')
-                      hay=(' '.join(p)+' '+url).lower()
-                      if any(k in hay for k in ['recipient','revoke','remove','access']):
-                          print('\n###', ' > '.join(p))
-                          print('METHOD', req.get('method'))
-                          print('URL', url)
-                          body=req.get('body') or {}
-                          print('BODY_MODE', body.get('mode'))
-                          for mode in ('raw','urlencoded','formdata'):
-                              v=body.get(mode)
-                              if isinstance(v, str):
-                                  print(mode.upper(), v[:4000])
-                              elif isinstance(v, list):
-                                  print(mode.upper())
-                                  for f in v:
-                                      print(json.dumps({k:f.get(k) for k in ('key','value','description','type')}, ensure_ascii=False))
-                          for resp in item.get('response') or []:
-                              print('RESPONSE', resp.get('name'), resp.get('code'))
-                              b=resp.get('body') or ''
-                              print(str(b)[:5000])
+                  if 'request' in item and p[:2] == ('Document Security','File'):
+                      req=item['request']; url=req.get('url')
+                      if isinstance(url,dict): url=url.get('raw') or ''
+                      print('\n###',' > '.join(p))
+                      print('METHOD',req.get('method'))
+                      print('URL',url)
+                      body=req.get('body') or {}
+                      print('MODE',body.get('mode'))
+                      for mode in ('urlencoded','formdata','raw'):
+                          v=body.get(mode)
+                          if isinstance(v,list):
+                              for f in v:
+                                  print(json.dumps({k:f.get(k) for k in ('key','value','description')},ensure_ascii=False))
+                          elif isinstance(v,str):
+                              print(v[:3000])
                   walk(item.get('item'), p)
           walk(data.get('item'))
           PY

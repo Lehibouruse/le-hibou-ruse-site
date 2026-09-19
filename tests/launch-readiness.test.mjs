@@ -149,6 +149,35 @@ test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de sec
   assert.equal(JSON.stringify(result).includes("server-root-secret"), false);
 });
 
+
+test("le mode early-access peut ouvrir le checkout avec livre/juridique encore incomplets si les dépendances de vente sont prêtes", () => {
+  const input = readyInput();
+  input.config.commerce_readiness_mode = "early_access";
+  input.config.book_current_edition = "V1.0-early-access-2026-09";
+  input.config.withdrawal_durable_receipt_tested = "false";
+  input.chapters = chapters(16, false);
+  input.legal = legal(false);
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.match(result.checkoutUrl, /^https:/);
+  assert.equal(result.blockers.length, 0);
+  assert.ok(result.warnings.some((item) => item.key === "book_complete"));
+  assert.ok(result.warnings.some((item) => item.key === "withdrawal_durable_receipt"));
+  assert.ok(result.warnings.some((item) => item.key === "legal:CGV produit numérique"));
+});
+
+test("le mode early-access reste bloqué sans autorisation explicite, domaine, checkout ou Digify", () => {
+  const input = readyInput();
+  input.config.commerce_readiness_mode = "early_access";
+  input.config.book_current_edition = "V1.0-early-access-2026-09";
+  input.config.commerce_launch_authorized = "false";
+  delete input.product["Digify File GUID"];
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "launch_authorized"));
+  assert.ok(result.blockers.some((item) => item.key === "digify_file"));
+});
+
 test("la readiness de test Lemon et Digify est séparée de l'autorisation de vente live", () => {
   const input = testReadyInput();
   const result = commerceTestReadiness(input);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { configMap, queryRecords, TABLES } from "../../../../lib/airtable";
-import { DIGIFY_ADD_RECIPIENT_DEFAULT_URL, digifyReadiness } from "../../../../lib/digify-config.mjs";
+import { DIGIFY_ADD_RECIPIENT_DEFAULT_URL, DIGIFY_REVOKE_RECIPIENT_DEFAULT_URL, digifyReadiness } from "../../../../lib/digify-config.mjs";
+import { listDigifyRecipients } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
@@ -33,11 +34,9 @@ function nextAction(blockers) {
   const messages = {
     missing_DIGIFY_KEY_ID: "Vérifier que DIGIFY_KEY_ID est lié au projet Vercel en Production.",
     missing_DIGIFY_SECRET: "Vérifier que DIGIFY_SECRET est lié au projet Vercel en Production.",
-    missing_add_recipient_template: "Capturer le payload officiel /v1/file/recipient/add depuis le Developer Portal Digify.",
     missing_file_guid: "Charger le PDF dans Digify puis enregistrer son File GUID dans Produits site.",
-    missing_revoke_endpoint: "Capturer l'endpoint officiel de révocation destinataire depuis le Developer Portal Digify.",
-    missing_revoke_template: "Capturer le payload officiel de révocation destinataire depuis le Developer Portal Digify.",
     webhook_auth_not_ready: "Vérifier CRON_SECRET ou le couple DIGIFY_WEBHOOK_USERNAME/DIGIFY_WEBHOOK_PASSWORD.",
+    digify_api_probe_failed: "Les credentials ou le File GUID ne permettent pas de lire la liste des destinataires Digify. Vérifier la clé et le fichier.",
   };
   return messages[first] || "Aucun blocage technique détecté. Conserver commerce_launch_authorized=false jusqu'au test contrôlé.";
 }
@@ -64,18 +63,25 @@ export async function POST(request) {
   const blockers = [];
   if (!keyIdPresent) blockers.push("missing_DIGIFY_KEY_ID");
   if (!secretPresent) blockers.push("missing_DIGIFY_SECRET");
-  if (!runtime.add_template_present) blockers.push("missing_add_recipient_template");
   if (!fileGuid) blockers.push("missing_file_guid");
-  if (!runtime.revoke_endpoint_present) blockers.push("missing_revoke_endpoint");
-  if (!runtime.revoke_template_present) blockers.push("missing_revoke_template");
   if (!runtime.webhook_auth_ready) blockers.push("webhook_auth_not_ready");
 
-  const recipientContractReady = Boolean(runtime.credentials_present && runtime.add_template_present);
-  const revocationContractReady = Boolean(
-    runtime.credentials_present
-      && runtime.revoke_endpoint_present
-      && runtime.revoke_template_present
-  );
+  let apiProbeOk = false;
+  let recipientCount = null;
+  let apiProbeError = "";
+  if (runtime.credentials_present && fileGuid) {
+    try {
+      const probe = await listDigifyRecipients({ fileGuid });
+      apiProbeOk = true;
+      recipientCount = probe.recipients.length;
+    } catch (error) {
+      apiProbeError = String(error?.message || error).slice(0, 300);
+      blockers.push("digify_api_probe_failed");
+    }
+  }
+
+  const recipientContractReady = Boolean(runtime.credentials_present && apiProbeOk);
+  const revocationContractReady = Boolean(runtime.credentials_present && apiProbeOk);
   const deliveryRuntimeReady = Boolean(recipientContractReady && fileGuid);
   const revocationRuntimeReady = Boolean(revocationContractReady && fileGuid);
 
@@ -87,9 +93,12 @@ export async function POST(request) {
     key_id_present: keyIdPresent,
     secret_present: secretPresent,
     add_recipient_endpoint: runtime.add_recipient_endpoint || DIGIFY_ADD_RECIPIENT_DEFAULT_URL,
-    add_template_present: runtime.add_template_present,
-    revoke_endpoint_present: runtime.revoke_endpoint_present,
-    revoke_template_present: runtime.revoke_template_present,
+    revoke_recipient_endpoint: runtime.revoke_recipient_endpoint || DIGIFY_REVOKE_RECIPIENT_DEFAULT_URL,
+    recipient_contract_builtin: runtime.recipient_contract_builtin,
+    revocation_contract_builtin: runtime.revocation_contract_builtin,
+    api_probe_ok: apiProbeOk,
+    recipient_count: recipientCount,
+    api_probe_error: apiProbeError,
     webhook_auth_ready: runtime.webhook_auth_ready,
     webhook_auth_source: runtime.webhook_auth_source,
     webhook_endpoint: "https://le-hibou-ruse-site.vercel.app/api/commerce/digify-webhook",

@@ -40,10 +40,8 @@ function readyInput() {
       CRON_SECRET: "server-root-secret",
       DIGIFY_KEY_ID: "key",
       DIGIFY_SECRET: "secret",
-      DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add",
-      DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
-      DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/example/revoke",
-      DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_ADD_RECIPIENT_URL: "https://svc.digify.com/v1/file/recipient/add",
+      DIGIFY_REVOKE_RECIPIENT_URL: "https://svc.digify.com/v1/file/recipient/remove",
     },
   };
 }
@@ -73,10 +71,8 @@ function testReadyInput() {
       LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret",
       DIGIFY_KEY_ID: "key",
       DIGIFY_SECRET: "digify-secret",
-      DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients",
-      DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: "{}",
-      DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/files/file-guid/recipients/test",
-      DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: "{}",
+      DIGIFY_ADD_RECIPIENT_URL: "https://svc.digify.com/v1/file/recipient/add",
+      DIGIFY_REVOKE_RECIPIENT_URL: "https://svc.digify.com/v1/file/recipient/remove",
       DIGIFY_WEBHOOK_USERNAME: "hibou-digify",
       DIGIFY_WEBHOOK_PASSWORD: "long-test-password",
     },
@@ -170,16 +166,17 @@ test("un checkout Lemon de test hors domaine Lemon ne peut pas rendre le test pr
   assert.ok(result.lemon.blockers.some((item) => item.key === "test_checkout"));
 });
 
-test("Digify test reste bloqué si le payload d'ajout ou la révocation ne sont pas entièrement configurés", () => {
+test("Digify test reste prêt sans templates Vercel car les contrats officiels sont intégrés", () => {
   const input = testReadyInput();
   delete input.env.DIGIFY_ADD_RECIPIENT_URL;
+  delete input.env.DIGIFY_REVOKE_RECIPIENT_URL;
   delete input.env.DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE;
   delete input.env.DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE;
   const result = commerceTestReadiness(input);
-  assert.equal(result.digify.ready, false);
-  assert.equal(result.digify.blockers.some((item) => item.key === "add_recipient_endpoint"), false);
-  assert.ok(result.digify.blockers.some((item) => item.key === "add_recipient_template"));
-  assert.ok(result.digify.blockers.some((item) => item.key === "revoke_template"));
+  assert.equal(result.digify.ready, true);
+  assert.equal(result.digify.blockers.length, 0);
+  assert.ok(result.digify.checks.some((item) => item.key === "add_recipient_contract" && item.ok));
+  assert.ok(result.digify.checks.some((item) => item.key === "revoke_contract" && item.ok));
 });
 
 test("Digify test exige aussi l'authentification indépendante de son webhook d'activité", () => {

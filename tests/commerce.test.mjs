@@ -37,41 +37,52 @@ test("la vente canonique est stable entre doublons concurrents", () => {
   assert.equal(canonicalSale([]), null);
 });
 
-test("l'ajout destinataire Digify accepte l'endpoint officiel ou une surcharge sûre", () => {
+test("l'ajout destinataire Digify utilise le contrat officiel form-urlencoded", () => {
   const env = {
     DIGIFY_KEY_ID: "key",
     DIGIFY_SECRET: "secret",
-    DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add",
-    DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE: JSON.stringify({ FileGUID: "{{file_guid}}", RecipientEmail: "{{email}}", Reference: "{{order_id}}" }),
   };
-  const request = digifyRecipientRequest({ fileGuid: "file-1", email: "buyer@example.com", orderId: "order-1" }, env);
-  assert.equal(request.url, "https://api.digify.com/v1/example/add");
-  assert.equal(request.body.FileGUID, "file-1");
-  assert.equal(request.body.RecipientEmail, "buyer@example.com");
-  assert.throws(() => digifyRecipientRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { ...env, DIGIFY_ADD_RECIPIENT_URL: "https://example.com/add" }), /Endpoint Digify refusé/);
+  const request = digifyRecipientRequest({ fileGuid: "file-1", email: "BUYER@EXAMPLE.COM", orderId: "order-1" }, env);
+  assert.equal(request.url, "https://svc.digify.com/v1/file/recipient/add");
+  assert.equal(request.headers["Content-Type"], "application/x-www-form-urlencoded");
+  const params = new URLSearchParams(request.body);
+  assert.equal(params.get("Guid"), "file-1");
+  assert.equal(params.get("RecipientEmail"), "buyer@example.com");
+  assert.equal(params.get("Permission"), "Recipient");
+  assert.throws(
+    () => digifyRecipientRequest(
+      { fileGuid: "f", email: "e@x.com", orderId: "o" },
+      { ...env, DIGIFY_ADD_RECIPIENT_URL: "https://example.com/add" },
+    ),
+    /Endpoint Digify refusé/,
+  );
 });
 
-test("le pipeline connaît l'endpoint officiel mais refuse de deviner le schéma Digify", () => {
+test("le schéma officiel Digify est intégré et ne dépend plus de templates Vercel", () => {
   const context = { fileGuid: "f", email: "e@x.com", orderId: "o" };
-  assert.throws(() => digifyRecipientRequest(context, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" }), /BODY_TEMPLATE absent/);
-  assert.throws(() => digifyRecipientRequest(context, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret", DIGIFY_ADD_RECIPIENT_URL: "https://api.digify.com/v1/example/add" }), /BODY_TEMPLATE absent/);
+  const request = digifyRecipientRequest(context, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" });
+  const params = new URLSearchParams(request.body);
+  assert.equal(params.get("Guid"), "f");
+  assert.equal(params.get("RecipientEmail"), "e@x.com");
 });
 
-test("la révocation Digify est configurable mais verrouillée sur api.digify.com", () => {
+test("la révocation technique utilise la suppression officielle d'un destinataire", () => {
   const env = {
     DIGIFY_KEY_ID: "key",
     DIGIFY_SECRET: "secret",
-    DIGIFY_REVOKE_RECIPIENT_URL: "https://api.digify.com/v1/example/revoke",
-    DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE: JSON.stringify({ FileGUID: "{{file_guid}}", RecipientEmail: "{{email}}", Reference: "{{order_id}}" }),
   };
   const request = digifyRevokeRequest({ fileGuid: "file-1", email: "buyer@example.com", orderId: "order-1" }, env);
-  assert.equal(new URL(request.url).hostname, "api.digify.com");
-  assert.equal(request.body.RecipientEmail, "buyer@example.com");
-  assert.throws(() => digifyRevokeRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { ...env, DIGIFY_REVOKE_RECIPIENT_URL: "https://example.com/revoke" }), /Endpoint Digify refusé/);
-});
-
-test("la révocation reste inactive tant que l'endpoint et le template officiels ne sont pas configurés", () => {
-  assert.throws(() => digifyRevokeRequest({ fileGuid: "f", email: "e@x.com", orderId: "o" }, { DIGIFY_KEY_ID: "key", DIGIFY_SECRET: "secret" }), /REVOKE_RECIPIENT_URL absent/);
+  assert.equal(request.url, "https://svc.digify.com/v1/file/recipient/remove");
+  const params = new URLSearchParams(request.body);
+  assert.equal(params.get("Guid"), "file-1");
+  assert.equal(params.get("RecipientEmail"), "buyer@example.com");
+  assert.throws(
+    () => digifyRevokeRequest(
+      { fileGuid: "f", email: "e@x.com", orderId: "o" },
+      { ...env, DIGIFY_REVOKE_RECIPIENT_URL: "https://example.com/revoke" },
+    ),
+    /Endpoint Digify refusé/,
+  );
 });
 
 test("le webhook Lemon et les processeurs Digify sont séparés", () => {

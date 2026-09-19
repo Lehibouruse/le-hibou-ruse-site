@@ -32,6 +32,11 @@ jobs:
             sleep 10
           done
 
+          echo "contains_checkout=$(grep -Fc "$CHECKOUT_HOST/checkout/buy/" "$home" || true)"
+          echo "contains_buy_cta=$(grep -Fc "Acheter le guide" "$home" || true)"
+          echo "contains_early_access=$(grep -Fc "V1 en cours d’enrichissement" "$home" || true)"
+          echo "contains_coming_soon=$(grep -Fic "bientôt disponible" "$home" || true)"
+          echo "contains_old_opening_note=$(grep -Fic "Ouverture commerciale après validation" "$home" || true)"
           test "$code" = "200"
           grep -Fq "$CHECKOUT_HOST/checkout/buy/" "$home"
           grep -Fq "Acheter le guide" "$home"

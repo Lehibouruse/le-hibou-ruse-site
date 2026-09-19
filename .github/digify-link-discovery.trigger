@@ -1,1 +1,1 @@
-2026-09-19 inspect Digify FileGUID and recipient API markers
+2026-09-19 discover official developer.digify.com API schema

@@ -1,1 +1,1 @@
-2026-09-19 second retrigger after repairing Digify readiness workflow.
+2026-09-19 validate Digify readiness parser and production credentials.

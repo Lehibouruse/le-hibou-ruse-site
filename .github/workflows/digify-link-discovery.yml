@@ -1,4 +1,4 @@
-name: Digify Developer Spec Discovery
+name: Digify API Contract Discovery
 
 on:
   push:
@@ -13,35 +13,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Discover official Digify API schema
+      - name: Extract recipient endpoints from official Postman collection
         shell: bash
         run: |
           set -euo pipefail
-          page=$(mktemp)
-          curl --silent --show-error --location 'https://developer.digify.com/' -o "$page"
-          echo '=== PAGE META ==='
-          wc -c "$page"
-          echo '=== POSSIBLE SPEC LINKS ==='
-          grep -Eo 'https?://[^"'\'' ]+|[^"'\'' ]+(openapi|swagger)[^"'\'' ]*|[^"'\'' ]+\.json' "$page" |             grep -Ei 'openapi|swagger|spec|api|json' | head -100 || true
-          echo '=== SCRIPT SRC ==='
-          grep -Eo 'src="[^"]+"' "$page" | head -80 || true
-          echo '=== ADD RECIPIENT MARKERS ==='
-          grep -Eio '.{0,220}(recipient/add|file/recipient|revoke|remove recipient|FileGUID).{0,500}' "$page" | head -80 || true
+          spec=$(mktemp)
+          curl --silent --show-error --location             'https://developer.digify.com/api/collections/21965707/UzQvu65E?environment=21965707-cc35a71f-0aec-458a-b297-402aaa3d4817&segregateAuth=true&versionTag=latest'             -o "$spec"
+          python3 - "$spec" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1], encoding='utf-8'))
 
-          while read -r src; do
-            [ -n "$src" ] || continue
-            case "$src" in
-              http*) full="$src" ;;
-              /*) full="https://developer.digify.com$src" ;;
-              *) full="https://developer.digify.com/$src" ;;
-            esac
-            js=$(mktemp)
-            if curl --silent --show-error --location "$full" -o "$js"; then
-              if grep -qiE 'recipient/add|openapi|swagger|FileGUID|revoke' "$js"; then
-                echo "=== MATCH IN $full ==="
-                grep -Eio '.{0,250}(recipient/add|file/recipient|FileGUID|revoke|openapi|swagger).{0,650}' "$js" | head -100 || true
-              fi
-            fi
-            rm -f "$js"
-          done < <(grep -Eo 'src="[^"]+"' "$page" | sed -E 's/^src="|"$//g' | head -40)
-          rm -f "$page"
+          def walk(items, path=()):
+              for item in items or []:
+                  p=path+(item.get('name',''),)
+                  if 'request' in item:
+                      req=item['request']
+                      url=req.get('url')
+                      if isinstance(url, dict):
+                          url=url.get('raw') or ''
+                      url=str(url or '')
+                      hay=(' '.join(p)+' '+url).lower()
+                      if any(k in hay for k in ['recipient','revoke','remove','access']):
+                          print('\n###', ' > '.join(p))
+                          print('METHOD', req.get('method'))
+                          print('URL', url)
+                          body=req.get('body') or {}
+                          print('BODY_MODE', body.get('mode'))
+                          for mode in ('raw','urlencoded','formdata'):
+                              v=body.get(mode)
+                              if isinstance(v, str):
+                                  print(mode.upper(), v[:4000])
+                              elif isinstance(v, list):
+                                  print(mode.upper())
+                                  for f in v:
+                                      print(json.dumps({k:f.get(k) for k in ('key','value','description','type')}, ensure_ascii=False))
+                          for resp in item.get('response') or []:
+                              print('RESPONSE', resp.get('name'), resp.get('code'))
+                              b=resp.get('body') or ''
+                              print(str(b)[:5000])
+                  walk(item.get('item'), p)
+          walk(data.get('item'))
+          PY
+          rm -f "$spec"

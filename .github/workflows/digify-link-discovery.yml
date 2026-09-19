@@ -1,4 +1,4 @@
-name: Digify File API Discovery
+name: Digify Read API Discovery
 
 on:
   push:
@@ -13,34 +13,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Extract Document Security file endpoints
+      - name: Extract safe read endpoints and auth definition
         shell: bash
         run: |
           set -euo pipefail
           spec=$(mktemp)
           curl --silent --show-error --location             'https://developer.digify.com/api/collections/21965707/UzQvu65E?environment=21965707-cc35a71f-0aec-458a-b297-402aaa3d4817&segregateAuth=true&versionTag=latest'             -o "$spec"
           python3 - "$spec" <<'PY'
-          import json, sys
-          data=json.load(open(sys.argv[1], encoding='utf-8'))
-          def walk(items, path=()):
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding='utf-8'))
+          print("COLLECTION AUTH", json.dumps(data.get('auth'), ensure_ascii=False)[:5000])
+          def walk(items,path=()):
               for item in items or []:
                   p=path+(item.get('name',''),)
-                  if 'request' in item and p[:2] == ('Document Security','File'):
-                      req=item['request']; url=req.get('url')
+                  if 'request' in item:
+                      req=item['request']; method=req.get('method')
+                      url=req.get('url')
                       if isinstance(url,dict): url=url.get('raw') or ''
-                      print('\n###',' > '.join(p))
-                      print('METHOD',req.get('method'))
-                      print('URL',url)
-                      body=req.get('body') or {}
-                      print('MODE',body.get('mode'))
-                      for mode in ('urlencoded','formdata','raw'):
-                          v=body.get(mode)
-                          if isinstance(v,list):
-                              for f in v:
-                                  print(json.dumps({k:f.get(k) for k in ('key','value','description')},ensure_ascii=False))
-                          elif isinstance(v,str):
-                              print(v[:3000])
-                  walk(item.get('item'), p)
+                      if method == 'GET' or any(k in ' '.join(p).lower() for k in ['account','profile','sent file','file list','retrieve file']):
+                          print("\n###",' > '.join(p))
+                          print("METHOD",method)
+                          print("URL",url)
+                          print("AUTH",json.dumps(req.get('auth'),ensure_ascii=False)[:3000])
+                          print("HEADERS",json.dumps(req.get('header'),ensure_ascii=False)[:3000])
+                  walk(item.get('item'),p)
           walk(data.get('item'))
           PY
           rm -f "$spec"

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { configMap, queryRecords, TABLES } from "../../../../lib/airtable";
-import { addDigifyRecipient, revokeDigifyRecipient } from "../../../../lib/commerce.mjs";
+import { addDigifyRecipient, revokeDigifyRecipient, searchDigifyFiles } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
@@ -45,9 +45,35 @@ export async function POST(request) {
   }
 
   const product = selectProduct(products);
-  const fileGuid = text(product?.fields?.["Digify File GUID"]);
+  const configuredFileGuid = text(product?.fields?.["Digify File GUID"]);
+
+  let searchFiles = [];
+  try {
+    const searched = await searchDigifyFiles({ searchQuery: "Hibou", pageIndex: 0, pageSize: 40 });
+    searchFiles = searched.files || [];
+  } catch (error) {
+    return NextResponse.json({
+      ok: false,
+      stage: "search",
+      search_ok: false,
+      error: String(error?.message || error).slice(0, 500),
+    }, { status: 422 });
+  }
+
+  const exact = searchFiles.find((item) => text(item?.Guid) === configuredFileGuid);
+  const candidate = exact
+    || searchFiles.find((item) => /le[_ ]?hibou|hibou/i.test(text(item?.Name)))
+    || searchFiles[0]
+    || null;
+  const fileGuid = text(candidate?.Guid);
+  const fileName = text(candidate?.Name);
   if (!fileGuid) {
-    return NextResponse.json({ ok: false, error: "Missing Digify File GUID" }, { status: 422 });
+    return NextResponse.json({
+      ok: false,
+      stage: "search",
+      search_ok: true,
+      error: "No Hibou file returned by Digify search",
+    }, { status: 422 });
   }
 
   let addOk = false;
@@ -98,5 +124,9 @@ export async function POST(request) {
     cleanup_error: cleanupError,
     probe_email: PROBE_EMAIL,
     selected_product: text(product?.fields?.Produit),
+    discovered_file_guid: fileGuid,
+    configured_file_guid: configuredFileGuid,
+    file_guid_matches: Boolean(configuredFileGuid && configuredFileGuid === fileGuid),
+    discovered_file_name: fileName,
   }, { status: addOk && removeOk ? 200 : 502, headers: { "Cache-Control": "no-store" } });
 }

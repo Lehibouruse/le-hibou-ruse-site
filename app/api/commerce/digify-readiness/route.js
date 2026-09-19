@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { configMap, queryRecords, TABLES } from "../../../../lib/airtable";
 import { DIGIFY_ADD_RECIPIENT_DEFAULT_URL, DIGIFY_REVOKE_RECIPIENT_DEFAULT_URL, digifyReadiness } from "../../../../lib/digify-config.mjs";
-import { listDigifyRecipients } from "../../../../lib/commerce.mjs";
+import { searchDigifyFiles } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
@@ -36,7 +36,8 @@ function nextAction(blockers) {
     missing_DIGIFY_SECRET: "Vérifier que DIGIFY_SECRET est lié au projet Vercel en Production.",
     missing_file_guid: "Charger le PDF dans Digify puis enregistrer son File GUID dans Produits site.",
     webhook_auth_not_ready: "Vérifier CRON_SECRET ou le couple DIGIFY_WEBHOOK_USERNAME/DIGIFY_WEBHOOK_PASSWORD.",
-    digify_api_probe_failed: "Les credentials ou le File GUID ne permettent pas de lire la liste des destinataires Digify. Vérifier la clé et le fichier.",
+    digify_api_probe_failed: "La clé Digify ne permet pas de rechercher les fichiers envoyés.",
+    file_guid_mismatch: "Le File GUID Airtable ne correspond pas au fichier Hibou retrouvé par l’API Digify.",
   };
   return messages[first] || "Aucun blocage technique détecté. Conserver commerce_launch_authorized=false jusqu'au test contrôlé.";
 }
@@ -67,21 +68,29 @@ export async function POST(request) {
   if (!runtime.webhook_auth_ready) blockers.push("webhook_auth_not_ready");
 
   let apiProbeOk = false;
-  let recipientCount = null;
+  let discoveredFileGuid = "";
+  let discoveredFileName = "";
+  let fileGuidMatchesSearch = false;
   let apiProbeError = "";
-  if (runtime.credentials_present && fileGuid) {
+  if (runtime.credentials_present) {
     try {
-      const probe = await listDigifyRecipients({ fileGuid });
+      const probe = await searchDigifyFiles({ searchQuery: "Hibou", pageIndex: 0, pageSize: 40 });
       apiProbeOk = true;
-      recipientCount = probe.recipients.length;
+      const files = probe.files || [];
+      const exact = files.find((item) => text(item?.Guid) === fileGuid);
+      const candidate = exact || files.find((item) => /hibou/i.test(text(item?.Name))) || files[0] || null;
+      discoveredFileGuid = text(candidate?.Guid);
+      discoveredFileName = text(candidate?.Name);
+      fileGuidMatchesSearch = Boolean(fileGuid && exact);
+      if (fileGuid && files.length && !fileGuidMatchesSearch) blockers.push("file_guid_mismatch");
     } catch (error) {
       apiProbeError = String(error?.message || error).slice(0, 300);
       blockers.push("digify_api_probe_failed");
     }
   }
 
-  const recipientContractReady = Boolean(runtime.credentials_present && apiProbeOk);
-  const revocationContractReady = Boolean(runtime.credentials_present && apiProbeOk);
+  const recipientContractReady = Boolean(runtime.credentials_present && apiProbeOk && fileGuidMatchesSearch);
+  const revocationContractReady = Boolean(runtime.credentials_present && apiProbeOk && fileGuidMatchesSearch);
   const deliveryRuntimeReady = Boolean(recipientContractReady && fileGuid);
   const revocationRuntimeReady = Boolean(revocationContractReady && fileGuid);
 
@@ -97,7 +106,9 @@ export async function POST(request) {
     recipient_contract_builtin: runtime.recipient_contract_builtin,
     revocation_contract_builtin: runtime.revocation_contract_builtin,
     api_probe_ok: apiProbeOk,
-    recipient_count: recipientCount,
+    discovered_file_guid: discoveredFileGuid,
+    discovered_file_name: discoveredFileName,
+    file_guid_matches_search: fileGuidMatchesSearch,
     api_probe_error: apiProbeError,
     webhook_auth_ready: runtime.webhook_auth_ready,
     webhook_auth_source: runtime.webhook_auth_source,

@@ -1,2 +1,1 @@
-2026-09-19
-Purpose: retrigger Digify readiness after Production DIGIFY_KEY_ID + DIGIFY_SECRET setup and redeploy.
+2026-09-19 second retrigger after repairing Digify readiness workflow.

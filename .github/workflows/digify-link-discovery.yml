@@ -1,4 +1,4 @@
-name: Digify Link Discovery
+name: Digify Developer Spec Discovery
 
 on:
   push:
@@ -11,39 +11,37 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
-      - name: Inspect Digify link and client API markers without side effects
+      - name: Discover official Digify API schema
         shell: bash
         run: |
           set -euo pipefail
-          url='https://digify.com/s/ydZRRg'
-          headers=$(mktemp)
-          body=$(mktemp)
-          meta=$(mktemp)
-          curl --silent --show-error --location             --dump-header "$headers"             --output "$body"             --write-out '%{http_code}\n%{url_effective}\n%{content_type}\n'             "$url" > "$meta"
-          echo '=== META ==='
-          cat "$meta"
-          echo '=== REDIRECT/LOCATION HEADERS ==='
-          grep -iE '^(HTTP/|location:|content-type:)' "$headers" || true
-          final_url=$(sed -n '2p' "$meta")
-          echo "FINAL_URL=$final_url"
-          candidate=$(printf '%s' "$final_url" | grep -Eo '[0-9a-fA-F]{32}' | tail -1 || true)
-          echo "FINAL_URL_GUID_CANDIDATE=$candidate"
+          page=$(mktemp)
+          curl --silent --show-error --location 'https://developer.digify.com/' -o "$page"
+          echo '=== PAGE META ==='
+          wc -c "$page"
+          echo '=== POSSIBLE SPEC LINKS ==='
+          grep -Eo 'https?://[^"'\'' ]+|[^"'\'' ]+(openapi|swagger)[^"'\'' ]*|[^"'\'' ]+\.json' "$page" |             grep -Ei 'openapi|swagger|spec|api|json' | head -100 || true
+          echo '=== SCRIPT SRC ==='
+          grep -Eo 'src="[^"]+"' "$page" | head -80 || true
+          echo '=== ADD RECIPIENT MARKERS ==='
+          grep -Eio '.{0,220}(recipient/add|file/recipient|revoke|remove recipient|FileGUID).{0,500}' "$page" | head -80 || true
 
-          echo '=== PAGE GUID-LIKE CANDIDATES ==='
-          grep -Eo '[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,36}' "$body" | sort -u | head -50 || true
-
-          main_js=$(grep -Eo 'src="main-[A-Z0-9]+\.js"' "$body" | head -1 | sed -E 's/^src="|"$//g' || true)
-          echo "MAIN_JS=$main_js"
-          if [ -n "$main_js" ]; then
+          while read -r src; do
+            [ -n "$src" ] || continue
+            case "$src" in
+              http*) full="$src" ;;
+              /*) full="https://developer.digify.com$src" ;;
+              *) full="https://developer.digify.com/$src" ;;
+            esac
             js=$(mktemp)
-            curl --silent --show-error --location "https://digify.com/a/$main_js" -o "$js"
-            echo '=== API ENDPOINT MARKERS IN DIGIFY CLIENT ==='
-            grep -Eo '.{0,240}/v1/file/recipient/[A-Za-z0-9_/-]+.{0,500}' "$js" | head -30 || true
-            grep -Eo '.{0,240}/v1/file/[A-Za-z0-9_/-]+.{0,500}' "$js" | grep -Ei 'recipient|revoke|access|share|file' | head -50 || true
-            echo '=== PAYLOAD FIELD MARKERS ==='
-            grep -Eo '.{0,160}(FileGUID|FileGuid|fileGUID|fileGuid|RecipientEmail|RecipientUserEmail|QuickAccess|Frictionless).{0,360}' "$js" | head -80 || true
+            if curl --silent --show-error --location "$full" -o "$js"; then
+              if grep -qiE 'recipient/add|openapi|swagger|FileGUID|revoke' "$js"; then
+                echo "=== MATCH IN $full ==="
+                grep -Eio '.{0,250}(recipient/add|file/recipient|FileGUID|revoke|openapi|swagger).{0,650}' "$js" | head -100 || true
+              fi
+            fi
             rm -f "$js"
-          fi
-          rm -f "$headers" "$body" "$meta"
+          done < <(grep -Eo 'src="[^"]+"' "$page" | sed -E 's/^src="|"$//g' | head -40)
+          rm -f "$page"

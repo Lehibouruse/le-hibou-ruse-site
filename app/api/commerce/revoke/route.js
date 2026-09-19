@@ -47,7 +47,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, error: String(error?.message || "Unauthorized").slice(0, 300) }, { status: 401 });
   }
 
-  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET && process.env.DIGIFY_REVOKE_RECIPIENT_URL && process.env.DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE);
+  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET);
   if (!configured) return NextResponse.json({ ok: true, processed: 0, reason: "revocation_not_configured", configured: false });
 
   const staleId = await clearStaleRevocation();

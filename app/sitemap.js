@@ -7,6 +7,7 @@ const STATIC_ROUTES = [
   "/confidentialite",
   "/conditions-utilisation",
   "/retractation",
+  "/suppression-donnees",
 ];
 
 export default function sitemap() {

@@ -1,0 +1,35 @@
+name: Lemon Live Checkout Reachability
+
+on:
+  push:
+    paths:
+      - 'docs/.lemon-live-checkout-smoke'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reachability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify live Lemon checkout page is reachable
+        shell: bash
+        env:
+          CHECKOUT: https://lehibouruse.lemonsqueezy.com/checkout/buy/87dc7bf9-4425-49c1-b385-4302e55ea24b
+        run: |
+          set -euo pipefail
+          body=$(mktemp)
+          code=$(curl --location --silent --show-error --connect-timeout 10 --max-time 25             -o "$body" -w '%{http_code}' "$CHECKOUT")
+          final=$(curl --location --silent --show-error --connect-timeout 10 --max-time 25             -o /dev/null -w '%{url_effective}' "$CHECKOUT")
+          echo "HTTP $code"
+          echo "FINAL $final"
+          test "$code" = "200"
+          case "$final" in
+            https://*.lemonsqueezy.com/*) ;;
+            *) echo "Unexpected checkout host" >&2; exit 1 ;;
+          esac
+          grep -Eiq 'checkout|Guide du Hibou|29|Lemon Squeezy' "$body"
+          echo "live_checkout_reachable=true"
+          rm -f "$body"

@@ -15,6 +15,7 @@ export async function GET() {
   return Response.json({
     ok: true,
     meta_app_id_present: present(env.META_APP_ID),
+    meta_app_id: present(env.META_APP_ID) ? String(env.META_APP_ID) : "",
     meta_app_secret_present: present(env.META_APP_SECRET),
     meta_graph_version_present: present(env.META_GRAPH_VERSION),
     meta_graph_version: present(env.META_GRAPH_VERSION) ? String(env.META_GRAPH_VERSION) : "",

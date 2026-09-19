@@ -1,0 +1,35 @@
+name: Digify Link Discovery
+
+on:
+  push:
+    paths:
+      - '.github/digify-link-discovery.trigger'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect Digify short link without side effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://digify.com/s/ydZRRg'
+          headers=$(mktemp)
+          body=$(mktemp)
+          meta=$(mktemp)
+          curl --silent --show-error --location             --dump-header "$headers"             --output "$body"             --write-out '%{http_code}\n%{url_effective}\n%{content_type}\n'             "$url" > "$meta"
+          echo '=== META ==='
+          cat "$meta"
+          echo '=== REDIRECT/LOCATION HEADERS ==='
+          grep -iE '^(HTTP/|location:|content-type:)' "$headers" || true
+          echo '=== GUID-LIKE CANDIDATES ==='
+          grep -Eo '[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,36}' "$body" | sort -u | head -50 || true
+          echo '=== DIGIFY MARKERS ==='
+          grep -Eoi '.{0,120}(FileGUID|fileGuid|file_guid|ydZRRg|Le_Hibou_Ruse|Livre_Partiel).{0,220}' "$body" | head -30 || true
+          echo '=== SCRIPT SRC ==='
+          grep -Eo 'src="[^"]+"' "$body" | head -30 || true
+          rm -f "$headers" "$body" "$meta"

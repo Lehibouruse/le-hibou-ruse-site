@@ -11,9 +11,9 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Inspect Digify short link without side effects
+      - name: Inspect Digify link and client API markers without side effects
         shell: bash
         run: |
           set -euo pipefail
@@ -26,10 +26,24 @@ jobs:
           cat "$meta"
           echo '=== REDIRECT/LOCATION HEADERS ==='
           grep -iE '^(HTTP/|location:|content-type:)' "$headers" || true
-          echo '=== GUID-LIKE CANDIDATES ==='
+          final_url=$(sed -n '2p' "$meta")
+          echo "FINAL_URL=$final_url"
+          candidate=$(printf '%s' "$final_url" | grep -Eo '[0-9a-fA-F]{32}' | tail -1 || true)
+          echo "FINAL_URL_GUID_CANDIDATE=$candidate"
+
+          echo '=== PAGE GUID-LIKE CANDIDATES ==='
           grep -Eo '[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,36}' "$body" | sort -u | head -50 || true
-          echo '=== DIGIFY MARKERS ==='
-          grep -Eoi '.{0,120}(FileGUID|fileGuid|file_guid|ydZRRg|Le_Hibou_Ruse|Livre_Partiel).{0,220}' "$body" | head -30 || true
-          echo '=== SCRIPT SRC ==='
-          grep -Eo 'src="[^"]+"' "$body" | head -30 || true
+
+          main_js=$(grep -Eo 'src="main-[A-Z0-9]+\.js"' "$body" | head -1 | sed -E 's/^src="|"$//g' || true)
+          echo "MAIN_JS=$main_js"
+          if [ -n "$main_js" ]; then
+            js=$(mktemp)
+            curl --silent --show-error --location "https://digify.com/a/$main_js" -o "$js"
+            echo '=== API ENDPOINT MARKERS IN DIGIFY CLIENT ==='
+            grep -Eo '.{0,240}/v1/file/recipient/[A-Za-z0-9_/-]+.{0,500}' "$js" | head -30 || true
+            grep -Eo '.{0,240}/v1/file/[A-Za-z0-9_/-]+.{0,500}' "$js" | grep -Ei 'recipient|revoke|access|share|file' | head -50 || true
+            echo '=== PAYLOAD FIELD MARKERS ==='
+            grep -Eo '.{0,160}(FileGUID|FileGuid|fileGUID|fileGuid|RecipientEmail|RecipientUserEmail|QuickAccess|Frictionless).{0,360}' "$js" | head -80 || true
+            rm -f "$js"
+          fi
           rm -f "$headers" "$body" "$meta"

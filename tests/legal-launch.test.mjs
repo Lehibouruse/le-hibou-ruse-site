@@ -35,7 +35,8 @@ test("les CGV early-access décrivent la V1 évolutive et préservent les droits
   assert.match(cgv, /consentement exprès/i);
   assert.match(cgv, /reconnaissance de la perte du droit/i);
   assert.match(cgv, /support durable/i);
-  assert.match(cgv, /aucun droit général de rétractation de 14 jours ne subsiste/i);\n  assert.match(cgv, /pas de politique commerciale de remboursement volontaire/i);
+  assert.match(cgv, /aucun droit général de rétractation de 14 jours ne subsiste/i);
+  assert.match(cgv, /pas de politique commerciale de remboursement volontaire/i);
   assert.match(cgv, /Aucune clause des présentes ne limite un droit impératif/i);
   assert.match(cgv, /contact@d4d5d6\.fr/);
 });

@@ -88,7 +88,7 @@ test("le checkout n'est ouvert que lorsque tous les contrôles stricts sont vert
   assert.match(result.checkoutUrl, /^https:/);
 });
 
-test("le checkout standard sans mention du PDF partiel ne peut pas ouvrir la vente", () => {
+test("le checkout live identifié reste requis pour ouvrir la vente", () => {
   const input = readyInput();
   delete input.config.lemon_live_checkout_id;
   const result = commercialReadiness(input);

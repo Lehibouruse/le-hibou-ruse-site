@@ -40,4 +40,12 @@ test("clearCommerceLease enlève toujours le token et l'expiration", () => {
     "Commerce lease expires": null,
   });
 });
-\ntest("un remboursement garde toute livraison en cours révocable", () => {\n  assert.equal(refundDeliveryStatus("processing"), "revocation_pending");\n  assert.equal(refundDeliveryStatus("delivered"), "revocation_pending");\n  assert.equal(refundDeliveryStatus("revocation_pending"), "revocation_pending");\n  assert.equal(refundDeliveryStatus("revoking"), "revoking");\n  assert.equal(refundDeliveryStatus("pending"), "revoked");\n  assert.equal(refundDeliveryStatus("manual_review"), "manual_review");\n});\n
+
+test("un remboursement garde toute livraison en cours révocable", () => {
+  assert.equal(refundDeliveryStatus("processing"), "revocation_pending");
+  assert.equal(refundDeliveryStatus("delivered"), "revocation_pending");
+  assert.equal(refundDeliveryStatus("revocation_pending"), "revocation_pending");
+  assert.equal(refundDeliveryStatus("revoking"), "revoking");
+  assert.equal(refundDeliveryStatus("pending"), "revoked");
+  assert.equal(refundDeliveryStatus("manual_review"), "manual_review");
+});

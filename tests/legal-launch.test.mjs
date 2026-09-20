@@ -26,9 +26,10 @@ test("la politique de confidentialité identifie les prestataires essentiels et 
   assert.match(privacy, /ne stocke pas les numéros complets de carte bancaire/i);
 });
 
-test("les CGV early-access décrivent la V1 évolutive et préservent les droits impératifs du contenu numérique", () => {
+test("les CGV décrivent l’édition numérique évolutive et préservent les droits impératifs du contenu numérique", () => {
   assert.match(cgv, /Version en vigueur/);
-  assert.match(cgv, /V1 en cours d’enrichissement/i);
+  assert.match(cgv, /édition numérique disponible au moment de la commande/i);
+  assert.doesNotMatch(cgv, /V1 en cours d’enrichissement/i);
   assert.match(cgv, /LLC de droit du Nouveau-Mexique/i);
   assert.match(cgv, /29 €/);
   assert.match(cgv, /Merchant of Record/);

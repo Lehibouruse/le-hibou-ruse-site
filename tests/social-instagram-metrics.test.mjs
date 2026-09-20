@@ -12,10 +12,10 @@ function response(status, data, statusText = "") {
 }
 
 const env = {
-  META_ACCESS_TOKEN: "secret-instagram-token",
-  META_GRAPH_VERSION: "v26.0",
+  INSTAGRAM_ACCESS_TOKEN: "secret-instagram-token",
+  INSTAGRAM_GRAPH_VERSION: "v26.0",
 };
-const scopes = "pages_read_engagement instagram_manage_insights instagram_basic instagram_content_publish";
+const scopes = "instagram_business_basic instagram_business_manage_insights instagram_business_content_publish";
 
 test("normalizeInstagramEnhancedMetrics conserve le schéma canonique et les champs insights utiles", () => {
   const metric = normalizeInstagramEnhancedMetrics("ig-1", {
@@ -77,8 +77,8 @@ test("une métrique non disponible ne fait plus échouer tous les insights Insta
   assert.equal(metric.total_interactions, 21);
   assert.equal(metric.analytics_status, "active");
   assert.equal(metric.analytics_metrics.includes("plays"), true);
-  assert.equal(calls.every((call) => !call.url.includes(env.META_ACCESS_TOKEN)), true);
-  assert.equal(calls.every((call) => call.auth === `Bearer ${env.META_ACCESS_TOKEN}`), true);
+  assert.equal(calls.every((call) => !call.url.includes(env.INSTAGRAM_ACCESS_TOKEN)), true);
+  assert.equal(calls.every((call) => call.auth === `Bearer ${env.INSTAGRAM_ACCESS_TOKEN}`), true);
 });
 
 test("un refus 403 d'Instagram Insights remonte needs_reauth", async () => {
@@ -93,20 +93,20 @@ test("un refus 403 d'Instagram Insights remonte needs_reauth", async () => {
   );
 });
 
-test("instagram_manage_insights manquant bloque les analytics avant tout appel réseau", async () => {
+test("instagram_business_manage_insights manquant bloque les analytics avant tout appel réseau", async () => {
   let called = false;
   const fetchImpl = async () => { called = true; return response(500, {}); };
   await assert.rejects(
-    () => fetchInstagramEnhancedMetrics("ig-4", env, fetchImpl, "pages_read_engagement instagram_basic"),
-    (error) => error?.code === "needs_reauth" && /instagram_manage_insights/.test(error.message),
+    () => fetchInstagramEnhancedMetrics("ig-4", env, fetchImpl, "instagram_business_basic"),
+    (error) => error?.code === "needs_reauth" && /instagram_business_manage_insights/.test(error.message),
   );
   assert.equal(called, false);
 });
 
 test("un token éventuellement renvoyé dans une erreur fournisseur est expurgé", async () => {
-  const fetchImpl = async () => response(500, { error: { message: `bad token ${env.META_ACCESS_TOKEN}` } });
+  const fetchImpl = async () => response(500, { error: { message: `bad token ${env.INSTAGRAM_ACCESS_TOKEN}` } });
   await assert.rejects(
     () => fetchInstagramEnhancedMetrics("ig-5", env, fetchImpl, scopes),
-    (error) => !error.message.includes(env.META_ACCESS_TOKEN) && error.message.includes("[redacted]"),
+    (error) => !error.message.includes(env.INSTAGRAM_ACCESS_TOKEN) && error.message.includes("[redacted]"),
   );
 });

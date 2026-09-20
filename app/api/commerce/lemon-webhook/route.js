@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { canonicalSale, escapeFormula, lemonOrder, resolveLemonWebhookSecret, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
 import { saleAttribution } from "../../../../lib/attribution.mjs";
+import { refundDeliveryStatus } from "../../../../lib/commerce-lease.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -166,10 +167,7 @@ export async function POST(request) {
     const deliveryStatus = String(existing.fields?.["Livraison statut"] || "");
     // A refund can arrive while Digify is adding the recipient. Keep that order
     // in the revocation queue; the delivery worker rechecks after the API call.
-    const revokeNeeded = ["delivered", "processing", "revocation_pending"].includes(deliveryStatus);
-    const nextStatus = deliveryStatus === "revoking" ? "revoking"
-      : ["manual_review", "failed"].includes(deliveryStatus) ? "manual_review"
-        : revokeNeeded ? "revocation_pending" : "revoked";
+    const nextStatus = refundDeliveryStatus(deliveryStatus);
     await updateRecord(TABLES.sales, existing.id, {
       Statut: "refunded",
       "Identifiant commande public": order.identifier,

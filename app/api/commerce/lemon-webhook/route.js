@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
-import { canonicalSale, escapeFormula, lemonOrder, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
+import { canonicalSale, escapeFormula, lemonOrder, resolveLemonWebhookSecret, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
 import { saleAttribution } from "../../../../lib/attribution.mjs";
 
 export const runtime = "nodejs";
@@ -131,7 +131,7 @@ async function recordEarlyRefund(order) {
 export async function POST(request) {
   const raw = Buffer.from(await request.arrayBuffer());
   const signature = request.headers.get("x-signature") || "";
-  const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET || "";
+  const secret = resolveLemonWebhookSecret(process.env);
   if (!verifyLemonSignature(raw, signature, secret)) {
     return NextResponse.json({ ok: false, error: "Invalid signature" }, { status: 401 });
   }
@@ -163,15 +163,21 @@ export async function POST(request) {
       await journal(order, "Completed", "Remboursement enregistré avant order_created; tombstone anti-livraison créée", saleId || order.id);
       return NextResponse.json({ ok: true, refunded: true, sale_id: saleId, out_of_order: true });
     }
-    const delivered = String(existing.fields?.["Livraison statut"] || "") === "delivered";
+    const deliveryStatus = String(existing.fields?.["Livraison statut"] || "");
+    // A refund can arrive while Digify is adding the recipient. Keep that order
+    // in the revocation queue; the delivery worker rechecks after the API call.
+    const revokeNeeded = ["delivered", "processing", "revocation_pending"].includes(deliveryStatus);
+    const nextStatus = deliveryStatus === "revoking" ? "revoking"
+      : ["manual_review", "failed"].includes(deliveryStatus) ? "manual_review"
+        : revokeNeeded ? "revocation_pending" : "revoked";
     await updateRecord(TABLES.sales, existing.id, {
       Statut: "refunded",
       "Identifiant commande public": order.identifier,
       Remboursement: order.refundedAt || new Date().toISOString(),
-      "Livraison statut": delivered ? "revocation_pending" : "revoked",
-      "Livraison erreur": delivered ? "Accès Digify à révoquer; automatisation de révocation non activée tant que le schéma API officiel n'est pas configuré." : "",
+      "Livraison statut": nextStatus,
+      ...(nextStatus === "revocation_pending" ? { "Livraison erreur": "Remboursement reçu; retrait de l'accès Digify en attente." } : {}),
     });
-    await journal(order, "Completed", delivered ? "Vente remboursée; révocation Digify mise en attente" : "Vente remboursée avant livraison", existing.id);
+    await journal(order, "Completed", nextStatus === "revocation_pending" ? "Vente remboursée; révocation Digify mise en attente" : "Vente remboursée; accès absent, déjà révoqué ou en revue", existing.id);
     return NextResponse.json({ ok: true, refunded: true, sale_id: existing.id, deduplicated: saleIsRefunded(existing.fields) });
   }
 

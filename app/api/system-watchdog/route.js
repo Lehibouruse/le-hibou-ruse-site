@@ -21,7 +21,8 @@ const OIDC_WORKFLOW = "system-watchdog.yml";
 const PROVIDER_PLATFORMS = {
   youtube: ["YouTube"],
   tiktok: ["TikTok"],
-  meta: ["Facebook", "Instagram"],
+  meta: ["Facebook"],
+  instagram: ["Instagram"],
   linkedin: ["LinkedIn"],
   pinterest: ["Pinterest"],
   x: ["X"],

@@ -1,5 +1,5 @@
-import { queryRecords, TABLES, updateRecord } from "../../../../lib/airtable.js";
-import { verifyMetaSignedRequest } from "../../../../lib/meta-signed-request.mjs";
+import { queryRecords, TABLES, updateRecord } from "../../../../../lib/airtable.js";
+import { verifyMetaSignedRequest } from "../../../../../lib/meta-signed-request.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

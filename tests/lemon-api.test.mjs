@@ -102,7 +102,7 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
 
 test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () => {
   assert.match(route, /async function existingTestCheckout/);
-  assert.match(route, /retrieveLemonCheckout\(id\)/);
+  assert.match(route, /retrieveLemonCheckout\(id, \{ apiKey \}\)/);
   assert.match(route, /attrs\.test_mode !== true/);
   assert.match(route, /Store ID différent/);
   assert.match(route, /Variant ID différent/);

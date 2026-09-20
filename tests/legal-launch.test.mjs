@@ -21,7 +21,7 @@ test("les mentions légales early-access restent factuelles sur la structure non
 test("la politique de confidentialité identifie les prestataires essentiels et un canal d'exercice des droits", () => {
   for (const item of ["Vercel", "Airtable", "Lemon Squeezy", "Digify", "CNIL"]) assert.match(privacy, new RegExp(item));
   assert.match(privacy, /Version en vigueur/);
-  assert.match(privacy, /LLC du Nouveau-Mexique en cours de formation/i);
+  assert.match(privacy, /Le Hibou Rusé, LLC de droit du Nouveau-Mexique.*en cours de formation/i);
   assert.match(privacy, /contact@d4d5d6\.fr/);
   assert.match(privacy, /ne stocke pas les numéros complets de carte bancaire/i);
 });
@@ -35,7 +35,8 @@ test("les CGV early-access décrivent la V1 évolutive et préservent les droits
   assert.match(cgv, /consentement exprès/i);
   assert.match(cgv, /reconnaissance de la perte du droit/i);
   assert.match(cgv, /support durable/i);
-  assert.match(cgv, /ne prétendent pas supprimer un droit de rétractation/i);
+  assert.match(cgv, /aucun droit général de rétractation de 14 jours ne subsiste/i);
+  assert.match(cgv, /pas de politique commerciale de remboursement volontaire/i);
   assert.match(cgv, /Aucune clause des présentes ne limite un droit impératif/i);
   assert.match(cgv, /contact@d4d5d6\.fr/);
 });

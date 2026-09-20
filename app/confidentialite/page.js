@@ -4,10 +4,10 @@ export const metadata = { title: "Confidentialité" };
 
 export default function Page() {
   return <LegalPage title="Confidentialité">
-    <p><strong>Version en vigueur : 19 septembre 2026.</strong></p>
+    <p><strong>Version en vigueur : 20 septembre 2026.</strong></p>
 
     <h2>Responsable opérationnel</h2>
-    <p>Le Hibou Rusé est un projet éditorial exploité avant immatriculation de la structure dédiée, envisagée sous la forme d’une LLC du Nouveau-Mexique en cours de formation. Contact vie privée : <strong>contact@d4d5d6.fr</strong>.</p>
+    <p>Le Hibou Rusé est un projet éditorial exploité avant immatriculation de sa structure dédiée. La structure envisagée est <strong>Le Hibou Rusé, LLC de droit du Nouveau-Mexique, actuellement en cours de formation et non encore immatriculée</strong>. Cette mention ne signifie pas qu’une personne morale existe déjà. Contact vie privée : <strong>contact@d4d5d6.fr</strong>.</p>
 
     <h2>Données traitées</h2>
     <p>Le service peut traiter les données nécessaires aux demandes de contact, à la commande, à la livraison du guide, au support, à la sécurité et à une mesure d’audience limitée : notamment e-mail, référence de commande, statut de paiement, état d’accès Digify et informations techniques nécessaires au fonctionnement.</p>

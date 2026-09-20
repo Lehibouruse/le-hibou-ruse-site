@@ -4,11 +4,12 @@ export const metadata = { title: "Mentions légales" };
 
 export default function Page() {
   return <LegalPage title="Mentions légales">
-    <p><strong>Version en vigueur : 19 septembre 2026.</strong></p>
+    <p><strong>Version en vigueur : 20 septembre 2026.</strong></p>
 
     <h2>Éditeur du site</h2>
-    <p><strong>Le Hibou Rusé</strong> est un projet éditorial actuellement exploité avant immatriculation de la structure dédiée.</p>
-    <p>Structure envisagée : <strong>Limited Liability Company (LLC) de droit du Nouveau-Mexique, États-Unis, en cours de formation et non encore immatriculée</strong>. Cette mention ne signifie pas qu’une personne morale existe déjà.</p>
+    <p><strong>Le Hibou Rusé</strong> est la marque éditoriale du projet actuellement exploité avant immatriculation de sa structure dédiée.</p>
+    <p>Structure dédiée envisagée : <strong>Le Hibou Rusé, Limited Liability Company (LLC) de droit du Nouveau-Mexique, États-Unis, actuellement en cours de formation et non encore immatriculée</strong>. Cette mention décrit le projet de structuration et ne signifie pas qu’une personne morale existe déjà.</p>
+    <p>Les identifiants, adresse et autres informations d’immatriculation de la future LLC ne seront publiés qu’après sa constitution effective. Aucun numéro ou identifiant provisoire n’est présenté comme définitif.</p>
     <p>Contact : <strong>contact@d4d5d6.fr</strong>.</p>
 
     <h2>Vente et paiement</h2>

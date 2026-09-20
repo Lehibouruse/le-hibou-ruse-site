@@ -7,10 +7,10 @@ const withdrawal = fs.readFileSync(new URL("../app/retractation/page.js", import
 
 test("la fonctionnalité de rétractation est directement accessible depuis le footer public", () => {
   assert.match(home, /href="\/retractation"/);
-  assert.match(home, /Renoncer au contrat ici/);
+  assert.match(home, /Rétractation — informations légales/);
 });
 
 test("la page de rétractation rappelle le caractère durable de l'accusé avant lancement", () => {
   assert.match(withdrawal, /support durable/i);
-  assert.match(withdrawal, /validé avant l’ouverture commerciale définitive/i);
+  assert.match(withdrawal, /confirmation correspondante.*support durable/i);
 });

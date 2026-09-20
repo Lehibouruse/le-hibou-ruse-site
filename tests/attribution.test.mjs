@@ -20,7 +20,7 @@ test("capture une campagne et conserve la landing initiale", () => {
   assert.match(captured.referrer, /^https:\/\/www\.tiktok\.com/);
 });
 
-test("un checkout Lemon reçoit uniquement des custom data bornées", () => {
+test("un checkout Lemon non signé reçoit uniquement des custom data bornées", () => {
   const href = checkoutWithAttribution(
     "https://hibou.lemonsqueezy.com/checkout/buy/abc?embed=1",
     { utm_source: "youtube", utm_campaign: "video-test", utm_content: "hook-a" },
@@ -32,6 +32,16 @@ test("un checkout Lemon reçoit uniquement des custom data bornées", () => {
   assert.equal(url.searchParams.get("checkout[custom][utm_content]"), "hook-a");
   assert.equal(url.searchParams.get("checkout[custom][click_event]"), "checkout_opened");
   assert.equal(url.searchParams.get("embed"), "1");
+});
+
+test("un checkout Lemon signé reste strictement inchangé", () => {
+  const raw = "https://hibou.lemonsqueezy.com/checkout/buy/abc?expires=1790000000&signature=deadbeef&embed=1";
+  const href = checkoutWithAttribution(
+    raw,
+    { utm_source: "instagram", utm_campaign: "launch", utm_content: "reel-001" },
+    "checkout_opened",
+  );
+  assert.equal(href, raw);
 });
 
 test("aucune donnée n'est ajoutée à un lien non Lemon", () => {

@@ -11,6 +11,7 @@ on:
         options:
           - inspect_live
           - webhook_live
+          - checkout_live
           - full_live_infra
 
 permissions:
@@ -38,6 +39,7 @@ jobs:
           case "$ACTION" in
             inspect_live) actions=(inspect_live) ;;
             webhook_live) actions=(webhook_live) ;;
+            checkout_live) actions=(checkout_live) ;;
             full_live_infra) actions=(inspect_live webhook_live) ;;
             *) echo "Unsupported action" >&2; exit 2 ;;
           esac
@@ -71,5 +73,5 @@ jobs:
               echo "Lemon live bootstrap HTTP failure: $http_code" >&2
               exit 1
             fi
-            python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; assert d.get("mode") == "live_infra_only"; assert d.get("public_checkout_enabled") is False; print("lemon_live_ok=true")' <<< "$response"
+            python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; assert d.get("mode") == "live_infra_only"; assert d.get("public_checkout_enabled") is (d.get("action") == "checkout_live"); print("lemon_live_ok=true")' <<< "$response"
           done

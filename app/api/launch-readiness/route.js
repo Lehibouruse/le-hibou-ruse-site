@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { configMap, getRecords, TABLES } from "../../../lib/airtable";
+import { configMap, getAllRecords, getRecords, TABLES } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 
@@ -25,7 +25,7 @@ export async function GET(request) {
   }
 
   const [configuration, products, chapters, legal] = await Promise.all([
-    getRecords(TABLES.configuration),
+    getAllRecords(TABLES.configuration, { maxRecords: 500 }),
     getRecords(TABLES.products),
     getRecords(TABLES.book),
     getRecords(TABLES.legal),

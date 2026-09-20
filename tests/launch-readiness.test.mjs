@@ -21,6 +21,8 @@ function readyInput() {
     config: {
       payment_provider: "lemon_squeezy",
       checkout_url: "https://example.lemonsqueezy.com/buy/abc",
+      lemon_live_checkout_id: "checkout-123",
+      lemon_checkout_status: "LIVE_PUBLIC",
       commerce_launch_authorized: "true",
       commerce_readiness_mode: "strict",
       book_current_edition: "V1.0-2026-09",
@@ -84,6 +86,14 @@ test("le checkout n'est ouvert que lorsque tous les contrôles stricts sont vert
   assert.equal(result.ready, true);
   assert.equal(result.blockers.length, 0);
   assert.match(result.checkoutUrl, /^https:/);
+});
+
+test("le checkout standard sans mention du PDF partiel ne peut pas ouvrir la vente", () => {
+  const input = readyInput();
+  delete input.config.lemon_live_checkout_id;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "live_checkout_verified"));
 });
 
 test("le kill switch bloque même une configuration technique complète", () => {

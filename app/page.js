@@ -1,7 +1,7 @@
 import Brand from "../components/Brand";
 import LeadForm from "../components/LeadForm";
 import TrackedLink from "../components/TrackedLink";
-import { block, configMap, getRecords, TABLES } from "../lib/airtable";
+import { block, configMap, getAllRecords, getRecords, TABLES } from "../lib/airtable";
 import { commercialReadiness } from "../lib/launch-readiness.mjs";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export default async function Home() {
     getRecords(TABLES.cms),
     getRecords(TABLES.articles),
     getRecords(TABLES.products),
-    getRecords(TABLES.configuration),
+    getAllRecords(TABLES.configuration, { maxRecords: 500 }),
     getRecords(TABLES.book),
     getRecords(TABLES.legal),
   ]);

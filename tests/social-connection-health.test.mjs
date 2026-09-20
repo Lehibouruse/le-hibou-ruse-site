@@ -18,6 +18,7 @@ test("les contrôles OAuth sont strictement des lectures distantes d'identité",
     "graph.instagram.com",
     "graph.instagram.com",
     "api.pinterest.com/v5/user_account",
+    "com.atproto.server.createSession",
   ]) assert.ok(health.includes(endpoint), endpoint);
   assert.doesNotMatch(health, /dispatchSocialPost|media_publish|threads_publish|video_reels|pins\s*\/\s*create/);
 });

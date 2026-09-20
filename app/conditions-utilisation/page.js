@@ -4,7 +4,7 @@ export const metadata = { title: "Conditions d’utilisation" };
 
 export default function Page() {
   return <LegalPage title="Conditions d’utilisation">
-    <p><strong>Version de pré-lancement.</strong> Ces conditions encadrent l’utilisation du site et de ses contenus publics. L’achat du guide numérique relève en outre des Conditions générales de vente applicables au moment de la commande.</p>
+    <p><strong>Version en vigueur : 20 septembre 2026.</strong> Ces conditions encadrent l’utilisation du site et de ses contenus publics. L’achat du guide numérique relève en outre des Conditions générales de vente applicables au moment de la commande.</p>
 
     <h2>1. Objet du site</h2>
     <p>Le Hibou Rusé publie des contenus pédagogiques et documentaires consacrés notamment à la fiscalité, au patrimoine, à l’entrepreneuriat, aux aides publiques, au financement et à l’investissement. L’objectif est d’expliquer des mécanismes, leurs interactions, leurs conditions et leurs risques.</p>
@@ -37,6 +37,6 @@ export default function Page() {
     <p>Les traitements de données sont décrits dans la politique de confidentialité. Les conditions propres à l’achat et à la fourniture du guide numérique figurent dans les CGV. Ces documents complètent les présentes conditions sans se substituer les uns aux autres.</p>
 
     <h2>11. Évolution des conditions</h2>
-    <p>Ces conditions peuvent évoluer avec le service. La version publiée sur le site est celle applicable à l’utilisation des contenus publics à compter de sa date d’entrée en vigueur. La version de pré-lancement actuelle n’a pas vocation à masquer les informations légales qui doivent encore être complétées avant ouverture commerciale.</p>
+    <p>Ces conditions peuvent évoluer avec le service. La version publiée sur le site est celle applicable à l’utilisation des contenus publics à compter de sa date d’entrée en vigueur. Toute mise à jour substantielle est reflétée dans la version publiée.</p>
   </LegalPage>;
 }

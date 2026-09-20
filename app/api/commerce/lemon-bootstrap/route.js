@@ -124,11 +124,11 @@ function safeLemonCheckoutUrl(value) {
   }
 }
 
-async function existingTestCheckout(config, storeId, variantId) {
+async function existingTestCheckout(config, storeId, variantId, apiKey) {
   const id = text(config.lemon_test_checkout_id);
   if (!id) return null;
   try {
-    const checkout = await retrieveLemonCheckout(id);
+    const checkout = await retrieveLemonCheckout(id, { apiKey });
     const attrs = checkout?.attributes || {};
     if (attrs.test_mode !== true) throw new Error("Checkout Lemon enregistré incompatible: test_mode=false");
     if (String(attrs.store_id ?? "") !== String(storeId)) throw new Error("Checkout Lemon enregistré incompatible: Store ID différent");
@@ -142,47 +142,45 @@ async function existingTestCheckout(config, storeId, variantId) {
   }
 }
 
-async function inspectLemon(state) {
-  if (!process.env.LEMON_SQUEEZY_API_KEY) throw new Error("LEMON_SQUEEZY_API_KEY absent du serveur");
+async function inspectLemon(state, apiKey) {
+  if (!apiKey) throw new Error("LEMON_SQUEEZY_TEST_API_KEY absent du serveur");
   if (!truthy(state.config.lemon_test_mode_only)) throw new Error("lemon_test_mode_only doit rester TRUE pendant le bootstrap");
   if (!state.productRecord) throw new Error("Produit Airtable actif introuvable");
 
   const expectedName = text(state.config.lemon_product_name || state.productRecord.fields?.Produit || "Le guide du Hibou Rusé");
-  const stores = await listLemonStores();
-  const store = chooseStore(stores, state.config.lemon_store_id);
+  const stores = await listLemonStores({ apiKey });
+  const store = chooseStore(stores, state.config.lemon_test_store_id);
   const storeId = lemonResourceId(store);
 
-  const products = await listLemonProducts(storeId);
-  const product = chooseProduct(products, expectedName, state.productRecord.fields?.["Lemon Squeezy Product ID"] || state.config.lemon_product_id);
+  const products = await listLemonProducts(storeId, { apiKey });
+  const product = chooseProduct(products, expectedName, state.config.lemon_test_product_id);
   const productId = lemonResourceId(product);
 
-  const variants = await listLemonVariants(productId);
-  const variant = chooseVariant(variants, state.productRecord.fields?.["Lemon Squeezy Variant ID"] || state.config.lemon_variant_id);
+  const variants = await listLemonVariants(productId, { apiKey });
+  const variant = chooseVariant(variants, state.config.lemon_test_variant_id);
   const variantId = lemonResourceId(variant);
   const variantPrice = Number(variant?.attributes?.price || 0);
 
+  if (product?.attributes?.test_mode !== true) throw new Error("Produit Lemon de test refusé: test_mode non confirmé");
+  if (variant?.attributes?.test_mode !== true) throw new Error("Variant Lemon de test refusé: test_mode non confirmé");
   if (variant?.attributes?.is_subscription === true) throw new Error("Le variant Hibou ne doit pas être un abonnement");
   if (variantPrice !== 2900) throw new Error(`Prix variant inattendu: ${variantPrice} centimes`);
 
-  await updateRecord(TABLES.products, state.productRecord.id, {
-    "Lemon Squeezy Product ID": productId,
-    "Lemon Squeezy Variant ID": variantId,
-  });
   await Promise.all([
-    upsertConfig("lemon_store_id", storeId, "Store ID Lemon détecté via API."),
-    upsertConfig("lemon_product_id", productId, "Product ID Lemon détecté via API."),
-    upsertConfig("lemon_variant_id", variantId, "Variant ID Lemon 29 € détecté via API."),
-    upsertConfig("lemon_api_status", "CONNECTED_TEST_ONLY", "API Lemon authentifiée; opérations mutantes limitées au test mode."),
-    upsertConfig("lemon_product_status", "API_DISCOVERED", "Produit réel trouvé via API; fichier partiel temporaire autorisé uniquement pour tests."),
+    upsertConfig("lemon_test_store_id", storeId, "Store ID Lemon détecté avec la clé API Test."),
+    upsertConfig("lemon_test_product_id", productId, "Product ID Lemon Test détecté via API."),
+    upsertConfig("lemon_test_variant_id", variantId, "Variant ID Lemon Test 29 € détecté via API."),
+    upsertConfig("lemon_test_api_status", "CONNECTED_TEST_ONLY", "Clé API Lemon Test authentifiée; aucune ressource Live utilisée."),
+    upsertConfig("lemon_test_product_status", "API_DISCOVERED", "Produit Test trouvé via API; séparé des IDs Live."),
   ]);
 
   return { store, storeId, product, productId, variant, variantId, variantPrice };
 }
 
-async function ensureTestWebhook(storeId, baseUrl) {
+async function ensureTestWebhook(storeId, baseUrl, apiKey) {
   const endpoint = `${baseUrl}/api/commerce/lemon-webhook`;
   const requiredEvents = ["order_created", "order_refunded"];
-  const existing = await listLemonWebhooks(storeId);
+  const existing = await listLemonWebhooks(storeId, { apiKey });
   const sameEndpoint = existing.filter((item) => text(item?.attributes?.url) === endpoint);
   const exact = sameEndpoint.find((item) => item?.attributes?.test_mode === true
     && requiredEvents.every((event) => (item?.attributes?.events || []).includes(event)));
@@ -196,7 +194,7 @@ async function ensureTestWebhook(storeId, baseUrl) {
     url: endpoint,
     events: requiredEvents,
     secret,
-  });
+  }, { apiKey });
   return { id: created.id, reused: false };
 }
 
@@ -222,7 +220,8 @@ export async function POST(request) {
     }
 
     const state = await loadState();
-    const inspected = await inspectLemon(state);
+    const testApiKey = text(process.env.LEMON_SQUEEZY_TEST_API_KEY);
+    const inspected = await inspectLemon(state, testApiKey);
     const baseUrl = testBaseUrl(state.config);
     const result = {
       ok: true,
@@ -235,7 +234,7 @@ export async function POST(request) {
     };
 
     if (action === "checkout_test") {
-      const existing = await existingTestCheckout(state.config, inspected.storeId, inspected.variantId);
+      const existing = await existingTestCheckout(state.config, inspected.storeId, inspected.variantId, testApiKey);
       const checkout = existing || await createTestLemonCheckout({
         storeId: inspected.storeId,
         variantId: inspected.variantId,
@@ -245,7 +244,7 @@ export async function POST(request) {
         receiptButtonText: text(state.config.lemon_receipt_button_text || "Lire mon guide"),
         receiptLinkUrl: `${baseUrl}/merci?order=[order_identifier]`,
         receiptThankYouNote: text(state.config.lemon_receipt_thank_you_note),
-      });
+      }, { apiKey: testApiKey });
       result.test_checkout_id = checkout.id;
       result.test_checkout_url = checkout.url;
       result.test_checkout_reused = Boolean(checkout.reused);
@@ -257,7 +256,7 @@ export async function POST(request) {
     }
 
     if (action === "webhook_test") {
-      const webhook = await ensureTestWebhook(inspected.storeId, baseUrl);
+      const webhook = await ensureTestWebhook(inspected.storeId, baseUrl, testApiKey);
       result.test_webhook_id = webhook.id;
       result.test_webhook_reused = webhook.reused;
       await Promise.all([

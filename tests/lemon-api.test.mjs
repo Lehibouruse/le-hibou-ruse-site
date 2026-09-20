@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import {
   buildTestCheckoutPayload,
+  buildLiveCheckoutPayload,
   buildTestWebhookPayload,
   lemonRequest,
   retrieveLemonCheckout,
@@ -124,4 +125,22 @@ test("le webhook persiste l'order_identifier dans le champ dédié et /merci le 
   assert.match(webhookRoute, /"Identifiant commande public": order\.identifier/);
   assert.match(accessRoute, /\{Identifiant commande public\}='\$\{safeIdentifier\}'/);
   assert.match(accessRoute, /safeLegacyMarker/);
+});
+
+
+test("le checkout live exige la mention de version partielle et refuse test_mode", () => {
+  const input = {
+    storeId: "475333",
+    variantId: "2140119",
+    productName: "Guide du Hibou Rusé — version partielle actuelle",
+    description: "Version partielle actuelle : PDF V1 disponible aujourd’hui.",
+    redirectUrl: "https://d4d5d6.com/merci?order=[order_identifier]",
+    receiptLinkUrl: "https://d4d5d6.com/merci?order=[order_identifier]",
+  };
+  const payload = buildLiveCheckoutPayload(input);
+  assert.equal(payload.data.attributes.test_mode, false);
+  assert.equal(payload.data.attributes.checkout_options.desc, true);
+  assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [2140119]);
+  assert.match(payload.data.attributes.product_options.description, /partielle/i);
+  assert.throws(() => buildLiveCheckoutPayload({ ...input, description: "Guide complet" }), /version partielle/);
 });

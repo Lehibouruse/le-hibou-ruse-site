@@ -89,7 +89,7 @@ test("le webhook Lemon et les processeurs Digify sont séparés", () => {
   const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
   const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
   const revoke = readFileSync(new URL("../app/api/commerce/revoke/route.js", import.meta.url), "utf8");
-  assert.match(lemon, /LEMON_SQUEEZY_WEBHOOK_SECRET/);
+  assert.match(lemon, /resolveLemonWebhookSecret\(process\.env\)/);
   assert.match(lemon, /revocation_pending/);
   assert.doesNotMatch(lemon, /revokeDigifyRecipient/);
   assert.match(delivery, /addDigifyRecipient/);

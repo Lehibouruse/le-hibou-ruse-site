@@ -5,12 +5,13 @@ import { buildSocialAppReviewPack } from "../lib/social-app-review-pack.mjs";
 const snapshot = { providers: [
   { provider: "youtube", phase: "EXTERNAL_GOOGLE_OAUTH_APP_SETUP_REQUIRED", redirect_uri: "https://le-hibou-ruse-site.vercel.app/api/social/oauth/youtube/callback", missing_publish_scopes: ["youtube.upload"], missing_analytics_scopes: ["yt-analytics.readonly"] },
   { provider: "meta", phase: "EXTERNAL_META_APP_SETUP_REQUIRED", redirect_uri: "https://le-hibou-ruse-site.vercel.app/api/social/oauth/meta/callback" },
+  { provider: "instagram", phase: "EXTERNAL_INSTAGRAM_BUSINESS_LOGIN_SETUP_REQUIRED", redirect_uri: "https://le-hibou-ruse-site.vercel.app/api/social/oauth/instagram/callback" },
 ] };
 
-test("le pack couvre les huit providers d'autorisation/review", () => {
+test("le pack couvre les neuf providers d'autorisation/review", () => {
   const pack = buildSocialAppReviewPack(snapshot);
-  assert.equal(pack.packs.length, 8);
-  for (const provider of ["youtube", "meta", "tiktok", "linkedin", "pinterest", "threads", "x", "snapchat"]) {
+  assert.equal(pack.packs.length, 9);
+  for (const provider of ["youtube", "meta", "instagram", "tiktok", "linkedin", "pinterest", "threads", "x", "snapchat"]) {
     assert.ok(pack.packs.some((item) => item.provider === provider));
   }
 });

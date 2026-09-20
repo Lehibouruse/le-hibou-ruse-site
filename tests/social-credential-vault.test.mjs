@@ -35,6 +35,13 @@ test("le coffre accepte Pinterest comme provider OAuth officiel", () => {
   }, env), payload);
 });
 
+test("le coffre accepte Instagram comme provider OAuth séparé de Meta", () => {
+  const payload = { env: { INSTAGRAM_ACCESS_TOKEN: "ig-token-test", INSTAGRAM_BUSINESS_ACCOUNT_ID: "1784" } };
+  const encrypted = encryptSocialCredential("instagram", "primary", payload, env);
+  assert.equal(encrypted.provider, "instagram");
+  assert.equal(encrypted.ciphertext.includes("ig-token-test"), false);
+});
+
 test("le coffre lie cryptographiquement le provider et le compte", () => {
   const encrypted = encryptSocialCredential("tiktok", "primary", { access_token: "secret" }, env);
   assert.throws(() => decryptSocialCredential({

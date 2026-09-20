@@ -187,6 +187,17 @@ export async function POST(request) {
       "Livré le": new Date().toISOString(),
       "Livraison erreur": url ? "" : "Accès nominatif créé; l'API n'a pas renvoyé de Quick Access Link. La notification Digify doit être activée pour ce destinataire.",
     }));
+    // A signed refund may have arrived during the external Digify call.
+    // Recheck after persisting the recipient so the next queue pass removes it.
+    const afterDelivery = await getRecord(TABLES.sales, current.id);
+    if (saleIsRefunded(afterDelivery.fields)) {
+      await updateRecord(TABLES.sales, current.id, {
+        "Livraison statut": "revocation_pending",
+        "Livraison erreur": "Remboursement reçu pendant la livraison; retrait Digify en attente.",
+      });
+      await journal(current, "Completed", "Accès créé pendant un remboursement; révocation Digify mise en attente", url);
+      return NextResponse.json({ ok: true, processed: 1, status: "revocation_pending", edition, access_url_recorded: Boolean(url) });
+    }
     await journal(current, "Completed", `Accès Digify nominatif créé · édition ${edition}${url ? " · Quick Access Link enregistré" : " · notification Digify requise"}`, url);
     return NextResponse.json({ ok: true, processed: 1, status: "delivered", edition, access_url_recorded: Boolean(url) });
   } catch (error) {

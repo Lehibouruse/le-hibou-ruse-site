@@ -215,3 +215,22 @@ test("Digify test exige aussi l'authentification indépendante de son webhook d'
   assert.equal(result.digify.ready, false);
   assert.ok(result.digify.blockers.some((item) => item.key === "activity_webhook_auth"));
 });
+
+
+test("le webhook dérivé du secret serveur permet la vente live sans exposer le secret", () => {
+  const input = readyInput();
+  input.config.commerce_readiness_mode = "early_access";
+  delete input.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.ok(result.checks.some((item) => item.key === "lemon_webhook" && item.ok));
+  assert.equal(JSON.stringify(result).includes(input.env.CRON_SECRET), false);
+});
+
+test("le checkout public refuse une URL extérieure à Lemon Squeezy", () => {
+  const input = readyInput();
+  input.config.checkout_url = "https://example.com/checkout";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "checkout_url"));
+});

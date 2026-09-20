@@ -89,13 +89,20 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
   assert.match(route, /allowedEvents: \["workflow_dispatch"\]/);
   assert.doesNotMatch(route, /CRON_SECRET/);
   assert.match(route, /lemon_test_mode_only/);
+  assert.match(route, /LEMON_SQUEEZY_TEST_API_KEY/);
+  assert.doesNotMatch(route, /process\.env\.LEMON_SQUEEZY_API_KEY/);
+  assert.match(route, /lemon_test_store_id/);
+  assert.match(route, /lemon_test_product_id/);
+  assert.match(route, /lemon_test_variant_id/);
+  assert.match(route, /product\?\.attributes\?\.test_mode !== true/);
+  assert.match(route, /variant\?\.attributes\?\.test_mode !== true/);
   assert.match(route, /mode: "test_only"/);
   assert.doesNotMatch(route, /checkout_live|webhook_live|action === "live"/);
 });
 
 test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () => {
   assert.match(route, /async function existingTestCheckout/);
-  assert.match(route, /retrieveLemonCheckout\(id\)/);
+  assert.match(route, /retrieveLemonCheckout\(id, \{ apiKey \}\)/);
   assert.match(route, /attrs\.test_mode !== true/);
   assert.match(route, /Store ID différent/);
   assert.match(route, /Variant ID différent/);

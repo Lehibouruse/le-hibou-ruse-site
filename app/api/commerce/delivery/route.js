@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const OIDC_WORKFLOW = "hibou-wake.yml";
+const COMMERCE_WORKFLOW = "commerce-queue.yml";
 const ALLOWED_EVENTS = ["schedule", "workflow_dispatch"];
 
 function truthy(value) {
@@ -101,7 +102,7 @@ export async function POST(request) {
     const auth = request.headers.get("authorization") || "";
     if (!auth.startsWith("Bearer ")) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     await verifyGithubActionsToken(auth.slice("Bearer ".length), {
-      allowedWorkflowFiles: [OIDC_WORKFLOW],
+      allowedWorkflowFiles: [OIDC_WORKFLOW, COMMERCE_WORKFLOW],
       allowedEvents: ALLOWED_EVENTS,
     });
   } catch (error) {

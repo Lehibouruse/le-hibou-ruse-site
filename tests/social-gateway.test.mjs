@@ -18,7 +18,7 @@ test("direct mode can be preferred over an existing webhook during migration", (
   const env = {
     HIBOU_SOCIAL_INSTAGRAM_WEBHOOK_URL: "https://example.com/instagram",
     HIBOU_SOCIAL_INSTAGRAM_MODE: "direct",
-    META_ACCESS_TOKEN: "secret-meta",
+    INSTAGRAM_ACCESS_TOKEN: "secret-instagram",
     INSTAGRAM_BUSINESS_ACCOUNT_ID: "1784",
   };
   const instagram = socialGatewayStatus(env).find((item) => item.provider === "instagram");
@@ -26,7 +26,7 @@ test("direct mode can be preferred over an existing webhook during migration", (
   assert.equal(instagram.direct_configured, true);
   assert.equal(instagram.webhook_configured, true);
   assert.deepEqual(instagram.direct_capabilities, ["video_native"]);
-  assert.equal(JSON.stringify(instagram).includes("secret-meta"), false);
+  assert.equal(JSON.stringify(instagram).includes("secret-instagram"), false);
 });
 
 test("provider diagnostics name missing environment variables but never values", () => {

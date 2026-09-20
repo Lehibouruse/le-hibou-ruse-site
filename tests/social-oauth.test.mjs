@@ -17,15 +17,18 @@ const base = {
   META_APP_ID: "meta-id",
   META_APP_SECRET: "meta-secret",
   META_GRAPH_VERSION: "v26.0",
+  INSTAGRAM_APP_ID: "ig-id",
+  INSTAGRAM_APP_SECRET: "ig-secret",
+  INSTAGRAM_GRAPH_VERSION: "v26.0",
   THREADS_APP_ID: "threads-id",
   THREADS_APP_SECRET: "threads-secret",
   PINTEREST_APP_ID: "pin-id",
   PINTEREST_APP_SECRET: "pin-secret",
 };
 
-test("les sept providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
+test("les huit providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
   const readiness = oauthProviderReadiness(base);
-  assert.equal(readiness.length, 7);
+  assert.equal(readiness.length, 8);
   assert.equal(readiness.every((item) => item.ready), true);
   assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
 });
@@ -74,7 +77,7 @@ test("Meta OAuth peut préparer l'autorisation avec CRON_SECRET comme coffre ser
     META_APP_ID: "meta-id",
     META_APP_SECRET: "meta-secret",
     META_GRAPH_VERSION: "v26.0",
-    META_OAUTH_SCOPES: "pages_show_list,pages_manage_posts,pages_read_engagement,read_insights,instagram_basic,instagram_content_publish,instagram_manage_insights",
+    META_OAUTH_SCOPES: "pages_show_list,pages_manage_posts,pages_read_engagement,read_insights",
   };
   const auth = buildSocialAuthorization("meta", env);
   const url = new URL(auth.url);
@@ -82,6 +85,17 @@ test("Meta OAuth peut préparer l'autorisation avec CRON_SECRET comme coffre ser
   assert.equal(url.pathname, "/v26.0/dialog/oauth");
   assert.equal(url.searchParams.get("redirect_uri"), "https://d4d5d6.com/api/social/oauth/meta/callback");
   assert.match(url.searchParams.get("scope") || "", /pages_manage_posts/);
-  assert.match(url.searchParams.get("scope") || "", /instagram_content_publish/);
+  assert.doesNotMatch(url.searchParams.get("scope") || "", /instagram_/);
   assert.equal(auth.url.includes("meta-secret"), false);
+});
+
+test("Instagram Business Login utilise son propre callback, ses credentials et ses scopes", () => {
+  const auth = buildSocialAuthorization("instagram", base);
+  const url = new URL(auth.url);
+  assert.equal(url.origin, "https://www.instagram.com");
+  assert.equal(url.searchParams.get("redirect_uri"), "https://d4d5d6.com/api/social/oauth/instagram/callback");
+  assert.match(url.searchParams.get("scope") || "", /instagram_business_basic/);
+  assert.match(url.searchParams.get("scope") || "", /instagram_business_content_publish/);
+  assert.match(url.searchParams.get("scope") || "", /instagram_business_manage_insights/);
+  assert.equal(auth.url.includes("ig-secret"), false);
 });

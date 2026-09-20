@@ -126,6 +126,7 @@ test("les blocages externes non automatisables sont explicites réseau par rése
   const phases = Object.fromEntries(snapshot.providers.map((item) => [item.provider, item.phase]));
   assert.equal(phases.youtube, "EXTERNAL_GOOGLE_OAUTH_APP_SETUP_REQUIRED");
   assert.equal(phases.meta, "EXTERNAL_META_APP_SETUP_REQUIRED");
+  assert.equal(phases.instagram, "EXTERNAL_INSTAGRAM_BUSINESS_LOGIN_SETUP_REQUIRED");
   assert.equal(phases.tiktok, "EXTERNAL_TIKTOK_APP_PRODUCT_APPROVAL_REQUIRED");
   assert.equal(phases.linkedin, "EXTERNAL_LINKEDIN_COMMUNITY_MANAGEMENT_ACCESS_REQUIRED");
   assert.equal(phases.pinterest, "EXTERNAL_PINTEREST_TRIAL_ACCESS_APPROVAL_REQUIRED");

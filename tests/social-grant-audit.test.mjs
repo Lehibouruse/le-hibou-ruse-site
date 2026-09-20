@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { auditSocialGrants, scopeSet, socialGrantSummary } from "../lib/social-grant-audit.mjs";
 
-const ready = ["youtube", "tiktok", "meta", "linkedin", "pinterest", "x", "threads"].map((provider) => ({
+const ready = ["youtube", "tiktok", "meta", "instagram", "linkedin", "pinterest", "x", "threads"].map((provider) => ({
   provider,
   ready: true,
   redirect_uri: `https://le-hibou-ruse-site.vercel.app/api/social/oauth/${provider}/callback`,
@@ -65,6 +65,18 @@ test("Meta Facebook devient pleinement autorisé avec publication + analytics Pa
   assert.deepEqual(complete.missing_analytics_scopes, []);
 });
 
+test("Instagram Business Login exige publication et insights business", () => {
+  const complete = auditSocialGrants(ready, [{
+    provider: "instagram",
+    status: "Connected",
+    scopes: "instagram_business_basic instagram_business_content_publish instagram_business_manage_insights",
+  }]).find((item) => item.provider === "instagram");
+  assert.equal(complete.authorization_ready, true);
+  assert.equal(complete.analytics_scope_ok, true);
+  assert.equal(complete.fully_ready, true);
+  assert.deepEqual(complete.missing_publish_scopes, []);
+});
+
 test("YouTube distingue publication least-privilege et Analytics complète", () => {
   const partial = auditSocialGrants(ready, [{
     provider: "youtube",
@@ -125,6 +137,6 @@ test("Snapchat reste explicitement manuel tant que l'accès produit Snap n'est p
   assert.equal(snapchat.manual_only, true);
   assert.equal(snapchat.authorization_ready, false);
   const summary = socialGrantSummary(audit);
-  assert.equal(summary.oauth_providers, 7);
+  assert.equal(summary.oauth_providers, 8);
   assert.deepEqual(summary.manual_only, ["snapchat"]);
 });

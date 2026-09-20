@@ -5,6 +5,7 @@ import { socialGatewayStatus } from "../lib/social-gateway.mjs";
 test("les providers directs exposent leur état sans révéler les tokens", () => {
   const env = {
     META_ACCESS_TOKEN: "secret-meta",
+    INSTAGRAM_ACCESS_TOKEN: "secret-instagram",
     INSTAGRAM_BUSINESS_ACCOUNT_ID: "ig-1",
     FACEBOOK_PAGE_ID: "fb-1",
     THREADS_ACCESS_TOKEN: "secret-threads",

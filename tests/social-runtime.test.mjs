@@ -44,9 +44,11 @@ test("Airtable injecte les scopes, versions et identifiants sociaux non secrets 
     HIBOU_SOCIAL_VAULT_KEY: "vault-secret",
   };
   const env = socialRuntimeEnv({
-    social_oauth_scopes_meta: "pages_show_list,pages_manage_posts,pages_read_engagement,read_insights,instagram_basic,instagram_content_publish,instagram_manage_insights",
+    social_oauth_scopes_meta: "pages_show_list,pages_manage_posts,pages_read_engagement,read_insights",
+    social_oauth_scopes_instagram: "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights",
     social_youtube_analytics_lookback_days: "365",
     social_meta_graph_version: "v26.0",
+    social_instagram_graph_version: "v26.0",
     social_meta_target_page_id: "1289018694298622",
     social_linkedin_organization_urn: "urn:li:organization:146337938",
     social_linkedin_version: "202608",
@@ -57,8 +59,10 @@ test("Airtable injecte les scopes, versions et identifiants sociaux non secrets 
   }, base);
 
   assert.equal(env.META_OAUTH_SCOPES.includes("read_insights"), true);
+  assert.equal(env.INSTAGRAM_OAUTH_SCOPES.includes("instagram_business_content_publish"), true);
   assert.equal(env.YOUTUBE_ANALYTICS_LOOKBACK_DAYS, "365");
   assert.equal(env.META_GRAPH_VERSION, "v26.0");
+  assert.equal(env.INSTAGRAM_GRAPH_VERSION, "v26.0");
   assert.equal(env.META_TARGET_PAGE_ID, "1289018694298622");
   assert.equal(env.LINKEDIN_ORGANIZATION_URN, "urn:li:organization:146337938");
   assert.equal(env.LINKEDIN_VERSION, "202608");

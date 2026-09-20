@@ -4,6 +4,8 @@ import { escapeFormula, resolveLemonWebhookSecret } from "../../../../lib/commer
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 import {
   lemonRequest,
+  createLiveLemonCheckout,
+  retrieveLemonCheckout,
   lemonResourceId,
   lemonResourceName,
   listLemonProducts,
@@ -17,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const OIDC_WORKFLOW = "lemon-live-bootstrap.yml";
-const ALLOWED_ACTIONS = new Set(["inspect_live", "webhook_live"]);
+const ALLOWED_ACTIONS = new Set(["inspect_live", "webhook_live", "checkout_live"]);
 const REQUIRED_EVENTS = ["order_created", "order_refunded"];
 const VERCEL_FALLBACK = "https://le-hibou-ruse-site.vercel.app";
 
@@ -133,6 +135,7 @@ async function inspectLive(state) {
   const variantId = lemonResourceId(variant);
   const variantPrice = Number(variant?.attributes?.price || 0);
 
+  if (product?.attributes?.test_mode === true || variant?.attributes?.test_mode === true) throw new Error("Produit ou variant Lemon en mode test");
   if (variant?.attributes?.is_subscription === true) throw new Error("Le variant Hibou ne doit pas être un abonnement");
   if (variantPrice !== 2900) throw new Error(`Prix variant inattendu: ${variantPrice} centimes`);
 
@@ -187,6 +190,50 @@ async function ensureLiveWebhook(storeId, baseUrl) {
   return { id: text(webhook?.id), reused: false, endpoint };
 }
 
+const PARTIAL_CHECKOUT_DESCRIPTION = "Version partielle actuelle du Guide du Hibou Rusé. Vous recevez immédiatement le PDF V1 disponible aujourd’hui. Le guide est encore en cours d’enrichissement.";
+const ORDER_PAGE_URL = "https://d4d5d6.com/merci?order=[order_identifier]";
+
+function safeCheckoutUrl(value) {
+  try {
+    const url = new URL(text(value));
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && (host === "lemonsqueezy.com" || host.endsWith(".lemonsqueezy.com")) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+async function ensureLiveCheckout(state, inspected) {
+  const existingId = text(state.config.lemon_live_checkout_id);
+  if (existingId) {
+    const checkout = await retrieveLemonCheckout(existingId);
+    const attrs = checkout?.attributes || {};
+    const options = attrs.product_options || {};
+    const url = safeCheckoutUrl(attrs.url);
+    if (attrs.test_mode === false
+      && String(attrs.store_id ?? "") === inspected.storeId
+      && String(attrs.variant_id ?? "") === inspected.variantId
+      && /partielle?/i.test(text(options.description))
+      && text(options.redirect_url) === ORDER_PAGE_URL
+      && text(options.receipt_link_url) === ORDER_PAGE_URL
+      && url) {
+      return { id: existingId, url, reused: true };
+    }
+    throw new Error("Checkout live enregistré incompatible; revue manuelle requise");
+  }
+
+  return createLiveLemonCheckout({
+    storeId: inspected.storeId,
+    variantId: inspected.variantId,
+    productName: "Guide du Hibou Rusé — version partielle actuelle",
+    description: PARTIAL_CHECKOUT_DESCRIPTION,
+    redirectUrl: ORDER_PAGE_URL,
+    receiptButtonText: "Lire mon guide",
+    receiptLinkUrl: ORDER_PAGE_URL,
+    receiptThankYouNote: "Merci pour votre achat. Votre accès personnel au PDF partiel actuel est créé automatiquement après confirmation du paiement.",
+  });
+}
+
 async function journal(action, status, notes, externalId = "") {
   await createRecord(TABLES.journal, {
     Workflow: "HIBOU_LEMON_LIVE_INFRA_V1",
@@ -221,6 +268,18 @@ export async function POST(request) {
       public_checkout_enabled: false,
     };
 
+    if (action === "checkout_live") {
+      const checkout = await ensureLiveCheckout(state, inspected);
+      result.live_checkout_id = checkout.id;
+      result.live_checkout_url = checkout.url;
+      result.live_checkout_reused = Boolean(checkout.reused);
+      await upsertConfig("lemon_live_checkout_id", checkout.id, "Checkout Lemon LIVE avec description explicite du PDF partiel, redirection et reçu vers /merci.");
+      await updateRecord(TABLES.products, state.productRecord.id, { "Lemon Squeezy Checkout URL": checkout.url });
+      await upsertConfig("checkout_url", checkout.url, "Checkout Lemon LIVE avec version partielle actuelle clairement annoncée.");
+      await upsertConfig("lemon_checkout_status", "LIVE_PUBLIC", "Checkout live personnalisé à 29 € publié sur le site; PDF partiel explicitement annoncé.");
+      result.public_checkout_enabled = true;
+    }
+
     if (action === "webhook_live") {
       const webhook = await ensureLiveWebhook(inspected.storeId, publicBaseUrl(state.config));
       result.live_webhook_id = webhook.id;
@@ -233,7 +292,7 @@ export async function POST(request) {
       ]);
     }
 
-    await journal(action, "Completed", JSON.stringify(result), result.live_webhook_id || inspected.productId);
+    await journal(action, "Completed", JSON.stringify(result), result.live_webhook_id || result.live_checkout_id || inspected.productId);
     return NextResponse.json(result);
   } catch (error) {
     const message = text(error?.message || error || "Erreur Lemon inconnue");

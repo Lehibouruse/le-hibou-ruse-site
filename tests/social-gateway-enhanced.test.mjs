@@ -15,6 +15,7 @@ async function withFetch(fake, fn) {
 test("les capacités enrichies sont annoncées sans activer le live", () => {
   const env = {
     META_ACCESS_TOKEN: "meta",
+    INSTAGRAM_ACCESS_TOKEN: "instagram",
     INSTAGRAM_BUSINESS_ACCOUNT_ID: "ig",
     FACEBOOK_PAGE_ID: "page",
     THREADS_ACCESS_TOKEN: "threads",
@@ -88,7 +89,7 @@ test("Instagram publie une image native et attend le container", async () => {
     if (target.includes("/container-9?") && (!init.method || init.method === "GET")) return jsonResponse({ status_code: "FINISHED" });
     throw new Error(`unexpected ${target}`);
   };
-  const result = await withFetch(fakeFetch, () => dispatchSocialPost({ provider: "instagram", media_url: "https://cdn.example.com/card.jpg", caption: "Carte", metadata: { media_type: "image" }, dry_run: false }, { META_ACCESS_TOKEN: "meta", INSTAGRAM_BUSINESS_ACCOUNT_ID: "ig123", META_GRAPH_VERSION: "v26.0" }));
+  const result = await withFetch(fakeFetch, () => dispatchSocialPost({ provider: "instagram", media_url: "https://cdn.example.com/card.jpg", caption: "Carte", metadata: { media_type: "image" }, dry_run: false }, { INSTAGRAM_ACCESS_TOKEN: "instagram", INSTAGRAM_BUSINESS_ACCOUNT_ID: "ig123", INSTAGRAM_GRAPH_VERSION: "v26.0" }));
   assert.equal(postCount, 1);
   assert.equal(result.result.media_id, "ig-media-9");
   assert.equal(result.result.media_type, "image");

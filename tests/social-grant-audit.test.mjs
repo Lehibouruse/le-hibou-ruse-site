@@ -44,34 +44,25 @@ test("un credential Needs reauth est distingué d'un premier consentement", () =
   assert.equal(socialGrantSummary(audit).oauth_reauth_required, 1);
 });
 
-test("un OAuth connecté mais incomplet ne peut pas être présenté comme autorisé", () => {
-  const audit = auditSocialGrants(ready, [{ provider: "meta", status: "Connected", scopes: "pages_read_engagement" }]);
+test("un OAuth Facebook connecté mais sans pages_manage_posts ne peut pas être présenté comme autorisé", () => {
+  const audit = auditSocialGrants(ready, [{ provider: "meta", status: "Connected", scopes: "pages_read_engagement read_insights" }]);
   const meta = audit.find((item) => item.provider === "meta");
   assert.equal(meta.credential_connected, true);
   assert.equal(meta.publish_scope_ok, false);
   assert.equal(meta.authorization_ready, false);
-  assert.deepEqual(meta.missing_publish_scopes.sort(), ["instagram_content_publish", "pages_manage_posts"].sort());
+  assert.deepEqual(meta.missing_publish_scopes, ["pages_manage_posts"]);
 });
 
-test("Meta distingue publication prête et analytics Instagram incomplètes", () => {
-  const partial = auditSocialGrants(ready, [{
-    provider: "meta",
-    status: "Connected",
-    scopes: "pages_manage_posts instagram_content_publish pages_read_engagement read_insights",
-  }]).find((item) => item.provider === "meta");
-  assert.equal(partial.authorization_ready, true);
-  assert.equal(partial.analytics_scope_ok, false);
-  assert.equal(partial.fully_ready, false);
-  assert.deepEqual(partial.missing_analytics_scopes, ["instagram_manage_insights"]);
-
+test("Meta Facebook devient pleinement autorisé avec publication + analytics Page", () => {
   const complete = auditSocialGrants(ready, [{
     provider: "meta",
     status: "Connected",
-    scopes: "pages_manage_posts instagram_content_publish pages_read_engagement read_insights instagram_manage_insights",
+    scopes: "pages_show_list pages_manage_posts pages_read_engagement read_insights",
   }]).find((item) => item.provider === "meta");
   assert.equal(complete.authorization_ready, true);
   assert.equal(complete.analytics_scope_ok, true);
   assert.equal(complete.fully_ready, true);
+  assert.deepEqual(complete.missing_analytics_scopes, []);
 });
 
 test("YouTube distingue publication least-privilege et Analytics complète", () => {

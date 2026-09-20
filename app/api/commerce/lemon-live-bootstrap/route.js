@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { configMap, createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
+import { configMap, createRecord, queryAllRecords, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { escapeFormula, resolveLemonWebhookSecret } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 import {
@@ -61,7 +61,7 @@ async function upsertConfig(key, value, description, status = "Actif") {
 
 async function loadState() {
   const [configuration, products] = await Promise.all([
-    queryRecords(TABLES.configuration, { pageSize: 100, priorityAware: false }),
+    queryAllRecords(TABLES.configuration, {}, { maxRecords: 500 }),
     queryRecords(TABLES.products, { filterByFormula: "{Actif}=1", pageSize: 20, priorityAware: false }),
   ]);
   return {

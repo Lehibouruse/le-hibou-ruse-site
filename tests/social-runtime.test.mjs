@@ -8,11 +8,13 @@ test("Airtable peut piloter direct/webhook sans modifier les secrets", () => {
     social_mode_youtube: "webhook",
     social_mode_pinterest: "direct",
     social_mode_x: "invalid",
+    social_mode_bluesky: "direct",
   }, { META_ACCESS_TOKEN: "secret" });
   assert.equal(env.HIBOU_SOCIAL_INSTAGRAM_MODE, "direct");
   assert.equal(env.HIBOU_SOCIAL_YOUTUBE_MODE, "webhook");
   assert.equal(env.HIBOU_SOCIAL_PINTEREST_MODE, "direct");
   assert.equal(env.HIBOU_SOCIAL_X_MODE, undefined);
+  assert.equal(env.HIBOU_SOCIAL_BLUESKY_MODE, "direct");
   assert.equal(env.META_ACCESS_TOKEN, "secret");
 });
 
@@ -55,6 +57,7 @@ test("Airtable injecte les scopes, versions et identifiants sociaux non secrets 
     social_tiktok_app_audited: "false",
     social_tiktok_transfer_mode: "FILE_UPLOAD",
     social_pinterest_sandbox: "true",
+    social_bluesky_pds_url: "https://bsky.social",
     social_fake_secret: "must-not-be-injected",
   }, base);
 
@@ -69,6 +72,7 @@ test("Airtable injecte les scopes, versions et identifiants sociaux non secrets 
   assert.equal(env.TIKTOK_APP_AUDITED, "false");
   assert.equal(env.TIKTOK_TRANSFER_MODE, "FILE_UPLOAD");
   assert.equal(env.PINTEREST_SANDBOX, "true");
+  assert.equal(env.BLUESKY_PDS_URL, "https://bsky.social");
   assert.equal(env.META_APP_SECRET, "server-secret");
   assert.equal(env.HIBOU_SOCIAL_VAULT_KEY, "vault-secret");
   assert.equal(env.SOCIAL_FAKE_SECRET, undefined);

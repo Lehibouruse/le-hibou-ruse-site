@@ -269,6 +269,9 @@ export async function POST(request) {
     };
 
     if (action === "checkout_live") {
+      if (!truthy(state.config.commerce_launch_authorized)) throw new Error("Lancement commercial non autorisé");
+      if (!text(state.config.lemon_live_webhook_id)) throw new Error("Webhook Lemon live absent");
+      if (!text(state.productRecord.fields?.["Digify File GUID"])) throw new Error("PDF Digify absent");
       const checkout = await ensureLiveCheckout(state, inspected);
       result.live_checkout_id = checkout.id;
       result.live_checkout_url = checkout.url;

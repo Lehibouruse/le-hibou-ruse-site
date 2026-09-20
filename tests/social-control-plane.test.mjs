@@ -70,24 +70,23 @@ test("YouTube distingue publication autorisée et scopes Analytics incomplets", 
   ]);
 });
 
-test("Meta expose séparément les fallbacks Instagram et Facebook et reste pilotable via Metricool", () => {
+test("Meta Facebook n'expose plus les scopes/fallbacks Instagram dans le consentement Facebook", () => {
   const env = {
     HIBOU_SOCIAL_VAULT_KEY: Buffer.alloc(32, 4).toString("base64url"),
     META_APP_ID: "meta-id",
     META_APP_SECRET: "meta-secret",
-    META_GRAPH_VERSION: "v24.0",
-    HIBOU_SOCIAL_INSTAGRAM_WEBHOOK_URL: "https://example.com/ig",
+    META_GRAPH_VERSION: "v26.0",
     HIBOU_SOCIAL_FACEBOOK_WEBHOOK_URL: "https://example.com/fb",
   };
-  const readiness = [{ provider: "meta", ready: true, scopes: "", redirect_uri: "https://example.com/meta", error: "" }];
+  const readiness = [{ provider: "meta", ready: true, scopes: "pages_show_list,pages_manage_posts,pages_read_engagement,read_insights", redirect_uri: "https://example.com/meta", error: "" }];
   const snapshot = buildSocialControlPlane({ readiness, credentials: [], env });
   const meta = snapshot.providers.find((item) => item.provider === "meta");
   assert.equal(meta.phase, "HUMAN_OAUTH_APPROVAL_REQUIRED");
-  assert.equal(meta.fallback_webhooks.instagram, true);
   assert.equal(meta.fallback_webhooks.facebook, true);
+  assert.equal(meta.fallback_webhooks.instagram, undefined);
   assert.equal(meta.fallback_configured, true);
   assert.equal(meta.metricool_verified, true);
-  assert.deepEqual(meta.airtable_platforms, ["Instagram", "Facebook"]);
+  assert.deepEqual(meta.airtable_platforms, ["Facebook"]);
 });
 
 test("LinkedIn control plane respecte le mode organisation fourni par le runtime", () => {

@@ -128,12 +128,12 @@ test("le webhook persiste l'order_identifier dans le champ dédié et /merci le 
 });
 
 
-test("le checkout live exige la mention de version partielle et refuse test_mode", () => {
+test("le checkout live exige une description transparente de l’édition numérique et refuse test_mode", () => {
   const input = {
     storeId: "475333",
     variantId: "2140119",
-    productName: "Guide du Hibou Rusé — version partielle actuelle",
-    description: "Version partielle actuelle : PDF V1 disponible aujourd’hui.",
+    productName: "Guide du Hibou Rusé",
+    description: "Le Guide du Hibou Rusé — édition numérique. Accès immédiat au guide disponible à cette date. Le contenu pourra faire l’objet de mises à jour ultérieures.",
     redirectUrl: "https://d4d5d6.com/merci?order=[order_identifier]",
     receiptLinkUrl: "https://d4d5d6.com/merci?order=[order_identifier]",
   };
@@ -141,6 +141,6 @@ test("le checkout live exige la mention de version partielle et refuse test_mode
   assert.equal(payload.data.attributes.test_mode, false);
   assert.equal(payload.data.attributes.checkout_options.desc, true);
   assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [2140119]);
-  assert.match(payload.data.attributes.product_options.description, /partielle/i);
-  assert.throws(() => buildLiveCheckoutPayload({ ...input, description: "Guide complet" }), /version partielle/);
+  assert.match(payload.data.attributes.product_options.description, /édition numérique/i);
+  assert.throws(() => buildLiveCheckoutPayload({ ...input, description: "Guide complet" }), /description transparente/);
 });

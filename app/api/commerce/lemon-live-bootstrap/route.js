@@ -190,7 +190,7 @@ async function ensureLiveWebhook(storeId, baseUrl) {
   return { id: text(webhook?.id), reused: false, endpoint };
 }
 
-const PARTIAL_CHECKOUT_DESCRIPTION = "Version partielle actuelle du Guide du Hibou Rusé. Vous recevez immédiatement le PDF V1 disponible aujourd’hui. Le guide est encore en cours d’enrichissement.";
+const GUIDE_CHECKOUT_DESCRIPTION = "Le Guide du Hibou Rusé — édition numérique. Accès immédiat après achat au guide disponible à cette date. Le contenu pourra faire l’objet de mises à jour ultérieures.";
 const ORDER_PAGE_URL = "https://d4d5d6.com/merci?order=[order_identifier]";
 
 function safeCheckoutUrl(value) {
@@ -213,24 +213,23 @@ async function ensureLiveCheckout(state, inspected) {
     if (attrs.test_mode === false
       && String(attrs.store_id ?? "") === inspected.storeId
       && String(attrs.variant_id ?? "") === inspected.variantId
-      && /partielle?/i.test(text(options.description))
+      && text(options.description) === GUIDE_CHECKOUT_DESCRIPTION
       && text(options.redirect_url) === ORDER_PAGE_URL
       && text(options.receipt_link_url) === ORDER_PAGE_URL
       && url) {
       return { id: existingId, url, reused: true };
     }
-    throw new Error("Checkout live enregistré incompatible; revue manuelle requise");
   }
 
   return createLiveLemonCheckout({
     storeId: inspected.storeId,
     variantId: inspected.variantId,
-    productName: "Guide du Hibou Rusé — version partielle actuelle",
-    description: PARTIAL_CHECKOUT_DESCRIPTION,
+    productName: "Guide du Hibou Rusé",
+    description: GUIDE_CHECKOUT_DESCRIPTION,
     redirectUrl: ORDER_PAGE_URL,
     receiptButtonText: "Lire mon guide",
     receiptLinkUrl: ORDER_PAGE_URL,
-    receiptThankYouNote: "Merci pour votre achat. Votre accès personnel au PDF partiel actuel est créé automatiquement après confirmation du paiement.",
+    receiptThankYouNote: "Merci pour votre achat. Votre accès personnel au guide est créé automatiquement après confirmation du paiement.",
   });
 }
 
@@ -276,7 +275,7 @@ export async function POST(request) {
       result.live_checkout_id = checkout.id;
       result.live_checkout_url = checkout.url;
       result.live_checkout_reused = Boolean(checkout.reused);
-      await upsertConfig("lemon_live_checkout_id", checkout.id, "Checkout Lemon LIVE avec description explicite du PDF partiel, redirection et reçu vers /merci.");
+      await upsertConfig("lemon_live_checkout_id", checkout.id, "Checkout Lemon LIVE du Guide du Hibou Rusé, redirection et reçu vers /merci.");
       await updateRecord(TABLES.products, state.productRecord.id, { "Lemon Squeezy Checkout URL": checkout.url });
       await upsertConfig("checkout_url", checkout.url, "Checkout Lemon LIVE avec version partielle actuelle clairement annoncée.");
       await upsertConfig("lemon_checkout_status", "LIVE_PUBLIC", "Checkout live personnalisé à 29 € publié sur le site; PDF partiel explicitement annoncé.");

@@ -135,7 +135,7 @@ async function inspectLive(state) {
   const variantId = lemonResourceId(variant);
   const variantPrice = Number(variant?.attributes?.price || 0);
 
-  if (product?.attributes?.test_mode === true || variant?.attributes?.test_mode === true) throw new Error("Produit ou variant Lemon en mode test");
+  if (product?.attributes?.test_mode !== false || variant?.attributes?.test_mode !== false) throw new Error("Produit ou variant Lemon en mode test");
   if (variant?.attributes?.is_subscription === true) throw new Error("Le variant Hibou ne doit pas être un abonnement");
   if (variantPrice !== 2900) throw new Error(`Prix variant inattendu: ${variantPrice} centimes`);
 

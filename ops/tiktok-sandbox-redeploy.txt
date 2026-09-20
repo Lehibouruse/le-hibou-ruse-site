@@ -1,0 +1,1 @@
+Redeploy production after TikTok Sandbox credentials were updated in Vercel.

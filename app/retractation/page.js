@@ -7,11 +7,12 @@ export const metadata = {
 };
 
 export default function Page() {
-  return <LegalPage title="Renoncer au contrat ici">
-    <p>Cette fonctionnalité permet d’envoyer en ligne une déclaration de rétractation concernant un contrat conclu avec Le Hibou Rusé. Elle reste accessible indépendamment du service client.</p>
+  return <LegalPage title="Informations sur la rétractation">
+    <p>Le guide Le Hibou Rusé est un contenu numérique fourni immédiatement après confirmation du paiement.</p>
+    <p><strong>Lorsque le checkout a valablement recueilli votre consentement exprès au commencement immédiat de la fourniture et votre reconnaissance de la perte du droit de rétractation, puis qu’une confirmation correspondante vous a été fournie sur support durable, le droit de rétractation de 14 jours n’est plus applicable à cette fourniture numérique commencée.</strong></p>
+    <p>Cette page reste disponible comme canal de déclaration lorsque vous estimez qu’un droit de rétractation subsiste malgré tout. Le dépôt d’une demande ne vaut ni reconnaissance automatique de l’existence de ce droit, ni promesse de remboursement.</p>
     <p>Pour identifier le contrat, indiquez votre nom, votre prénom, la référence de commande ou du contrat et le moyen électronique auquel vous souhaitez recevoir l’accusé de réception.</p>
-    <p><strong>Contenu numérique :</strong> lorsque l’exécution d’un contenu numérique sans support matériel a commencé avant la fin du délai de rétractation avec les consentements et confirmations légalement requis, le droit de rétractation peut avoir été perdu. Le dépôt du formulaire reste enregistré mais ne vaut donc pas reconnaissance automatique de l’existence du droit, ni décision de remboursement.</p>
     <WithdrawalForm />
-    <p>Une copie téléchargeable de votre déclaration est générée immédiatement après l’envoi. Le dispositif d’envoi d’un accusé sur support durable doit également être validé avant l’ouverture commerciale définitive.</p>
+    <p>Une copie téléchargeable de votre déclaration est générée immédiatement après l’envoi. Le traitement d’une demande dépend ensuite des droits effectivement applicables au contrat concerné.</p>
   </LegalPage>;
 }

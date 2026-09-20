@@ -41,7 +41,7 @@ test("les CGV early-access décrivent la V1 évolutive et préservent les droits
   assert.match(cgv, /contact@d4d5d6\.fr/);
 });
 
-test("la landing expose un lien CGV et divulgue le caractère early-access lorsque le checkout est actif", () => {
+test("la landing expose un lien CGV sans vocabulaire PDF partiel dans le bloc d’achat", () => {
   assert.match(home, /href="\/cgv"/);
-  assert.match(home, /Version partielle actuelle/);
+  assert.doesNotMatch(home, /Version partielle actuelle|PDF V1|en cours d’enrichissement/);
 });

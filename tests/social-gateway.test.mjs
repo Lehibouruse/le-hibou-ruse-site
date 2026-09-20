@@ -70,3 +70,25 @@ test("Pinterest utilise l API directe avant le webhook en mode auto et reste en 
   assert.equal(plan.dry_run, true);
   assert.equal(plan.gateway.mode, "direct");
 });
+
+
+test("Bluesky direct fonctionne sans app développeur ni OAuth tiers", async () => {
+  const env = {
+    BLUESKY_IDENTIFIER: "lehibouruse.bsky.social",
+    BLUESKY_APP_PASSWORD: "app-password-secret",
+  };
+  const status = socialGatewayStatus(env).find((item) => item.provider === "bluesky");
+  assert.equal(status.configured, true);
+  assert.equal(status.mode, "direct");
+  assert.deepEqual(status.direct_capabilities, ["text_native", "image_native"]);
+  assert.equal(JSON.stringify(status).includes("app-password-secret"), false);
+
+  const plan = await dispatchSocialPost({
+    provider: "bluesky",
+    caption: "Test Hibou",
+    dry_run: true,
+  }, env);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.dry_run, true);
+  assert.equal(plan.payload.media_url, "");
+});

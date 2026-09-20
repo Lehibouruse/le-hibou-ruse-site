@@ -28,7 +28,7 @@ test("la politique de confidentialité identifie les prestataires essentiels et 
 
 test("les CGV early-access décrivent la V1 évolutive et préservent les droits impératifs du contenu numérique", () => {
   assert.match(cgv, /Version en vigueur/);
-  assert.match(cgv, /Version partielle actuelle/i);
+  assert.match(cgv, /V1 en cours d’enrichissement/i);
   assert.match(cgv, /LLC de droit du Nouveau-Mexique/i);
   assert.match(cgv, /29 €/);
   assert.match(cgv, /Merchant of Record/);
@@ -42,5 +42,5 @@ test("les CGV early-access décrivent la V1 évolutive et préservent les droits
 
 test("la landing expose un lien CGV et divulgue le caractère early-access lorsque le checkout est actif", () => {
   assert.match(home, /href="\/cgv"/);
-  assert.match(home, /V1 en cours d’enrichissement/);
+  assert.match(home, /Version partielle actuelle/);
 });

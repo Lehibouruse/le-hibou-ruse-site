@@ -7,7 +7,7 @@ export default function Page() {
     <p><strong>Version en vigueur : 20 septembre 2026.</strong></p>
 
     <h2>1. Produit</h2>
-    <p>Le produit vendu est le guide numérique <strong>Le Hibou Rusé</strong>. L’édition actuellement proposée est une <strong>V1 en cours d’enrichissement</strong> : l’achat donne accès immédiatement à la version disponible au moment de la commande. Le contenu peut être complété ou corrigé ultérieurement.</p>
+    <p>Le produit vendu est le guide numérique <strong>Le Hibou Rusé</strong>. L’achat donne accès immédiatement à <strong>l’édition numérique disponible au moment de la commande</strong>. Le contenu peut faire l’objet de mises à jour, corrections ou enrichissements ultérieurs sans que cela remette en cause la fourniture de l’édition achetée.</p>
     <p>Le guide fournit une information générale et pédagogique. Il ne constitue pas un conseil juridique, fiscal, comptable, financier ou patrimonial individualisé.</p>
 
     <h2>2. Structure éditoriale</h2>

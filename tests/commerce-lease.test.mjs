@@ -7,6 +7,7 @@ import {
   commercePendingFormula,
   commerceStaleFormula,
   ownsCommerceLease,
+  refundDeliveryStatus,
 } from "../lib/commerce-lease.mjs";
 
 test("pending et stale sont deux files distinctes", () => {
@@ -38,4 +39,13 @@ test("clearCommerceLease enlève toujours le token et l'expiration", () => {
     "Commerce lock token": "",
     "Commerce lease expires": null,
   });
+});
+
+test("un remboursement garde toute livraison en cours révocable", () => {
+  assert.equal(refundDeliveryStatus("processing"), "revocation_pending");
+  assert.equal(refundDeliveryStatus("delivered"), "revocation_pending");
+  assert.equal(refundDeliveryStatus("revocation_pending"), "revocation_pending");
+  assert.equal(refundDeliveryStatus("revoking"), "revoking");
+  assert.equal(refundDeliveryStatus("pending"), "revoked");
+  assert.equal(refundDeliveryStatus("manual_review"), "manual_review");
 });

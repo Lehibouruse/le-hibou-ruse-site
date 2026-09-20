@@ -1,5 +1,5 @@
 import { completeSocialAuthorization } from "../../../../../../lib/social-oauth.mjs";
-import { queryRecords, TABLES } from "../../../../../../lib/airtable.js";
+import { queryAllRecords, TABLES } from "../../../../../../lib/airtable.js";
 import { testVaultProviderConnections } from "../../../../../../lib/social-connection-health.mjs";
 import { socialControlPlaneSnapshot, syncSocialControlPlaneToAirtable } from "../../../../../../lib/social-control-plane.mjs";
 import { syncSocialRoutingPlanToAirtable } from "../../../../../../lib/social-routing-airtable.mjs";
@@ -15,7 +15,7 @@ function resultUrl(request, params = {}) {
 
 async function oauthEnv() {
   try {
-    const records = await queryRecords(TABLES.configuration, { pageSize: 100 });
+    const records = await queryAllRecords(TABLES.configuration, {}, { maxRecords: 1000 });
     return socialRuntimeEnv(configurationMap(records), process.env);
   } catch {
     return process.env;

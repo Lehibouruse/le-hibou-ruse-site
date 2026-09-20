@@ -22,8 +22,8 @@ La marque Metricool du Hibou est reliée à YouTube, Instagram, Facebook, Thread
 | Réseau | Voie actuelle | Blocage externe direct exact | État visé avant clic utilisateur |
 |---|---|---|---|
 | YouTube | Metricool | Projet Google Cloud + YouTube Data API v3 + YouTube Analytics API + client OAuth Web + callback + Client ID/Secret | `HUMAN_OAUTH_APPROVAL_REQUIRED` |
-| Instagram | Metricool | App Meta + liaison Page Facebook ↔ Instagram professionnel + permissions/app review applicables + App ID/Secret | `HUMAN_OAUTH_APPROVAL_REQUIRED` |
-| Facebook | Metricool | Même app Meta + Page cible + permissions Page/Insights + App ID/Secret | `HUMAN_OAUTH_APPROVAL_REQUIRED` |
+| Instagram | Metricool | Instagram API with Instagram Login / Business Login + compte Instagram professionnel + callback dédié + Instagram App ID/Secret | `HUMAN_OAUTH_APPROVAL_REQUIRED` |
+| Facebook | API officielle directe + Metricool fallback | Facebook Login for Business + Page cible + permissions Page/Insights. OAuth Hibou déjà connecté au 20/09/2026. | `AUTHORIZED` |
 | Threads | Metricool | App Threads Meta + callback + App ID/Secret | `HUMAN_OAUTH_APPROVAL_REQUIRED` |
 | TikTok | Metricool | App + Login Kit + Content Posting API + scopes ; audit pour public ; domaine/préfixe média vérifié pour les photos `PULL_FROM_URL` | OAuth possible après app/secrets ; tests `SELF_ONLY` avant audit |
 | Pinterest | Metricool | App + Trial Access + callback + App ID/Secret ; board cible après OAuth ; Standard Access pour production complète | OAuth après Trial + secrets |
@@ -41,9 +41,15 @@ La marque Metricool du Hibou est reliée à YouTube, Instagram, Facebook, Thread
 
 Le pipeline Social Performance sait conserver les compteurs Data API et, lorsque YouTube Analytics est autorisé, ajouter watch time, durée moyenne, taux moyen de visionnage, abonnés gagnés et partages.
 
-### Meta — Facebook + Instagram
+### Meta — Facebook
 
-`pages_show_list,pages_manage_posts,pages_read_engagement,read_insights,instagram_basic,instagram_content_publish,instagram_manage_insights`
+`pages_show_list,pages_manage_posts,pages_read_engagement,read_insights`
+
+### Instagram — Instagram Business Login
+
+`instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights`
+
+Instagram utilise son propre App ID/Secret, son propre callback et `graph.instagram.com`. Ne pas remettre les scopes Instagram dans le dialogue OAuth Facebook.
 
 ### TikTok
 
@@ -75,11 +81,15 @@ Aucun plan, crédit ou paiement n'est activé automatiquement.
 
 Le domaine public canonique est désormais `https://d4d5d6.com`.
 
-Pour Meta (Facebook + Instagram), le callback est :
+Facebook :
 
 `https://d4d5d6.com/api/social/oauth/meta/callback`
 
-Les callbacks exacts sont générés par le control plane et synchronisés dans Airtable. Ne pas utiliser un autre callback sans modifier d'abord la configuration serveur.
+Instagram Business Login :
+
+`https://d4d5d6.com/api/social/oauth/instagram/callback`
+
+Les callbacks exacts sont générés par le control plane et synchronisés dans Airtable. Ne pas mélanger les deux providers ni utiliser un autre callback sans modifier d'abord la configuration serveur.
 
 ## Control plane
 
@@ -94,14 +104,16 @@ Le control plane et les écrans admin lisent la même configuration non secrète
 
 ## Ordre recommandé pour la session humaine courte
 
-1. Google / YouTube.
-2. Meta / Facebook + Instagram.
+1. Instagram Business Login — priorité actuelle.
+2. Google / YouTube.
 3. Threads.
 4. TikTok.
 5. Pinterest.
 6. LinkedIn.
 7. X uniquement après décision explicite sur l'accès/coût.
 8. Snapchat uniquement si Snap a accordé le produit/API requis.
+
+Facebook est déjà connecté via l'API officielle directe et ne doit pas être reconnecté pour autoriser Instagram.
 
 Après chaque création/configuration d'app :
 
@@ -124,17 +136,21 @@ Un `publish_id` n'est pas un `post_id`. Le gateway expose le statut TikTok via `
 À ce stade, le code peut préparer les adapters, callbacks, scopes, stockage chiffré, refresh supporté, dry-runs, métriques, idempotence, synchronisation Airtable et diagnostics. Les étapes qui restent volontairement humaines ou externes sont : création/approbation des apps chez les fournisseurs, saisie des Client Secrets dans l'environnement serveur, consentement OAuth/2FA, validation de domaines exigée par un fournisseur, rôle administrateur lorsque le fournisseur l'impose, approbation produit/API et tout engagement financier.
 
 
-## Meta — session humaine minimale
+## Instagram — session humaine minimale
 
-Pour Facebook + Instagram, le backend Hibou est déjà prêt : OAuth, échange long-lived token, découverte de la Page, récupération du Page Access Token, découverte du compte Instagram professionnel lié, chiffrement des tokens, test de lecture et synchronisation Airtable.
+Le backend Instagram est prêt séparément de Facebook : Instagram Business Login, callback dédié, échange du jeton court vers un jeton long-lived, chiffrement AES-256-GCM, lecture du profil professionnel, publication, analytics et synchronisation Airtable. Le correctif de pagination #164 garantit aussi que les routes OAuth lisent toute la table Configuration au-delà de 100 lignes.
+
+État au 20/09/2026 : le compte Instagram du Hibou est déjà enregistré comme Professionnel / créateur et reste opérationnel via Metricool. Facebook est `AUTHORIZED` séparément. Il ne faut donc pas reconnecter Facebook pour finaliser Instagram.
 
 Actions humaines restantes :
-1. vérifier que le compte Instagram du Hibou est Professionnel (Business ou Creator) et lié à la Page Facebook du Hibou ;
-2. créer une app Meta de type Business, nom conseillé : `Le Hibou Rusé — Social API` ;
-3. ajouter/configurer les cas d'usage Facebook Pages + Instagram API avec Facebook Login ;
-4. déclarer le callback exact `https://d4d5d6.com/api/social/oauth/meta/callback` ;
-5. dans App Settings > Basic, utiliser `https://d4d5d6.com`, `https://d4d5d6.com/confidentialite` et `https://d4d5d6.com/suppression-donnees` lorsque Meta demande site, politique de confidentialité et suppression des données ;
-6. copier l'App ID et l'App Secret dans Vercel sous `META_APP_ID` et `META_APP_SECRET` ; ne jamais les mettre dans Airtable ou un chat ;
-7. ouvrir ensuite le lien OAuth Hibou et approuver personnellement les permissions demandées.
+1. dans Meta for Developers, ouvrir l'app du Hibou et configurer **Instagram API with Instagram Login / Business Login** ;
+2. déclarer exactement le callback `https://d4d5d6.com/api/social/oauth/instagram/callback` ;
+3. demander/configurer `instagram_business_basic`, `instagram_business_content_publish` et `instagram_business_manage_insights` ;
+4. si Meta demande les URL de conformité, utiliser le site `https://d4d5d6.com`, la politique `https://d4d5d6.com/confidentialite` et la suppression des données `https://d4d5d6.com/suppression-donnees` ;
+5. copier l'Instagram App ID et l'Instagram App Secret dans Vercel Production sous `INSTAGRAM_APP_ID` et `INSTAGRAM_APP_SECRET` ; ne jamais les mettre dans Airtable, GitHub ou un chat ;
+6. laisser `INSTAGRAM_GRAPH_VERSION=v26.0` et les scopes par défaut sauf nécessité documentée ;
+7. après redéploiement, ouvrir `https://d4d5d6.com/api/social/oauth/instagram/start` depuis la session admin et approuver personnellement l'autorisation Instagram.
 
-Le runtime utilise Graph API `v26.0` via Airtable. Les scopes cibles sont également fournis par Airtable. Le coffre OAuth peut utiliser `HIBOU_SOCIAL_VAULT_KEY` lorsqu'une clé dédiée existe ; sinon il dérive une clé séparée à partir de `CRON_SECRET`, déjà secret serveur, avec séparation de domaine cryptographique.
+Après le callback, le runtime doit créer un credential `instagram` chiffré, exécuter un test de lecture et synchroniser le control plane. Aucune publication réelle n'est nécessaire pour valider l'authentification.
+
+Le coffre OAuth peut utiliser `HIBOU_SOCIAL_VAULT_KEY` lorsqu'une clé dédiée existe ; sinon il dérive une clé séparée à partir de `CRON_SECRET`, déjà secret serveur, avec séparation de domaine cryptographique.

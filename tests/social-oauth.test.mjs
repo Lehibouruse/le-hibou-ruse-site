@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { buildSocialAuthorization, oauthProviderReadiness } from "../lib/social-oauth.mjs";
 
@@ -43,6 +44,7 @@ test("YouTube demande l'accès offline sans exposer le client secret", () => {
 
 test("TikTok utilise Login Kit v2 avec publication et lecture des performances", () => {
   const auth = buildSocialAuthorization("tiktok", base);
+  const url = new URL(auth.url);
   assert.match(auth.url, /^https:\/\/www\.tiktok\.com\/v2\/auth\/authorize\//);
   const scopes = new URL(auth.url).searchParams.get("scope") || "";
   assert.match(scopes, /video\.publish/);
@@ -59,7 +61,6 @@ test("X utilise PKCE et conserve le verifier uniquement dans l'état chiffré", 
   assert.equal(auth.url.includes("x-secret"), false);
 });
 
-
 test("Pinterest prépare OAuth avec les scopes organiques sans exposer le secret", () => {
   const auth = buildSocialAuthorization("pinterest", base);
   const url = new URL(auth.url);
@@ -68,7 +69,6 @@ test("Pinterest prépare OAuth avec les scopes organiques sans exposer le secret
   assert.match(url.searchParams.get("scope") || "", /boards:read/);
   assert.equal(auth.url.includes("pin-secret"), false);
 });
-
 
 test("Meta OAuth peut préparer l'autorisation avec CRON_SECRET comme coffre serveur", () => {
   const env = {
@@ -98,4 +98,16 @@ test("Instagram Business Login utilise son propre callback, ses credentials et s
   assert.match(url.searchParams.get("scope") || "", /instagram_business_content_publish/);
   assert.match(url.searchParams.get("scope") || "", /instagram_business_manage_insights/);
   assert.equal(auth.url.includes("ig-secret"), false);
+});
+
+test("les routes OAuth chargent toute la Configuration Airtable, au-delà de 100 enregistrements", () => {
+  const paths = [
+    "../app/api/social/oauth/[provider]/start/route.js",
+    "../app/api/social/oauth/[provider]/callback/route.js",
+  ];
+  for (const path of paths) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /queryAllRecords\(TABLES\.configuration/);
+    assert.doesNotMatch(source, /queryRecords\(TABLES\.configuration/);
+  }
 });

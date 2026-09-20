@@ -15,6 +15,7 @@ test("les contrôles OAuth sont strictement des lectures distantes d'identité",
     "api.x.com/2/users/me",
     "linkedin.com/v2/userinfo",
     "graph.threads.net",
+    "graph.instagram.com",
     "api.pinterest.com/v5/user_account",
   ]) assert.ok(health.includes(endpoint), endpoint);
   assert.doesNotMatch(health, /dispatchSocialPost|media_publish|threads_publish|video_reels|pins\s*\/\s*create/);
@@ -39,6 +40,7 @@ test("le watchdog ne reteste qu’un provider OAuth stale à la fois", () => {
   assert.match(watchdog, /testVaultProviderConnections\(provider, env\)/);
   assert.match(watchdog, /social_read_health_test/);
   assert.match(watchdog, /pinterest: \["Pinterest"\]/);
+  assert.match(watchdog, /instagram: \["Instagram"\]/);
 });
 
 test("l'état READ_TESTED exige auth et lecture API réussies sans valider publication ou analytics", () => {

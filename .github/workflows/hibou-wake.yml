@@ -67,7 +67,9 @@ concurrency:
 
 jobs:
   bluesky_connection:
-    if: github.event_name == 'workflow_dispatch' && inputs.test_bluesky
+    # The explicit commit marker also permits a one-off check through the GitHub
+    # connector, which can merge changes but cannot dispatch workflows.
+    if: (github.event_name == 'workflow_dispatch' && inputs.test_bluesky) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[test-bluesky]'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -106,7 +108,7 @@ jobs:
           test "$http_code" = "200"
 
   wake:
-    if: github.event_name != 'workflow_dispatch' || !inputs.test_bluesky
+    if: (github.event_name != 'workflow_dispatch' || !inputs.test_bluesky) && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[test-bluesky]'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

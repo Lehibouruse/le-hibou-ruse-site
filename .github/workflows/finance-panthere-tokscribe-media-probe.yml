@@ -1,0 +1,51 @@
+name: Finance Panthere TokScribe media probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-tokscribe-media-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe archive media endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          python3 - <<'PY'
+          import requests,bs4,os,re,json
+          UA={"User-Agent":"Mozilla/5.0"}
+          ids=[]
+          for page in ["https://tokscribe.com/author/financepanthere","https://tokscribe.com/author/financepanthere?page=2"]:
+              s=bs4.BeautifulSoup(requests.get(page,headers=UA,timeout=30).text,"html.parser")
+              for a in s.find_all("a",href=True):
+                  m=re.match(r"/t/([^/?#]+)",a["href"])
+                  if m and m.group(1) not in ids: ids.append(m.group(1))
+          print("IDS",len(ids),ids)
+          rows=[]
+          for tid in ids:
+              row={"id":tid}
+              for kind in ["cover","video"]:
+                  u=f"https://tokscribe.com/api/transcriptions/{tid}/{kind}"
+                  r=requests.get(u,headers=UA,timeout=30,allow_redirects=True)
+                  row[kind]={"status":r.status_code,"bytes":len(r.content),"content_type":r.headers.get("content-type"),"final":r.url}
+                  if r.ok and len(r.content)>1000:
+                      ext=".jpg" if "image" in (r.headers.get("content-type") or "") else ".mp4"
+                      open(f"out/{tid}_{kind}{ext}","wb").write(r.content)
+              rows.append(row)
+              print(row)
+          json.dump(rows,open("out/status.json","w"),indent=2)
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-tokscribe-media-probe
+          path: out/
+          retention-days: 3

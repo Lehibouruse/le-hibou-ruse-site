@@ -1,0 +1,141 @@
+name: Furet Top50 visual corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top50-visuals.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install tools
+        run: |
+          pipx install yt-dlp
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq
+
+      - name: Build Top 50 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json             "https://www.tiktok.com/@lefutetfute" > profile.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("profile.json"))
+          rows=[]
+          for e in d.get("entries") or []:
+              rows.append({
+                  "id":e.get("id"),
+                  "url":e.get("url") or f'https://www.tiktok.com/@lefutetfute/video/{e.get("id")}',
+                  "title":e.get("title") or e.get("description") or "",
+                  "duration":e.get("duration"),
+                  "views":e.get("view_count") or 0,
+                  "likes":e.get("like_count") or 0,
+                  "comments":e.get("comment_count") or 0,
+                  "reposts":e.get("repost_count") or 0,
+                  "saves":e.get("save_count") or 0,
+                  "track":e.get("track") or "",
+                  "artists":e.get("artists") or [],
+                  "timestamp":e.get("timestamp"),
+                  "thumbnail": next((x.get("url") for x in (e.get("thumbnails") or []) if x.get("id")=="cover"), None)
+              })
+          rows.sort(key=lambda x:x["views"], reverse=True)
+          top=rows[:50]
+          json.dump(top,open("top50.json","w"),ensure_ascii=False,indent=2)
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\ttrack\ttitle\n")
+              for i,r in enumerate(top,1):
+                  title=r["title"].replace("\t"," ").replace("\n"," ")
+                  track=r["track"].replace("\t"," ").replace("\n"," ")
+                  f.write(f'{i}\t{r["id"]}\t{r["views"]}\t{r["duration"] or ""}\t{track}\t{title}\n')
+          print("top50",len(top),"min_views",top[-1]["views"],"max_views",top[0]["views"])
+          PY
+
+      - name: Download and extract temporal frames
+        shell: bash
+        run: |
+          set +e
+          mkdir -p corpus
+          : > metrics.tsv
+          echo -e "rank\tid\tviews\tduration_meta\tduration_file\twidth\theight\tfps\tscene_count\tdownload_ok" >> metrics.tsv
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration track title; do
+            dir=$(printf "corpus/%02d_%s" "$rank" "$id")
+            mkdir -p "$dir"
+            url="https://www.tiktok.com/@lefutetfute/video/$id"
+            outfile="$dir/video.mp4"
+            yt-dlp --no-playlist --quiet --no-warnings               -S "res:360" -f "bv*[height<=540]+ba/b[height<=540]/worst"               --merge-output-format mp4 -o "$outfile" "$url"
+            ok=$?
+            if [ "$ok" -ne 0 ] || [ ! -s "$outfile" ]; then
+              echo -e "$rank\t$id\t$views\t$duration\t\t\t\t\t\t0" >> metrics.tsv
+              continue
+            fi
+            probe=$(ffprobe -v error -select_streams v:0               -show_entries stream=width,height,r_frame_rate               -show_entries format=duration               -of json "$outfile")
+            python3 - "$rank" "$id" "$views" "$duration" "$dir" <<'PY'
+          import json,sys,subprocess,os,math
+          rank,id,views,dmeta,dir=sys.argv[1:]
+          p=json.loads(subprocess.check_output(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height,r_frame_rate","-show_entries","format=duration","-of","json",f"{dir}/video.mp4"]))
+          s=p["streams"][0]; dur=float(p["format"]["duration"])
+          def fps(v):
+              a,b=v.split("/"); return float(a)/float(b)
+          fr=fps(s.get("r_frame_rate","0/1"))
+          times=[0.5,max(1,dur*.20),max(1,dur*.50),max(1,dur*.80),max(1,dur-0.8)]
+          for n,t in enumerate(times):
+              subprocess.run(["ffmpeg","-loglevel","error","-ss",str(t),"-i",f"{dir}/video.mp4","-frames:v","1","-q:v","3",f"{dir}/frame{n}.jpg"],check=False)
+          # scene count at threshold 0.30
+          cmd=["ffmpeg","-hide_banner","-i",f"{dir}/video.mp4","-filter_complex","select='gt(scene,0.30)',metadata=print","-an","-f","null","-"]
+          r=subprocess.run(" ".join(cmd),shell=True,stderr=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
+          scene_count=r.stderr.count("lavfi.scene_score")
+          with open("metrics.tsv","a") as f:
+              f.write(f"{rank}\t{id}\t{views}\t{dmeta}\t{dur:.3f}\t{s.get('width')}\t{s.get('height')}\t{fr:.3f}\t{scene_count}\t1\n")
+          PY
+            rm -f "$outfile"
+          done
+          true
+
+      - name: Build contact sheets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageOps,ImageDraw
+          import glob,os,math
+          dirs=sorted(glob.glob("corpus/*"))
+          os.makedirs("sheets",exist_ok=True)
+          for start in range(0,len(dirs),5):
+              batch=dirs[start:start+5]
+              cellw,cellh=220,390
+              cols=5; rows=5
+              canvas=Image.new("RGB",(cols*cellw,rows*cellh),(245,245,245))
+              draw=ImageDraw.Draw(canvas)
+              for col,d in enumerate(batch):
+                  rank=os.path.basename(d).split("_")[0]
+                  for row in range(5):
+                      p=os.path.join(d,f"frame{row}.jpg")
+                      if not os.path.exists(p): continue
+                      im=Image.open(p).convert("RGB")
+                      im.thumbnail((cellw-8,cellh-26))
+                      x=col*cellw+(cellw-im.width)//2
+                      y=row*cellh+22+(cellh-26-im.height)//2
+                      canvas.paste(im,(x,y))
+                      draw.text((col*cellw+4,row*cellh+3),f"#{rank} t{row}",fill=(0,0,0))
+              ranks=[os.path.basename(d).split("_")[0] for d in batch]
+              canvas.save(f"sheets/sheet_{ranks[0]}_{ranks[-1]}.jpg",quality=88)
+          PY
+
+      - name: Upload corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-top50-visual-corpus
+          path: |
+            top50.json
+            manifest.tsv
+            metrics.tsv
+            corpus/**/*.jpg
+            sheets/*.jpg
+          retention-days: 3
+          compression-level: 6

@@ -53,12 +53,7 @@ jobs:
             if [ -n "$vf" ] && [ -s "$vf" ]; then
               dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$vf" | head -n1)
               echo "$dur" > "$dir/duration.txt"
-              python3 - "$dur" "$dir/times.txt" <<'PY'
-import sys
-d=float(sys.argv[1] or 0)
-pts=[0.05,0.25,0.50,0.75,0.95]
-open(sys.argv[2],"w").write("\n".join(str(max(0,d*p)) for p in pts))
-PY
+              python3 -c 'import sys; d=float(sys.argv[1] or 0); pts=[0.05,0.25,0.50,0.75,0.95]; open(sys.argv[2],"w").write("\\n".join(str(max(0,d*p)) for p in pts))' "$dur" "$dir/times.txt"
               k=0
               while IFS= read -r t; do
                 k=$((k+1))

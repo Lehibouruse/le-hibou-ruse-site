@@ -11,7 +11,7 @@ test("les providers directs exposent leur état sans révéler les tokens", () =
     THREADS_ACCESS_TOKEN: "secret-threads",
     THREADS_USER_ID: "th-1",
     LINKEDIN_ACCESS_TOKEN: "secret-li",
-    LINKEDIN_AUTHOR_URN: "urn:li:person:1",
+    LINKEDIN_ORGANIZATION_URN: "urn:li:organization:123456",
     LINKEDIN_VERSION: "202608",
     X_ACCESS_TOKEN: "secret-x",
     YOUTUBE_ACCESS_TOKEN: "secret-yt",

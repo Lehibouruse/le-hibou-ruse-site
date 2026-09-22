@@ -51,6 +51,16 @@ test("TikTok utilise Login Kit v2 avec publication et lecture des performances",
   assert.match(scopes, /video\.list/);
 });
 
+test("LinkedIn cible la Page et ne demande pas w_member_social", () => {
+  const auth = buildSocialAuthorization("linkedin", base);
+  const scopes = new URL(auth.url).searchParams.get("scope") || "";
+  assert.match(scopes, /w_organization_social/);
+  assert.match(scopes, /r_organization_social/);
+  assert.match(scopes, /rw_organization_admin/);
+  assert.doesNotMatch(scopes, /w_member_social/);
+  assert.equal(auth.url.includes("li-secret"), false);
+});
+
 test("X utilise PKCE et conserve le verifier uniquement dans l'état chiffré", () => {
   const auth = buildSocialAuthorization("x", base);
   const url = new URL(auth.url);

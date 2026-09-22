@@ -35,8 +35,8 @@ test("normalise Threads, Instagram et LinkedIn", () => {
     { name: "views", values: [{ value: 8000 }] }, { name: "saved", values: [{ value: 19 }] }, { name: "shares", values: [{ value: 33 }] },
   ], { like_count: 440, comments_count: 18, permalink: "https://instagram.com/reel/ig42" });
   assert.equal(instagram.views, 8000); assert.equal(instagram.saves, 19);
-  const linkedin = normalizeLinkedInMetrics("urn:li:share:42", { IMPRESSION: 5000, REACTION: 160, COMMENT: 15, RESHARE: 12, POST_SAVE: 20, LINK_CLICKS: 80, FOLLOWER_GAINED_FROM_CONTENT: 9 });
-  assert.equal(linkedin.clicks, 80); assert.equal(linkedin.followers_generated, 9);
+  const linkedin = normalizeLinkedInMetrics("urn:li:share:42", { impressionCount: 5000, likeCount: 160, commentCount: 15, shareCount: 12, clickCount: 80 });
+  assert.equal(linkedin.clicks, 80); assert.equal(linkedin.views, 5000); assert.equal(linkedin.followers_generated, null); assert.equal(linkedin.saves, null);
 });
 
 test("normalise Pinterest à partir du résumé demandé, avec repli lifetime", () => {

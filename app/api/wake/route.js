@@ -4,6 +4,7 @@ import { isAgenticAction } from "../../../lib/agent-capabilities.mjs";
 import { githubOidcAudience, verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 import { readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
+import { PAID_AI_DISABLED_BY_POLICY } from "../../../lib/hibou-agent.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,7 +84,9 @@ export async function POST(request) {
     if (!cronSecret) return NextResponse.json({ ok: false, error: "CRON_SECRET absent" }, { status: 503 });
 
     const [records, circuit] = await Promise.all([eligibleJobs(), readOpenAiCircuit()]);
-    const candidate = circuit.active ? records.find((job) => !requiresOpenAi(job)) || null : records[0] || null;
+    const candidate = (PAID_AI_DISABLED_BY_POLICY || circuit.active)
+      ? records.find((job) => !requiresOpenAi(job)) || null
+      : records[0] || null;
 
     if (dryRun || !candidate) {
       return NextResponse.json({
@@ -92,7 +95,9 @@ export async function POST(request) {
         eligible: records.length,
         processed: 0,
         action: candidate ? actionName(candidate) : "",
-        reason: !candidate && circuit.active && records.some(requiresOpenAi) ? "openai_credit_circuit_open" : "",
+        reason: !candidate && PAID_AI_DISABLED_BY_POLICY && records.some(requiresOpenAi)
+          ? "paid_ai_disabled_by_policy"
+          : !candidate && circuit.active && records.some(requiresOpenAi) ? "openai_credit_circuit_open" : "",
         circuit: circuit.active ? { active: true, until: circuit.until, reason: circuit.reason } : { active: false },
         audience: githubOidcAudience(),
       });

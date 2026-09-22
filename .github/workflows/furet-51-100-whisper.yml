@@ -1,0 +1,100 @@
+name: Furet ranks 51-100 content transcripts
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top50-whisper.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transcribe:
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [0, 1, 2, 3, 4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install tools
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          python3 -m pip install -q faster-whisper
+
+      - name: Build batch manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@lefutetfute" > profile.json
+          BATCH="${{ matrix.batch }}" python3 - <<'PY'
+          import json,os
+          d=json.load(open("profile.json"))
+          es=sorted(d.get("entries") or [],key=lambda x:int(x.get("view_count") or 0),reverse=True)[50:100]
+          b=int(os.environ["BATCH"])
+          part=es[b*10:(b+1)*10]
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\ttitle\turl\n")
+              for j,e in enumerate(part,b*10+51):
+                  vals=[str(j),str(e.get("id") or ""),str(e.get("view_count") or 0),str(e.get("duration") or ""),
+                        (e.get("title") or "").replace("\t"," ").replace("\n"," "),str(e.get("url") or "")]
+                  f.write("\t".join(vals)+"\n")
+          print("batch",b,"videos",len(part))
+          PY
+
+      - name: Transcribe batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transcripts
+          cat > transcribe_batch.py <<'PY'
+          from faster_whisper import WhisperModel
+          import subprocess,os,csv,json
+          model=WhisperModel("small",device="cpu",compute_type="int8")
+          rows=[]
+          with open("manifest.tsv") as f:
+              items=list(csv.DictReader(f,delimiter="\t"))
+          for item in items:
+              rank=item["rank"]; vid=item["id"]; url=item["url"]
+              media=f"video_{rank}.mp4"
+              cmd=["yt-dlp","--extractor-args","tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com",
+                   "-f","worst[ext=mp4]/worst","--no-playlist","-o",media,url]
+              print("DOWNLOAD",rank,vid,flush=True)
+              p=subprocess.run(cmd,capture_output=True,text=True)
+              if p.returncode!=0 or not os.path.exists(media):
+                  print("DOWNLOAD_FAIL",rank,p.stderr[-1000:],flush=True)
+                  rows.append({**item,"status":"download_failed"}); continue
+              print("TRANSCRIBE",rank,flush=True)
+              segs,info=model.transcribe(media,language="fr",beam_size=5,vad_filter=True,
+                                         condition_on_previous_text=True)
+              out=[]
+              for s in segs:
+                  txt=s.text.strip()
+                  if txt:
+                      out.append({"start":round(s.start,2),"end":round(s.end,2),"text":txt})
+              txtpath=f"transcripts/{int(rank):02d}_{vid}.txt"
+              with open(txtpath,"w") as g:
+                  for s in out:
+                      g.write(f'[{s["start"]:.2f}-{s["end"]:.2f}] {s["text"]}\n')
+              full=" ".join(s["text"] for s in out)
+              rows.append({**item,"status":"ok","language":info.language,
+                           "language_probability":info.language_probability,
+                           "segments":len(out),"words":len(full.split()),"text":full})
+              os.remove(media)
+          json.dump(rows,open("batch.json","w"),ensure_ascii=False,indent=2)
+          print("OK",sum(r.get("status")=="ok" for r in rows),"OF",len(rows))
+          PY
+          python3 transcribe_batch.py
+
+      - name: Upload batch
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-51-100-transcripts-batch-${{ matrix.batch }}
+          path: |
+            manifest.tsv
+            batch.json
+            transcripts/
+          retention-days: 3
+          compression-level: 6

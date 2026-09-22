@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-22 21:58 Europe/Paris
+Dernière mise à jour : 2026-09-22 22:55 Europe/Paris
 
 ## Décisions actuelles
 
@@ -19,7 +19,7 @@ Branche canonique : `hibou-local-video-pipeline-20260922`, PR #175.
 - `getAgentConfig().aiEnabled` reste faux même si une ancienne variable Vercel tente de remettre `AI_ENABLED=true`.
 - Le worker refuse les Jobs agentiques ; les chemins déterministes restent disponibles.
 - `.env.example` est fail-closed : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
-- CI GitHub verte sur le head actuel `399f66be42ee1ad05247bccfcefe2a643bcc5523` (run #643).
+- CI GitHub verte sur le head actuel `fb91c77efb01740261156603710bfbe982ce6b15` (run #646).
 - PR #176 a été fermée comme doublon pour éviter deux politiques de sécurité divergentes.
 - Production n’est PAS encore déclarée protégée : la preuve finale nécessite fusion/déploiement de #175 puis contrôle runtime sans appel OpenAI réel.
 - Audit Jobs : 116 Jobs, aucun Running/Retry/Pending ; 103 CREATE_BOOK et 3 CREATE_VIDEO historiques. Les 3 CREATE_VIDEO restent en Manual Review et les 21 CREATE_BOOK en Manual Review qui portaient encore un `next_run_at` historique ont été neutralisés (`next_run_at=null`).
@@ -34,12 +34,12 @@ Box Spread :
 - renderer : FFmpeg local déterministe ;
 - format : 1080×1920, 30 fps, H.264/AAC, faststart ;
 - POC court conservé en Library ;
-- master technique complet : 18 scènes, 42,6 s, 15 919 538 octets, SHA-256 `64e99df73e5fd8c999893392f40ae6b0397f527b18429c75a3256ba0a24978c9` ;
+- master technique complet : 18 scènes, 42,6 s, 15 919 538 octets, SHA-256 `64e99df73e5fd8c999893392f40ae6b0397f527b18429c75a3256ba0a24978c9` ; contrôle indépendant du 22/09 : source V2 SHA-256 `cf3222c502987cac99ccbe86bb0aafa443abd3dafbbe038e956c11e6a804a15e`, source 24 fps, master 30 fps ;
 - contrôle visuel sur 1, 8, 15, 22, 29, 36 et 41 s : PASS ;
 - master sans musique commerciale ; cues conservés ;
 - sous-titres exacts encore en attente car aucune transcription n’est inventée depuis l’audio ;
 - publication non autorisée ; validation humaine requise ;
-- Content Pipeline canonique : `recVuNUbyUm9WIpVx`, état « Master technique complet 18 scènes — PASS technique — non validé publication » ;
+- Content Pipeline canonique : `rec8lgQT8jXreflmt`, état `HUMAN_REVIEW`, version vidéo 3. L’ancien POC `recVuNUbyUm9WIpVx` est conservé comme historique et marqué superseded ;
 - Library : `/Le Hibou Rusé/Vidéos/Box Spread/Master technique 30fps 2026-09-22/` contient MP4, contrat JSON, manifeste et planche QC.
 
 Environnement du POC :

@@ -8,6 +8,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SETUP = {
+  reddit: {
+    label: "Reddit",
+    portal: "https://support.reddithelp.com/hc/en-us/requests/new?tf_42139884615700=api_request_type_enterprise_clone&ticket_form_id=14868593862164",
+    note: "Obtenir l’accord API commercial, configurer l’app Web OAuth puis autoriser le compte du Hibou. Texte/lien uniquement ; cible Reddit à choisir avant publication.",
+  },
   youtube: {
     label: "YouTube",
     portal: "https://console.cloud.google.com/apis/credentials",

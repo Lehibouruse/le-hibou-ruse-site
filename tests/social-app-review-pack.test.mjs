@@ -10,7 +10,7 @@ const snapshot = { providers: [
 
 test("le pack couvre les neuf providers d'autorisation/review", () => {
   const pack = buildSocialAppReviewPack(snapshot);
-  assert.equal(pack.packs.length, 9);
+  assert.equal(pack.packs.length, 10);
   for (const provider of ["youtube", "meta", "instagram", "tiktok", "linkedin", "pinterest", "threads", "x", "snapchat"]) {
     assert.ok(pack.packs.some((item) => item.provider === provider));
   }

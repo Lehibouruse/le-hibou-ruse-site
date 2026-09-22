@@ -126,9 +126,15 @@ test("le résumé distingue direct, webhook, Metricool et blocages", () => {
       gateway("facebook", { webhook_configured: true }),
     ],
   });
-  assert.equal(plan.summary.total, 9);
+  assert.equal(plan.summary.total, 11);
   assert.equal(plan.summary.direct, 1);
   assert.equal(plan.summary.webhook, 1);
   assert.equal(plan.summary.metricool, 1);
-  assert.equal(plan.summary.blocked, 6);
+  assert.equal(plan.summary.blocked, 8);
+});
+
+
+test("Bluesky authentication by app password can route reads without an OAuth flag", () => {
+  const plan = buildSocialRoutingPlan({ operation: "read", accounts: [account("Bluesky", { "OAuth Hibou connecté": false, "Auth direct OK": true, "Lecture API OK": true })], gateways: [gateway("bluesky", { direct_configured: true })] });
+  assert.equal(plan.routes.find(item => item.provider === "bluesky").route, "direct_api");
 });

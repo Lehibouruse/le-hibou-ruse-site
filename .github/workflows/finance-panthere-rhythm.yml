@@ -1,0 +1,60 @@
+name: Finance Panthere visual rhythm
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-rhythm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Analyze current public videos
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@financepanthere" > profile.json
+          python3 - <<'PY'
+          import json,subprocess,os,re,statistics
+          d=json.load(open("profile.json"))
+          rows=[]
+          for e in d.get("entries") or []:
+              vid=e["id"]; url=e["url"]; media=f"/tmp/{vid}.mp4"
+              p=subprocess.run(["yt-dlp","--extractor-args","tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com",
+                                "-f","worst[ext=mp4]/worst","--no-playlist","-o",media,url],
+                               capture_output=True,text=True)
+              if p.returncode or not os.path.exists(media):
+                  rows.append({"id":vid,"status":"download_failed"}); continue
+              dur=float(e.get("duration") or 0)
+              out=subprocess.run(["ffmpeg","-hide_banner","-i",media,"-vf","select='gt(scene,0.30)',showinfo","-f","null","-"],
+                                 capture_output=True,text=True).stderr
+              times=[float(x) for x in re.findall(r'pts_time:([0-9.]+)',out)]
+              intervals=[b-a for a,b in zip(times,times[1:])]
+              rows.append({
+                "id":vid,"views":e.get("view_count"),"duration":dur,
+                "cuts_030":len(times),
+                "median_interval_030":statistics.median(intervals) if intervals else None,
+                "mean_interval_030":sum(intervals)/len(intervals) if intervals else None,
+                "times":times
+              })
+              os.remove(media)
+          json.dump(rows,open("rhythm.json","w"),ensure_ascii=False,indent=2)
+          print(json.dumps(rows,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-rhythm
+          path: rhythm.json
+          retention-days: 3

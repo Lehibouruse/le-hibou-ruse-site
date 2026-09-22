@@ -21,21 +21,68 @@ jobs:
           ids=(bkF_sZgBRsU KQxjChS1p6s CbFERLNN8AU)
           for id in "${ids[@]}"; do
             echo "VIDEO=$id"
-            urls=(
-              "https://www.youtube.com/api/timedtext?type=list&v=$id"
-              "https://www.youtube.com/api/timedtext?v=$id&lang=fr&fmt=vtt"
-              "https://www.youtube.com/api/timedtext?v=$id&lang=fr&kind=asr&fmt=vtt"
-            )
-            for u in "${urls[@]}"; do
-              code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 15 -o out.txt -w "%{http_code}" "$u" || true)
-              bytes=$(wc -c < out.txt 2>/dev/null || echo 0)
-              echo "HTTP=$code BYTES=$bytes URL=$u"
-              head -c 1000 out.txt 2>/dev/null || true
-              echo
-              echo "---"
-            done
-            code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 15 -o watch.html -w "%{http_code}" "https://www.youtube.com/watch?v=$id" || true)
-            echo "WATCH_HTTP=$code WATCH_BYTES=$(wc -c < watch.html 2>/dev/null || echo 0)"
-            python3 -c 'import re,html; s=open("watch.html",encoding="utf-8",errors="ignore").read(); print("captionTracks",s.find("captionTracks")); print("playerCaptionsTracklistRenderer",s.find("playerCaptionsTracklistRenderer")); print("captions",s.find("\\"captions\\"")); m=re.search(r"\\"captionTracks\\":(\\[[^\\]]+\\])",s); print("captionTracksMatch",bool(m)); print(html.unescape(m.group(1))[:5000] if m else "")'
+            curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 20 \
+              "https://www.youtube.com/watch?v=$id&hl=fr" -o watch.html
+            echo "WATCH_BYTES=$(wc -c < watch.html)"
+            python3 - <<'PY'
+          import json
+          s=open("watch.html",encoding="utf-8",errors="ignore").read()
+          key='"captionTracks":'
+          p=s.find(key)
+          print("captionTracksPos", p)
+          if p < 0:
+              open("caption_urls.txt","w").close()
+              raise SystemExit
+          i=p+len(key)
+          while i < len(s) and s[i].isspace():
+              i+=1
+          if i >= len(s) or s[i] != '[':
+              open("caption_urls.txt","w").close()
+              raise SystemExit
+          start=i
+          depth=0
+          instr=False
+          esc=False
+          end=None
+          for j in range(i,len(s)):
+              ch=s[j]
+              if instr:
+                  if esc: esc=False
+                  elif ch=='\\': esc=True
+                  elif ch=='"': instr=False
+              else:
+                  if ch=='"': instr=True
+                  elif ch=='[': depth+=1
+                  elif ch==']':
+                      depth-=1
+                      if depth==0:
+                          end=j+1
+                          break
+          arr=json.loads(s[start:end])
+          print("tracks",len(arr))
+          with open("caption_urls.txt","w") as f:
+              for t in arr:
+                  name=((t.get("name") or {}).get("simpleText") or "")
+                  print(json.dumps({
+                      "languageCode":t.get("languageCode"),
+                      "kind":t.get("kind"),
+                      "name":name,
+                      "isTranslatable":t.get("isTranslatable"),
+                      "vssId":t.get("vssId")
+                  }, ensure_ascii=False))
+                  if t.get("baseUrl"):
+                      f.write(t["baseUrl"]+"\n")
+          PY
+            if [ -s caption_urls.txt ]; then
+              n=0
+              while IFS= read -r url; do
+                n=$((n+1))
+                [ "$n" -le 3 ] || break
+                code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 20 -o "cap$n.xml" -w "%{http_code}" "$url" || true)
+                echo "CAPTION_$n HTTP=$code BYTES=$(wc -c < cap$n.xml 2>/dev/null || echo 0)"
+                head -c 3000 "cap$n.xml" 2>/dev/null || true
+                echo
+              done < caption_urls.txt
+            fi
             echo "======"
           done

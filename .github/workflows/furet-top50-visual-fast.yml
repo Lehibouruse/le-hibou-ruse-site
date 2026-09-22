@@ -17,8 +17,7 @@ jobs:
       - name: Prepare
         shell: bash
         run: |
-          python3 -m pip install -q yt-dlp
-          ffmpeg -version | head -1
+          python3 -m pip install -q yt-dlp opencv-python-headless
 
       - name: Build ranked Top 50
         shell: bash

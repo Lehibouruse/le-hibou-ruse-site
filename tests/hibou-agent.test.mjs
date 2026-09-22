@@ -140,7 +140,7 @@ test("l'escalade réelle passe de Luna à Terra une seule fois", async () => {
     const result = await runAgentJob({
       job: source,
       route: routeJob(source),
-      env: { OPENAI_API_KEY: "test-only", HIBOU_MAX_API_RETRIES: "0" },
+      env: { OPENAI_API_KEY: "test-only", HIBOU_MAX_API_RETRIES: "0", AI_ENABLED: "true", HIBOU_AI_KILL_SWITCH: "false", HIBOU_MAX_AI_CALLS_PER_JOB: "4", HIBOU_MAX_COST_PER_JOB_USD: "1", HIBOU_DAILY_SOFT_BUDGET_USD: "10", HIBOU_DAILY_HARD_BUDGET_USD: "20" },
     });
     assert.deepEqual(calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
     assert.equal(result.status, "completed");
@@ -157,7 +157,7 @@ test("le plafond journalier arrête le Job avant tout appel", async () => {
     job: source,
     route: routeJob(source),
     dailySpendUsd: 1,
-    env: { OPENAI_API_KEY: "test-only", HIBOU_DAILY_HARD_BUDGET_USD: "1" },
+    env: { OPENAI_API_KEY: "test-only", AI_ENABLED: "true", HIBOU_AI_KILL_SWITCH: "false", HIBOU_MAX_AI_CALLS_PER_JOB: "4", HIBOU_MAX_COST_PER_JOB_USD: "1", HIBOU_DAILY_SOFT_BUDGET_USD: "0.5", HIBOU_DAILY_HARD_BUDGET_USD: "1" },
   });
   assert.equal(result.status, "waiting_for_human");
   assert.equal(result.ai_calls, 0);
@@ -181,9 +181,29 @@ test("une escalade Sol peut atteindre Astra sans passer par les tiers inférieur
   };
   try {
     const source = job("REPURPOSE", { complexity: "complex" });
-    const result = await runAgentJob({ job: source, route: routeJob(source), env: { OPENAI_API_KEY: "test-only", HIBOU_MAX_API_RETRIES: "0" } });
+    const result = await runAgentJob({ job: source, route: routeJob(source), env: { OPENAI_API_KEY: "test-only", HIBOU_MAX_API_RETRIES: "0", AI_ENABLED: "true", HIBOU_AI_KILL_SWITCH: "false", HIBOU_MAX_AI_CALLS_PER_JOB: "4", HIBOU_MAX_COST_PER_JOB_USD: "1", HIBOU_DAILY_SOFT_BUDGET_USD: "10", HIBOU_DAILY_HARD_BUDGET_USD: "20" } });
     assert.deepEqual(calls, ["gpt-5.6-sol", "gpt-6-astra"]);
     assert.equal(result.status, "completed");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
+test("aucun appel réseau n'est possible avec l'IA projet désactivée", async () => {
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => { called = true; throw new Error("network must not be reached"); };
+  try {
+    const source = job("CREATE_VARIATION", { objective: "test sécurité" });
+    const result = await runAgentJob({
+      job: source,
+      route: routeJob(source),
+      env: { OPENAI_API_KEY: "would-be-secret", AI_ENABLED: "false", HIBOU_AI_KILL_SWITCH: "true" },
+    });
+    assert.equal(result.status, "waiting_for_human");
+    assert.equal(result.ai_calls, 0);
+    assert.equal(called, false);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1,0 +1,76 @@
+name: Finance Panthere cadence probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-cadence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install tools
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          python3 -m pip install -q opencv-python-headless
+      - name: Analyze five live posts
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@financepanthere" > profile.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("profile.json"))
+          es=sorted(d.get("entries") or [],key=lambda x:int(x.get("view_count") or 0),reverse=True)
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\turl\n")
+              for i,e in enumerate(es,1):
+                  f.write(f'{i}\t{e.get("id")}\t{e.get("view_count",0)}\t{e.get("duration",0)}\t{e.get("url")}\n')
+          PY
+          cat > analyze.py <<'PY'
+          import cv2,sys,json,os,numpy as np
+          path=sys.argv[1]
+          cap=cv2.VideoCapture(path)
+          fps=cap.get(cv2.CAP_PROP_FPS) or 30
+          total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+          dur=total/fps if fps else 0
+          step=max(1,int(fps*0.5))
+          prev=None; changes=[]; samples=0
+          for idx in range(0,total,step):
+              cap.set(cv2.CAP_PROP_POS_FRAMES,idx)
+              ok,fr=cap.read()
+              if not ok: continue
+              g=cv2.cvtColor(cv2.resize(fr,(96,168)),cv2.COLOR_BGR2GRAY)
+              if prev is not None:
+                  diff=float(np.mean(cv2.absdiff(g,prev))/255.0)
+                  if diff>0.14: changes.append(idx/fps)
+              prev=g;samples+=1
+          cap.release()
+          gaps=np.diff(changes).tolist() if len(changes)>1 else []
+          print(json.dumps({"duration":dur,"samples":samples,"major_changes":len(changes),
+                            "changes":changes,"median_gap":float(np.median(gaps)) if gaps else None}))
+          PY
+          : > cadence.jsonl
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration url; do
+            rm -f video.mp4
+            yt-dlp --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+              -f "worst[ext=mp4]/worst" --no-playlist -o video.mp4 "$url" >/dev/null 2>&1
+            res=$(python3 analyze.py video.mp4)
+            echo "{\"rank\":$rank,\"id\":\"$id\",\"views\":$views,\"metrics\":$res}" >> cadence.jsonl
+            rm -f video.mp4
+          done
+          cat cadence.jsonl
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-cadence
+          path: |
+            cadence.jsonl
+            manifest.tsv
+          retention-days: 3

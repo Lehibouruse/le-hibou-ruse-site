@@ -1,0 +1,40 @@
+name: Finance Panthere representative motion sample
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-motion-sample.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+      - name: Download two representative videos
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@financepanthere" > profile.json
+          python3 - <<'PY'
+          import json,subprocess,os
+          d=json.load(open("profile.json"))
+          es=sorted(d.get("entries") or [],key=lambda x:int(x.get("view_count") or 0),reverse=True)
+          for i,e in enumerate(es[:2],1):
+              subprocess.run(["yt-dlp","--extractor-args","tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com",
+                              "-f","worst[ext=mp4]/worst","--no-playlist","-o",f"sample_{i}.mp4",e["url"]],check=True)
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-motion-sample
+          path: sample_*.mp4
+          retention-days: 1
+          compression-level: 0

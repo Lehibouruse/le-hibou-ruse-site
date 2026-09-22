@@ -5,6 +5,7 @@ import { BOOK_EDITORIAL_VERSION, bookInstructions } from "../../../lib/book-edit
 import { bookQualityGate } from "../../../lib/book-quality.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 import { creditPausePatch, isCreditExhausted, openOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
+import { isProjectAiEnabled } from "../../../lib/ai-policy.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -216,7 +217,7 @@ export async function GET(request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  let claimedJob = null;
+  if (!isProjectAiEnabled(process.env)) {\n    return NextResponse.json({ ok: false, processed: 0, status: "disabled", reason: "openai_api_disabled", openai_calls: 0 }, { status: 409 });\n  }\n\n  let claimedJob = null;
   try {
     const eligible = eligibleJobsFormula(process.env);
     const candidates = await queryRecords(TABLES.jobs, {

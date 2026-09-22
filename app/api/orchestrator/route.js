@@ -4,6 +4,7 @@ import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../
 import {
   getAgentConfig,
   HIBOU_AGENT_PROMPT_VERSION,
+  PAID_AI_DISABLED_BY_POLICY,
   routeJob,
   runAgentJob,
 } from "../../../lib/hibou-agent.mjs";
@@ -252,6 +253,12 @@ export async function GET(request) {
       const outcome = await runDeterministicAction(job);
       await finalize(job, "Completed", "completed", outcome.result, started, {}, outcome.externalId || "");
       return NextResponse.json({ ok: true, processed: 1, job_id: job.fields.job_id, status: "completed", openai_calls: 0 });
+    }
+
+    if (PAID_AI_DISABLED_BY_POLICY) {
+      const result = "OpenAI API désactivée par politique projet ; utiliser ChatGPT actuel ou un traitement déterministe/local.";
+      await finalize(job, "Manual Review", "waiting_for_human", result, started);
+      return NextResponse.json({ ok: false, processed: 1, job_id: job.fields.job_id, status: "waiting_for_human", openai_calls: 0, reason: "paid_ai_disabled_by_policy" });
     }
 
     const spend = await dailyAiSpend();

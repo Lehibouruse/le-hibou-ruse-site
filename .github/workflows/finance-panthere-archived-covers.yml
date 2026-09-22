@@ -16,49 +16,77 @@ jobs:
     steps:
       - name: Install
         run: python3 -m pip install -q requests beautifulsoup4 pillow
-      - name: Fetch covers
+      - name: Fetch public cover URLs from archive pages
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p covers
           python3 - <<'PY'
-          import requests,os,json
+          import requests,os,json,re
           from bs4 import BeautifulSoup
-          base="https://tokscribe.com"
-          links=[]
-          for p in [1,2]:
-              u=f"{base}/author/financepanthere"+("" if p==1 else "?page=2")
-              h=requests.get(u,headers={"User-Agent":"Mozilla/5.0"},timeout=30).text
-              s=BeautifulSoup(h,"html.parser")
-              for a in s.find_all("a",href=True):
-                  if a["href"].startswith("/t/") and a["href"] not in links:
-                      links.append(a["href"])
-          os.makedirs("covers",exist_ok=True)
           rows=[]
-          for i,href in enumerate(links,1):
-              tid=href.rsplit("/",1)[-1]
-              u=base+href
+          for p in [1,2]:
+              u="https://tokscribe.com/author/financepanthere"+("" if p==1 else "?page=2")
               h=requests.get(u,headers={"User-Agent":"Mozilla/5.0"},timeout=30).text
               s=BeautifulSoup(h,"html.parser")
-              txt=s.get_text(" ",strip=True)
-              title=s.find("h1").get_text(" ",strip=True) if s.find("h1") else ""
-              cover=f"{base}/api/transcriptions/{tid}/cover"
-              r=requests.get(cover,headers={"User-Agent":"Mozilla/5.0","Referer":u},timeout=30,allow_redirects=True)
-              ctype=r.headers.get("content-type","")
-              ok=r.status_code==200 and ctype.startswith("image/") and len(r.content)>1000
-              print("COVER",i,r.status_code,ctype,len(r.content),r.url,"OK",ok)
-              if ok:
-                  ext=".webp" if "webp" in ctype else ".jpg"
-                  open(f"covers/{i:02d}{ext}","wb").write(r.content)
-              rows.append({"i":i,"href":href,"title":title,"cover_status":r.status_code,"content_type":ctype,"bytes":len(r.content),"final_url":r.url})
-          json.dump(rows,open("covers.json","w"),ensure_ascii=False,indent=2)
+              for card in s.select('a[href^="/t/"]'):
+                  img=card.find("img")
+                  if not img or not img.get("src"): continue
+                  text=card.get_text(" ",strip=True)
+                  mviews=re.search(r'([0-9.]+[KMB])',text)
+                  mdur=re.search(r'(\d+:\d{2})',text)
+                  item=re.search(r'item=(\d+)',img["src"])
+                  vid=item.group(1) if item else card["href"].rsplit("/",1)[-1]
+                  row={
+                    "id":vid,
+                    "cover":img["src"],
+                    "title":(img.get("alt") or "").strip(),
+                    "views":mviews.group(1) if mviews else "",
+                    "duration":mdur.group(1) if mdur else "",
+                    "page":"https://tokscribe.com"+card["href"]
+                  }
+                  if not any(x["page"]==row["page"] for x in rows):
+                      rows.append(row)
+          def n(x):
+              if not x:return 0
+              mul={"K":1e3,"M":1e6,"B":1e9}.get(x[-1],1)
+              try:return float(x[:-1])*mul
+              except:return 0
+          rows.sort(key=lambda r:n(r["views"]),reverse=True)
+          for i,r in enumerate(rows,1):
+              r["rank"]=i
+              resp=requests.get(r["cover"],headers={"User-Agent":"Mozilla/5.0"},timeout=30)
+              print("ROW",i,r["views"],resp.status_code,len(resp.content),r["id"])
+              if resp.ok and len(resp.content)>1000:
+                  open(f'covers/{i:02d}_{r["id"]}.jpg',"wb").write(resp.content)
+          json.dump(rows,open("covers_manifest.json","w"),ensure_ascii=False,indent=2)
+          print("rows",len(rows),"files",len(os.listdir("covers")))
+          PY
+      - name: Build contact sheet
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageOps,ImageDraw
+          import glob,json,os
+          rows=json.load(open("covers_manifest.json"))
+          files=sorted(glob.glob("covers/*.jpg"))
+          cols=6; tw,th=180,320; rn=(len(files)+cols-1)//cols
+          sh=Image.new("RGB",(cols*tw,rn*(th+28)),"white"); dr=ImageDraw.Draw(sh)
+          for i,fp in enumerate(files):
+              x=(i%cols)*tw; y=(i//cols)*(th+28)
+              try: im=ImageOps.fit(Image.open(fp).convert("RGB"),(tw,th))
+              except: continue
+              sh.paste(im,(x,y+28))
+              label=f'#{i+1} {rows[i]["views"]}'
+              dr.text((x+3,y+5),label,fill="black")
+          sh.save("archive_covers_sheet.jpg",quality=88)
           PY
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: finance-panthere-archived-covers
           path: |
-            covers.json
+            covers_manifest.json
             covers/
+            archive_covers_sheet.jpg
           retention-days: 3
-
-# refresh archive covers 2026-09-22

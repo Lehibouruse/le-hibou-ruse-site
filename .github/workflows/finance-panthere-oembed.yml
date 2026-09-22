@@ -1,0 +1,73 @@
+name: Finance Panthere TikTok oembed archive
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-oembed.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe archived videos through oEmbed
+        shell: bash
+        run: |
+          python3 -m pip install -q requests beautifulsoup4
+          python3 - <<'PY'
+          import requests,os,re,json
+          from bs4 import BeautifulSoup
+          base="https://tokscribe.com"
+          links=[]
+          for p in [1,2]:
+              h=requests.get(f"{base}/author/financepanthere"+("" if p==1 else "?page=2"),headers={"User-Agent":"Mozilla/5.0"},timeout=30).text
+              s=BeautifulSoup(h,"html.parser")
+              for a in s.find_all("a",href=True):
+                  if a["href"].startswith("/t/") and a["href"] not in links:
+                      links.append(a["href"])
+          rows=[]
+          os.makedirs("thumbs",exist_ok=True)
+          for i,href in enumerate(links,1):
+              u=base+href
+              h=requests.get(u,headers={"User-Agent":"Mozilla/5.0"},timeout=30).text
+              s=BeautifulSoup(h,"html.parser")
+              tik=None
+              for a in s.find_all("a",href=True):
+                  if "view on tiktok" in a.get_text(" ",strip=True).lower():
+                      tik=a["href"];break
+              if not tik: continue
+              try:
+                  rr=requests.get(tik,headers={"User-Agent":"Mozilla/5.0"},timeout=30,allow_redirects=True)
+                  final=rr.url
+              except Exception:
+                  final=tik
+              m=re.search(r'/video/(\d+)',final)
+              vid=m.group(1) if m else ""
+              api="https://www.tiktok.com/oembed"
+              r=requests.get(api,params={"url":final},headers={"User-Agent":"Mozilla/5.0"},timeout=30)
+              print("ROW",i,"VID",vid,"HTTP",r.status_code,"BYTES",len(r.content),"FINAL",final)
+              data={}
+              try:data=r.json()
+              except:pass
+              thumb=data.get("thumbnail_url")
+              ok=False
+              if thumb:
+                  tr=requests.get(thumb,headers={"User-Agent":"Mozilla/5.0"},timeout=30)
+                  ok=tr.status_code==200 and tr.headers.get("content-type","").startswith("image/") and len(tr.content)>1000
+                  if ok:open(f"thumbs/{i:02d}.jpg","wb").write(tr.content)
+              rows.append({"i":i,"video_id":vid,"final":final,"oembed_status":r.status_code,"title":data.get("title"),"author_name":data.get("author_name"),"thumbnail_url":thumb,"thumb_ok":ok})
+          json.dump(rows,open("oembed.json","w"),ensure_ascii=False,indent=2)
+          print("TOTAL",len(rows),"THUMBS",sum(x["thumb_ok"] for x in rows))
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-oembed
+          path: |
+            oembed.json
+            thumbs/
+          retention-days: 3

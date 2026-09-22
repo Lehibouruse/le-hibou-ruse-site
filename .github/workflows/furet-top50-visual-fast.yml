@@ -51,8 +51,7 @@ jobs:
             prefix=$(printf "%02d_%s" "$rank" "$id")
             rm -f temp.mp4
             python3 -m yt_dlp --no-playlist --quiet --no-warnings \
-              --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
-              -f "b[ext=mp4]/b" -o temp.mp4 "$url"
+              -f "download/b[ext=mp4]/b" -o temp.mp4 "$url"
             [ -s temp.mp4 ] || continue
             python3 - "$prefix" <<'PY'
           import cv2,sys,os

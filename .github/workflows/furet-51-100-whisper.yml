@@ -3,7 +3,7 @@ name: Furet ranks 51-100 content transcripts
 on:
   push:
     paths:
-      - ".github/workflows/furet-top50-whisper.yml"
+      - ".github/workflows/furet-51-100-whisper.yml"
   workflow_dispatch:
 
 permissions:

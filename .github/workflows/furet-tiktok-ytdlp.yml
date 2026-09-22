@@ -1,0 +1,38 @@
+name: Furet TikTok yt-dlp metadata
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-tiktok-ytdlp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install yt-dlp
+        run: pipx install yt-dlp
+      - name: Extract public profile metadata
+        shell: bash
+        run: |
+          set +e
+          yt-dlp --flat-playlist --dump-single-json             --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"             "https://www.tiktok.com/@lefutetfute" > profile.json 2>err.txt
+          code=$?
+          echo "EXIT=$code BYTES=$(wc -c < profile.json 2>/dev/null || echo 0)"
+          echo "ERRORS:"
+          tail -n 80 err.txt || true
+          echo "PROFILE_HEAD:"
+          head -c 20000 profile.json || true
+          exit 0
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-tiktok-ytdlp-metadata
+          path: |
+            profile.json
+            err.txt
+          retention-days: 3

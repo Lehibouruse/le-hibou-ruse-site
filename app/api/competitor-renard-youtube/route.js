@@ -184,6 +184,8 @@ export async function GET(request) {
         shortFormVideos: shortForm.length,
       },
       top50: ranked.slice(0, 50),
+      next50: ranked.slice(50, 100),
+      top100: ranked.slice(0, 100),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({

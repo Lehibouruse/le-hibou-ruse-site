@@ -1,9 +1,6 @@
 name: Furet transcript probe
 
 on:
-  push:
-    paths:
-      - ".github/workflows/furet-transcript-probe.yml"
   workflow_dispatch:
 
 permissions:

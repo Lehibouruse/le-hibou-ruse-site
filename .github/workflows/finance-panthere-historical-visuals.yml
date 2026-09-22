@@ -1,0 +1,81 @@
+name: Finance Panthere historical visuals
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-historical-visuals.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Install tools
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Fetch historical posts
+        shell: bash
+        run: |
+          set +e
+          mkdir -p corpus
+          cat > ids.txt <<'EOF'
+7649878022354504993
+7634292064515083553
+7631693479185354016
+7635000346640747809
+7641873502626204961
+7629063822749289761
+7645058924604820768
+7642825784956112161
+7630923023440268576
+7630587558539414816
+7633139197016100129
+7636891104876547360
+7630036576214469921
+7629795204467363104
+EOF
+          n=0
+          while IFS= read -r id; do
+            n=$((n+1))
+            dir=$(printf "corpus/%02d_%s" "$n" "$id")
+            mkdir -p "$dir"
+            url="https://www.tiktok.com/@financepanthere/video/$id"
+            yt-dlp --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+              -f "worst[ext=mp4]/worst" --no-playlist \
+              -o "$dir/video.%(ext)s" "$url" >"$dir/ytdlp.out" 2>"$dir/ytdlp.err"
+            vf=$(find "$dir" -maxdepth 1 -type f -name 'video.*' | head -n1)
+            if [ -n "$vf" ] && [ -s "$vf" ]; then
+              dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$vf" | head -n1)
+              echo "$dur" > "$dir/duration.txt"
+              python3 - "$dur" "$dir/times.txt" <<'PY'
+import sys
+d=float(sys.argv[1] or 0)
+pts=[0.05,0.25,0.50,0.75,0.95]
+open(sys.argv[2],"w").write("\n".join(str(max(0,d*p)) for p in pts))
+PY
+              k=0
+              while IFS= read -r t; do
+                k=$((k+1))
+                ffmpeg -loglevel error -ss "$t" -i "$vf" -frames:v 1 -q:v 3 "$dir/frame_$k.jpg" -y || true
+              done < "$dir/times.txt"
+              rm -f "$vf"
+              echo "OK $id"
+            else
+              echo "FAIL $id"
+            fi
+          done < ids.txt
+          echo "SUCCESS_DIRS=$(find corpus -type f -name 'frame_3.jpg' | wc -l)"
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-historical-visuals
+          path: corpus/
+          retention-days: 3
+          compression-level: 6

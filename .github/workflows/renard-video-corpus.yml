@@ -23,11 +23,11 @@ jobs:
           import json
           d=json.load(open("dataset.json"))
           assert d.get("ok") is True
-          vids=d.get("top50",[])
+          vids=d.get("next50",[])
           assert len(vids) >= 50, len(vids)
           with open("manifest.tsv","w") as f:
               f.write("rank\tid\tviews\tduration\ttitle\turl\n")
-              for i,v in enumerate(vids[:50],1):
+              for i,v in enumerate(vids[:50],51):
                   title=(v.get("title") or "").replace("\t"," ").replace("\n"," ")
                   f.write(f'{i}\t{v.get("id","")}\t{v.get("viewCount",0)}\t{v.get("durationSeconds","")}\t{title}\t{v.get("url","")}\n')
           PY

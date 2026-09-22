@@ -89,7 +89,7 @@ function openAiError(response, data, label = "OpenAI Responses API") {
   return error;
 }
 
-async function claim() {
+async function claim(body = {}) {
   const circuit = await readOpenAiCircuit();
   if (circuit.active) {
     return {
@@ -103,7 +103,11 @@ async function claim() {
     filterByFormula: eligibleJobsFormula(process.env, { includeReserved: true }),
     sortField: "created_at", pageSize: 10,
   });
-  const candidate = candidates.find((job) => isAgenticAction(actionName(job), parameters(job)));
+  const requestedActions = new Set(Array.isArray(body.allowed_actions) ? body.allowed_actions.map((value) => String(value)) : []);
+  const candidate = candidates.find((job) => {
+    const action = actionName(job);
+    return isAgenticAction(action, parameters(job)) && (!requestedActions.size || requestedActions.has(action));
+  });
   if (!candidate) return { ok: true, claimed: false };
   const lockToken = randomUUID();
   const now = new Date();
@@ -467,7 +471,7 @@ export async function POST(request) {
   try {
     await authenticate(request);
     const body = await request.json();
-    const result = body.operation === "claim" ? await claim()
+    const result = body.operation === "claim" ? await claim(body)
       : body.operation === "step" ? await openaiStep(body)
         : body.operation === "step_status" ? await openaiStepStatus(body)
           : body.operation === "tool" ? await serverTool(body)

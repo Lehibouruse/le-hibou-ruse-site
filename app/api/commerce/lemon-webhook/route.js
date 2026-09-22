@@ -3,6 +3,7 @@ import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../li
 import { canonicalSale, escapeFormula, lemonOrder, resolveLemonWebhookSecret, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
 import { saleAttribution } from "../../../../lib/attribution.mjs";
 import { refundDeliveryStatus } from "../../../../lib/commerce-lease.mjs";
+import { digitalSupplyConsentAudit, validDigitalSupplyCustomData } from "../../../../lib/digital-supply-consent.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,6 +97,7 @@ function orderAuditNotes(order, reasons = []) {
     `product_id=${order.productId}`,
     `variant_id=${order.variantId}`,
     `test_mode=${order.testMode}`,
+    ...digitalSupplyConsentAudit(order.customData),
     ...reasons,
   ].filter(Boolean).join("; ");
 }
@@ -223,8 +225,10 @@ export async function POST(request) {
   const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
   const attribution = attributionFields(order);
   const refundedBeforeCreate = Boolean(refundMarker);
+  const consentValid = validDigitalSupplyCustomData(order.customData);
   const ready = Boolean(
     launchAuthorized
+    && consentValid
     && product
     && fileGuid
     && order.status === "paid"
@@ -236,6 +240,7 @@ export async function POST(request) {
   const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? "pending" : "manual_review";
   const reasons = [];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
+  if (!consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
   if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);

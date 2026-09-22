@@ -1,0 +1,123 @@
+name: Furet top50 visual corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top50-visual-corpus.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install tools
+        run: |
+          pipx install yt-dlp
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Build Top 50 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@lefutetfute" > profile.json
+          python3 - <<'PY'
+          import json,csv
+          d=json.load(open("profile.json"))
+          es=d.get("entries") or []
+          es=sorted(es,key=lambda x:int(x.get("view_count") or 0),reverse=True)[:50]
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\ttrack\tartist\ttitle\turl\n")
+              for i,e in enumerate(es,1):
+                  vals=[
+                    str(i),str(e.get("id") or ""),str(e.get("view_count") or 0),
+                    str(e.get("duration") or ""),str(e.get("track") or ""),
+                    ", ".join(e.get("artists") or []),
+                    (e.get("title") or "").replace("\t"," ").replace("\n"," "),
+                    str(e.get("url") or "")
+                  ]
+                  f.write("\t".join(vals)+"\n")
+          PY
+      - name: Download each video and extract temporal frames
+        shell: bash
+        run: |
+          set +e
+          mkdir -p corpus
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration track artist title url; do
+            dir=$(printf "corpus/%02d_%s" "$rank" "$id")
+            mkdir -p "$dir"
+            echo "$title" > "$dir/title.txt"
+            echo "$views" > "$dir/views.txt"
+            echo "$duration" > "$dir/duration.txt"
+            echo "$track" > "$dir/track.txt"
+            echo "$artist" > "$dir/artist.txt"
+            yt-dlp -f "worst[ext=mp4]/worst" --no-playlist -o "$dir/video.%(ext)s" "$url" >"$dir/ytdlp.out" 2>"$dir/ytdlp.err"
+            vf=$(find "$dir" -maxdepth 1 -type f -name 'video.*' | head -n1)
+            if [ -n "$vf" ] && [ -s "$vf" ]; then
+              dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$vf" | head -n1)
+              python3 - "$dur" "$dir/times.txt" <<'PY'
+          import sys
+          d=float(sys.argv[1] or 0)
+          pts=[0.05,0.25,0.50,0.75,0.95]
+          open(sys.argv[2],"w").write("\n".join(str(max(0,d*p)) for p in pts))
+          PY
+              n=0
+              while IFS= read -r t; do
+                n=$((n+1))
+                ffmpeg -loglevel error -ss "$t" -i "$vf" -frames:v 1 -q:v 3 "$dir/frame_$n.jpg" -y || true
+              done < "$dir/times.txt"
+              ffprobe -v quiet -print_format json -show_streams -show_format "$vf" > "$dir/ffprobe.json" || true
+              rm -f "$vf"
+            fi
+          done
+      - name: Build contact sheets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageOps,ImageDraw,ImageFont
+          import glob,os,math
+          dirs=sorted(glob.glob("corpus/*"))
+          os.makedirs("sheets",exist_ok=True)
+          W,H=180,320
+          for batch_start in range(0,len(dirs),5):
+              batch=dirs[batch_start:batch_start+5]
+              sheet=Image.new("RGB",(W*5,H*5+30*5),"white")
+              dr=ImageDraw.Draw(sheet)
+              for col,d in enumerate(batch):
+                  rank=os.path.basename(d).split("_")[0]
+                  title=open(os.path.join(d,"title.txt"),errors="ignore").read().strip()[:38]
+                  dr.text((col*W+4,4),f"#{int(rank)} {title}",fill="black")
+                  for row in range(5):
+                      fp=os.path.join(d,f"frame_{row+1}.jpg")
+                      if not os.path.exists(fp): continue
+                      im=Image.open(fp).convert("RGB")
+                      im=ImageOps.fit(im,(W,H))
+                      sheet.paste(im,(col*W,30+row*H))
+              out=f"sheets/sheet_{batch_start+1}_{batch_start+len(batch)}.jpg"
+              sheet.save(out,quality=82)
+          # one thumbnail-like grid using middle frame
+          cols=10; rows=5; tw,th=120,213
+          grid=Image.new("RGB",(cols*tw,rows*(th+18)),"white")
+          dr=ImageDraw.Draw(grid)
+          for i,d in enumerate(dirs[:50]):
+              fp=os.path.join(d,"frame_3.jpg")
+              if not os.path.exists(fp): continue
+              im=ImageOps.fit(Image.open(fp).convert("RGB"),(tw,th))
+              x=(i%cols)*tw;y=(i//cols)*(th+18)
+              grid.paste(im,(x,y+18));dr.text((x+2,y+2),f"#{i+1}",fill="black")
+          grid.save("sheets/all50_midframes.jpg",quality=85)
+          PY
+      - name: Upload corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-top50-visual-corpus
+          path: |
+            manifest.tsv
+            profile.json
+            corpus/
+            sheets/
+          retention-days: 3
+          compression-level: 6

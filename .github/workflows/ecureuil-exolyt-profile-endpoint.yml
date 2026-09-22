@@ -1,0 +1,43 @@
+name: Ecureuil Exolyt profile endpoint
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-exolyt-profile-endpoint.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect profile chunk
+        shell: bash
+        run: |
+          set -euo pipefail
+          u="https://app.exolyt.com/_next/static/immutable/chunks/1c5r1_d2vxckc.js"
+          curl -fsSL "$u" -o profile.js
+          echo "SIZE=$(wc -c < profile.js)"
+          python3 - <<'PY'
+          import re
+          s=open("profile.js",encoding="utf-8",errors="ignore").read()
+          pats=["BACKEND_ORIGIN","videos","allVideos","userVideos","topVideos","uniqueId","/user/","/video","timeline","sort","limit","offset"]
+          for pat in pats: print(pat,s.lower().count(pat.lower()))
+          # pull URL-ish and backend-ish surrounding snippets
+          spots=set()
+          for term in ["BACKEND_ORIGIN","videos","uniqueId","userVideos","allVideos"]:
+              for m in re.finditer(term,s,re.I):
+                  spots.add(max(0,m.start()-900))
+          for i,st in enumerate(sorted(spots)[:80]):
+              sn=re.sub(r'\s+',' ',s[st:st+2600])
+              print("\nSNIP",i,sn)
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: exolyt-profile-js
+          path: profile.js
+          retention-days: 2

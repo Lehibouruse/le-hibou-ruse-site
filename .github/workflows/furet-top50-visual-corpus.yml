@@ -55,7 +55,7 @@ jobs:
             echo "$duration" > "$dir/duration.txt"
             echo "$track" > "$dir/track.txt"
             echo "$artist" > "$dir/artist.txt"
-            yt-dlp -f "worst[ext=mp4]/worst" --no-playlist -o "$dir/video.%(ext)s" "$url" >"$dir/ytdlp.out" 2>"$dir/ytdlp.err"
+            yt-dlp --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" -f "worst[ext=mp4]/worst" --no-playlist -o "$dir/video.%(ext)s" "$url" >"$dir/ytdlp.out" 2>"$dir/ytdlp.err"
             vf=$(find "$dir" -maxdepth 1 -type f -name 'video.*' | head -n1)
             if [ -n "$vf" ] && [ -s "$vf" ]; then
               dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$vf" | head -n1)

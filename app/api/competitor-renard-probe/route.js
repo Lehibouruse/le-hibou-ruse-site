@@ -39,6 +39,7 @@ export async function GET(request) {
   const metaToken = String(metaEnv.META_ACCESS_TOKEN || metaEnv.FACEBOOK_PAGE_ACCESS_TOKEN || "").trim();
   const pageId = String(metaEnv.FACEBOOK_PAGE_ID || metaEnv.META_TARGET_PAGE_ID || "").trim();
   let igUserId = String(igEnv.INSTAGRAM_BUSINESS_ACCOUNT_ID || "").trim();
+  let metaLinkedIgUserId = "";
 
   const diagnostics = {
     target: TARGET,
@@ -55,7 +56,7 @@ export async function GET(request) {
     return NextResponse.json({ ok: false, diagnostics, error: "meta_token_missing" }, { status: 503 });
   }
 
-  if (!igUserId && pageId) {
+  if (pageId) {
     const pageUrl = new URL(`https://graph.facebook.com/${version}/${encodeURIComponent(pageId)}`);
     pageUrl.searchParams.set("fields", "instagram_business_account{id,username}");
     const pageResponse = await fetch(pageUrl, {
@@ -64,8 +65,10 @@ export async function GET(request) {
     });
     const pageData = await readJson(pageResponse);
     if (pageResponse.ok) {
-      igUserId = String(pageData?.instagram_business_account?.id || "").trim();
+      metaLinkedIgUserId = String(pageData?.instagram_business_account?.id || "").trim();
       diagnostics.page_instagram_business_account = pageData?.instagram_business_account || null;
+      diagnostics.has_meta_linked_ig_user_id = Boolean(metaLinkedIgUserId);
+      if (metaLinkedIgUserId) igUserId = metaLinkedIgUserId;
       diagnostics.has_ig_user_id = Boolean(igUserId);
     } else {
       diagnostics.page_lookup_error = safeError("page_lookup", pageResponse, pageData);

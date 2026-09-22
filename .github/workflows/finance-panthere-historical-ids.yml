@@ -1,0 +1,66 @@
+name: Finance Panthere historical ID frames
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-historical-ids.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Download historical IDs
+        shell: bash
+        run: |
+          set +e
+          mkdir -p corpus
+          ids=(
+            7634292064515083553
+            7631693479185354016
+            7635000346640747809
+            7641873502626204961
+            7629063822749289761
+            7645058924604820768
+            7642825784956112161
+            7630923023440268576
+            7636891104876547360
+          )
+          n=0
+          for id in "${ids[@]}"; do
+            n=$((n+1))
+            d=$(printf "corpus/%02d_%s" "$n" "$id")
+            mkdir -p "$d"
+            url="https://www.tiktok.com/@financepanthere/video/$id"
+            yt-dlp --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"               -f "worst[ext=mp4]/worst" --no-playlist -o "$d/video.%(ext)s" "$url" >"$d/out" 2>"$d/err"
+            vf=$(find "$d" -maxdepth 1 -type f -name 'video.*' | head -n1)
+            if [ -n "$vf" ] && [ -s "$vf" ]; then
+              dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$vf"|head -n1)
+              for frac in .08 .35 .65 .92; do
+                idx=$(python3 -c "print(max(0,float('$dur')*float('$frac')))")
+                k=$(find "$d" -name 'frame_*.jpg' | wc -l); k=$((k+1))
+                ffmpeg -loglevel error -ss "$idx" -i "$vf" -frames:v 1 -q:v 3 "$d/frame_$k.jpg" -y
+              done
+              rm -f "$vf"
+              echo "OK $id $dur"
+            else
+              echo "FAIL $id"
+              tail -3 "$d/err"
+            fi
+          done
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-historical-id-frames
+          path: corpus/
+          retention-days: 3

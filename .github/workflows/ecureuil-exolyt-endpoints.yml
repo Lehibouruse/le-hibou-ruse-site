@@ -1,0 +1,68 @@
+name: Ecureuil Exolyt endpoint discovery
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-exolyt-endpoints.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Fetch public page and JS chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p chunks
+          curl -fsSL -A "Mozilla/5.0" "https://exolyt.com/user/tiktok/lefutetfute" -o page.html
+          python3 - <<'PY'
+          import re
+          s=open("page.html",encoding="utf-8",errors="ignore").read()
+          srcs=re.findall(r'<script[^>]+src="([^"]+\.js[^"]*)"',s)
+          with open("scripts.txt","w") as f:
+              for x in srcs:
+                  if x.startswith("/"): x="https://app.exolyt.com"+x
+                  elif x.startswith("http"): pass
+                  else: continue
+                  f.write(x+"\n")
+          print("scripts",len(srcs))
+          PY
+          n=0
+          while IFS= read -r u; do
+            n=$((n+1))
+            curl -L -sS --connect-timeout 5 --max-time 30 "$u" -o "chunks/$n.js" || true
+          done < scripts.txt
+          echo "downloaded $(find chunks -type f | wc -l)"
+      - name: Search endpoint strings
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          terms=["userTopVideos","userVideos","allVideos","topVideos","/api/","uniqueId","videos?","tiktok/user","user/videos","user-video","video-list"]
+          for p in Path("chunks").glob("*.js"):
+              s=p.read_text(errors="ignore")
+              hits=[t for t in terms if t.lower() in s.lower()]
+              if not hits: continue
+              print("\nFILE",p,"HITS",hits,"SIZE",len(s))
+              # print surrounding snippets around likely API patterns
+              for pat in [r'.{0,500}(?:/api/|userTopVideos|userVideos|uniqueId).{0,900}']:
+                  for m in re.finditer(pat,s,re.I|re.S):
+                      sn=re.sub(r'\s+',' ',m.group(0))
+                      print("SNIP",sn[:1600])
+                      break
+          PY
+      - name: Upload chunks
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecureuil-exolyt-js
+          path: |
+            page.html
+            scripts.txt
+            chunks/
+          retention-days: 2

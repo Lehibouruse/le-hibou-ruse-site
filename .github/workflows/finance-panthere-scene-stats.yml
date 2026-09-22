@@ -1,0 +1,100 @@
+name: Finance Panthere scene stats
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-scene-stats.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install tools
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          python3 -m pip install -q opencv-python-headless numpy
+
+      - name: Collect current videos and scene stats
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@financepanthere" > profile.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("profile.json"))
+          es=sorted(d.get("entries") or [],key=lambda x:int(x.get("view_count") or 0),reverse=True)
+          json.dump(es,open("entries.json","w"),ensure_ascii=False,indent=2)
+          PY
+          cat > analyze.py <<'PY'
+          import cv2,sys,json,numpy as np,os
+          p=sys.argv[1]
+          cap=cv2.VideoCapture(p)
+          fps=cap.get(cv2.CAP_PROP_FPS) or 30
+          total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+          prev=None; diffs=[]; times=[]
+          idx=0
+          while True:
+              ok,frame=cap.read()
+              if not ok: break
+              if idx % max(1,int(fps/2))==0:
+                  g=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+                  g=cv2.resize(g,(96,171))
+                  if prev is not None:
+                      diffs.append(float(np.mean(cv2.absdiff(g,prev)))/255.0)
+                      times.append(idx/fps)
+                  prev=g
+              idx+=1
+          cap.release()
+          if not diffs:
+              print(json.dumps({"error":"no_frames"}));raise SystemExit
+          a=np.array(diffs)
+          # robust threshold: upper tail, but at least 0.10
+          thr=max(0.10,float(np.quantile(a,.85)))
+          cand=[times[i] for i,x in enumerate(a) if x>=thr]
+          cuts=[];last=-99
+          for t in cand:
+              if t-last>=1.0:
+                  cuts.append(t);last=t
+          ints=[b-a for a,b in zip(cuts,cuts[1:])]
+          print(json.dumps({
+             "fps":fps,"duration":total/fps if fps else 0,
+             "sample_diff_median":float(np.median(a)),
+             "scene_threshold":thr,
+             "major_changes":len(cuts),
+             "median_interval":float(np.median(ints)) if ints else None,
+             "cuts":cuts
+          }))
+          PY
+          python3 - <<'PY'
+          import json,subprocess,os
+          es=json.load(open("entries.json"))
+          out=[]
+          for rank,e in enumerate(es,1):
+              url=e.get("url"); vid=e.get("id")
+              media=f"v{rank}.mp4"
+              p=subprocess.run(["yt-dlp","--extractor-args","tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com",
+                                "-f","worst[ext=mp4]/worst","--no-playlist","-o",media,url],
+                               capture_output=True,text=True)
+              if p.returncode or not os.path.exists(media):
+                  out.append({"rank":rank,"id":vid,"error":"download"});continue
+              q=subprocess.run(["python3","analyze.py",media],capture_output=True,text=True)
+              try: stat=json.loads(q.stdout.strip().splitlines()[-1])
+              except: stat={"error":"analyze","stdout":q.stdout[-500:]}
+              stat.update({"rank":rank,"id":vid,"views":e.get("view_count"),"duration_meta":e.get("duration")})
+              out.append(stat)
+              os.remove(media)
+          json.dump(out,open("scene_stats.json","w"),ensure_ascii=False,indent=2)
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-scene-stats
+          path: scene_stats.json
+          retention-days: 3

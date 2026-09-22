@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/renard-probe.yml"
       - "app/api/competitor-renard-probe/route.js"
+      - "app/api/competitor-renard-youtube/route.js"
   workflow_dispatch:
 
 permissions:
@@ -34,3 +35,15 @@ jobs:
           cat response.json 2>/dev/null || true
           echo
           echo "RENARD_PROBE_RESPONSE_END"
+
+      - name: Query Renard YouTube collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://d4d5d6.com/api/competitor-renard-youtube?target=renard_finance"
+          code=$(curl -L -sS -o youtube.json -w "%{http_code}" "$url" || true)
+          echo "youtube_http=$code"
+          echo "RENARD_YOUTUBE_RESPONSE_BEGIN"
+          cat youtube.json 2>/dev/null || true
+          echo
+          echo "RENARD_YOUTUBE_RESPONSE_END"

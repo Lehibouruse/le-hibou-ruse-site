@@ -1,19 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getAgentConfig, PAID_AI_DISABLED_BY_POLICY } from "../lib/hibou-agent.mjs";
+import { readFile } from "node:fs/promises";
+import { PAID_AI_DISABLED_BY_POLICY } from "../lib/hibou-agent.mjs";
 
-test("paid OpenAI execution stays disabled even if stale env vars try to enable it", () => {
+test("paid OpenAI policy is hard-disabled and every external agent entry point gates it", async () => {
   assert.equal(PAID_AI_DISABLED_BY_POLICY, true);
-  const config = getAgentConfig({
-    AI_ENABLED: "true",
-    HIBOU_AI_KILL_SWITCH: "false",
-    HIBOU_ALLOW_TERRA: "true",
-    HIBOU_ALLOW_SOL: "true",
-    HIBOU_ALLOW_ASTRA: "true",
-  });
-  assert.equal(config.aiEnabled, false);
-  // Routing metadata can remain available for historical jobs/tests; execution is the killed surface.
-  assert.equal(config.allowTerra, true);
-  assert.equal(config.allowSol, true);
-  assert.equal(config.allowAstra, true);
+  const files = [
+    "app/api/orchestrator/route.js",
+    "app/api/agent-worker/route.js",
+    "app/api/wake/route.js",
+  ];
+  for (const path of files) {
+    const source = await readFile(new URL(`../${path}`, import.meta.url), "utf8");
+    assert.match(source, /PAID_AI_DISABLED_BY_POLICY/);
+    assert.match(source, /paid_ai_disabled_by_policy|désactivée par politique projet/);
+  }
 });

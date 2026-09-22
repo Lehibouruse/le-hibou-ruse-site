@@ -1,0 +1,77 @@
+name: Finance Panthere top5 dynamics
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-top5-dynamics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Install
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          python3 -m pip install -q faster-whisper opencv-python-headless
+      - name: Download and analyze current videos
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@financepanthere" > profile.json
+          cat > analyze.py <<'PY'
+          import json,subprocess,os,cv2,numpy as np,re
+          from faster_whisper import WhisperModel
+          d=json.load(open("profile.json"))
+          es=sorted(d.get("entries") or [],key=lambda x:int(x.get("view_count") or 0),reverse=True)
+          model=WhisperModel("small",device="cpu",compute_type="int8")
+          rows=[]
+          for rank,e in enumerate(es,1):
+              url=e["url"]; vid=e["id"]; media=f"v{rank}.mp4"
+              p=subprocess.run(["yt-dlp","--extractor-args","tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com",
+                                "-f","worst[ext=mp4]/worst","--no-playlist","-o",media,url],capture_output=True,text=True)
+              if p.returncode or not os.path.exists(media):
+                  rows.append({"rank":rank,"id":vid,"status":"download_failed"});continue
+              cap=cv2.VideoCapture(media)
+              fps=cap.get(cv2.CAP_PROP_FPS) or 30
+              total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+              dur=total/fps if fps else float(e.get("duration") or 0)
+              # sample 2 fps, grayscale perceptual change
+              prev=None; cuts=[]; idx=0; step=max(1,int(fps/2))
+              while True:
+                  cap.set(cv2.CAP_PROP_POS_FRAMES,idx)
+                  ok,frame=cap.read()
+                  if not ok:break
+                  small=cv2.resize(cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY),(64,112))
+                  if prev is not None:
+                      score=float(np.mean(cv2.absdiff(prev,small))/255.0)
+                      if score>0.12: cuts.append({"t":round(idx/fps,2),"score":round(score,3)})
+                  prev=small;idx+=step
+                  if idx>=total:break
+              cap.release()
+              segs,info=model.transcribe(media,language="fr",beam_size=3,vad_filter=True)
+              text=" ".join(s.text.strip() for s in segs if s.text.strip())
+              words=len(re.findall(r"\b[\w’'-]+\b",text,flags=re.UNICODE))
+              rows.append({
+                "rank":rank,"id":vid,"views":e.get("view_count"),"duration_metadata":e.get("duration"),
+                "duration_actual":round(dur,2),"track":e.get("track"),"artists":e.get("artists"),
+                "major_visual_changes":len(cuts),"median_change_interval":round(dur/(len(cuts)+1),2),
+                "words":words,"wpm":round(words/dur*60,1) if dur else None,
+                "first_120_chars":text[:120],"cuts":cuts
+              })
+              os.remove(media)
+          json.dump(rows,open("analysis.json","w"),ensure_ascii=False,indent=2)
+          for r in rows: print(r)
+          PY
+          python3 analyze.py
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-top5-dynamics
+          path: analysis.json
+          retention-days: 3

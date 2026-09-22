@@ -53,14 +53,21 @@ jobs:
               dur=(int(m.group(3))*60+int(m.group(4))) if m else 0
               title=(s.find("h1").get_text(" ",strip=True) if s.find("h1") else "")
               mp4=None
+              cover=None
+              og_cover=None
               tiktok=None
               for a in s.find_all("a",href=True):
                   lab=a.get_text(" ",strip=True).lower()
                   if "download mp4" in lab:
                       mp4=a["href"]
+                  if "download hd cover" in lab:
+                      cover=a["href"]
                   if "view on tiktok" in lab:
                       tiktok=a["href"]
-              rows.append({"archive_url":u,"title":title,"views_label":views,"likes_label":likes,"duration":dur,"mp4":mp4,"tiktok":tiktok})
+              meta=s.find("meta",attrs={"property":"og:image"})
+              if meta and meta.get("content"):
+                  og_cover=meta.get("content")
+              rows.append({"archive_url":u,"title":title,"views_label":views,"likes_label":likes,"duration":dur,"mp4":mp4,"cover":cover,"og_cover":og_cover,"tiktok":tiktok})
               print("ROW",idx,views,dur,title[:60],"MP4",bool(mp4))
           json.dump(rows,open("archive.json","w"),ensure_ascii=False,indent=2)
           PY
@@ -88,6 +95,9 @@ jobs:
               open(f"{d}/title.txt","w").write(r.get("title",""))
               open(f"{d}/views.txt","w").write(str(r.get("views_label","")))
               open(f"{d}/duration.txt","w").write(str(r.get("duration",0)))
+              cover=r.get("cover") or r.get("og_cover")
+              if cover:
+                  subprocess.run(["curl","-L","-sS","--connect-timeout","5","--max-time","30","-A","Mozilla/5.0","-o",f"{d}/cover.jpg",cover])
               mp4=r.get("mp4")
               url=r.get("tiktok")
               ok=False
@@ -143,4 +153,4 @@ jobs:
           retention-days: 3
           compression-level: 6
 
-# trigger: 2026-09-22 archive refresh 2
+# trigger: 2026-09-22 archive refresh 3

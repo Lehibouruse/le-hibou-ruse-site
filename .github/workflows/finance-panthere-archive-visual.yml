@@ -1,0 +1,121 @@
+name: Finance Panthere archived visual corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-archive-visual.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Install tools
+        run: |
+          python3 -m pip install -q requests beautifulsoup4
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Crawl TokScribe archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > crawl.py <<'PY'
+          import requests,bs4,re,json,os,subprocess,time,urllib.parse
+          sess=requests.Session()
+          sess.headers.update({"User-Agent":"Mozilla/5.0"})
+          detail=[]
+          for page in [1,2]:
+              url="https://tokscribe.com/author/financepanthere"+(f"?page={page}" if page>1 else "")
+              html=sess.get(url,timeout=30).text
+              soup=bs4.BeautifulSoup(html,"html.parser")
+              for a in soup.find_all("a",href=True):
+                  href=a["href"]
+                  if href.startswith("/t/") and href not in detail:
+                      detail.append(href)
+          print("DETAILS",len(detail),detail)
+          os.makedirs("corpus",exist_ok=True)
+          rows=[]
+          for idx,href in enumerate(detail,1):
+              url=urllib.parse.urljoin("https://tokscribe.com",href)
+              html=sess.get(url,timeout=30).text
+              soup=bs4.BeautifulSoup(html,"html.parser")
+              text=" ".join(soup.stripped_strings)
+              title=(soup.find("h1").get_text(" ",strip=True) if soup.find("h1") else "")
+              m=re.search(r'([\d.]+[KMB]?)\s+views\s+([\d.]+[KMB]?)\s+likes\s+(\d+:\d+)',text,re.I)
+              views=m.group(1) if m else ""
+              likes=m.group(2) if m else ""
+              duration=m.group(3) if m else ""
+              mp4=""
+              for a in soup.find_all("a",href=True):
+                  label=a.get_text(" ",strip=True).lower()
+                  h=a["href"]
+                  if "download mp4" in label or ("tiktokcdn" in h and ("video" in h or "mime_type=video" in h)):
+                      mp4=urllib.parse.urljoin(url,h); break
+              tiktok=""
+              for a in soup.find_all("a",href=True):
+                  if "tiktok.com" in a["href"] and "View on TikTok" in a.get_text(" ",strip=True):
+                      tiktok=a["href"]; break
+              row={"archive_rank":idx,"detail":url,"title":title,"views":views,"likes":likes,"duration":duration,"mp4":mp4,"tiktok":tiktok}
+              rows.append(row)
+              print("ROW",idx,views,duration,title[:50],"MP4",bool(mp4))
+              if not mp4: continue
+              d=f"corpus/{idx:02d}"
+              os.makedirs(d,exist_ok=True)
+              media=f"{d}/video.mp4"
+              rr=sess.get(mp4,timeout=60,allow_redirects=True)
+              open(media,"wb").write(rr.content)
+              if os.path.getsize(media)<10000:
+                  print("SMALL_MEDIA",idx,os.path.getsize(media)); continue
+              probe=subprocess.check_output(["ffprobe","-v","error","-show_entries","format=duration","-of","default=nw=1:nk=1",media],text=True).strip()
+              dur=float(probe or 0)
+              for n,p in enumerate([.05,.25,.50,.75,.95],1):
+                  t=max(0,dur*p)
+                  subprocess.run(["ffmpeg","-loglevel","error","-ss",str(t),"-i",media,"-frames:v","1","-q:v","3",f"{d}/frame_{n}.jpg","-y"])
+              os.remove(media)
+              time.sleep(.2)
+          json.dump(rows,open("archive.json","w"),ensure_ascii=False,indent=2)
+          PY
+          python3 crawl.py
+
+      - name: Make contact sheets
+        shell: bash
+        run: |
+          python3 -m pip install -q pillow
+          python3 - <<'PY'
+          from PIL import Image,ImageOps,ImageDraw
+          import glob,os,json
+          rows=json.load(open("archive.json"))
+          dirs=sorted(glob.glob("corpus/*"))
+          os.makedirs("sheets",exist_ok=True)
+          W,H=180,320
+          for b in range(0,len(dirs),5):
+              batch=dirs[b:b+5]
+              sheet=Image.new("RGB",(W*len(batch),H*5+30),"white")
+              dr=ImageDraw.Draw(sheet)
+              for col,d in enumerate(batch):
+                  i=int(os.path.basename(d))
+                  row=rows[i-1]
+                  dr.text((col*W+3,4),f"#{i} {row['views']} {row['title'][:20]}",fill="black")
+                  for k in range(1,6):
+                      fp=f"{d}/frame_{k}.jpg"
+                      if os.path.exists(fp):
+                          im=ImageOps.fit(Image.open(fp).convert("RGB"),(W,H))
+                          sheet.paste(im,(col*W,30+(k-1)*H))
+              sheet.save(f"sheets/archive_{b+1}_{b+len(batch)}.jpg",quality=82)
+          PY
+
+      - name: Upload archive corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-archive-visual
+          path: |
+            archive.json
+            corpus/
+            sheets/
+          retention-days: 3
+          compression-level: 6

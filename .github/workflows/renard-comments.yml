@@ -1,0 +1,28 @@
+name: Renard comments corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/renard-comments.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch comments
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 120 "https://d4d5d6.com/api/competitor-renard-comments?target=renard_finance" -o comments.json
+          python3 -c 'import json; d=json.load(open("comments.json")); print("videos",len(d.get("videos",[]))); print("comments",sum(len(v.get("comments",[])) for v in d.get("videos",[])))'
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: renard-top50-comments
+          path: comments.json
+          retention-days: 3

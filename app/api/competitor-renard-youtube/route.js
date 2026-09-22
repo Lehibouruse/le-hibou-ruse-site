@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const TARGET = "Renard Finance";
+const ANCHOR_VIDEO_ID = "aS5VEfO2WWQ";
 
 async function readJson(response) {
   const text = await response.text();
@@ -63,6 +64,13 @@ export async function GET(request) {
   if (!token) return NextResponse.json({ ok: false, diagnostics, error: "youtube_token_missing" }, { status: 503 });
 
   try {
+    const anchorBatch = await yt("videos", {
+      part: "snippet,statistics,contentDetails,status",
+      id: ANCHOR_VIDEO_ID,
+      maxResults: 1,
+    }, token);
+    const anchorVideo = anchorBatch.items?.[0] || null;
+
     const channelSearch = await yt("search", {
       part: "snippet",
       type: "channel",
@@ -77,8 +85,17 @@ export async function GET(request) {
       thumbnail: item?.snippet?.thumbnails?.high?.url || item?.snippet?.thumbnails?.default?.url || "",
     })).filter((x) => x.channelId);
 
+    const anchoredChannelId = String(anchorVideo?.snippet?.channelId || "").trim();
     const exact = candidates.find((x) => x.title.trim().toLowerCase() === TARGET.toLowerCase());
-    const chosen = exact || candidates[0] || null;
+    const chosen = anchoredChannelId
+      ? {
+          channelId: anchoredChannelId,
+          title: anchorVideo?.snippet?.channelTitle || TARGET,
+          description: "",
+          publishedAt: "",
+          thumbnail: "",
+        }
+      : (exact || candidates[0] || null);
     if (!chosen) return NextResponse.json({ ok: false, diagnostics, candidates, error: "channel_not_found" }, { status: 404 });
 
     const channels = await yt("channels", {
@@ -140,6 +157,18 @@ export async function GET(request) {
       ok: true,
       diagnostics,
       candidates,
+      anchorVideo: anchorVideo ? {
+        id: anchorVideo.id,
+        url: `https://www.youtube.com/watch?v=${anchorVideo.id}`,
+        title: anchorVideo?.snippet?.title || "",
+        channelId: anchorVideo?.snippet?.channelId || "",
+        channelTitle: anchorVideo?.snippet?.channelTitle || "",
+        publishedAt: anchorVideo?.snippet?.publishedAt || "",
+        viewCount: n(anchorVideo?.statistics?.viewCount),
+        likeCount: n(anchorVideo?.statistics?.likeCount),
+        commentCount: n(anchorVideo?.statistics?.commentCount),
+        durationSeconds: parseDuration(anchorVideo?.contentDetails?.duration || ""),
+      } : null,
       channel: {
         id: channel?.id || chosen.channelId,
         title: channel?.snippet?.title || chosen.title,

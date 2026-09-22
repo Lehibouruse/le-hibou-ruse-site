@@ -19,9 +19,10 @@ Branche canonique : `hibou-local-video-pipeline-20260922`, PR #175.
 - `getAgentConfig().aiEnabled` reste faux même si une ancienne variable Vercel tente de remettre `AI_ENABLED=true`.
 - Le worker refuse les Jobs agentiques ; les chemins déterministes restent disponibles.
 - `.env.example` est fail-closed : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
-- CI GitHub verte sur le head `825b182da14661cd977bf41979c786b812f907c2` (run #640).
+- CI GitHub verte sur le head actuel `399f66be42ee1ad05247bccfcefe2a643bcc5523` (run #643).
 - PR #176 a été fermée comme doublon pour éviter deux politiques de sécurité divergentes.
 - Production n’est PAS encore déclarée protégée : la preuve finale nécessite fusion/déploiement de #175 puis contrôle runtime sans appel OpenAI réel.
+- Audit Jobs : 116 Jobs, aucun Running/Retry/Pending ; 103 CREATE_BOOK et 3 CREATE_VIDEO historiques. Les 3 CREATE_VIDEO restent en Manual Review et les 21 CREATE_BOOK en Manual Review qui portaient encore un `next_run_at` historique ont été neutralisés (`next_run_at=null`).
 - Rollback préparé : revert du merge ou retour au main antérieur `da3dd1143b933e1e09d9f5c25b5bac7bb2ac2fd8`.
 
 ## Vidéo

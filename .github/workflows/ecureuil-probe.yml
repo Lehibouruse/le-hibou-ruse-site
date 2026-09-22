@@ -32,3 +32,21 @@ jobs:
           cat response.json 2>/dev/null || true
           echo
           echo "ECUREUIL_RESPONSE_END"
+
+      - name: Query Furet rebrand collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://d4d5d6.com/api/competitor-furet-youtube?target=furetfute"
+          for i in $(seq 1 20); do
+            code=$(curl -L -sS -o furet.json -w "%{http_code}" "$url" || true)
+            echo "attempt=$i http=$code"
+            if [ "$code" = "200" ] || [ "$code" = "404" ] || [ "$code" = "500" ] || [ "$code" = "503" ]; then
+              break
+            fi
+            sleep 8
+          done
+          echo "FURET_RESPONSE_BEGIN"
+          cat furet.json 2>/dev/null || true
+          echo
+          echo "FURET_RESPONSE_END"

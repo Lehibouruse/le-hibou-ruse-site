@@ -12,7 +12,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 8
     steps:
       - name: Fetch ranked dataset
         shell: bash
@@ -32,7 +32,7 @@ jobs:
                   f.write(f'{i}\t{v.get("id","")}\t{v.get("viewCount",0)}\t{v.get("durationSeconds","")}\t{title}\t{v.get("url","")}\n')
           PY
 
-      - name: Fetch thumbnails and public storyboard sprites
+      - name: Fetch temporal YouTube thumbnails
         shell: bash
         run: |
           set -euo pipefail
@@ -40,21 +40,13 @@ jobs:
           tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration title url; do
             dir=$(printf "visuals/%02d_%s" "$rank" "$id")
             mkdir -p "$dir"
-            curl -L -sS --fail "https://i.ytimg.com/vi/$id/maxresdefault.jpg" -o "$dir/thumbnail.jpg" ||               curl -L -sS --fail "https://i.ytimg.com/vi/$id/hqdefault.jpg" -o "$dir/thumbnail.jpg" || true
-            for level in L2 L1 L0; do
-              for idx in 0; do
-                target="$dir/storyboard3_${level}_M${idx}.jpg"
-                if ! curl -L -sS --fail --connect-timeout 2 --max-time 4 "https://i.ytimg.com/sb/$id/storyboard3_${level}/M${idx}.jpg" -o "$target"; then
-                  rm -f "$target"
-                  break
-                fi
-              done
+            for name in maxresdefault hqdefault 0 1 2 3; do
+              curl -L -sS --fail --connect-timeout 2 --max-time 5                 "https://i.ytimg.com/vi/$id/$name.jpg"                 -o "$dir/$name.jpg" || rm -f "$dir/$name.jpg"
             done
           done
           find visuals -type f -printf '%p\t%s\n' | sort > visual_files.tsv
-          echo "thumbnails=$(find visuals -name thumbnail.jpg | wc -l)"
-          echo "storyboards=$(find visuals -name 'storyboard*.jpg' | wc -l)"
-          tail -n 20 visual_files.tsv || true
+          echo "images=$(find visuals -type f -name '*.jpg' | wc -l)"
+          echo "videos_with_images=$(find visuals -mindepth 1 -maxdepth 1 -type d | wc -l)"
 
       - name: Upload visual corpus artifact
         uses: actions/upload-artifact@v4

@@ -1,0 +1,62 @@
+name: Finance Panthere archived covers
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-archived-covers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install
+        run: python3 -m pip install -q requests beautifulsoup4 pillow
+      - name: Fetch covers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import requests,os,json
+          from bs4 import BeautifulSoup
+          base="https://tokscribe.com"
+          links=[]
+          for p in [1,2]:
+              u=f"{base}/author/financepanthere"+("" if p==1 else "?page=2")
+              h=requests.get(u,headers={"User-Agent":"Mozilla/5.0"},timeout=30).text
+              s=BeautifulSoup(h,"html.parser")
+              for a in s.find_all("a",href=True):
+                  if a["href"].startswith("/t/") and a["href"] not in links:
+                      links.append(a["href"])
+          os.makedirs("covers",exist_ok=True)
+          rows=[]
+          for i,href in enumerate(links,1):
+              tid=href.rsplit("/",1)[-1]
+              u=base+href
+              h=requests.get(u,headers={"User-Agent":"Mozilla/5.0"},timeout=30).text
+              s=BeautifulSoup(h,"html.parser")
+              txt=s.get_text(" ",strip=True)
+              title=s.find("h1").get_text(" ",strip=True) if s.find("h1") else ""
+              cover=f"{base}/api/transcriptions/{tid}/cover"
+              r=requests.get(cover,headers={"User-Agent":"Mozilla/5.0","Referer":u},timeout=30,allow_redirects=True)
+              ctype=r.headers.get("content-type","")
+              ok=r.status_code==200 and ctype.startswith("image/") and len(r.content)>1000
+              print("COVER",i,r.status_code,ctype,len(r.content),r.url,"OK",ok)
+              if ok:
+                  ext=".webp" if "webp" in ctype else ".jpg"
+                  open(f"covers/{i:02d}{ext}","wb").write(r.content)
+              rows.append({"i":i,"href":href,"title":title,"cover_status":r.status_code,"content_type":ctype,"bytes":len(r.content),"final_url":r.url})
+          json.dump(rows,open("covers.json","w"),ensure_ascii=False,indent=2)
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-archived-covers
+          path: |
+            covers.json
+            covers/
+          retention-days: 3

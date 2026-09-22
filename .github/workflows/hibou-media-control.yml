@@ -1,0 +1,58 @@
+name: Hibou Media Control
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  issues: read
+
+env:
+  HIBOU_BASE_URL: ${{ vars.HIBOU_PUBLIC_BASE_URL || 'https://le-hibou-ruse-site.vercel.app' }}
+
+concurrency:
+  group: hibou-media-control
+  cancel-in-progress: false
+
+jobs:
+  wake_media:
+    if: github.event_name == 'workflow_dispatch' || (github.event.issue.title == 'HIBOU MEDIA CONTROL' && startsWith(github.event.comment.body, '/wake-media'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prepare bounded media worker
+        run: node scripts/prepare-hibou-worker.mjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure media runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null || ! command -v rsvg-convert >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg librsvg2-bin
+          fi
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+          rsvg-convert --version
+
+      - name: Process one media Job
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HIBOU_WORKER_ALLOWED_ACTIONS: CREATE_VIDEO,REGENERATE_SCENE
+        run: HIBOU_WORKER_URL="${HIBOU_BASE_URL}/api/agent-worker" node scripts/hibou-worker.mjs

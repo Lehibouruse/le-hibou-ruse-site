@@ -99,16 +99,48 @@ export async function GET(request) {
   const data = await readJson(response);
 
   if (!response.ok) {
+    const facebookError = safeError("business_discovery_facebook_login", response, data);
+    const igToken = String(igEnv.INSTAGRAM_ACCESS_TOKEN || "").trim();
+    if (igToken) {
+      const igVersion = String(igEnv.INSTAGRAM_GRAPH_VERSION || "v26.0").trim();
+      const igFields = [
+        "id","username","name","biography","followers_count","follows_count","media_count","profile_picture_url","website",
+        "media.limit(100){id,caption,comments_count,like_count,media_type,media_product_type,permalink,thumbnail_url,timestamp}"
+      ].join(",");
+      const igUrl = new URL(`https://graph.instagram.com/${igVersion}/${encodeURIComponent(igUserId)}`);
+      igUrl.searchParams.set("fields", `business_discovery.username(${TARGET}){${igFields}}`);
+      const igResponse = await fetch(igUrl, {
+        headers: { Authorization: `Bearer ${igToken}` },
+        cache: "no-store",
+      });
+      const igData = await readJson(igResponse);
+      if (igResponse.ok && igData?.business_discovery) {
+        return NextResponse.json({
+          ok: true,
+          path: "instagram_login",
+          diagnostics,
+          business: igData.business_discovery,
+          facebook_login_error: facebookError,
+        }, { headers: { "Cache-Control": "no-store" } });
+      }
+      return NextResponse.json({
+        ok: false,
+        diagnostics,
+        facebook_login_error: facebookError,
+        instagram_login_error: safeError("business_discovery_instagram_login", igResponse, igData),
+      }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json({
       ok: false,
       diagnostics,
-      graph_error: safeError("business_discovery", response, data),
+      facebook_login_error: facebookError,
     }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
 
   const business = data?.business_discovery || null;
   return NextResponse.json({
     ok: true,
+    path: "facebook_login",
     diagnostics,
     business,
   }, { headers: { "Cache-Control": "no-store" } });

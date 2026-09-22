@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import { applyWorkflowOverrides, stableJobId, validateImageRequest, validateVoiceRequest } from "../scripts/video-local-adapters.mjs";
 
 test("IMAGE_GEN refuse un endpoint ComfyUI distant", () => {
@@ -34,4 +35,10 @@ test("les identifiants de travail sont stables et sensibles aux entrées", () =>
   const base = { interface: "VOICE_GEN_V1", engine: "chatterbox_multilingual", content_id: "box", scene_id: "s01", text: "A", language_id: "fr" };
   assert.equal(stableJobId("VOICE_GEN", base), stableJobId("VOICE_GEN", { ...base }));
   assert.notEqual(stableJobId("VOICE_GEN", base), stableJobId("VOICE_GEN", { ...base, text: "B" }));
+});
+
+
+test("le wrapper Chatterbox est syntaxiquement valide sans charger le modèle", () => {
+  const result = spawnSync("python3", ["-m", "py_compile", "scripts/chatterbox-local.py"], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });

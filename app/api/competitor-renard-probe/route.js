@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveSocialEnv } from "../../../../lib/social-credentials-runtime.mjs";
+import { resolveSocialEnv } from "../../../lib/social-credentials-runtime.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,0 +1,59 @@
+name: Renard transcripts 51-100 fallback
+
+on:
+  push:
+    paths:
+      - ".github/workflows/renard-transcripts-51-100-fallback.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fetch manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 60 "https://d4d5d6.com/api/competitor-renard-youtube?target=renard_finance" -o dataset.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("dataset.json"))
+          vids=d["next50"]
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\ttitle\n")
+              for i,v in enumerate(vids,51):
+                  title=(v.get("title") or "").replace("\t"," ").replace("\n"," ")
+                  f.write(f'{i}\t{v["id"]}\t{v.get("viewCount",0)}\t{v.get("durationSeconds","")}\t{title}\n')
+          PY
+
+      - name: Fetch transcripts
+        shell: bash
+        run: |
+          set -u
+          mkdir -p transcripts
+          : > status.tsv
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration title; do
+            out=$(printf "transcripts/%03d_%s.txt" "$rank" "$id")
+            code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 90 \
+              -o "$out" -w "%{http_code}" \
+              "https://youtube-transcript.ai/transcript/$id.txt?lang=fr" || true)
+            bytes=$(wc -c < "$out" 2>/dev/null || echo 0)
+            printf "%s\t%s\t%s\t%s\n" "$rank" "$id" "$code" "$bytes" >> status.tsv
+            echo "rank=$rank http=$code bytes=$bytes"
+            sleep 0.2
+          done
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: renard-51-100-transcripts-fallback
+          path: |
+            dataset.json
+            manifest.tsv
+            status.tsv
+            transcripts/
+          retention-days: 3

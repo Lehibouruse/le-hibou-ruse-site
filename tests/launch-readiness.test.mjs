@@ -30,6 +30,7 @@ function readyInput() {
       public_site_host_expected: "d4d5d6.com",
       domain_verified: "true",
       withdrawal_durable_receipt_tested: "true",
+      digital_supply_consent_durable_confirmation_tested: "true",
     },
     product: {
       "Lemon Squeezy Variant ID": "123",
@@ -139,6 +140,18 @@ test("un document juridique critique non validé bloque la vente", () => {
   const result = commercialReadiness(input);
   assert.equal(result.ready, false);
   assert.ok(result.blockers.some((item) => item.key === "legal:CGV produit numérique"));
+});
+
+test("la preuve durable du consentement à la fourniture immédiate bloque strict et early-access tant qu’elle n’est pas testée", () => {
+  for (const mode of ["strict", "early_access"]) {
+    const input = readyInput();
+    input.config.commerce_readiness_mode = mode;
+    input.config.digital_supply_consent_durable_confirmation_tested = "false";
+    const result = commercialReadiness(input);
+    assert.equal(result.ready, false);
+    assert.equal(result.checkoutUrl, "");
+    assert.ok(result.blockers.some((item) => item.key === "digital_supply_consent_durable_confirmation"));
+  }
 });
 
 test("un accusé durable de rétractation non testé bloque toute ouverture commerciale", () => {

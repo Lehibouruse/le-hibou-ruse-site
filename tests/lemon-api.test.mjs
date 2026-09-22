@@ -31,8 +31,18 @@ test("le checkout Lemon bootstrap est toujours test_mode, français et borné au
     description: "Test",
     redirectUrl: "https://le-hibou-ruse-site.vercel.app/merci?order=[order_identifier]",
     receiptLinkUrl: "https://le-hibou-ruse-site.vercel.app/merci?order=[order_identifier]",
+    checkoutCustomData: {
+      consent_id: "consent-123",
+      consent_at: "2026-09-22T20:30:00.000Z",
+      consent_version: "DIGITAL_SUPPLY_V1",
+      immediate_supply_consent: "true",
+      withdrawal_loss_ack: "true",
+    },
   });
   assert.equal(payload.data.attributes.test_mode, true);
+  assert.equal(payload.data.attributes.checkout_data.custom.consent_id, "consent-123");
+  assert.equal(payload.data.attributes.checkout_data.custom.immediate_supply_consent, "true");
+  assert.equal(payload.data.attributes.checkout_data.custom.withdrawal_loss_ack, "true");
   assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [34]);
   assert.equal(payload.data.attributes.checkout_options.locale, "fr");
   assert.equal(payload.data.relationships.store.data.id, "12");

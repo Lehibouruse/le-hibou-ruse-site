@@ -127,6 +127,14 @@ test("une commande test ne peut jamais passer en livraison", () => {
   assert.match(lemon, /commande Lemon en mode test: livraison bloquée/);
 });
 
+test("la livraison est bloquée sans preuve de consentement à la fourniture immédiate", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /validDigitalSupplyCustomData/);
+  assert.match(lemon, /const consentValid = validDigitalSupplyCustomData/);
+  assert.match(lemon, /&& consentValid/);
+  assert.match(lemon, /consentement fourniture immédiate absent\/invalide: livraison bloquée/);
+});
+
 test("le kill switch commerce bloque le webhook et est revérifié avant tout effet Digify", () => {
   const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
   const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");

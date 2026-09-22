@@ -1,0 +1,65 @@
+name: Furet TikTok raw creator API
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-raw-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch creator item list raw JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          sec='MS4wLjABAAAAfmIoi-wc-xJIAERtP8izJEYYa1Alvlg-Tu1Yl8WdV8RBkJdM-fjEzJecIUjfQxHA'
+          cursor=$(date +%s000)
+          device_id=7291234567890123456
+          python3 - "$sec" "$cursor" "$device_id" <<'PY'
+          import sys,urllib.parse
+          sec,cursor,device=sys.argv[1:]
+          q={
+            'aid':'1988','app_language':'en','app_name':'tiktok_web',
+            'browser_language':'en-US','browser_name':'Mozilla','browser_online':'true',
+            'browser_platform':'Win32','browser_version':'5.0 (Windows)',
+            'channel':'tiktok_web','cookie_enabled':'true','count':'35','cursor':cursor,
+            'device_id':device,'device_platform':'web_pc','focus_state':'true',
+            'from_page':'user','history_len':'2','is_fullscreen':'false',
+            'is_page_visible':'true','language':'en','os':'windows','priority_region':'',
+            'referer':'','region':'US','screen_height':'1080','screen_width':'1920',
+            'secUid':sec,'type':'1','tz_name':'UTC','verifyFp':'verify_abcdef1',
+            'webcast_language':'en'
+          }
+          open('url.txt','w').write('https://www.tiktok.com/api/creator/item_list/?'+urllib.parse.urlencode(q))
+          PY
+          url=$(cat url.txt)
+          code=$(curl -L -sS --connect-timeout 5 --max-time 30             -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36"             -H "Referer: https://www.tiktok.com/@lefutetfute"             -H "Accept: application/json, text/plain, */*"             -o raw.json -w "%{http_code}" "$url" || true)
+          echo "HTTP=$code BYTES=$(wc -c < raw.json 2>/dev/null || echo 0)"
+          python3 - <<'PY'
+          import json
+          try:
+              d=json.load(open('raw.json'))
+          except Exception as e:
+              print('JSON_ERROR',e); print(open('raw.json',errors='ignore').read()[:5000]); raise SystemExit
+          print('keys',list(d.keys()))
+          print('statusCode',d.get('statusCode'),'hasMore',d.get('hasMorePrevious'),'items',len(d.get('itemList') or []))
+          for x in (d.get('itemList') or [])[:2]:
+              print('id',x.get('id'),'desc',(x.get('desc') or '')[:80])
+              v=x.get('video') or {}
+              print('video keys',list(v.keys())[:80])
+              print('playAddr',v.get('playAddr'))
+              print('downloadAddr',v.get('downloadAddr'))
+              print('bitrateInfo',v.get('bitrateInfo'))
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-raw-api
+          path: raw.json
+          retention-days: 3

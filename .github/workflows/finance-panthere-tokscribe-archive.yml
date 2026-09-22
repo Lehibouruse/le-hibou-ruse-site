@@ -1,0 +1,154 @@
+name: Finance Panthere TokScribe visual archive
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-tokscribe-archive.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install
+        run: |
+          python3 -m pip install -q requests beautifulsoup4 pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Scrape TokScribe archive and extract frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > collect.py <<'PY'
+          import requests,re,os,json,subprocess,time
+          from bs4 import BeautifulSoup
+          from urllib.parse import urljoin
+          UA={"User-Agent":"Mozilla/5.0"}
+          base="https://tokscribe.com"
+          links=[]
+          for u in [f"{base}/author/financepanthere",f"{base}/author/financepanthere?page=2"]:
+              h=requests.get(u,headers=UA,timeout=30).text
+              s=BeautifulSoup(h,"html.parser")
+              for a in s.find_all("a",href=True):
+                  href=a["href"]
+                  if href.startswith("/t/"):
+                      full=urljoin(base,href)
+                      if full not in links: links.append(full)
+          print("TRANSCRIPT_PAGES",len(links))
+          os.makedirs("archive",exist_ok=True)
+          rows=[]
+          def parse_num(x):
+              x=x.strip().upper().replace(",","")
+              mult=1
+              if x.endswith("K"): mult=1_000; x=x[:-1]
+              elif x.endswith("M"): mult=1_000_000; x=x[:-1]
+              try:return int(float(x)*mult)
+              except:return 0
+          for idx,u in enumerate(links,1):
+              h=requests.get(u,headers=UA,timeout=30).text
+              s=BeautifulSoup(h,"html.parser")
+              txt=" ".join(s.stripped_strings)
+              title=(s.find("h1").get_text(" ",strip=True) if s.find("h1") else "")
+              m=re.search(r'([\d.]+[KM]?)\s+views\s+([\d.]+[KM]?)\s+likes\s+(\d+):(\d+)',txt,re.I)
+              views=parse_num(m.group(1)) if m else 0
+              likes=parse_num(m.group(2)) if m else 0
+              dur=(int(m.group(3))*60+int(m.group(4))) if m else 0
+              mp4=None
+              for a in s.find_all("a",href=True):
+                  label=a.get_text(" ",strip=True).lower()
+                  if "download mp4" in label or ("tiktokcdn" in a["href"] and ".mp4" in a["href"]):
+                      mp4=urljoin(base,a["href"]); break
+              if not mp4:
+                  for a in s.find_all("a",href=True):
+                      if "tiktokcdn" in a["href"]:
+                          mp4=a["href"]; break
+              tiktok=None
+              for a in s.find_all("a",href=True):
+                  if "view on tiktok" in a.get_text(" ",strip=True).lower():
+                      tiktok=a["href"]; break
+              final=tiktok
+              if tiktok:
+                  try:
+                      rr=requests.get(tiktok,headers=UA,timeout=30,allow_redirects=True)
+                      final=rr.url
+                  except: pass
+              video_id=""
+              mm=re.search(r'/video/(\d+)',final or "")
+              if mm: video_id=mm.group(1)
+              d=f"archive/{idx:02d}_{video_id or 'unknown'}"
+              os.makedirs(d,exist_ok=True)
+              open(f"{d}/title.txt","w").write(title)
+              open(f"{d}/source.txt","w").write(u+"\n"+str(final or ""))
+              ok=False
+              if mp4:
+                  try:
+                      r=requests.get(mp4,headers=UA,timeout=60,stream=True)
+                      if r.ok:
+                          with open(f"{d}/video.mp4","wb") as f:
+                              for ch in r.iter_content(1024*256):
+                                  if ch:f.write(ch)
+                          ok=os.path.getsize(f"{d}/video.mp4")>10000
+                  except Exception as e:
+                      open(f"{d}/error.txt","w").write(str(e))
+              if ok:
+                  actual=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=nw=1:nk=1",f"{d}/video.mp4"],capture_output=True,text=True).stdout.strip()
+                  try: actual=float(actual)
+                  except: actual=float(dur or 60)
+                  for n,p in enumerate((0.05,0.25,0.50,0.75,0.95),1):
+                      t=max(0,actual*p)
+                      subprocess.run(["ffmpeg","-loglevel","error","-ss",str(t),"-i",f"{d}/video.mp4","-frames:v","1","-q:v","3",f"{d}/frame_{n}.jpg","-y"])
+                  os.remove(f"{d}/video.mp4")
+              rows.append({"source":u,"video_id":video_id,"views":views,"likes":likes,"duration":dur,"title":title,"tiktok":final,"download_ok":ok})
+              print(idx,views,dur,video_id,ok,title[:60])
+          rows.sort(key=lambda x:x["views"],reverse=True)
+          json.dump(rows,open("archive_manifest.json","w"),ensure_ascii=False,indent=2)
+          PY
+          python3 collect.py
+
+      - name: Build contact sheets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageOps,ImageDraw
+          import glob,os,json
+          rows=json.load(open("archive_manifest.json"))
+          # Map source page to folder metadata by scanning source.txt
+          src_to_dir={}
+          for d in glob.glob("archive/*"):
+              p=os.path.join(d,"source.txt")
+              if os.path.exists(p):
+                  src=open(p).read().splitlines()[0].strip()
+                  src_to_dir[src]=d
+          dirs=[src_to_dir.get(r["source"]) for r in rows if src_to_dir.get(r["source"])]
+          W,H=180,320
+          os.makedirs("sheets",exist_ok=True)
+          for start in range(0,len(dirs),5):
+              batch=dirs[start:start+5]
+              sheet=Image.new("RGB",(W*5,H*5+30*5),"white")
+              dr=ImageDraw.Draw(sheet)
+              for col,d in enumerate(batch):
+                  row=rows[start+col]
+                  dr.text((col*W+4,4),f'#{start+col+1} {row["views"]//1000}k',fill="black")
+                  for rr in range(5):
+                      fp=os.path.join(d,f"frame_{rr+1}.jpg")
+                      if os.path.exists(fp):
+                          im=ImageOps.fit(Image.open(fp).convert("RGB"),(W,H))
+                          sheet.paste(im,(col*W,30+rr*H))
+              sheet.save(f"sheets/archive_{start+1}_{start+len(batch)}.jpg",quality=82)
+          PY
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-tokscribe-visual-archive
+          path: |
+            archive_manifest.json
+            archive/
+            sheets/
+          retention-days: 3
+          compression-level: 6

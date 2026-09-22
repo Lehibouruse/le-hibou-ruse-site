@@ -53,15 +53,23 @@ jobs:
             rm -f temp.mp4
             python3 -m yt_dlp --no-playlist --quiet --no-warnings \
               --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
-              -S "res:480" -f "b[ext=mp4]/b" -o temp.mp4 "$url"
+              -f "b[ext=mp4]/b" -o temp.mp4 "$url"
             [ -s temp.mp4 ] || continue
-            for pair in "1 0.08" "2 0.32" "3 0.60" "4 0.88"; do
-              n=$(echo "$pair"|cut -d' ' -f1)
-              frac=$(echo "$pair"|cut -d' ' -f2)
-              t=$(python3 -c "print(max(0.1,float('$duration')*float('$frac')))")
-              outfile="frames/"$prefix"_"$n".jpg"
-              ffmpeg -hide_banner -loglevel error -ss "$t" -i temp.mp4 -frames:v 1 -q:v 3 "$outfile"
-            done
+            python3 - "$prefix" <<'PY'
+          import cv2,sys,os
+          prefix=sys.argv[1]
+          cap=cv2.VideoCapture("temp.mp4")
+          total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+          if total<=0:
+              cap.release(); raise SystemExit
+          for n,frac in enumerate((0.08,0.32,0.60,0.88),1):
+              idx=max(0,min(total-1,int(total*frac)))
+              cap.set(cv2.CAP_PROP_POS_FRAMES,idx)
+              ok,frame=cap.read()
+              if ok:
+                  cv2.imwrite(f"frames/{prefix}_{n}.jpg",frame,[int(cv2.IMWRITE_JPEG_QUALITY),85])
+          cap.release()
+          PY
             rm -f temp.mp4
             echo "done rank=$rank"
           done

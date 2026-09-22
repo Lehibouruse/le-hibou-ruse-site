@@ -1,0 +1,79 @@
+name: Furet top50 visual fast
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top50-visual-fast.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Prepare
+        shell: bash
+        run: |
+          python3 -m pip install -q yt-dlp
+          ffmpeg -version | head -1
+
+      - name: Build ranked Top 50
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m yt_dlp --flat-playlist --dump-single-json \
+            --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+            "https://www.tiktok.com/@lefutetfute" > profile.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("profile.json"))
+          es=[e for e in d.get("entries",[]) if e.get("view_count") is not None]
+          es=sorted(es,key=lambda e:e.get("view_count") or 0,reverse=True)[:50]
+          json.dump(es,open("top50.json","w"),ensure_ascii=False,indent=2)
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\ttrack\tartist\ttitle\turl\n")
+              for i,e in enumerate(es,1):
+                  vals=[str(i),str(e.get("id","")),str(e.get("view_count",0)),str(e.get("duration",0)),
+                        str(e.get("track","")).replace("\t"," ").replace("\n"," "),
+                        ",".join(e.get("artists") or []).replace("\t"," ").replace("\n"," "),
+                        str(e.get("title","")).replace("\t"," ").replace("\n"," "),str(e.get("url",""))]
+                  f.write("\t".join(vals)+"\n")
+          PY
+
+      - name: Extract four frames per video
+        shell: bash
+        run: |
+          set +e
+          mkdir -p frames
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration track artist title url; do
+            prefix=$(printf "%02d_%s" "$rank" "$id")
+            rm -f temp.mp4
+            python3 -m yt_dlp --no-playlist --quiet --no-warnings \
+              --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+              -S "res:480" -f "b[ext=mp4]/b" -o temp.mp4 "$url"
+            [ -s temp.mp4 ] || continue
+            for pair in "1 0.08" "2 0.32" "3 0.60" "4 0.88"; do
+              n=$(echo "$pair"|cut -d' ' -f1)
+              frac=$(echo "$pair"|cut -d' ' -f2)
+              t=$(python3 -c "print(max(0.1,float('$duration')*float('$frac')))")
+              outfile="frames/"$prefix"_"$n".jpg"
+              ffmpeg -hide_banner -loglevel error -ss "$t" -i temp.mp4 -frames:v 1 -q:v 3 "$outfile"
+            done
+            rm -f temp.mp4
+            echo "done rank=$rank"
+          done
+          echo "FRAME_COUNT=$(find frames -type f -name '*.jpg' | wc -l)"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-top50-visual-fast
+          path: |
+            top50.json
+            manifest.tsv
+            frames/
+          retention-days: 3
+          compression-level: 6

@@ -1,0 +1,33 @@
+name: Ecureuil Instagram public probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-instagram-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public Instagram web profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://www.instagram.com/api/v1/users/web_profile_info/?username=ecureuilfinance"
+            "https://www.instagram.com/ecureuilfinance/?__a=1&__d=dis"
+          )
+          n=0
+          for url in "${urls[@]}"; do
+            n=$((n+1))
+            code=$(curl -L -sS --connect-timeout 5 --max-time 30               -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36"               -H "x-ig-app-id: 936619743392459"               -H "Accept-Language: fr-FR,fr;q=0.9,en;q=0.8"               -o "out$n.json" -w "%{http_code}" "$url" || true)
+            echo "URL=$url HTTP=$code BYTES=$(wc -c < out$n.json 2>/dev/null || echo 0)"
+            head -c 12000 "out$n.json" 2>/dev/null || true
+            echo
+            echo "======"
+          done

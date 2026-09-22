@@ -1,0 +1,56 @@
+name: Finance Panthere profile enumeration probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-enumeration-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+      - name: Test profile enumerators
+        shell: bash
+        run: |
+          set +e
+          mkdir -p out
+          hosts=(
+            ""
+            "api22-normal-c-useast1a.tiktokv.com"
+            "api16-normal-c-useast1a.tiktokv.com"
+            "api19-normal-c-useast1a.tiktokv.com"
+          )
+          i=0
+          for host in "${hosts[@]}"; do
+            i=$((i+1))
+            args=()
+            if [ -n "$host" ]; then args+=(--extractor-args "tiktok:api_hostname=$host"); fi
+            yt-dlp --flat-playlist --dump-single-json "${args[@]}"               "https://www.tiktok.com/@financepanthere" > "out/profile_$i.json" 2>"out/profile_$i.err" || true
+            python3 - "$i" "$host" <<'PY'
+          import json,sys,os
+          i=sys.argv[1]; host=sys.argv[2]
+          p=f"out/profile_{i}.json"
+          if not os.path.exists(p) or not os.path.getsize(p):
+              print("PROFILE",i,host or "plain","NO_JSON")
+              print(open(f"out/profile_{i}.err",errors="ignore").read()[-1000:])
+          else:
+              d=json.load(open(p)); es=d.get("entries") or []
+              print("PROFILE",i,host or "plain","COUNT",len(es))
+              print([(e.get("id"),e.get("view_count"),e.get("timestamp")) for e in es[:10]])
+          PY
+          done
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-enumeration-probe
+          path: out/
+          retention-days: 3

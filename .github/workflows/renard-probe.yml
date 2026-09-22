@@ -1,0 +1,36 @@
+name: Renard competitor probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/renard-probe.yml"
+      - "app/api/competitor-renard-probe/route.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query production competitor probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://d4d5d6.com/api/competitor-renard-probe?target=renard_finance"
+          body=""
+          code=""
+          for i in $(seq 1 18); do
+            code=$(curl -L -sS -o response.json -w "%{http_code}" "$url" || true)
+            body=$(cat response.json 2>/dev/null || true)
+            echo "attempt=$i http=$code"
+            if [ "$code" = "200" ] || [ "$code" = "502" ] || [ "$code" = "503" ]; then
+              break
+            fi
+            sleep 10
+          done
+          echo "RENARD_PROBE_RESPONSE_BEGIN"
+          cat response.json 2>/dev/null || true
+          echo
+          echo "RENARD_PROBE_RESPONSE_END"

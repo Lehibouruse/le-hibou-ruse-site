@@ -12,81 +12,80 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Fetch and parse public TikTok profile
+      - name: Fetch TikWM user feed
         shell: bash
         run: |
           set -euo pipefail
-          url="https://www.tiktok.com/@lefutetfute"
-          curl -L -sS --connect-timeout 5 --max-time 30             -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36"             -H "Accept-Language: fr-FR,fr;q=0.9,en;q=0.8"             -o profile.html "$url"
-          python3 - <<'PY'
-          import re,json,html as h
-          s=open("profile.html",encoding="utf-8",errors="ignore").read()
-          m=re.search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">(.*?)</script>',s,re.S)
-          print("found",bool(m))
-          if not m: raise SystemExit
-          data=json.loads(h.unescape(m.group(1)))
-          print("TOP_KEYS",list(data.keys()))
-          default=data.get("__DEFAULT_SCOPE__",{})
-          print("DEFAULT_KEYS",list(default.keys()))
-          for k,v in default.items():
-              if any(x in k.lower() for x in ["user","item","video","post"]):
-                  print("KEY",k)
-                  print(json.dumps(v,ensure_ascii=False)[:30000])
-          open("rehydration.json","w").write(json.dumps(data,ensure_ascii=False))
-          vids=sorted(set(re.findall(r'/@lefutetfute/video/(\\d+)',s)))
-          print("VIDEO_LINKS_IN_HTML",len(vids),vids[:30])
-          for pat in ["itemList","item_list","7267211914777986081","video/"]:
-              print("PATTERN",pat,"COUNT",s.count(pat))
-          PY
-      - name: Fetch public video list
-        shell: bash
-        run: |
-          set -euo pipefail
-          secuid=$(python3 - <<'PY'
-          import json
-          d=json.load(open("rehydration.json"))
-          print(d["__DEFAULT_SCOPE__"]["webapp.user-detail"]["userInfo"]["user"]["secUid"])
-          PY
-          )
+          mkdir -p pages
           cursor=0
           for page in 1 2 3 4 5 6; do
-            url="https://www.tiktok.com/api/post/item_list/?WebIdLastTime=1692029664&aid=1988&app_language=fr-FR&app_name=tiktok_web&browser_language=fr-FR&browser_name=Mozilla&browser_online=true&browser_platform=Win32&browser_version=5.0&channel=tiktok_web&cookie_enabled=true&count=35&cursor=$cursor&device_id=7280000000000000000&device_platform=web_pc&focus_state=true&from_page=user&history_len=4&is_fullscreen=false&is_page_visible=true&language=fr&os=windows&priority_region=FR&referer=https%3A%2F%2Fwww.tiktok.com%2F%40lefutetfute&region=FR&screen_height=1080&screen_width=1920&secUid=$secuid&tz_name=Europe%2FParis&webcast_language=fr"
-            code=$(curl -L -sS --connect-timeout 5 --max-time 40 \
-              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36" \
-              -H "Referer: https://www.tiktok.com/@lefutetfute" \
-              -o "items_page_$page.json" -w "%{http_code}" "$url" || true)
-            echo "PAGE=$page HTTP=$code BYTES=$(wc -c < items_page_$page.json 2>/dev/null || echo 0)"
+            url="https://tikwm.com/api/user/posts?unique_id=lefutetfute&count=34&cursor=$cursor"
+            code=$(curl -L -sS --connect-timeout 5 --max-time 60 -o "pages/$page.json" -w "%{http_code}" "$url" || true)
+            echo "PAGE=$page HTTP=$code BYTES=$(wc -c < pages/$page.json 2>/dev/null || echo 0)"
             python3 - "$page" <<'PY'
           import json,sys
-          p=sys.argv[1]
-          fn=f"items_page_{p}.json"
-          try:d=json.load(open(fn))
-          except Exception as e:
-              print("parse_error",e); raise SystemExit
-          print("status",d.get("statusCode"),d.get("statusMsg"),"items",len(d.get("itemList") or []),"cursor",d.get("cursor"),"hasMore",d.get("hasMore"))
-          if d.get("itemList"):
-              for x in d["itemList"][:3]:
-                  print(x.get("id"),x.get("desc","")[:80],x.get("stats",{}))
-          open("next_cursor.txt","w").write(str(d.get("cursor") or 0))
+          p=sys.argv[1]; d=json.load(open(f"pages/{p}.json"))
+          print("code",d.get("code"),"msg",d.get("msg"))
+          data=d.get("data") or {}
+          vids=data.get("videos") or data.get("itemList") or []
+          print("items",len(vids),"cursor",data.get("cursor"),"hasMore",data.get("hasMore") or data.get("has_more"))
+          for x in vids[:3]:
+              print(x.get("video_id") or x.get("id"),(x.get("title") or x.get("desc") or "")[:80],x.get("play_count"),x.get("digg_count"),x.get("comment_count"),x.get("share_count"))
+          open("next_cursor.txt","w").write(str(data.get("cursor") or 0))
+          open("hasmore.txt","w").write("1" if (data.get("hasMore") or data.get("has_more")) else "0")
           PY
             cursor=$(cat next_cursor.txt)
-            hasmore=$(python3 - "$page" <<'PY'
-          import json,sys
-          d=json.load(open(f"items_page_{sys.argv[1]}.json"))
-          print(1 if d.get("hasMore") else 0)
-          PY
-          )
-            [ "$hasmore" = "1" ] || break
+            [ "$(cat hasmore.txt)" = "1" ] || break
             sleep 1
           done
-
-      - name: Upload parsed page
+      - name: Build ranked manifest
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,glob
+          allv={}
+          for fn in glob.glob("pages/*.json"):
+              d=json.load(open(fn)); data=d.get("data") or {}
+              for x in (data.get("videos") or data.get("itemList") or []):
+                  vid=str(x.get("video_id") or x.get("id") or "")
+                  if vid: allv[vid]=x
+          def n(x,*keys):
+              for k in keys:
+                  v=x.get(k)
+                  if v is not None:
+                      try:return int(v)
+                      except: pass
+              return 0
+          rows=[]
+          for vid,x in allv.items():
+              rows.append({
+                "id":vid,
+                "desc":x.get("title") or x.get("desc") or "",
+                "create_time":x.get("create_time"),
+                "duration":x.get("duration") or (x.get("video") or {}).get("duration"),
+                "play_count":n(x,"play_count","playCount"),
+                "digg_count":n(x,"digg_count","diggCount"),
+                "comment_count":n(x,"comment_count","commentCount"),
+                "share_count":n(x,"share_count","shareCount"),
+                "cover":x.get("cover") or x.get("origin_cover") or (x.get("video") or {}).get("cover"),
+                "play":x.get("play") or (x.get("video") or {}).get("playAddr"),
+                "music":x.get("music") or "",
+                "music_info":x.get("music_info") or {}
+              })
+          rows.sort(key=lambda x:(x["play_count"],x["digg_count"],x["comment_count"]),reverse=True)
+          out={"count":len(rows),"top50":rows[:50],"all":rows}
+          open("ranked.json","w").write(json.dumps(out,ensure_ascii=False))
+          print("TOTAL",len(rows))
+          for i,x in enumerate(rows[:50],1):
+              print(i,x["id"],x["play_count"],x["duration"],x["desc"][:100])
+          PY
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: furet-tiktok-profile
+          name: ecureuil-furet-tiktok-corpus
           path: |
-            rehydration.json
-            items_page_*.json
-          retention-days: 2
+            pages/
+            ranked.json
+          retention-days: 3

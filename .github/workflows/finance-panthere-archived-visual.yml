@@ -17,6 +17,8 @@ jobs:
       - name: Install
         run: |
           python3 -m pip install -q requests beautifulsoup4 pillow
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Scrape TokScribe archive
@@ -86,8 +88,11 @@ jobs:
               open(f"{d}/title.txt","w").write(r.get("title",""))
               open(f"{d}/views.txt","w").write(str(r.get("views_label","")))
               open(f"{d}/duration.txt","w").write(str(r.get("duration",0)))
-              if not r.get("mp4"): continue
-              p=subprocess.run(["curl","-L","-sS","--connect-timeout","5","--max-time","90","-A","Mozilla/5.0","-o",f"{d}/video.mp4",r["mp4"]])
+              url=r.get("tiktok")
+              if not url: continue
+              p=subprocess.run(["yt-dlp","--extractor-args","tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com",
+                                "-f","worst[ext=mp4]/worst","--no-playlist","-o",f"{d}/video.mp4",url],
+                               stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
               if p.returncode or not os.path.exists(f"{d}/video.mp4") or os.path.getsize(f"{d}/video.mp4")<10000:
                   continue
               dur=r.get("duration") or 60

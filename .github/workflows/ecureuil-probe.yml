@@ -1,0 +1,34 @@
+name: Ecureuil competitor probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-probe.yml"
+      - "app/api/competitor-ecureuil-youtube/route.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Query Ecureuil collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://d4d5d6.com/api/competitor-ecureuil-youtube?target=ecureuilfinance"
+          for i in $(seq 1 20); do
+            code=$(curl -L -sS -o response.json -w "%{http_code}" "$url" || true)
+            echo "attempt=$i http=$code"
+            if [ "$code" = "200" ] || [ "$code" = "404" ] || [ "$code" = "500" ] || [ "$code" = "503" ]; then
+              break
+            fi
+            sleep 8
+          done
+          echo "ECUREUIL_RESPONSE_BEGIN"
+          cat response.json 2>/dev/null || true
+          echo
+          echo "ECUREUIL_RESPONSE_END"

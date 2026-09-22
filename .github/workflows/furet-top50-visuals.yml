@@ -16,7 +16,8 @@ jobs:
     steps:
       - name: Install tools
         run: |
-          pipx install yt-dlp\n          python -m pip install --user pillow
+          pipx install yt-dlp
+          python -m pip install --user pillow
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg jq
 

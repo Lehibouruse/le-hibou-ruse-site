@@ -1,0 +1,53 @@
+name: Ecureuil Exolyt backend probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-exolyt-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Probe backend public endpoints
+        shell: bash
+        run: |
+          set -u
+          mkdir -p out
+          urls=(
+            "https://backend.exolyt.com/users/lefutetfute/basic"
+            "https://backend.exolyt.com/users/7267211914777986081/basic"
+            "https://backend.exolyt.com/users/lefutetfute/basicInfo"
+            "https://backend.exolyt.com/users/7267211914777986081/basicInfo"
+            "https://backend.exolyt.com/users/lefutetfute/videos/withoutcache"
+            "https://backend.exolyt.com/users/7267211914777986081/videos/withoutcache"
+            "https://backend.exolyt.com/users/videos/lefutetfute"
+            "https://backend.exolyt.com/users/videos/7267211914777986081"
+          )
+          i=0
+          for u in "${urls[@]}"; do
+            i=$((i+1))
+            code=$(curl -L -sS --connect-timeout 5 --max-time 30               -H "Accept: application/json" -H "Content-Type: application/json"               -o "out/$i.txt" -w "%{http_code}" "$u" || true)
+            echo "IDX=$i HTTP=$code BYTES=$(wc -c < out/$i.txt 2>/dev/null || echo 0) URL=$u"
+            head -c 15000 "out/$i.txt" 2>/dev/null || true
+            echo
+            echo "===="
+          done
+          # Retry videos with the same literal header the guest client may emit
+          for id in lefutetfute 7267211914777986081; do
+            code=$(curl -L -sS --connect-timeout 5 --max-time 30               -H "Authorization: Bearer undefined" -H "Content-Type: application/json"               -o "out/auth_$id.txt" -w "%{http_code}"               "https://backend.exolyt.com/users/$id/videos/withoutcache" || true)
+            echo "AUTH_UNDEFINED ID=$id HTTP=$code BYTES=$(wc -c < out/auth_$id.txt 2>/dev/null || echo 0)"
+            head -c 15000 "out/auth_$id.txt" || true
+            echo
+          done
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecureuil-exolyt-backend
+          path: out/
+          retention-days: 2

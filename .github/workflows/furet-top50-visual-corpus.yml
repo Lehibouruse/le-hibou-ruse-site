@@ -17,6 +17,7 @@ jobs:
       - name: Install tools
         run: |
           pipx install yt-dlp
+          python3 -m pip install --user pillow
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Build Top 50 manifest

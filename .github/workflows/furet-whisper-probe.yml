@@ -21,29 +21,26 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p transcripts
+          cat > transcribe.py <<'PY'
+          from faster_whisper import WhisperModel
+          import sys
+          media=sys.argv[1]
+          out=sys.argv[2]
+          model=WhisperModel("small",device="cpu",compute_type="int8")
+          segments,info=model.transcribe(media,language="fr",beam_size=5,vad_filter=True)
+          with open(out,"w") as f:
+              for s in segments:
+                  line=f"[{s.start:.2f}-{s.end:.2f}] {s.text.strip()}"
+                  print(line)
+                  f.write(line+"\\n")
+          print("language",info.language,"prob",info.language_probability)
+          PY
           ids=(7680439152348810528 7662815671595584800 7685271593848687904)
-          python3 - <<'PY'
-from faster_whisper import WhisperModel
-m=WhisperModel("small",device="cpu",compute_type="int8")
-open("model_ready.txt","w").write("ok")
-PY
           for id in "${ids[@]}"; do
             url="https://www.tiktok.com/@lefutetfute/video/$id"
             rm -f video.mp4
             yt-dlp --no-playlist --quiet --no-warnings -f "download/b[ext=mp4]/b" -o video.mp4 "$url"
-            python3 - "$id" <<'PY'
-from faster_whisper import WhisperModel
-import sys
-id=sys.argv[1]
-m=WhisperModel("small",device="cpu",compute_type="int8")
-segments,info=m.transcribe("video.mp4",language="fr",beam_size=5,vad_filter=True)
-with open(f"transcripts/{id}.txt","w") as f:
-    for s in segments:
-        line=f"[{s.start:.2f}-{s.end:.2f}] {s.text.strip()}"
-        print(line)
-        f.write(line+"\n")
-print("language",info.language,"prob",info.language_probability)
-PY
+            python3 transcribe.py video.mp4 "transcripts/$id.txt"
           done
       - name: Upload
         uses: actions/upload-artifact@v4

@@ -1,0 +1,87 @@
+name: Finance Panthere archived covers
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-archive-covers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install
+        run: python3 -m pip install -q requests beautifulsoup4 pillow
+      - name: Crawl covers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > crawl.py <<'PY'
+          import requests,bs4,os,json,urllib.parse,re
+          from PIL import Image,ImageOps,ImageDraw
+          sess=requests.Session(); sess.headers.update({"User-Agent":"Mozilla/5.0"})
+          details=[]
+          for page in [1,2]:
+              url="https://tokscribe.com/author/financepanthere"+(f"?page={page}" if page>1 else "")
+              soup=bs4.BeautifulSoup(sess.get(url,timeout=30).text,"html.parser")
+              for a in soup.find_all("a",href=True):
+                  if a["href"].startswith("/t/") and a["href"] not in details:
+                      details.append(a["href"])
+          os.makedirs("covers",exist_ok=True)
+          rows=[]
+          for i,href in enumerate(details,1):
+              url=urllib.parse.urljoin("https://tokscribe.com",href)
+              soup=bs4.BeautifulSoup(sess.get(url,timeout=30).text,"html.parser")
+              title=soup.find("h1").get_text(" ",strip=True) if soup.find("h1") else ""
+              text=" ".join(soup.stripped_strings)
+              m=re.search(r'([\d.]+[KMB]?)\s+views\s+([\d.]+[KMB]?)\s+likes\s+(\d+:\d+)',text,re.I)
+              og=soup.find("meta",attrs={"property":"og:image"}) or soup.find("meta",attrs={"name":"twitter:image"})
+              img=og.get("content") if og else ""
+              if not img:
+                  for a in soup.find_all("a",href=True):
+                      if "cover" in a.get_text(" ",strip=True).lower():
+                          img=urllib.parse.urljoin(url,a["href"]); break
+              status=""
+              if img:
+                  rr=sess.get(img,timeout=30,allow_redirects=True)
+                  status=f"{rr.status_code}/{len(rr.content)}"
+                  if rr.ok and len(rr.content)>5000:
+                      open(f"covers/{i:02d}.img","wb").write(rr.content)
+              rows.append({"rank":i,"detail":url,"title":title,
+                           "views":m.group(1) if m else "","likes":m.group(2) if m else "",
+                           "duration":m.group(3) if m else "","image":img,"status":status})
+              print(i,status,img[:100])
+          json.dump(rows,open("covers.json","w"),ensure_ascii=False,indent=2)
+          # normalize and sheet
+          files=[]
+          for i in range(1,len(rows)+1):
+              raw=f"covers/{i:02d}.img"
+              if not os.path.exists(raw): continue
+              try:
+                  im=Image.open(raw).convert("RGB")
+                  out=f"covers/{i:02d}.jpg"; im.save(out,quality=88); os.remove(raw); files.append((i,out))
+              except Exception as e: print("BAD",i,e)
+          W,H=180,320; cols=5
+          rowsn=(len(files)+cols-1)//cols
+          sheet=Image.new("RGB",(cols*W,rowsn*(H+24)),"white"); dr=ImageDraw.Draw(sheet)
+          for j,(i,fp) in enumerate(files):
+              x=(j%cols)*W; y=(j//cols)*(H+24)
+              im=ImageOps.fit(Image.open(fp).convert("RGB"),(W,H))
+              sheet.paste(im,(x,y+24));dr.text((x+3,y+3),f"#{i} {rows[i-1]['views']}",fill="black")
+          sheet.save("archive_covers_sheet.jpg",quality=85)
+          print("SAVED",len(files))
+          PY
+          python3 crawl.py
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-archive-covers
+          path: |
+            covers.json
+            covers/
+            archive_covers_sheet.jpg
+          retention-days: 3

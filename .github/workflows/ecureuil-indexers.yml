@@ -1,0 +1,52 @@
+name: Ecureuil public indexers probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-indexers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Probe public indexers
+        shell: bash
+        run: |
+          set -u
+          mkdir -p out
+          python3 - <<'PY'
+          import subprocess, pathlib, re
+          urls=[
+            ("urlebird","https://urlebird.com/user/lefutetfute/"),
+            ("exolyt","https://exolyt.com/user/tiktok/lefutetfute"),
+            ("countik1","https://countik.com/tiktok-analytics/user/lefutetfute"),
+            ("countik2","https://countik.com/tiktok-analytics/lefutetfute"),
+            ("tokcount","https://tokcount.com/?user=lefutetfute"),
+            ("tikbuddy","https://tikbuddy.com/tiktok/lefutetfute"),
+            ("tokcounter","https://tokcounter.com/?user=lefutetfute"),
+          ]
+          for name,url in urls:
+              out=f"out/{name}.html"
+              cmd=["curl","-L","-sS","--connect-timeout","5","--max-time","40","-A","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36","-o",out,"-w","%{http_code}",url]
+              try: code=subprocess.check_output(cmd,text=True).strip()
+              except Exception as e: code=f"ERR:{e}"
+              try:s=pathlib.Path(out).read_text(errors="ignore")
+              except:s=""
+              print(name,"HTTP",code,"BYTES",len(s),"HANDLE",s.lower().count("lefutetfute"),"VIDEO",s.lower().count("video"))
+              for pat in ["followers","719","views","playcount","diggcount","video_id","itemlist"]:
+                  print(" ",pat,s.lower().count(pat.lower()))
+              # print small snippets around handle
+              i=s.lower().find("lefutetfute")
+              if i>=0: print("SNIP",re.sub(r"\s+"," ",s[max(0,i-300):i+1000])[:1400])
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecureuil-indexers
+          path: out/
+          retention-days: 2

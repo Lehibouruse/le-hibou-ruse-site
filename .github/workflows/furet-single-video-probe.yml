@@ -1,0 +1,51 @@
+name: Furet single video probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-single-video-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Install yt-dlp with impersonation
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+      - name: Probe top video
+        shell: bash
+        run: |
+          set +e
+          url="https://www.tiktok.com/@lefutetfute/video/7680439152348810528"
+          for mode in a b c; do
+            rm -f out.mp4 info.json err.txt
+            if [ "$mode" = "a" ]; then
+              args=(--extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com")
+            elif [ "$mode" = "b" ]; then
+              args=(--impersonate "chrome" --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com")
+            else
+              args=(--impersonate "chrome")
+            fi
+            yt-dlp "${args[@]}" -f "worst[ext=mp4]/worst" --write-info-json -o "out.%(ext)s" "$url" >stdout.txt 2>err.txt
+            code=$?
+            echo "MODE=$mode EXIT=$code"
+            cat err.txt
+            ls -lh out.* 2>/dev/null || true
+          done
+          exit 0
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-single-probe
+          path: |
+            out.*
+            stdout.txt
+            err.txt
+          retention-days: 1
+          if-no-files-found: ignore

@@ -39,7 +39,7 @@ jobs:
           for id in "${ids[@]}"; do
             url="https://www.tiktok.com/@lefutetfute/video/$id"
             rm -f video.mp4
-            yt-dlp --no-playlist --quiet --no-warnings -f "download/b[ext=mp4]/b" -o video.mp4 "$url"
+            yt-dlp --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" --no-playlist --quiet --no-warnings -f "worst[ext=mp4]/worst" -o video.mp4 "$url"
             python3 transcribe.py video.mp4 "transcripts/$id.txt"
           done
       - name: Upload

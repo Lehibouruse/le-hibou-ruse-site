@@ -217,7 +217,11 @@ export async function GET(request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isProjectAiEnabled(process.env)) {\n    return NextResponse.json({ ok: false, processed: 0, status: "disabled", reason: "openai_api_disabled", openai_calls: 0 }, { status: 409 });\n  }\n\n  let claimedJob = null;
+  if (!isProjectAiEnabled(process.env)) {
+    return NextResponse.json({ ok: false, processed: 0, status: "disabled", reason: "openai_api_disabled", openai_calls: 0 }, { status: 409 });
+  }
+
+  let claimedJob = null;
   try {
     const eligible = eligibleJobsFormula(process.env);
     const candidates = await queryRecords(TABLES.jobs, {

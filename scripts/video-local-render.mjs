@@ -42,6 +42,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
   const output = resolve(outputArg);
   const contract = JSON.parse(readFileSync(contractPath, "utf8"));
   const { audio, total } = validateVideoContract(contract, root);
+  const preset = String(contract.engine?.preset || "medium");
   mkdirSync(dirname(output), { recursive: true });
   const work = resolve(root, ".video-render-work");
   rmSync(work, { recursive: true, force: true });
@@ -57,14 +58,14 @@ export function renderVideoContract(contractPathArg, outputArg) {
     const increment = (maxZoom - 1) / frames;
     const clip = resolve(work, `scene-${String(i + 1).padStart(2,"0")}.mp4`);
     const vf = `scale=1200:2134:force_original_aspect_ratio=increase,crop=1200:2134,zoompan=z='if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=30,format=yuv420p`;
-    run("ffmpeg", ["-y","-loglevel","error","-loop","1","-i",image,"-vf",vf,"-t",duration.toFixed(3),"-an","-c:v","libx264","-preset","medium","-crf","18","-pix_fmt","yuv420p",clip]);
+    run("ffmpeg", ["-y","-loglevel","error","-loop","1","-i",image,"-vf",vf,"-t",duration.toFixed(3),"-an","-c:v","libx264","-preset",preset,"-crf","18","-pix_fmt","yuv420p",clip]);
     clips.push(clip);
   }
   const concatPath = resolve(work, "scenes.ffconcat");
   writeFileSync(concatPath, `ffconcat version 1.0\n${clips.map(path => `file '${path.replaceAll("'", "'\\''")}'`).join("\n")}\n`);
   const visual = resolve(work, "visual.mp4");
   run("ffmpeg", ["-y","-loglevel","error","-f","concat","-safe","0","-i",concatPath,"-c","copy",visual]);
-  run("ffmpeg", ["-y","-loglevel","error","-i",visual,"-i",audio,"-t",total.toFixed(3),"-map","0:v:0","-map","1:a:0","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","160k","-ar","48000","-ac","2","-pix_fmt","yuv420p","-movflags","+faststart","-shortest",output]);
+  run("ffmpeg", ["-y","-loglevel","error","-i",visual,"-i",audio,"-t",total.toFixed(3),"-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-b:a","160k","-ar","48000","-ac","2","-movflags","+faststart","-shortest",output]);
   const probe = JSON.parse(run("ffprobe", ["-v","error","-show_entries","format=duration,size:stream=codec_name,codec_type,width,height,r_frame_rate,sample_rate,channels","-of","json",output]));
   const video = probe.streams.find(stream => stream.codec_type === "video");
   const sound = probe.streams.find(stream => stream.codec_type === "audio");

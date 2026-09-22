@@ -14,16 +14,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Fetch public TikTok profile
+      - name: Fetch and parse public TikTok profile
         shell: bash
         run: |
           set -euo pipefail
           url="https://www.tiktok.com/@lefutetfute"
-          code=$(curl -L -sS --connect-timeout 5 --max-time 30             -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36"             -H "Accept-Language: fr-FR,fr;q=0.9,en;q=0.8"             -o profile.html -w "%{http_code}" "$url" || true)
-          echo "HTTP=$code BYTES=$(wc -c < profile.html 2>/dev/null || echo 0)"
+          curl -L -sS --connect-timeout 5 --max-time 30             -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36"             -H "Accept-Language: fr-FR,fr;q=0.9,en;q=0.8"             -o profile.html "$url"
           python3 - <<'PY'
+          import re,json,html as h
           s=open("profile.html",encoding="utf-8",errors="ignore").read()
-          for key in ["__UNIVERSAL_DATA_FOR_REHYDRATION__","SIGI_STATE","ItemModule","UserModule","webapp.user-detail","seo.abtest"]:
-              print(key,s.find(key))
-          print(s[:5000])
+          m=re.search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">(.*?)</script>',s,re.S)
+          print("found",bool(m))
+          if not m: raise SystemExit
+          data=json.loads(h.unescape(m.group(1)))
+          print("TOP_KEYS",list(data.keys()))
+          default=data.get("__DEFAULT_SCOPE__",{})
+          print("DEFAULT_KEYS",list(default.keys()))
+          for k,v in default.items():
+              if any(x in k.lower() for x in ["user","item","video","post"]):
+                  print("KEY",k)
+                  print(json.dumps(v,ensure_ascii=False)[:30000])
+          open("rehydration.json","w").write(json.dumps(data,ensure_ascii=False))
           PY
+      - name: Upload parsed page
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-tiktok-profile
+          path: |
+            rehydration.json
+          retention-days: 2

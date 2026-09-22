@@ -1,0 +1,45 @@
+name: Renard transcript probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/renard-transcript-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public YouTube captions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ids=(bkF_sZgBRsU KQxjChS1p6s CbFERLNN8AU)
+          for id in "${ids[@]}"; do
+            echo "VIDEO=$id"
+            for u in               "https://www.youtube.com/api/timedtext?type=list&v=$id"               "https://www.youtube.com/api/timedtext?v=$id&lang=fr&fmt=vtt"               "https://www.youtube.com/api/timedtext?v=$id&lang=fr&kind=asr&fmt=vtt"; do
+              code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 15 -o out.txt -w "%{http_code}" "$u" || true)
+              bytes=$(wc -c < out.txt 2>/dev/null || echo 0)
+              echo "HTTP=$code BYTES=$bytes URL=$u"
+              head -c 1000 out.txt 2>/dev/null || true
+              echo
+              echo "---"
+            done
+            code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 15 -o watch.html -w "%{http_code}" "https://www.youtube.com/watch?v=$id" || true)
+            echo "WATCH_HTTP=$code WATCH_BYTES=$(wc -c < watch.html 2>/dev/null || echo 0)"
+            python3 - <<'PY'
+import re, html
+s=open("watch.html",encoding="utf-8",errors="ignore").read()
+for key in ["captionTracks","playerCaptionsTracklistRenderer","captions"]:
+    print(key, s.find(key))
+m=re.search(r'"captionTracks":(\[[^\]]+\])', s)
+print("captionTracksMatch", bool(m))
+if m:
+    print(html.unescape(m.group(1))[:5000])
+PY
+            echo "======"
+          done

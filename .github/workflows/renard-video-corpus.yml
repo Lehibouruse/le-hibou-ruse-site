@@ -12,12 +12,8 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Install downloader
-        run: |
-          python3 -m pip install --upgrade yt-dlp
-
       - name: Fetch ranked dataset
         shell: bash
         run: |
@@ -29,48 +25,45 @@ jobs:
           assert d.get("ok") is True
           vids=d.get("top50",[])
           assert len(vids) >= 50, len(vids)
-          with open("urls.txt","w") as f:
-              for v in vids[:50]:
-                  f.write(v["url"]+"\n")
           with open("manifest.tsv","w") as f:
               f.write("rank\tid\tviews\tduration\ttitle\turl\n")
               for i,v in enumerate(vids[:50],1):
                   title=(v.get("title") or "").replace("\t"," ").replace("\n"," ")
                   f.write(f'{i}\t{v.get("id","")}\t{v.get("viewCount",0)}\t{v.get("durationSeconds","")}\t{title}\t{v.get("url","")}\n')
-          print("videos",len(vids[:50]))
           PY
 
-      - name: Download 50 public Shorts
+      - name: Fetch thumbnails and public storyboard sprites
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p videos
-          yt-dlp             --ignore-errors             --no-playlist             --restrict-filenames             --max-filesize 20M             -f "b[height<=360]/bv*[height<=360]+ba/b[height<=480]/b"             --merge-output-format mp4             -o "videos/%(id)s.%(ext)s"             -a urls.txt
-          echo "downloaded=$(find videos -type f | wc -l)"
-          find videos -type f -maxdepth 1 -printf '%f %s\n' | sort > downloaded_files.txt
-          cat downloaded_files.txt
-
-      - name: Create contact-sheet source frames
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p frames
-          for f in videos/*; do
-            [ -f "$f" ] || continue
-            id=$(basename "$f" | cut -d. -f1)
-            mkdir -p "frames/$id"
-            ffmpeg -hide_banner -loglevel error -i "$f" -vf "fps=1/4,scale=180:-1" -q:v 5 "frames/$id/%03d.jpg" || true
+          mkdir -p visuals
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration title url; do
+            dir=$(printf "visuals/%02d_%s" "$rank" "$id")
+            mkdir -p "$dir"
+            curl -L -sS --fail "https://i.ytimg.com/vi/$id/maxresdefault.jpg" -o "$dir/thumbnail.jpg" ||               curl -L -sS --fail "https://i.ytimg.com/vi/$id/hqdefault.jpg" -o "$dir/thumbnail.jpg" || true
+            for level in L3 L2 L1 L0; do
+              for idx in 0 1 2 3 4 5 6 7 8 9; do
+                target="$dir/storyboard3_${level}_M${idx}.jpg"
+                if ! curl -L -sS --fail "https://i.ytimg.com/sb/$id/storyboard3_${level}/M${idx}.jpg" -o "$target"; then
+                  rm -f "$target"
+                  break
+                fi
+              done
+            done
           done
+          find visuals -type f -printf '%p\t%s\n' | sort > visual_files.tsv
+          echo "thumbnails=$(find visuals -name thumbnail.jpg | wc -l)"
+          echo "storyboards=$(find visuals -name 'storyboard*.jpg' | wc -l)"
+          tail -n 20 visual_files.tsv || true
 
-      - name: Upload corpus artifact
+      - name: Upload visual corpus artifact
         uses: actions/upload-artifact@v4
         with:
-          name: renard-top50-corpus
+          name: renard-top50-visual-corpus
           path: |
             dataset.json
             manifest.tsv
-            downloaded_files.txt
-            videos/
-            frames/
+            visual_files.tsv
+            visuals/
           retention-days: 3
           compression-level: 6

@@ -1,0 +1,66 @@
+name: Finance Panthere TikTok item list probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-itemlist-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe TikTok item list
+        shell: bash
+        run: |
+          python3 -m pip install -q curl-cffi
+          python3 - <<'PY'
+          from curl_cffi import requests
+          import re,json,urllib.parse,sys
+          s=requests.Session(impersonate="chrome")
+          p=s.get("https://www.tiktok.com/@financepanthere",timeout=30)
+          m=re.search(r'"secUid"\s*:\s*"([^"]+)"',p.text)
+          if not m:
+              print("NO_SECUID"); sys.exit(1)
+          sec=m.group(1)
+          print("SECUID",sec)
+          all_items=[]
+          cursor=0
+          for page in range(6):
+              params={
+                "aid":"1988",
+                "count":"35",
+                "cursor":str(cursor),
+                "secUid":sec,
+              }
+              r=s.get("https://www.tiktok.com/api/post/item_list/",params=params,
+                      headers={"Referer":"https://www.tiktok.com/@financepanthere"},timeout=30)
+              print("PAGE",page,"HTTP",r.status_code,"BYTES",len(r.content),"URL",r.url)
+              try:
+                  d=r.json()
+              except Exception:
+                  print(r.text[:2000]); break
+              print("statusCode",d.get("statusCode"),"status_code",d.get("status_code"),
+                    "hasMore",d.get("hasMore"),"cursor",d.get("cursor"),
+                    "items",len(d.get("itemList") or []))
+              for x in d.get("itemList") or []:
+                  st=x.get("stats") or {}
+                  print("ITEM",x.get("id"),st.get("playCount"),x.get("createTime"),(x.get("desc") or "")[:80])
+                  all_items.append(x)
+              new_cursor=d.get("cursor")
+              if not d.get("hasMore") or new_cursor is None or str(new_cursor)==str(cursor):
+                  break
+              cursor=new_cursor
+          json.dump(all_items,open("items.json","w"),ensure_ascii=False,indent=2)
+          print("TOTAL",len(all_items),"UNIQUE",len({x.get("id") for x in all_items}))
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-item-list
+          path: items.json
+          retention-days: 3

@@ -1,0 +1,81 @@
+name: Furet top10 hooks endings
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top10-hooks-endings.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install
+        run: |
+          pipx install yt-dlp
+          pipx inject yt-dlp curl-cffi
+          python3 -m pip install --user pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Collect frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@lefutetfute" > profile.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("profile.json"))
+          es=sorted(d.get("entries") or [],key=lambda x:int(x.get("view_count") or 0),reverse=True)[:10]
+          with open("top10.tsv","w") as f:
+              for i,e in enumerate(es,1):
+                  f.write(f'{i}\t{e.get("id")}\t{e.get("duration")}\t{(e.get("title") or "").replace(chr(9)," ")}\t{e.get("url")}\n')
+          PY
+          mkdir -p frames
+          while IFS=$'\t' read -r rank id dur title url; do
+            d=$(printf "frames/%02d_%s" "$rank" "$id"); mkdir -p "$d"
+            yt-dlp --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" -f "worst[ext=mp4]/worst" -o "$d/video.%(ext)s" "$url" >/dev/null 2>"$d/err.txt" || continue
+            vf=$(find "$d" -name 'video.*' | head -n1)
+            realdur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$vf")
+            python3 - "$realdur" "$d/times.tsv" <<'PY'
+          import sys
+          x=float(sys.argv[1]); pairs=[]
+          for i,t in enumerate([0,1,2,3],1): pairs.append((f"h{i}",min(t,max(0,x-.1))))
+          for i,off in enumerate([4,3,2,1],1): pairs.append((f"e{i}",max(0,x-off)))
+          open(sys.argv[2],"w").write("\n".join(f"{n}\t{t}" for n,t in pairs)+"\n")
+          PY
+            while IFS=$'\t' read -r n t; do
+              ffmpeg -loglevel error -ss "$t" -i "$vf" -frames:v 1 -q:v 3 "$d/$n.jpg" -y
+            done < "$d/times.tsv"
+            rm -f "$vf"
+          done < top10.tsv
+      - name: Sheets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from PIL import Image,ImageOps,ImageDraw
+          import glob,os
+          dirs=sorted(glob.glob("frames/*"))
+          W,H=150,267
+          for phase,names in [("hooks",["h1","h2","h3","h4"]),("endings",["e1","e2","e3","e4"])]:
+              s=Image.new("RGB",(W*10,H*4+28),"white"); dr=ImageDraw.Draw(s)
+              for col,d in enumerate(dirs):
+                  dr.text((col*W+4,4),f"#{col+1}",fill="black")
+                  for row,n in enumerate(names):
+                      fp=os.path.join(d,n+".jpg")
+                      if os.path.exists(fp):
+                          im=ImageOps.fit(Image.open(fp).convert("RGB"),(W,H)); s.paste(im,(col*W,28+row*H))
+              s.save(phase+".jpg",quality=85)
+          PY
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-top10-hooks-endings
+          path: |
+            hooks.jpg
+            endings.jpg
+            top10.tsv
+          retention-days: 2

@@ -41,10 +41,10 @@ jobs:
             dir=$(printf "visuals/%02d_%s" "$rank" "$id")
             mkdir -p "$dir"
             curl -L -sS --fail "https://i.ytimg.com/vi/$id/maxresdefault.jpg" -o "$dir/thumbnail.jpg" ||               curl -L -sS --fail "https://i.ytimg.com/vi/$id/hqdefault.jpg" -o "$dir/thumbnail.jpg" || true
-            for level in L3 L2 L1 L0; do
-              for idx in 0 1 2 3 4 5 6 7 8 9; do
+            for level in L2 L1 L0; do
+              for idx in 0; do
                 target="$dir/storyboard3_${level}_M${idx}.jpg"
-                if ! curl -L -sS --fail "https://i.ytimg.com/sb/$id/storyboard3_${level}/M${idx}.jpg" -o "$target"; then
+                if ! curl -L -sS --fail --connect-timeout 2 --max-time 4 "https://i.ytimg.com/sb/$id/storyboard3_${level}/M${idx}.jpg" -o "$target"; then
                   rm -f "$target"
                   break
                 fi

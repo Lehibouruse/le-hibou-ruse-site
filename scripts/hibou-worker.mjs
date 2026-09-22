@@ -440,8 +440,15 @@ function finalText(response) {
   return (response.output || []).flatMap((item) => item.content || []).filter((item) => item.type === "output_text").map((item) => item.text).join("");
 }
 
+function allowedActions() {
+  return String(process.env.HIBOU_WORKER_ALLOWED_ACTIONS || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 async function main() {
-  const claimed = await api({ operation: "claim" });
+  const claimed = await api({ operation: "claim", allowed_actions: allowedActions() });
   if (!claimed.claimed) { console.log("Aucun job agentique éligible."); return; }
   const state = { ...claimed, external_id: "" };
   const input = initialInput(claimed.job);

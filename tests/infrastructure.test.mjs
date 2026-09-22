@@ -112,6 +112,12 @@ test("les actions GitHub exécutables sont figées sur des commits immuables", (
   assert.match(wake, new RegExp(`actions/upload-artifact@${UPLOAD_ARTIFACT_SHA}`));
 });
 
+test("le worker média autorise uniquement son workflow OIDC dédié en plus du wake historique", () => {
+  const route = readFileSync(new URL("../app/api/agent-worker/route.js", import.meta.url), "utf8");
+  assert.match(route, /allowedWorkflowFiles: \["hibou-wake\.yml", "hibou-media-control\.yml"\]/);
+  assert.match(route, /allowedEvents: \["push", "workflow_dispatch", "issue_comment"\]/);
+});
+
 test("un Manual Review métier ne casse ni ne rejoue le wake", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
   const wake = readFileSync(new URL("../app/api/wake/route.js", import.meta.url), "utf8");

@@ -1,0 +1,74 @@
+name: Furet top50 dynamic covers
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top50-dynamic-covers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Prepare
+        run: python3 -m pip install -q yt-dlp pillow
+
+      - name: Get Top 50 and extract dynamic covers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m yt_dlp --flat-playlist --dump-single-json \
+            --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+            "https://www.tiktok.com/@lefutetfute" > profile.json
+          python3 - <<'PY'
+          import json,os,subprocess,sys
+          from PIL import Image
+          d=json.load(open("profile.json"))
+          es=[e for e in d.get("entries",[]) if e.get("view_count") is not None]
+          es=sorted(es,key=lambda e:e.get("view_count") or 0,reverse=True)[:50]
+          os.makedirs("covers",exist_ok=True)
+          os.makedirs("dynamic",exist_ok=True)
+          rows=[]
+          for rank,e in enumerate(es,1):
+              thumbs={t.get("id"):t.get("url") for t in e.get("thumbnails",[]) if t.get("url")}
+              base=f"{rank:02d}_{e.get('id')}"
+              row={"rank":rank,"id":e.get("id"),"views":e.get("view_count"),"duration":e.get("duration"),"title":e.get("title"),
+                   "track":e.get("track"),"artist":e.get("artists"),"thumbs":thumbs}
+              rows.append(row)
+              for kind in ("cover","originCover","dynamicCover"):
+                  url=thumbs.get(kind)
+                  if not url: continue
+                  raw=f"/tmp/{base}_{kind}.bin"
+                  r=subprocess.run(["curl","-L","-sS","--connect-timeout","5","--max-time","30","-o",raw,url])
+                  if r.returncode!=0 or not os.path.exists(raw) or os.path.getsize(raw)==0: continue
+                  try:
+                      im=Image.open(raw)
+                      n=getattr(im,"n_frames",1)
+                      if kind!="dynamicCover" or n<=1:
+                          im.seek(0); im.convert("RGB").save(f"covers/{base}_{kind}.jpg",quality=85)
+                      else:
+                          picks=sorted(set([0,max(0,n//3),max(0,2*n//3),n-1]))
+                          for j,idx in enumerate(picks,1):
+                              im.seek(idx)
+                              im.convert("RGB").save(f"dynamic/{base}_{j}.jpg",quality=85)
+                          print("dynamic",rank,e.get("id"),"frames",n,"saved",len(picks))
+                  except Exception as ex:
+                      print("image_error",rank,kind,ex)
+          json.dump(rows,open("top50.json","w"),ensure_ascii=False,indent=2)
+          print("covers",len(os.listdir("covers")),"dynamic_frames",len(os.listdir("dynamic")))
+          PY
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-top50-dynamic-covers
+          path: |
+            top50.json
+            covers/
+            dynamic/
+          retention-days: 3
+          compression-level: 6

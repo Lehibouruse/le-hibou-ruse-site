@@ -1,42 +1,59 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-13 UTC
+Dernière mise à jour : 2026-09-22 UTC
 
-## Agent API autonome V1 — opérationnel et testé
+## Décisions actuelles
 
-- Dépôt réel repris sans retour en arrière depuis `main` au commit `bb9eea0`.
-- `HIBOU_AGENT_V1` est versionné dans le code avec les instructions générales « LE HIBOU RUSÉ — AGENT PRINCIPAL ». Un prompt OpenAI hébergé peut être substitué par `HIBOU_OPENAI_PROMPT_ID` et `HIBOU_OPENAI_PROMPT_VERSION` sans modifier l'orchestrateur.
-- Routeur effectivement appliqué : règle déterministe sans IA lorsqu'elle suffit, Luna pour le simple, Terra pour l'intermédiaire, Sol uniquement après échec Terra confirmé et justifié. Deux escalades maximum, un retry API maximum par modèle et quatre appels IA maximum par Job par défaut.
-- Sortie JSON stricte : `completed`, `failed`, `waiting_for_human` ou `needs_escalation`.
-- Kill switch, plafonds par Job et budgets journaliers configurables par variables Vercel. Modèle, reasoning, jetons entrée/cachés/sortie, coût estimé, appels, escalades et IDs de réponse sont écrits dans Jobs et Journal.
-- `POST /api/orchestrator` utilise la Responses API avec contexte minimal, filtrage des clés sensibles, `store: false` et cache de prompt. Aucun secret n'est présent dans le dépôt.
-- Verrous Airtable avec bail, vérification de propriété et clé d'idempotence empêchent le double traitement.
-- Les crons `/api/orchestrator` et `/api/health` sont activés en production. Sur le plan Hobby, ils s'exécutent quotidiennement; une cadence plus courte nécessitera Pipedream ou un plan Vercel supérieur.
-- Un passage sans Job admissible sort avant toute lecture de budget ou tout appel OpenAI (`openai_calls: 0`). Le health check n'appelle jamais OpenAI.
+- L’agent OpenAI API du projet est abandonné pour raison de coût. Aucun crédit ne doit être rechargé et aucun appel OpenAI payant ne doit être relancé.
+- Le raisonnement, la recherche, la rédaction et le pilotage sont réalisés dans la formule ChatGPT actuelle.
+- Les APIs sociales, Lemon Squeezy, Digify, Airtable, GitHub Actions et les traitements déterministes restent utilisables.
+- Aucune publication sociale publique sans validation humaine.
+- Aucun nouvel abonnement, achat ou engagement payant sans accord explicite.
 
-## Preuves production
+## Coupe-circuit IA
 
-- Déploiement manuel validé : `dpl_CDSq6GygVnRJibzWW2ehL6AX3e5o`, état `READY`, alias `https://le-hibou-ruse-site.vercel.app`.
-- Succès IA réel : Job `hibou-agent-v1-success-20260913102009` (`rec8xp72dHHEBqCjn`) passé de Pending à Running puis Completed avec `gpt-5.6-luna`, reasoning low, 1 686 jetons d'entrée, 71 de sortie, 1 appel, 0 escalade et coût estimé de 0,0004224 USD. Journal : `recpw0v3SQ9A7AHzC`.
-- Attente sûre réelle : Job `hibou-agent-v1-waiting-20260913102523` (`recybKXtWECNwc3ON`) terminé en Manual Review / `waiting_for_human`, sans boucle, sans retry, sans appel IA et à coût nul. Journal : `rec3KOKmqSHKXz3uv`.
-- Anti-doublon réel : Job `hibou-agent-v1-duplicate-20260913` (`rec83ZauQNcDpVgFz`) portant une clé déjà terminée a été clôturé Completed / dédupliqué, avec 0 appel IA et coût nul.
-- File vide réelle : déclenchement production terminé sans modifier les Jobs achevés et sans nouvel appel IA.
-- Tests locaux : 11 tests unitaires réussis et build Next.js de production réussi.
+- La branche de travail ajoute un verrou de code `PAID_AI_DISABLED_BY_POLICY=true`.
+- `getAgentConfig().aiEnabled` reste faux même si une ancienne variable Vercel tente de remettre `AI_ENABLED=true`.
+- Le worker refuse de réclamer un Job agentique et refuse création/récupération de Responses OpenAI.
+- `/api/wake` continue à sélectionner les Jobs déterministes et ignore les Jobs nécessitant OpenAI.
+- Les anciennes valeurs de circuit breaker restent historiques uniquement.
 
-## Variables Vercel
+## Vidéo
 
-- Secrets présents : `OPENAI_API_KEY`, `AIRTABLE_TOKEN`, `CRON_SECRET`. Leurs valeurs ne sont ni lues dans les journaux ni stockées dans GitHub ou Airtable.
-- Agent : `AI_ENABLED=true`, `HIBOU_AI_KILL_SWITCH=false`, Terra et Sol autorisés, plafonds d'escalade/retry/appels et budgets par Job/jour configurés pour Production, Preview et Development.
-- `LEMON_SQUEEZY_WEBHOOK_SECRET` reste à définir après création du webhook Lemon Squeezy.
+Références : `VIDEO_METHOD_V2` + `HIBOU_VIRAL_V1@2.0`.
 
-## Suite utile, hors périmètre Agent V1
+POC Box Spread du 22/09/2026 :
+- source de verbatim : audio existant de `Le_Hibou_Box_Spread_V2_prompt_actuel_verbatim_V1.mp4`, réutilisé sans réécriture ;
+- renderer : FFmpeg local déterministe ;
+- format de sortie : 1080×1920, 30 fps, H.264/AAC, faststart ;
+- test court : 10,4 s ;
+- deux rendus identiques octet par octet, SHA-256 `54c93df3c13ca5ded280e456c86d4b2436ff2293c52ad77ed2a7fe77b35f33d0`.
+- aucun GPU NVIDIA visible dans l’environnement ChatGPT utilisé pour ce POC : FLUX/Chatterbox ne sont donc pas déclarés installés ou testés ici.
 
-1. Brancher Pipedream si une fréquence inférieure à une fois par jour est souhaitée sur Vercel Hobby.
-2. Finaliser le compte, le produit à 29 € et le webhook Lemon Squeezy; KYC, coordonnées bancaires et acceptation des conditions restent humains.
-3. Relier une interface produit à `POST /api/analyze-montage` si cette analyse doit être exposée aux utilisateurs.
-4. Compléter `Content Pipeline`, puis construire le MVP Remotion.
+Pilotes canoniques :
+1. Box Spread — pilote de reproductibilité du moteur.
+2. OBO — pilote éditorial.
+3. Donation-cession — pilote éditorial.
 
-## Garde-fous
+La vidéo d’introduction reste un asset de marque séparé et le compte courant d’associé reste en backlog.
 
-- Ne pas publier les premières vidéos sans validation humaine.
-- Ne jamais enregistrer de token, clé ou mot de passe dans Airtable ou GitHub.
+## Livre
+
+- Production dans ChatGPT actuel uniquement ; anciens CREATE_BOOK non relancés.
+- Charte active : ivoire, bleu nuit, vert canard, or discret.
+- Gabarit cible : logique/mécanique/schéma puis chiffrage/variantes/risques/étapes.
+- Les marqueurs [À VÉRIFIER] ne disparaissent qu’après vérification réelle.
+
+## Blocages humains précis
+
+- Vercel : un déploiement reprenant le verrou de code est nécessaire avant de pouvoir déclarer la désactivation OpenAI effective en production.
+- Bluesky : remplacer uniquement `BLUESKY_APP_PASSWORD` dans Vercel par le mot de passe d’application complet et actuel, puis redéployer et relancer le test d’identité.
+- Lemon TEST : créer/ajouter `LEMON_SQUEEZY_TEST_API_KEY` côté Vercel avant le test de commande sans argent réel.
+- Publication sociale publique et mise en vente d’une nouvelle édition du livre : validation humaine requise.
+
+## Reprise immédiate
+
+1. Tester/relire la PR de désactivation + pipeline local.
+2. Après accord, fusionner/déployer puis vérifier que les endpoints agentiques n’appellent plus OpenAI.
+3. Rattacher Box Spread à une fiche Content Pipeline canonique et au registre de fichiers.
+4. Étendre le renderer au master complet, sous-titres et remontée Airtable.

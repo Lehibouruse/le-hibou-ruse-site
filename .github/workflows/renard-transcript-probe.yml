@@ -21,7 +21,12 @@ jobs:
           ids=(bkF_sZgBRsU KQxjChS1p6s CbFERLNN8AU)
           for id in "${ids[@]}"; do
             echo "VIDEO=$id"
-            for u in               "https://www.youtube.com/api/timedtext?type=list&v=$id"               "https://www.youtube.com/api/timedtext?v=$id&lang=fr&fmt=vtt"               "https://www.youtube.com/api/timedtext?v=$id&lang=fr&kind=asr&fmt=vtt"; do
+            urls=(
+              "https://www.youtube.com/api/timedtext?type=list&v=$id"
+              "https://www.youtube.com/api/timedtext?v=$id&lang=fr&fmt=vtt"
+              "https://www.youtube.com/api/timedtext?v=$id&lang=fr&kind=asr&fmt=vtt"
+            )
+            for u in "${urls[@]}"; do
               code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 15 -o out.txt -w "%{http_code}" "$u" || true)
               bytes=$(wc -c < out.txt 2>/dev/null || echo 0)
               echo "HTTP=$code BYTES=$bytes URL=$u"
@@ -31,15 +36,6 @@ jobs:
             done
             code=$(curl -A "Mozilla/5.0" -L -sS --connect-timeout 5 --max-time 15 -o watch.html -w "%{http_code}" "https://www.youtube.com/watch?v=$id" || true)
             echo "WATCH_HTTP=$code WATCH_BYTES=$(wc -c < watch.html 2>/dev/null || echo 0)"
-            python3 - <<'PY'
-import re, html
-s=open("watch.html",encoding="utf-8",errors="ignore").read()
-for key in ["captionTracks","playerCaptionsTracklistRenderer","captions"]:
-    print(key, s.find(key))
-m=re.search(r'"captionTracks":(\[[^\]]+\])', s)
-print("captionTracksMatch", bool(m))
-if m:
-    print(html.unescape(m.group(1))[:5000])
-PY
+            python3 -c 'import re,html; s=open("watch.html",encoding="utf-8",errors="ignore").read(); print("captionTracks",s.find("captionTracks")); print("playerCaptionsTracklistRenderer",s.find("playerCaptionsTracklistRenderer")); print("captions",s.find("\\"captions\\"")); m=re.search(r"\\"captionTracks\\":(\\[[^\\]]+\\])",s); print("captionTracksMatch",bool(m)); print(html.unescape(m.group(1))[:5000] if m else "")'
             echo "======"
           done

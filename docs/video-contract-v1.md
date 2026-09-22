@@ -6,7 +6,7 @@ Version : `HIBOU_VIDEO_CONTRACT_V1` — 22/09/2026.
 
 ChatGPT prépare le fond, le storyboard, la prosodie et le contrôle. Airtable conserve les états. Un processus local exécute les opérations techniques. Aucun composant local n’est supposé joignable depuis Vercel.
 
-Le renderer `scripts/video-local-render.mjs` ne fait aucun appel réseau. Il accepte un contrat JSON, vérifie les fichiers et hashes, rend chaque scène en 1080×1920 à 30 fps avec micro-zoom 2–4 %, concatène les plans et ajoute la piste voix existante. La sortie est H.264/AAC + `faststart`.
+Le renderer `scripts/video-local-render.mjs` ne fait aucun appel réseau. Il accepte un contrat JSON, vérifie les fichiers et hashes, rend chaque scène en 1080×1920 à 30 fps avec micro-zoom 2–4 %, concatène les plans puis copie le flux vidéo déjà encodé et n’encode que l’audio AAC. La sortie est H.264/AAC + `faststart`. Le preset H.264 des scènes est versionné dans `engine.preset` (défaut `medium`) afin d’adapter le temps de calcul à la machine sans modifier silencieusement le contrat.
 
 ## Champs minimaux
 
@@ -47,3 +47,8 @@ Prérequis : FFmpeg + FFprobe. Les gros médias et modèles restent hors du dép
 4. sous-titres à partir du texte exact validé ;
 5. remontée QC/erreurs/manifeste vers Airtable ;
 6. registre durable des fichiers.
+
+
+## Test complet Box Spread — 22/09/2026
+
+Le master de référence complet a été rendu à partir de 18 scènes et de l’audio/verbatim V1 existant : 42,6 s, 1080×1920, 30 fps, H.264/AAC, 15 919 538 octets, SHA-256 `64e99df73e5fd8c999893392f40ae6b0397f527b18429c75a3256ba0a24978c9`. Le rendu a utilisé `engine.preset=veryfast` compte tenu du CPU temporaire disponible. Le contrôle visuel a porté sur 1, 8, 15, 22, 29, 36 et 41 secondes. Ce fichier est un master de travail technique : publication non autorisée tant que la validation humaine n’est pas donnée.

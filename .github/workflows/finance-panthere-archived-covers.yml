@@ -60,3 +60,5 @@ jobs:
             covers.json
             covers/
           retention-days: 3
+
+# refresh archive covers 2026-09-22

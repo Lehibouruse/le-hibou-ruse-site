@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d4d5d6.com/schemas/hibou-video-contract-v1.json",
+  "title": "Le Hibou Rusé video production contract",
+  "type": "object",
+  "required": ["contract_version", "content", "engine", "scenes", "audio", "music", "subtitles", "qc", "validation"],
+  "properties": {
+    "contract_version": { "const": "HIBOU_VIDEO_CONTRACT_V1" },
+    "content": {
+      "type": "object",
+      "required": ["content_id", "script_version", "profile_version", "method_version"],
+      "properties": {
+        "content_id": { "type": "string", "minLength": 1 },
+        "script_version": { "type": ["string", "number"] },
+        "profile_version": { "type": "string", "minLength": 1 },
+        "method_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "required": ["renderer", "renderer_version", "fps", "width", "height"],
+      "properties": {
+        "renderer": { "type": "string" },
+        "renderer_version": { "type": "string" },
+        "fps": { "const": 30 },
+        "width": { "const": 1080 },
+        "height": { "const": 1920 },
+        "preset": { "type": "string" }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "order", "narration_exact", "visual_idea", "screen_text", "planned_duration_s", "image", "breath_unit", "voice"],
+        "properties": {
+          "scene_id": { "type": "string" },
+          "order": { "type": "integer", "minimum": 1 },
+          "narration_exact": {
+            "type": "object",
+            "required": ["mode", "source_audio", "start_s", "end_s", "sha256"],
+            "properties": {
+              "mode": { "const": "audio_reference" },
+              "source_audio": { "type": "string" },
+              "start_s": { "type": "number", "minimum": 0 },
+              "end_s": { "type": "number", "exclusiveMinimum": 0 },
+              "sha256": { "type": "string", "minLength": 64, "maxLength": 64 }
+            }
+          },
+          "visual_idea": { "type": "string" },
+          "screen_text": { "type": "string" },
+          "planned_duration_s": { "type": "number", "exclusiveMinimum": 0 },
+          "measured_duration_s": { "type": ["number", "null"] },
+          "zoom_percent": { "type": "number", "minimum": 2, "maximum": 4 },
+          "image": {
+            "type": "object",
+            "required": ["candidates", "selected", "selection_reason"],
+            "properties": {
+              "candidates": { "type": "array" },
+              "selected": { "type": "string", "minLength": 1 },
+              "selection_reason": { "type": "string" }
+            }
+          },
+          "breath_unit": { "type": "string" },
+          "voice": {
+            "type": "object",
+            "required": ["target_wpm", "relative_speed_pct", "pause_after_ms", "emphasis", "intent"],
+            "properties": {
+              "target_wpm": { "type": "number" },
+              "relative_speed_pct": { "type": "number" },
+              "pause_after_ms": { "type": "number", "minimum": 0 },
+              "emphasis": { "type": "string" },
+              "intent": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "audio": { "type": "object" },
+    "music": { "type": "object" },
+    "subtitles": { "type": "object" },
+    "qc": { "type": "object" },
+    "validation": { "type": "object" }
+  }
+}

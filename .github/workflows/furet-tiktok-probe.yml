@@ -35,6 +35,10 @@ jobs:
                   print("KEY",k)
                   print(json.dumps(v,ensure_ascii=False)[:30000])
           open("rehydration.json","w").write(json.dumps(data,ensure_ascii=False))
+          vids=sorted(set(re.findall(r'/@lefutetfute/video/(\\d+)',s)))
+          print("VIDEO_LINKS_IN_HTML",len(vids),vids[:30])
+          for pat in ["itemList","item_list","7267211914777986081","video/"]:
+              print("PATTERN",pat,"COUNT",s.count(pat))
           PY
       - name: Fetch public video list
         shell: bash

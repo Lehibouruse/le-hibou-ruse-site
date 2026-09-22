@@ -135,3 +135,5 @@ jobs:
             sheets/
           retention-days: 3
           compression-level: 6
+
+# trigger: 2026-09-22 archive refresh

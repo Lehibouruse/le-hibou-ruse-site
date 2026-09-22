@@ -3,7 +3,6 @@
   "git": {
     "deploymentEnabled": {
       "**": false,
-      "hibou-agent/**": true,
       "main": true
     }
   },
@@ -17,5 +16,5 @@
       "schedule": "53 5 * * *"
     }
   ],
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- app components public package.json package-lock.json proxy.js vercel.json"
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- app components lib public package.json package-lock.json proxy.js vercel.json"
 }

@@ -1,0 +1,99 @@
+name: Ecureuil Instagram browser corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ecureuil-instagram-browser.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install Playwright
+        run: |
+          python3 -m pip install --quiet playwright
+          python3 -m playwright install chromium
+
+      - name: Crawl Instagram public profile
+        shell: bash
+        run: |
+          cat > crawl.py <<'PY'
+          import asyncio,json,re
+          from playwright.async_api import async_playwright
+
+          async def main():
+              async with async_playwright() as p:
+                  browser=await p.chromium.launch(headless=True,args=["--disable-blink-features=AutomationControlled"])
+                  ctx=await browser.new_context(
+                      locale="fr-FR",timezone_id="Europe/Paris",
+                      viewport={"width":1440,"height":1200},
+                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+                  )
+                  page=await ctx.new_page()
+                  api=[]
+                  async def on_response(resp):
+                      u=resp.url
+                      if any(x in u for x in ["graphql/query","api/v1/feed/user","web_profile_info"]):
+                          rec={"url":u,"status":resp.status}
+                          try:
+                              txt=await resp.text()
+                              rec["body"]=txt[:3000000]
+                              print("API",resp.status,len(txt),u[:500])
+                          except Exception as e: rec["error"]=str(e)
+                          api.append(rec)
+                  page.on("response",on_response)
+                  await page.goto("https://www.instagram.com/furetfute18/",wait_until="domcontentloaded",timeout=60000)
+                  await page.wait_for_timeout(7000)
+                  print("TITLE",await page.title(),"URL",page.url)
+                  # close/decline cookie/login popups if possible
+                  for label in ["Refuser les cookies optionnels","Tout refuser","Allow all cookies","Not now","Plus tard"]:
+                      try:
+                          b=page.get_by_role("button",name=label)
+                          if await b.count(): await b.first.click(timeout=1200)
+                      except: pass
+                  seen={}
+                  stagnant=0
+                  last=0
+                  for step in range(70):
+                      items=await page.locator('a[href*="/reel/"],a[href*="/p/"]').evaluate_all("""els => els.map(a => {
+                        let p=a; let texts=[];
+                        for(let i=0;i<5 && p;i++,p=p.parentElement){if(p.innerText) texts.push(p.innerText);}
+                        let img=a.querySelector('img');
+                        return {href:a.href,texts,cover:img?img.src:null,alt:img?img.alt:null};
+                      })""")
+                      for x in items:
+                          m=re.search(r'/(reel|p)/([^/?#]+)',x.get("href",""))
+                          if not m: continue
+                          key=m.group(1)+":"+m.group(2)
+                          seen[key]={"type":m.group(1),"shortcode":m.group(2),"url":x["href"],"texts":x.get("texts") or [],"cover":x.get("cover"),"alt":x.get("alt")}
+                      if len(seen)==last: stagnant+=1
+                      else: stagnant=0;last=len(seen)
+                      print("STEP",step,"SEEN",len(seen),"STAG",stagnant)
+                      if len(seen)>=170 or stagnant>=10: break
+                      await page.mouse.wheel(0,7000)
+                      await page.wait_for_timeout(1000)
+                  open("cards.json","w",encoding="utf-8").write(json.dumps(list(seen.values()),ensure_ascii=False))
+                  open("api.json","w",encoding="utf-8").write(json.dumps(api,ensure_ascii=False))
+                  open("profile.html","w",encoding="utf-8").write(await page.content())
+                  print("FINAL",len(seen),"API_RESP",len(api))
+                  for x in list(seen.values())[:15]: print(json.dumps(x,ensure_ascii=False)[:1000])
+                  await browser.close()
+          asyncio.run(main())
+          PY
+          python3 crawl.py
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecureuil-instagram-browser-corpus
+          path: |
+            cards.json
+            api.json
+            profile.html
+          retention-days: 3
+          compression-level: 6

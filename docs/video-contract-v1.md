@@ -26,7 +26,7 @@ Le JSON doit contenir :
 
 ## Idempotence et reprise
 
-Les chemins de sortie sont déterministes. Un même contrat et les mêmes assets doivent produire le même rendu dans un environnement FFmpeg identique. Les scènes sont des unités indépendantes : une scène validée peut être gardée pendant qu’une autre est remplacée.
+Les chemins sont déterministes. Chaque clip de scène est placé dans `.video-render-cache` sous un nom dérivé d’une empreinte des entrées réelles (hash image, durée, zoom, dimensions, fps, preset et version moteur). Une interruption ne supprime donc plus les scènes valides : au redémarrage, les clips dont l’empreinte n’a pas changé sont réutilisés, tandis qu’une scène modifiée reçoit une nouvelle empreinte et seule cette scène est recalculée. La concaténation visuelle possède elle aussi une empreinte de contenu. Un même contrat et les mêmes assets doivent produire le même rendu dans un environnement FFmpeg identique.
 
 Le POC Box Spread exécuté le 22/09/2026 a produit deux fichiers identiques octet par octet :
 `54c93df3c13ca5ded280e456c86d4b2436ff2293c52ad77ed2a7fe77b35f33d0`.

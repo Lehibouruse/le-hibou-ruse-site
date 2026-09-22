@@ -1,0 +1,59 @@
+name: Furet TikTok profile formats probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-profile-formats.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Install and patch yt-dlp
+        shell: bash
+        run: |
+          set -euo pipefail
+          pipx install yt-dlp
+          file=$(find /opt/pipx/venvs/yt-dlp -path '*/yt_dlp/extractor/tiktok.py' | head -1)
+          echo "PATCH_FILE=$file"
+          python3 - "$file" <<'PY'
+          import sys
+          p=sys.argv[1]
+          s=open(p).read()
+          needle='**self._parse_aweme_video_web(video, webpage_url, video_id, extract_flat=True))'
+          repl='**self._parse_aweme_video_web(video, webpage_url, video_id, extract_flat=False))'
+          if needle not in s:
+              print('needle not found'); raise SystemExit(1)
+          s=s.replace(needle,repl,1)
+          open(p,'w').write(s)
+          print('patched')
+          PY
+
+      - name: Dump profile with formats
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json "https://www.tiktok.com/@lefutetfute" > profile_formats.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('profile_formats.json'))
+          es=d.get('entries') or []
+          print('entries',len(es))
+          for e in es[:3]:
+              fs=e.get('formats') or []
+              print('id',e.get('id'),'formats',len(fs),'views',e.get('view_count'))
+              for f in fs[:5]:
+                  print(f.get('format_id'),f.get('width'),f.get('height'),f.get('vcodec'),(f.get('url') or '')[:300])
+          PY
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-profile-formats
+          path: profile_formats.json
+          retention-days: 3

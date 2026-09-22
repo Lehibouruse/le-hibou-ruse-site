@@ -36,3 +36,16 @@ Create a REGENERATE_SCENE Job with the target scene record ID in parameters. The
 
 ## Safety
 No social publishing is triggered by the media worker. social_prepare is dry-run only. No secret is stored in Airtable.
+
+
+## ChatGPT control channel
+A dedicated GitHub Actions workflow can be woken from the persistent GitHub issue **HIBOU MEDIA CONTROL**. A comment beginning with `/wake-media` runs the bounded worker with an allowlist restricted to `CREATE_VIDEO` and `REGENERATE_SCENE`.
+
+This makes the chat control loop deterministic:
+1. ChatGPT writes/updates the Content Pipeline record.
+2. ChatGPT creates a bounded Job in Airtable.
+3. ChatGPT posts `/wake-media` to the control issue.
+4. GitHub Actions claims only a media Job, renders outside Vercel deployment branches, and writes progress back to Airtable.
+5. ChatGPT can inspect scenes/QC and request one-scene regeneration without rerendering the whole creative plan.
+
+The media control wake never processes commerce, book delivery, site updates, or social publishing.

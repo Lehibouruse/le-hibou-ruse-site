@@ -69,7 +69,10 @@ function videoAction(action) {
 async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
-  return verifyGithubActionsToken(auth.slice(7));
+  return verifyGithubActionsToken(auth.slice(7), {
+    allowedWorkflowFiles: ["hibou-wake.yml", "hibou-media-control.yml"],
+    allowedEvents: ["push", "workflow_dispatch", "issue_comment"],
+  });
 }
 
 async function ownedJob(recordId, lockToken) {

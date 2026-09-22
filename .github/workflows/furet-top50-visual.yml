@@ -1,0 +1,88 @@
+name: Furet top50 visual corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/furet-top50-visual.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install tools
+        shell: bash
+        run: |
+          pipx install yt-dlp
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Build ranked Top 50
+        shell: bash
+        run: |
+          set -euo pipefail
+          yt-dlp --flat-playlist --dump-single-json \
+            --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+            "https://www.tiktok.com/@lefutetfute" > profile.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("profile.json"))
+          es=[e for e in d.get("entries",[]) if e.get("view_count") is not None]
+          es=sorted(es,key=lambda e:e.get("view_count") or 0,reverse=True)[:50]
+          with open("top50.json","w") as f: json.dump(es,f,ensure_ascii=False,indent=2)
+          with open("manifest.tsv","w") as f:
+              f.write("rank\tid\tviews\tduration\ttrack\tartist\ttitle\turl\n")
+              for i,e in enumerate(es,1):
+                  vals=[
+                    str(i),str(e.get("id","")),str(e.get("view_count",0)),str(e.get("duration",0)),
+                    str(e.get("track","")).replace("\t"," ").replace("\n"," "),
+                    ",".join(e.get("artists") or []).replace("\t"," ").replace("\n"," "),
+                    str(e.get("title","")).replace("\t"," ").replace("\n"," "),
+                    str(e.get("url",""))
+                  ]
+                  f.write("\t".join(vals)+"\n")
+          print("top50",len(es))
+          PY
+
+      - name: Extract temporal frames
+        shell: bash
+        run: |
+          set -u
+          mkdir -p frames
+          tail -n +2 manifest.tsv | while IFS=$'\t' read -r rank id views duration track artist title url; do
+            prefix=$(printf "%02d_%s" "$rank" "$id")
+            echo "RANK=$rank ID=$id DUR=$duration VIEWS=$views"
+            rm -f temp.mp4
+            yt-dlp --no-playlist --quiet --no-warnings \
+              --extractor-args "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com" \
+              -S "res:480" -f "b[ext=mp4]/b" -o temp.mp4 "$url" || continue
+            python3 - "$duration" > times.txt <<'PY'
+          import sys
+          d=float(sys.argv[1] or 0)
+          for frac in (0.08,0.32,0.60,0.88):
+              print(max(0.1,d*frac))
+          PY
+            n=0
+            while read -r t; do
+              n=$((n+1))
+              outfile="frames/"$prefix"_"$n".jpg"
+              ffmpeg -hide_banner -loglevel error -ss "$t" -i temp.mp4 -frames:v 1 -q:v 3 "$outfile" || true
+            done < times.txt
+            rm -f temp.mp4
+          done
+          echo "FRAMES=$(find frames -type f -name '*.jpg' | wc -l)"
+
+      - name: Upload corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: furet-top50-visual-corpus
+          path: |
+            top50.json
+            manifest.tsv
+            frames/
+          retention-days: 3
+          compression-level: 6

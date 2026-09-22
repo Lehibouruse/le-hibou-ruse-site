@@ -1,0 +1,46 @@
+name: Finance Panthere archive discovery
+
+on:
+  push:
+    paths:
+      - ".github/workflows/finance-panthere-archive-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch public archive pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L -sS -A "Mozilla/5.0" "https://www.tokportal.com/tool/tiktok-profile-analytics-checker/financepanthere" -o tokportal.html
+          curl -L -sS -A "Mozilla/5.0" "https://tokscribe.com/author/financepanthere" -o tokscribe1.html
+          curl -L -sS -A "Mozilla/5.0" "https://tokscribe.com/author/financepanthere?page=2" -o tokscribe2.html
+          python3 - <<'PY'
+          import re,json,html
+          for p in ["tokportal.html","tokscribe1.html","tokscribe2.html"]:
+              s=open(p,encoding="utf-8",errors="ignore").read()
+              print("\nFILE",p,"bytes",len(s))
+              for key in ["video_id","videoId","posts","recentPosts","aweme","view_count","views","financepanthere"]:
+                  print(key, s.find(key))
+              # URLs / IDs that look TikTok-ish
+              ids=sorted(set(re.findall(r'(?<!\d)(7\d{18})(?!\d)',s)))
+              print("IDS",len(ids),ids[:100])
+              urls=sorted(set(html.unescape(u) for u in re.findall(r'https?[^"\'<> ]+',s) if 'tiktok' in u.lower()))
+              print("TIKTOK_URLS",len(urls))
+              for u in urls[:80]: print(u[:500])
+          PY
+      - name: Upload discovery
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-panthere-archive-discovery
+          path: |
+            tokportal.html
+            tokscribe1.html
+            tokscribe2.html
+          retention-days: 3

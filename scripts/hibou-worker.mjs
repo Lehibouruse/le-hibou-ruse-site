@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { vercelCommitState } from "../lib/agent-runtime.mjs";
 
 const API = process.env.HIBOU_WORKER_URL || "https://le-hibou-ruse-site.vercel.app/api/agent-worker";
 const ROOT = process.cwd();
-const MAX_STEPS = 40;
+const MAX_STEPS = Math.max(40, Number(process.env.HIBOU_WORKER_MAX_STEPS || 80));
 const MAX_AI_CALLS = 32;
 const MAX_AI_COST_USD = 2;
 const BACKGROUND_POLL_MS = 4000;
@@ -150,7 +150,9 @@ function createSrt(scenes, outputPath) {
 }
 
 function branchName(job) {
-  const mergeAuthorized = jobParameters(job).merge_authorization === true;
+  const action = job.fields?.action?.name || job.fields?.action || "";
+  const mediaJob = action === "CREATE_VIDEO" || action === "REGENERATE_SCENE";
+  const mergeAuthorized = !mediaJob && jobParameters(job).merge_authorization === true;
   const prefix = mergeAuthorized ? "hibou-agent" : "hibou-review";
   return `${prefix}/${safeJobId(job.fields.job_id)}-${process.env.GITHUB_RUN_ID || Date.now()}`;
 }
@@ -215,7 +217,44 @@ async function executeTool(call, state) {
   const args = JSON.parse(call.arguments || "{}");
   switch (call.name) {
     case "airtable_read":
+    case "scene_save":
+    case "video_state":
       return api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: args });
+    case "visual_qc": {
+      const file = safePath(args.image_path, "media");
+      if (!existsSync(file.full)) throw new Error("Image candidate introuvable");
+      const preview = resolve(dirname(file.full), "qc-preview.jpg");
+      run("ffmpeg", ["-y", "-i", file.full, "-vf", "scale=720:-2", "-q:v", "5", preview]);
+      const result = await api({
+        operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name,
+        arguments: {
+          narration: args.narration,
+          visual_concept: args.visual_concept,
+          style_lock: args.style_lock,
+          image: { path: file.normalized, base64: readFileSync(preview).toString("base64") },
+        },
+      });
+      rmSync(preview, { force: true });
+      return result;
+    }
+    case "prune_media": {
+      const prefix = String(args.prefix || "").replaceAll("\\", "/").replace(/^\/+/, "").replace(/\/+$/, "");
+      if (!/^public\/generated\/[a-z0-9._-]+$/i.test(prefix)) throw new Error("Préfixe média refusé");
+      const keep = new Set((args.keep_paths || []).map((path) => safePath(path, "media").full));
+      const prefixFull = resolve(ROOT, prefix);
+      if (!existsSync(prefixFull)) return { ok: true, removed: 0, kept: keep.size };
+      const found = run("find", [prefixFull, "-type", "f"]).split(/\r?\n/).filter(Boolean);
+      let removed = 0;
+      for (const full of found) {
+        const relativePath = relative(ROOT, full).replaceAll("\\", "/");
+        if (!/^public\/generated\/[a-z0-9._/-]+\.(png|jpg|jpeg|mp3|wav|srt|mp4)$/i.test(relativePath)) continue;
+        if (!keep.has(resolve(ROOT, relativePath))) {
+          rmSync(full, { force: true });
+          removed += 1;
+        }
+      }
+      return { ok: true, removed, kept: keep.size };
+    }
     case "repo_list":
       return { files: run("git", ["ls-files"]).split(/\r?\n/).filter(Boolean).slice(0, 1000) };
     case "repo_read": {
@@ -298,9 +337,18 @@ async function executeTool(call, state) {
       const output = safePath(args.output_path, "media");
       const voice = safePath(args.voice_path, "media");
       const music = args.music_path ? safePath(args.music_path, "media") : null;
-      let scenes = args.scenes.map((scene) => ({ ...scene, duration_seconds: Number(scene.duration_seconds), image: safePath(scene.image_path, "media") }));
+      let scenes = args.scenes.map((scene) => ({
+        ...scene,
+        duration_seconds: Number(scene.duration_seconds),
+        zoom_percent: Math.max(0, Math.min(6, Number(scene.zoom_percent || 3))),
+        anchor: String(scene.anchor || "centre"),
+        image: safePath(scene.image_path, "media"),
+      }));
       mkdirSync(dirname(output.full), { recursive: true });
+      const clipDir = resolve(dirname(output.full), "clips");
+      mkdirSync(clipDir, { recursive: true });
       const listPath = resolve(dirname(output.full), "scenes.ffconcat");
+      const visualPath = resolve(dirname(output.full), "visual-only.mp4");
       const srtPath = resolve(dirname(output.full), "subtitles.srt");
       const logoPath = resolve(dirname(output.full), "hibou-logo.png");
       run("rsvg-convert", ["-w", "132", "-h", "132", "-o", logoPath, resolve(ROOT, "public/hibou.svg")]);
@@ -308,20 +356,41 @@ async function executeTool(call, state) {
       const plannedDuration = scenes.reduce((total, scene) => total + scene.duration_seconds, 0);
       if (Number.isFinite(voiceDuration) && voiceDuration > 0 && plannedDuration > 0) {
         const scale = voiceDuration / plannedDuration;
-        scenes = scenes.map((scene) => ({ ...scene, duration_seconds: Math.max(0.5, scene.duration_seconds * scale) }));
+        scenes = scenes.map((scene) => ({ ...scene, duration_seconds: Math.max(0.8, scene.duration_seconds * scale) }));
       }
-      const concat = ["ffconcat version 1.0", ...scenes.flatMap((scene) => [`file '${scene.image.full.replaceAll("'", "'\\''")}'`, `duration ${Number(scene.duration_seconds)}`]), `file '${scenes.at(-1).image.full.replaceAll("'", "'\\''")}'`].join("\n");
-      writeFileSync(listPath, concat, "utf8");
+      const clipPaths = [];
+      const anchorExpr = (anchor) => {
+        const centerX = "iw/2-(iw/zoom/2)";
+        const centerY = "ih/2-(ih/zoom/2)";
+        if (anchor === "gauche") return { x: "0", y: centerY };
+        if (anchor === "droite") return { x: "iw-iw/zoom", y: centerY };
+        if (anchor === "haut") return { x: centerX, y: "0" };
+        if (anchor === "bas") return { x: centerX, y: "ih-ih/zoom" };
+        return { x: centerX, y: centerY };
+      };
+      for (let index = 0; index < scenes.length; index += 1) {
+        const scene = scenes[index];
+        const frames = Math.max(30, Math.round(scene.duration_seconds * 30));
+        const maxZoom = 1 + scene.zoom_percent / 100;
+        const increment = Math.max(0.000001, (maxZoom - 1) / frames);
+        const pos = anchorExpr(scene.anchor);
+        const clipPath = resolve(clipDir, `scene-${String(index + 1).padStart(2, "0")}.mp4`);
+        const vf = `scale=1200:2134:force_original_aspect_ratio=increase,crop=1200:2134,zoompan=z='if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))':x='${pos.x}':y='${pos.y}':d=${frames}:s=1080x1920:fps=30,format=yuv420p`;
+        run("ffmpeg", ["-y", "-loop", "1", "-i", scene.image.full, "-vf", vf, "-t", String(scene.duration_seconds), "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", clipPath]);
+        clipPaths.push(clipPath);
+      }
+      writeFileSync(listPath, ["ffconcat version 1.0", ...clipPaths.map((path) => `file '${path.replaceAll("'", "'\\''")}'`)].join("\n"), "utf8");
+      run("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", visualPath]);
       createSrt(scenes, srtPath);
-      const inputs = ["-f", "concat", "-safe", "0", "-i", listPath, "-i", voice.full];
+      const inputs = ["-i", visualPath, "-i", voice.full];
       if (music) inputs.push("-i", music.full);
       inputs.push("-loop", "1", "-i", logoPath);
       const logoInput = music ? 3 : 2;
       const escapedSrt = srtPath.replaceAll("\\", "/").replace(":", "\\:").replaceAll("'", "\\'");
-      const audio = music ? "[1:a]volume=1[a1];[2:a]volume=0.15[a2];[a1][a2]amix=inputs=2:duration=first[a]" : "[1:a]anull[a]";
-      run("ffmpeg", ["-y", ...inputs, "-filter_complex", `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles='${escapedSrt}':force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=170'[base];[${logoInput}:v]format=rgba,colorchannelmixer=aa=0.92[logo];[base][logo]overlay=W-w-48:48:shortest=1:eof_action=pass[v];${audio}`, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output.full]);
+      const audio = music ? "[1:a]volume=1[a1];[2:a]volume=0.14[a2];[a1][a2]amix=inputs=2:duration=first[a]" : "[1:a]anull[a]";
+      run("ffmpeg", ["-y", ...inputs, "-filter_complex", `[0:v]subtitles='${escapedSrt}':force_style='Fontsize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=170'[base];[${logoInput}:v]format=rgba,colorchannelmixer=aa=0.92[logo];[base][logo]overlay=W-w-48:48:shortest=1:eof_action=pass[v];${audio}`, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", output.full]);
       testsPassed = false; buildPassed = false; videoQcPassed = false;
-      return { ok: true, path: output.normalized, bytes: readFileSync(output.full).byteLength, publication: false };
+      return { ok: true, path: output.normalized, bytes: readFileSync(output.full).byteLength, scenes: scenes.length, stable_zoom: true, publication: false };
     }
     case "video_qc": {
       const video = safePath(args.video_path, "media");
@@ -342,11 +411,9 @@ async function executeTool(call, state) {
       if (!videoQcPassed) throw new Error("video_qc réussi requis avant enregistrement");
       if (readFileSync(video.full).byteLength > 90 * 1024 * 1024) throw new Error("Brouillon supérieur à 90 Mo");
       const pushed = await pushBranch(state.job, `Add autonomous video draft for ${state.job.fields.job_id}`);
-      const proposal = await openPullRequest(pushed, state.job);
-      const immutableRef = proposal.merged && proposal.merge_sha ? proposal.merge_sha : pushed.branch;
-      const result = await api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: { ...args, branch: immutableRef } });
+      const result = await api({ operation: "tool", record_id: state.record_id, lock_token: state.lock_token, name: call.name, arguments: { ...args, branch: pushed.branch } });
       state.external_id = result.url;
-      return { ...result, proposal };
+      return { ...result, branch: pushed.branch, commit: pushed.commit, vercel: "skipped" };
     }
     case "deployment_check": {
       const attempts = Math.min(12, Math.max(1, Number(args.attempts) || 1));

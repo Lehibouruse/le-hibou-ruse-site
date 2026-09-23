@@ -1,0 +1,463 @@
+{
+  "contract_version": "HIBOU_VIDEO_CONTRACT_V1",
+  "contract_state": "storyboard",
+  "content": {
+    "content_id": "obo-v1",
+    "script_version": 1,
+    "profile_version": "HIBOU_VIRAL_V1@2.0",
+    "method_version": "VIDEO_METHOD_V2"
+  },
+  "engine": {
+    "renderer": "ffmpeg-local",
+    "renderer_version": "1",
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "preset": "veryfast"
+  },
+  "scenes": [
+    {
+      "scene_id": "obo-v1_scene_01",
+      "order": 1,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Il vend sa boîte…",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Entrepreneur devant sa PME, acte de cession en main, surprise immédiate.",
+      "screen_text": "Il vend sa boîte…",
+      "planned_duration_s": 1.8,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; French entrepreneur beside his SME handing a share certificate toward a holding company folder; Le Hibou Rusé when specified: same yellow-eyed owl, gold monocle, black tuxedo, tall slim silhouette, intelligent mischievous expression; tense hook composition"
+      },
+      "breath_unit": "Il vend sa boîte…",
+      "voice": {
+        "target_wpm": 210,
+        "relative_speed_pct": 102,
+        "pause_after_ms": 120,
+        "emphasis": "vend sa boîte",
+        "intent": "hook"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_02",
+      "order": 2,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "à une holding qu’il vient lui-même de créer.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Même dirigeant des deux côtés d’une transaction, holding distincte juridiquement.",
+      "screen_text": "…à sa propre holding",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; split scene showing same entrepreneur as seller on left and newly created holding company on right, legally distinct entities, clean transaction arrow, no text"
+      },
+      "breath_unit": "à une holding qu’il vient lui-même de créer.",
+      "voice": {
+        "target_wpm": 208,
+        "relative_speed_pct": 101,
+        "pause_after_ms": 180,
+        "emphasis": "holding / lui-même",
+        "intent": "révélation"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_03",
+      "order": 3,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "C’est l’OBO.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Hibou révèle le nom du mécanisme.",
+      "screen_text": "OBO",
+      "planned_duration_s": 1.5,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; Le Hibou Rusé when specified: same yellow-eyed owl, gold monocle, black tuxedo, tall slim silhouette, intelligent mischievous expression; owl reveals a clean folder representing an owner buy-out mechanism, confident explanatory pose"
+      },
+      "breath_unit": "C’est l’OBO.",
+      "voice": {
+        "target_wpm": 205,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 250,
+        "emphasis": "OBO",
+        "intent": "révélation"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_04",
+      "order": 4,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "La holding rachète les titres,",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Flèche holding vers titres de la société cible.",
+      "screen_text": "La holding rachète les titres",
+      "planned_duration_s": 1.7,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; simple ownership diagram as physical objects: holding company folder acquiring share certificates of operating company, one clear arrow, no words"
+      },
+      "breath_unit": "La holding rachète les titres,",
+      "voice": {
+        "target_wpm": 200,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 100,
+        "emphasis": "rachète les titres",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_05",
+      "order": 5,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "souvent avec de la dette ;",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Contrat de prêt bancaire relié à la holding.",
+      "screen_text": "Souvent avec de la dette",
+      "planned_duration_s": 1.7,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; close-up of bank loan agreement and financing line flowing into a holding company acquisition, restrained finance visuals, no luxury"
+      },
+      "breath_unit": "souvent avec de la dette ;",
+      "voice": {
+        "target_wpm": 195,
+        "relative_speed_pct": 99,
+        "pause_after_ms": 160,
+        "emphasis": "dette",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_06",
+      "order": 6,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "le dirigeant transforme une partie",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Dirigeant arbitre entre titres professionnels et liquidité.",
+      "screen_text": "Transformer une partie…",
+      "planned_duration_s": 1.8,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; entrepreneur weighing business share certificates against available cash, thoughtful not celebratory, contemporary office"
+      },
+      "breath_unit": "le dirigeant transforme une partie",
+      "voice": {
+        "target_wpm": 198,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 80,
+        "emphasis": "transforme une partie",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_07",
+      "order": 7,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "de son patrimoine professionnel en liquidités",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "À gauche actions d’entreprise, à droite compte liquide.",
+      "screen_text": "Patrimoine pro → liquidités",
+      "planned_duration_s": 1.9,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; split visual professional equity on left changing into liquid cash balance on right, sober financial transformation, no money rain"
+      },
+      "breath_unit": "de son patrimoine professionnel en liquidités",
+      "voice": {
+        "target_wpm": 198,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 140,
+        "emphasis": "patrimoine professionnel / liquidités",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_08",
+      "order": 8,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "tout en restant au capital",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Dirigeant toujours actionnaire après l’opération.",
+      "screen_text": "Il peut rester au capital",
+      "planned_duration_s": 1.8,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; entrepreneur still holding a minority or continuing share certificate after transaction, ownership continuity visually clear"
+      },
+      "breath_unit": "tout en restant au capital",
+      "voice": {
+        "target_wpm": 195,
+        "relative_speed_pct": 99,
+        "pause_after_ms": 100,
+        "emphasis": "restant au capital",
+        "intent": "nuance"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_09",
+      "order": 9,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "ou au contrôle selon le montage.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Gouvernance montrée comme variable selon la structure.",
+      "screen_text": "…ou au contrôle, selon le montage",
+      "planned_duration_s": 1.8,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; clean governance scene with board table and ownership levers, multiple possible control paths without implying a guaranteed outcome"
+      },
+      "breath_unit": "ou au contrôle selon le montage.",
+      "voice": {
+        "target_wpm": 190,
+        "relative_speed_pct": 98,
+        "pause_after_ms": 250,
+        "emphasis": "selon le montage",
+        "intent": "nuance"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_10",
+      "order": 10,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Mais ce n’est pas une vente magique sans fiscalité :",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Hibou stoppe un raccourci « zéro impôt ».",
+      "screen_text": "Pas une vente magique",
+      "planned_duration_s": 2.2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; Le Hibou Rusé when specified: same yellow-eyed owl, gold monocle, black tuxedo, tall slim silhouette, intelligent mischievous expression; owl raises a caution hand beside a crossed-out magic wand over a sale contract and tax document, sober warning"
+      },
+      "breath_unit": "Mais ce n’est pas une vente magique sans fiscalité :",
+      "voice": {
+        "target_wpm": 180,
+        "relative_speed_pct": 96,
+        "pause_after_ms": 350,
+        "emphasis": "pas / sans fiscalité",
+        "intent": "alerte"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_11",
+      "order": 11,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "il faut une vraie valorisation,",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Balance de valorisation avec données comparables.",
+      "screen_text": "1. Vraie valorisation",
+      "planned_duration_s": 1.7,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; valuation file, calculator, comparable-company charts represented as clean paper documents, scale balancing company value, no tiny text"
+      },
+      "breath_unit": "il faut une vraie valorisation,",
+      "voice": {
+        "target_wpm": 185,
+        "relative_speed_pct": 97,
+        "pause_after_ms": 120,
+        "emphasis": "vraie valorisation",
+        "intent": "check"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_12",
+      "order": 12,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "un financement crédible",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Banquier examine capacité de remboursement et cash-flow.",
+      "screen_text": "2. Financement crédible",
+      "planned_duration_s": 1.7,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; banker reviewing acquisition financing and cash-flow documents with entrepreneur, realistic credit assessment, no luxury"
+      },
+      "breath_unit": "un financement crédible",
+      "voice": {
+        "target_wpm": 185,
+        "relative_speed_pct": 97,
+        "pause_after_ms": 120,
+        "emphasis": "financement crédible",
+        "intent": "check"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_13",
+      "order": 13,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "et une logique économique.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Pièces du montage alignées vers un objectif d’entreprise identifiable.",
+      "screen_text": "3. Logique économique",
+      "planned_duration_s": 1.7,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; acquisition pieces align into a coherent business strategy: company, holding, financing, operating plan, visually simple"
+      },
+      "breath_unit": "et une logique économique.",
+      "voice": {
+        "target_wpm": 185,
+        "relative_speed_pct": 97,
+        "pause_after_ms": 250,
+        "emphasis": "logique économique",
+        "intent": "check"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_14",
+      "order": 14,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "D4 quand on restructure réellement.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Version robuste : structure, financement et objectif cohérents.",
+      "screen_text": "D4 : restructuration réelle",
+      "planned_duration_s": 1.9,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; Le Hibou Rusé when specified: same yellow-eyed owl, gold monocle, black tuxedo, tall slim silhouette, intelligent mischievous expression; owl inspects a coherent corporate structure with real operating rationale, green check motif without embedded words"
+      },
+      "breath_unit": "D4 quand on restructure réellement.",
+      "voice": {
+        "target_wpm": 180,
+        "relative_speed_pct": 96,
+        "pause_after_ms": 250,
+        "emphasis": "restructure réellement",
+        "intent": "classification"
+      }
+    },
+    {
+      "scene_id": "obo-v1_scene_15",
+      "order": 15,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "D6 si tout n’est qu’un aller-retour de cash sans substance.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Circuit circulaire de cash barré en rouge.",
+      "screen_text": "D6 : cash en cercle sans substance",
+      "planned_duration_s": 2.5,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null,
+        "prompt": "vertical 9:16, semi-realistic French finance editorial illustration, clean shapes, muted dark green cream and warm gold, cinematic light, strong smartphone readability, no infographic layout, no embedded text; warning diagram as physical money flow circling through empty shell companies and returning to start, red caution cross, Le Hibou Rusé when specified: same yellow-eyed owl, gold monocle, black tuxedo, tall slim silhouette, intelligent mischievous expression observing critically"
+      },
+      "breath_unit": "D6 si tout n’est qu’un aller-retour de cash sans substance.",
+      "voice": {
+        "target_wpm": 175,
+        "relative_speed_pct": 94,
+        "pause_after_ms": 500,
+        "emphasis": "aller-retour / sans substance",
+        "intent": "chute"
+      }
+    }
+  ],
+  "audio": {
+    "state": "pending",
+    "interface": "VOICE_GEN_V1",
+    "engine": "chatterbox_multilingual",
+    "language_id": "fr"
+  },
+  "music": {
+    "state": "cues_only",
+    "commercial_track_embedded": false
+  },
+  "subtitles": {
+    "state": "pending",
+    "source": "exact_script_text"
+  },
+  "qc": {
+    "status": "STORYBOARD_ONLY",
+    "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78",
+    "scene_count": 15
+  },
+  "validation": {
+    "human_required": true,
+    "publication_authorized": false
+  }
+}

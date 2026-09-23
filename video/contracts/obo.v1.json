@@ -28,98 +28,117 @@
   "content_id": "recyt2rDHKP50ZCbV",
   "title": "OBO : vendre sa société à sa propre holding",
   "script_version": 1,
-  "planned_duration_s": 31,
+  "storyboard_revision": 2,
+  "planned_duration_s": 33.7,
   "exact_narration": "Il vend sa boîte… à une holding qu’il vient lui-même de créer. C’est l’OBO. La holding rachète les titres, souvent avec de la dette ; le dirigeant transforme une partie de son patrimoine professionnel en liquidités tout en restant au capital ou au contrôle selon le montage. Mais ce n’est pas une vente magique sans fiscalité : il faut une vraie valorisation, un financement crédible et une logique économique. D4 quand on restructure réellement. D6 si tout n’est qu’un aller-retour de cash sans substance.",
   "scenes": [
     {
       "order": 1,
       "scene_record_id": "recTtgxVWJejwPMwa",
-      "planned_duration_s": 2,
+      "planned_duration_s": 1.5,
       "narration": "Il vend sa boîte…"
     },
     {
       "order": 2,
       "scene_record_id": "recyY3l2DAChogPk2",
-      "planned_duration_s": 1.5,
+      "planned_duration_s": 2.5,
       "narration": "à une holding qu’il vient lui-même de créer."
     },
     {
       "order": 3,
       "scene_record_id": "recemzm0FdeDeb20C",
-      "planned_duration_s": 1.8,
+      "planned_duration_s": 1.5,
       "narration": "C’est l’OBO."
     },
     {
       "order": 4,
       "scene_record_id": "recRfiKZxSSLXxI46",
-      "planned_duration_s": 2.2,
+      "planned_duration_s": 1.8,
       "narration": "La holding rachète les titres,"
     },
     {
       "order": 5,
       "scene_record_id": "recXJoMAO2pPmPNow",
-      "planned_duration_s": 2.4,
+      "planned_duration_s": 2.1,
       "narration": "souvent avec de la dette ;"
     },
     {
       "order": 6,
       "scene_record_id": "recQsCZlouFqq51ng",
-      "planned_duration_s": 2.5,
-      "narration": "le dirigeant transforme une partie de son patrimoine professionnel"
+      "planned_duration_s": 1.8,
+      "narration": "le dirigeant transforme une partie"
     },
     {
       "order": 7,
       "scene_record_id": "reccDnBQYGDrgR9eG",
-      "planned_duration_s": 2.5,
-      "narration": "en liquidités"
+      "planned_duration_s": 1.5,
+      "narration": "de son patrimoine professionnel"
     },
     {
       "order": 8,
       "scene_record_id": "recQu6qBwONFMF5Gg",
-      "planned_duration_s": 2.3,
-      "narration": "tout en restant au capital"
+      "planned_duration_s": 1.5,
+      "narration": "en liquidités"
     },
     {
       "order": 9,
       "scene_record_id": "rec40ZB05a699G7Hf",
-      "planned_duration_s": 2.4,
-      "narration": "ou au contrôle selon le montage."
+      "planned_duration_s": 1.8,
+      "narration": "tout en restant au capital"
     },
     {
       "order": 10,
       "scene_record_id": "recNOxIj4K9Mq825n",
-      "planned_duration_s": 2.2,
-      "narration": "Mais ce n’est pas une vente magique sans fiscalité :"
+      "planned_duration_s": 2.1,
+      "narration": "ou au contrôle selon le montage."
     },
     {
       "order": 11,
       "scene_record_id": "recWQ6Mod2t7t7FGT",
-      "planned_duration_s": 2.3,
-      "narration": "il faut une vraie valorisation,"
+      "planned_duration_s": 2.5,
+      "narration": "Mais ce n’est pas une vente magique"
     },
     {
       "order": 12,
       "scene_record_id": "recxP9Hql4RI0gcut",
-      "planned_duration_s": 1.8,
-      "narration": "un financement crédible"
+      "planned_duration_s": 1.5,
+      "narration": "sans fiscalité :"
     },
     {
       "order": 13,
       "scene_record_id": "reckmQgQ6FNiPCn5C",
-      "planned_duration_s": 1.6,
-      "narration": "et une logique économique."
+      "planned_duration_s": 2,
+      "narration": "il faut une vraie valorisation,"
     },
     {
       "order": 14,
       "scene_record_id": "recTsNG0C5D47YFaC",
-      "planned_duration_s": 1.6,
-      "narration": "D4 quand on restructure réellement."
+      "planned_duration_s": 1.5,
+      "narration": "un financement crédible"
     },
     {
       "order": 15,
       "scene_record_id": "rect0IhhuvEgwj7rG",
+      "planned_duration_s": 1.7,
+      "narration": "et une logique économique."
+    },
+    {
+      "order": 16,
+      "scene_record_id": "recpiyyM5nQKSpPV2",
+      "planned_duration_s": 2.1,
+      "narration": "D4 quand on restructure réellement."
+    },
+    {
+      "order": 17,
+      "scene_record_id": "recPyqDqbEzSpesfF",
+      "planned_duration_s": 2.4,
+      "narration": "D6 si tout n’est qu’un aller-retour"
+    },
+    {
+      "order": 18,
+      "scene_record_id": "recMO3oeMMrr5bsLJ",
       "planned_duration_s": 1.9,
-      "narration": "D6 si tout n’est qu’un aller-retour de cash sans substance."
+      "narration": "de cash sans substance."
     }
   ]
 }

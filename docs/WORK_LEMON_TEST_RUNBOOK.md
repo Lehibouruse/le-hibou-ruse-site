@@ -137,6 +137,8 @@ Le test Digify ne dépend pas d'une fausse commande Lemon.
 
 Le webhook d'activité Digify reste un canal distinct des credentials API d'ajout/retrait de destinataire.
 
+Endpoint canonique : `https://d4d5d6.com/api/commerce/digify-webhook` (route `/api/commerce/digify-webhook`).
+
 Variables serveur attendues :
 - `DIGIFY_WEBHOOK_USERNAME`
 - `DIGIFY_WEBHOOK_PASSWORD`

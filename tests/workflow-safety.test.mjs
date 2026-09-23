@@ -56,6 +56,6 @@ test("la file commerce traite automatiquement livraison et révocation sans rév
   assert.match(commerceQueue, /\*\/5 \* \* \* \*/);
   assert.match(commerceQueue, /id-token: write/);
   assert.match(commerceQueue, /api\/commerce\/\$\{endpoint\}/);
-  assert.match(commerceQueue, /for endpoint in revoke delivery/);
+  assert.match(commerceQueue, /call_commerce_endpoint revoke/);\n  assert.match(commerceQueue, /call_commerce_endpoint delivery/);
   assert.doesNotMatch(commerceQueue, /api\/wake|api\/agent-worker/);
 });

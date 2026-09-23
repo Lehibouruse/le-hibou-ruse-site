@@ -7,6 +7,8 @@ import { commercialReadiness } from "../lib/launch-readiness.mjs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export const metadata = { alternates: { canonical: "/" } };
+
 export default async function Home() {
   const [cms, articleRecords, productRecords, configuration, bookRecords, legalRecords] = await Promise.all([
     getRecords(TABLES.cms),

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const route = readFileSync(new URL("../app/api/site-identity/route.js", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../app/layout.js", import.meta.url), "utf8");
+const home = readFileSync(new URL("../app/page.js", import.meta.url), "utf8");
 
 test("le site expose une identité publique non sensible pour diagnostiquer le domaine", () => {
   assert.match(route, /Le Hibou Rusé/);
@@ -15,7 +16,8 @@ test("le site expose une identité publique non sensible pour diagnostiquer le d
 
 test("un domaine acheté mais non vérifié ne devient pas canonique SEO prématurément", () => {
   assert.match(layout, /metadataBase: new URL\(publicOrigin\)/);
-  assert.match(layout, /alternates: \{ canonical: "\/" \}/);
+  assert.doesNotMatch(layout, /alternates: \{ canonical: "\/" \}/);
+  assert.match(home, /alternates: \{ canonical: "\/" \}/);
   assert.match(layout, /index: true/);
   assert.match(layout, /follow: true/);
   assert.doesNotMatch(layout, /metadataBase: new URL\("https:\/\/d4d5d6\.com"\)/);

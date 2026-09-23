@@ -4,7 +4,7 @@ import { configMap, getAllRecords, TABLES } from "../../lib/airtable";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const metadata = { title: "Acheter le guide", robots: { index: false, follow: false } };
+export const metadata = { title: "Acheter le guide", alternates: { canonical: "/achat-guide" }, robots: { index: false, follow: false } };
 
 export default async function PurchasePage() {
   const records = await getAllRecords(TABLES.configuration, { maxRecords: 500 });

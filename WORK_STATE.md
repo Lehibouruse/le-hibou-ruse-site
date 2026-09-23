@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-23 09:45 Europe/Paris
+Dernière mise à jour : 2026-09-23 — infrastructure vidéo prioritaire
 
 ## Décisions actuelles
 
@@ -9,6 +9,7 @@ Dernière mise à jour : 2026-09-23 09:45 Europe/Paris
 - APIs sociales, Lemon Squeezy, Digify et automatisations déterministes restent pertinentes.
 - Aucune publication sociale publique, aucun achat réel, aucun abonnement/plan payant et aucun remplacement commercial du livre sans validation humaine explicite.
 - Gros médias, caches et modèles hors Git/Vercel.
+- Priorité opérationnelle actuelle : infrastructure de production vidéo. Le livre est hors de la passe active.
 
 ## Coupe-circuit IA et branche canonique
 
@@ -34,7 +35,7 @@ Branche : `hibou-local-video-pipeline-20260922` — PR #175 (draft, mergeable).
 
 ## Vidéo — Box Spread et moteur reproductible
 
-Références : `VIDEO_METHOD_V2` + `HIBOU_VIRAL_V1@2.0`.
+Références : Box Spread historique = `VIDEO_METHOD_V2`. Toute nouvelle production = `VIDEO_METHOD_V3` + `HIBOU_VIRAL_V1@2.0`.
 
 Box Spread :
 - Content Pipeline canonique : `rec8lgQT8jXreflmt`, `HUMAN_REVIEW`, vidéo v3.
@@ -59,6 +60,8 @@ Interfaces ajoutées :
 - `IMAGE_GEN_V1` : `scripts/video-local-adapters.mjs`, ComfyUI loopback/local uniquement, workflow API explicite, overrides seulement sur inputs existants, ID stable, timeout 10–3600 s, retries 0–2, manifeste et réutilisation, aucun fallback payant.
 - `VOICE_GEN_V1` : wrapper direct `scripts/chatterbox-local.py`, français, unités de souffle <=300 caractères, paramètres natifs Chatterbox séparés des métadonnées prosodiques Hibou, aucun serveur exposé, aucun fallback silencieux.
 - Tests unitaires + compilation syntaxique Python inclus.
+- V3 ajoute : export Airtable strict, machine à états, batch voix/image reprenable, mastering EBU R128 double passe, QC Whisper optionnel, QC technique des images, ranking DINOv2 optionnel, sélection humaine, captions ASS narration + texte écran, micro-zoom ancré, burn-in captions, QC master black/silence/loudness, registre SHA-256 et remontée Airtable.
+- `npm run video:preflight`, `video:status`, `video:export`, `video:image-plan`, `video:image-batch`, `video:image-qc`, `video:subtitles`, `video:render`, `video:qc` exposent les briques principales.
 
 Environnement ChatGPT réellement testé :
 - Linux x86_64, 5 vCPU, ~5,8 GiB RAM, ~30 GiB libres, Node 22, Python 3.13, FFmpeg 7.1.5.
@@ -78,8 +81,8 @@ Stack/licences vérifiées :
 
 Pilotes canoniques :
 1. Box Spread — moteur/reproductibilité.
-2. OBO — éditorial, STORYBOARD_READY r2 : 18 scènes, 33,7 s, timing/prosodie PASS, aucun média généré.
-3. Donation-cession — éditorial, STORYBOARD_READY r2 : 18 scènes, 33,6 s, timing/prosodie PASS, aucun média généré.
+2. OBO — éditorial, `VIDEO_METHOD_V3`, STORYBOARD_READY r2 : 18 scènes, 33,7 s, timing/prosodie PASS, aucun média généré.
+3. Donation-cession — éditorial, `VIDEO_METHOD_V3`, STORYBOARD_READY r2 : 18 scènes, 33,6 s, timing/prosodie PASS, aucun média généré.
 Les deux storyboards r2 ont été resegmentés car certaines unités du premier découpage 15 scènes imposaient un débit individuel incompatible avec la cible. Trois doublons techniques OBO S16–S18 ont été désolidarisés et conservés hors vidéo comme historique.
 La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors des trois pilotes.
 
@@ -150,10 +153,12 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 ## Prochaine action exécutable
 
 Sans validation humaine :
-1. combler en priorité le gap `191–202` par lots de 3–5 montages sourcés ; le chapitre 11 étant déjà à 82 k caractères, éviter de l'allonger mécaniquement avant d'avoir traité ce gap du chapitre 10 ;
-2. OBO et donation-cession étant storyboardés, utiliser le batch voix puis le promoteur d’assets dès qu’un GPU local est disponible ; en attendant, ne pas simuler de média généré ;
-3. conserver le runbook/preflight comme porte d’entrée unique de la première machine GPU, sans télécharger plusieurs modèles ;
-4. maintenir les expériences Growth et la matrice social/commerce sans publier.
+1. maintenir #175 verte et ne modifier que l'infrastructure vidéo prioritaire ;
+2. dès qu'une machine GPU est accessible : `npm run video:preflight` ; si PASS, générer **une unité Chatterbox**, puis **une scène FLUX ×3 candidats** ;
+3. exécuter ensuite le QC image, la sélection humaine de cette scène, le mastering audio, captions, promotion render-ready, rendu et QC master ;
+4. seulement si ce micro-test est exploitable : passer à 3 scènes, mesurer temps/VRAM/corrections/idempotence, puis OBO complet ;
+5. Donation-cession vient après OBO en réutilisant exactement la même usine ;
+6. ne télécharger aucun modèle optionnel Whisper/DINOv2 tant qu'un gain réel n'est pas nécessaire ; ils restent des modules gratuits d'assistance, non des dépendances du cœur.
 
 Après validation PR #175 :
 1. fusionner/déployer ;

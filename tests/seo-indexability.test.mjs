@@ -44,9 +44,9 @@ test("les canonicals ne sont pas hérités de force depuis le layout racine", ()
   const cgv = readFileSync(new URL("../app/cgv/page.js", import.meta.url), "utf8");
   const privacy = readFileSync(new URL("../app/confidentialite/page.js", import.meta.url), "utf8");
   const article = readFileSync(new URL("../app/articles/[slug]/page.js", import.meta.url), "utf8");
-  assert.doesNotMatch(layout, /alternates:\s*\{\s*canonical:\s*"\/"\s*\}/);
-  assert.match(home, /alternates:\\s*\\{\\s*canonical:\\s*"\\/"\\s*\\}/);
-  assert.match(cgv, /canonical:\s*"\/cgv"/);
-  assert.match(privacy, /canonical:\s*"\/confidentialite"/);
-  assert.match(article, /canonical:\s*`\/articles\/\$\{slug\}`/);
+  assert.equal(layout.includes('alternates: { canonical: "/" }'), false);
+  assert.equal(home.includes('alternates: { canonical: "/" }'), true);
+  assert.equal(cgv.includes('canonical: "/cgv"'), true);
+  assert.equal(privacy.includes('canonical: "/confidentialite"'), true);
+  assert.equal(article.includes('canonical: `/articles/${slug}`'), true);
 });

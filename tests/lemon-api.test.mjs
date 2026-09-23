@@ -96,7 +96,7 @@ test("un checkout stocké est relu chez Lemon avant réutilisation", async () =>
 
 test("la route bootstrap refuse toute action live et n'accepte que le workflow manuel OIDC dédié", () => {
   assert.match(route, /OIDC_WORKFLOW = "lemon-commerce-test\.yml"/);
-  assert.match(route, /ALLOWED_ACTIONS = new Set\(\["inspect", "checkout_test", "webhook_test"\]\)/);
+  assert.match(route, /ALLOWED_ACTIONS = new Set\(\["preflight", "inspect", "checkout_test", "webhook_test"\]\)/);
   assert.match(route, /allowedEvents: \["workflow_dispatch"\]/);
   assert.doesNotMatch(route, /CRON_SECRET/);
   assert.match(route, /lemon_test_mode_only/);
@@ -130,7 +130,7 @@ test("le workflow Lemon est manuel, borné aux actions de test et échoue sur un
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /default: "preflight"/);
   assert.doesNotMatch(workflow, /schedule:/);
-  assert.match(workflow, /inspect\|checkout_test\|webhook_test/);
+  assert.match(workflow, /preflight\|inspect\|checkout_test\|webhook_test/);
   assert.doesNotMatch(workflow, /checkout_live|webhook_live/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /for attempt in 1 2 3/);

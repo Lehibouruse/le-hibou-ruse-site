@@ -31,6 +31,7 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
 
   mkdirSync(resolve(targetRoot,"assets","audio"),{recursive:true});
   mkdirSync(resolve(targetRoot,"assets","images"),{recursive:true});
+  mkdirSync(resolve(targetRoot,"assets","subtitles"),{recursive:true});
   const audioTarget=resolve(targetRoot,"assets","audio",basename(audioSource));
   if(audioSource!==audioTarget) copyFileSync(audioSource,audioTarget);
   const audioRel=`assets/audio/${basename(audioTarget)}`;
@@ -57,11 +58,23 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
   }
 
   contract.audio.reference=audioRel;
+
+  if (contract.subtitles?.burn_in && contract.subtitles?.reference) {
+    const subtitleSource=isAbsolute(contract.subtitles.reference)
+      ? contract.subtitles.reference
+      : resolve(sourceRoot,contract.subtitles.reference);
+    if(!existsSync(subtitleSource)) fail(`subtitles missing: ${subtitleSource}`);
+    if(contract.subtitles.sha256 && sha256(subtitleSource)!==contract.subtitles.sha256) fail("subtitle sha256 mismatch before promotion");
+    const subtitleTarget=resolve(targetRoot,"assets","subtitles","captions.ass");
+    if(subtitleSource!==subtitleTarget) copyFileSync(subtitleSource,subtitleTarget);
+    contract.subtitles.reference="assets/subtitles/captions.ass";
+    contract.subtitles.sha256=sha256(subtitleTarget);
+  }
   contract.contract_state="render_ready";
   contract.qc={...(contract.qc||{}),status:"PENDING_RENDER"};
   contract.validation={...(contract.validation||{}),human_required:true,publication_authorized:false,status:"READY_FOR_RENDER_NOT_PUBLICATION"};
   writeFileSync(outputPath,JSON.stringify(contract,null,2));
-  return {output:outputPath,scene_count:contract.scenes.length,audio_sha256:contract.audio.sha256};
+  return {output:outputPath,scene_count:contract.scenes.length,audio_sha256:contract.audio.sha256,subtitles_burn_in:Boolean(contract.subtitles?.burn_in)};
 }
 
 if(import.meta.url===`file://${process.argv[1]}`){

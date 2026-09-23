@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-23 08:35 Europe/Paris
+Dernière mise à jour : 2026-09-23 09:27 Europe/Paris
 
 ## Décisions actuelles
 
@@ -19,7 +19,7 @@ Branche : `hibou-local-video-pipeline-20260922` — PR #175 (draft, mergeable).
 - `.env.example` : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
 - Jobs : 116 historiques ; aucun Running/Retry/Pending. Anciens CREATE_VIDEO en Manual Review ; anciens CREATE_BOOK neutralisés sans relance.
 - Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement puis tests runtime bloqués avec `openai_calls=0`, sans effectuer d’appel OpenAI.
-- Head actuel vérifié : `013fdf63d444d146d84b5954b5e608841bbaf5ea`; Hibou CI #700 = success.
+- Dernier head exécutable vert avant la synchronisation documentaire courante : `3c068e2fbad3fb808119ea74e06ffdc924472224`; Hibou CI #712 = success. Les commits documentaires suivants sont revalidés par CI avant d'être considérés comme stables.
 - Production reste sur l'ancien comportement tant que #175 n'est pas déployée : `system_health_report` du 23/09/2026 06:12:22 UTC indique encore `openai.circuit_active=false` et `credit_paused=false`. Cette preuve interdit de marquer le coupe-circuit comme effectif en Production.
 - Rollback : revert du merge ou retour au main `da3dd1143b933e1e09d9f5c25b5bac7bb2ac2fd8`.
 
@@ -47,9 +47,8 @@ Box Spread :
 - Compatible techniquement H.264/AAC mobile ; lecture iPhone réelle non revendiquée.
 - Library durable : `/Le Hibou Rusé/Vidéos/Box Spread/Master technique 30fps 2026-09-22/`.
 - Sous-titres exacts et validation éditoriale finale restent à faire.
-- OBO `recyt2rDHKP50ZCbV` : storyboard canonique 15 scènes Airtable, narration concaténée exactement égale au script, durée planifiée 30,2 s, état STORYBOARD_READY.
-- Donation-cession `recnospVHwEtAwxMV` : storyboard canonique 15 scènes Airtable, narration concaténée exactement égale au script, durée planifiée 30,5 s, état STORYBOARD_READY.
-- Contrats persistants : `docs/pilots/obo-storyboard-contract-v1.json` et `docs/pilots/donation-cession-storyboard-contract-v1.json`.
+- OBO `recyt2rDHKP50ZCbV` et donation-cession `recnospVHwEtAwxMV` ont eu un premier découpage 15 scènes, désormais superseded par les storyboards r2 18 scènes décrits plus bas. Ne pas reprendre le découpage 15 scènes.
+- Contrats persistants r2 : `docs/pilots/obo-storyboard-contract-v1.json`, `docs/pilots/donation-cession-storyboard-contract-v1.json`, ainsi que leurs contrats d'exécution `video/contracts/obo.v1.json` et `video/contracts/donation-cession.v1.json` ; tous sont désormais à 18 scènes.
 
 Renderer :
 - `scripts/video-local-render.mjs` : rendu FFmpeg déterministe, validation des hashes, cache par empreinte, reprise scène par scène. Le contrat gère désormais `storyboard`, `render_ready`, `rendered`; le renderer refuse explicitement un storyboard sans médias.
@@ -88,10 +87,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 - 16 blocs canoniques ; corpus conservé.
 - 757 occurrences exactes `[À VÉRIFIER]` après résolution réelle de 5 marqueurs du montage 21 (ancien total 762).
-- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **199/294 sections uniques**, 0 doublon, soit **95 absentes**.
-- Gaps exacts : `31–35`, `141–145`, `191–202`, `222–294`.
-- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, puis toute la séquence #206–221 du chapitre 11.
-- Séquence #206–221 complète : auteur/conseil #206–207, formateur #208, anti-fractionnement #209, cumul de vrais statuts #210, micro-BNC #211, micro-BIC services #212, micro-vente #213, anti-éclatement fictif #214, fausse indépendance #215, vrai consulting parallèle #216, intérêts CCA #217, financement holding #218, dividendes SAS #219, remboursement principal CCA #220, réduction de capital #221. Chapitre 10 = 23/35 ; chapitre 11 = 16/45. Aucun nouveau marqueur `[À VÉRIFIER]`.
+- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **203/294 sections uniques**, 0 doublon, soit **91 absentes**.
+- Gaps exacts : `31–35`, `141–145`, `191–202`, `226–294`.
+- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, puis toute la séquence #206–225 du chapitre 11.
+- Chapitre 10 = 23 sections (`171–190`, `203–205`). Chapitre 11 = **20 sections consécutives `206–225`**. Le champ Airtable `Montages couverts` du chapitre 11 a été réconcilié à 20 après une mise à jour partielle qui l'avait fait retomber à 6. Aucun nouveau marqueur `[À VÉRIFIER]` ; total exact du livre = 757.
 - Charte canonique : ivoire, bleu nuit, vert canard, or discret.
 - Aucun marqueur ne disparaît sans vérification/réécriture exacte ; aucun remplacement du PDF commercial sans identification de l’édition et validation humaine.
 
@@ -124,10 +123,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 ## Commerce et coûts
 
 - Lemon LIVE : Store 475333 / Product 1369573 / Variant 2140119 / checkout live référencé.
-- Lemon TEST est strictement séparé : `LEMON_SQUEEZY_TEST_API_KEY` dédiée, ressources obligatoirement `test_mode=true`, aucun fallback vers la clé LIVE et aucune livraison Digify pour une commande test. HMAC, déduplication et remboursement out-of-order sont couverts par les tests ; preuve dynamique bloquée uniquement par la clé/ressources TEST.
+- Lemon TEST est strictement séparé : `LEMON_SQUEEZY_TEST_API_KEY` dédiée, ressources obligatoirement `test_mode=true`, aucun fallback vers la clé LIVE et aucune livraison Digify pour une commande test. HMAC, déduplication et remboursement out-of-order sont couverts par les tests ; preuve dynamique bloquée uniquement par la clé/ressources TEST. Runbook canonique : `docs/WORK_LEMON_TEST_RUNBOOK.md`, réconcilié le 23/09 avec l'état LIVE déjà public et le TEST fail-closed.
 - Fourniture immédiate et accusé de rétractation sont deux preuves distinctes.
 - Registre de coûts daté dans Configuration : Lemon = 0 $ fixe + 5 % + 0,50 $/transaction avant suppléments ; Vercel = Hobby gratuit mais 10 Go saturés ; OpenAI API = 0 € autorisé/cible.
-- Digify : essai gratuit 7 jours confirmé démarré le 17/09/2026, échéance théorique ~24/09 ; prix public Pro vérifié 190 $/mois ou 1 680 $/an. **Aucun abonnement payant n'est démontré et aucun abonnement ne doit être déclenché sans accord.** L'intégration technique reste prête.
+- Digify : e-mail du 18/09/2026 à 20:59 confirme un essai gratuit de 7 jours. Documentation officielle Digify août 2026 : essai sans engagement et sans carte bancaire ; à l'expiration, le compte devient gratuit, **sans upgrade/facturation automatique**. Les fichiers envoyés/data rooms possédés ne sont toutefois plus accessibles aux destinataires jusqu'à un éventuel upgrade. Échéance théorique d'après cet e-mail : ~25/09 (activation exacte pouvant être légèrement antérieure). Aucun abonnement payant n'est démontré ni autorisé.
 - Metricool : brand `lehibouruse` connecté ; promotion LinkedIn annoncée le 19/09 comme expirant sous 7 jours (~26/09) ; aucun plan payant démontré. X impose plan payant + add-on 10 €/mois/compte, non souscrit.
 - L'ancienne simulation `100 € de frais fixes` n'est plus une donnée constatée ; recalculer la contribution uniquement avec les coûts réellement engagés.
 
@@ -142,16 +141,16 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 1. **PR #175** : autorisation Marc pour fusion/déploiement Production. Débloque preuve runtime du coupe-circuit OpenAI + règles Vercel.
 2. **Bluesky** : remplacer dans Vercel Production la valeur complète de `BLUESKY_APP_PASSWORD`, redéployer, puis relancer identité/lecture. Ne jamais partager le secret dans le chat.
-3. **Lemon TEST** : créer/retrouver une clé API en mode Test et la stocker dans Vercel sous `LEMON_SQUEEZY_TEST_API_KEY`. Débloque inspect → checkout_test → webhook_test → tests Digify.
+3. **Lemon TEST** : créer/retrouver une clé API en mode Test et la stocker dans Vercel sous `LEMON_SQUEEZY_TEST_API_KEY`. Débloque inspect → checkout_test → webhook_test → commande/remboursement TEST. Les tests Digify restent séparés et une commande TEST ne doit jamais déclencher Digify.
 4. **Reddit** : autoriser ultérieurement l’envoi du dossier et obtenir l’accord requis ; aucun contact tiers sans autorisation.
 5. **GPU local** : fournir un environnement local réellement accessible avec GPU adapté avant le premier essai FLUX/Chatterbox. Vérifier GPU/VRAM/RAM/stockage avant tout gros téléchargement.
-6. **Digify** : décider explicitement avant/à la fin de l’essai s’il faut payer, remplacer la solution ou suspendre la livraison protégée. Ne pas souscrire automatiquement.
+6. **Digify** : aucune action n'est nécessaire pour éviter une facturation automatique. Décision humaine seulement si Marc veut maintenir l'accès protégé des destinataires après l'essai ; sinon le compte repasse gratuit et l'accès partagé est suspendu.
 7. **Publication/remplacement commercial** : validation humaine explicite.
 
 ## Prochaine action exécutable
 
 Sans validation humaine :
-1. poursuivre le livre par lots de 3–5 montages sourcés, prochaine zone naturelle `222–225` ou comblement `191–202`, et rattacher chaque correction au passage exact ;
+1. poursuivre le livre par lots de 3–5 montages sourcés, prochaine zone naturelle `226–230` ou comblement prioritaire `191–202`, et rattacher chaque correction au passage exact ;
 2. OBO et donation-cession étant storyboardés, utiliser le batch voix puis le promoteur d’assets dès qu’un GPU local est disponible ; en attendant, ne pas simuler de média généré ;
 3. conserver le runbook/preflight comme porte d’entrée unique de la première machine GPU, sans télécharger plusieurs modèles ;
 4. maintenir les expériences Growth et la matrice social/commerce sans publier.

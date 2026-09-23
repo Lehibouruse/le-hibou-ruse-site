@@ -10,7 +10,6 @@ const publicOrigin = publicSiteOrigin();
 
 export const metadata = {
   metadataBase: new URL(publicOrigin),
-  alternates: { canonical: "/" },
   applicationName: "Le Hibou Rusé",
   title: { default: "Le Hibou Rusé", template: "%s — Le Hibou Rusé" },
   description: "Comprendre les règles. Exploiter les failles. Fiscalité, argent, patrimoine et montages D4 à D6 avec cas concrets, chiffres et risques explicités.",

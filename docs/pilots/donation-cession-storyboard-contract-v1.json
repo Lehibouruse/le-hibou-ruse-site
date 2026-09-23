@@ -1,0 +1,462 @@
+{
+  "contract_version": "HIBOU_VIDEO_CONTRACT_V1",
+  "contract_state": "storyboard",
+  "content": {
+    "content_id": "recnospVHwEtAwxMV",
+    "script_version": 1,
+    "profile_version": "HIBOU_VIRAL_V1@2.0",
+    "method_version": "VIDEO_METHOD_V2"
+  },
+  "engine": {
+    "renderer": "ffmpeg",
+    "renderer_version": "video-local-render-v1",
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "preset": "medium"
+  },
+  "scenes": [
+    {
+      "scene_id": "DON-S01",
+      "source_scene_record_id": "recYULdqyzspaGdVm",
+      "order": 1,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Pourquoi donner ses actions",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Main transmet des actions, environnement patrimonial français",
+      "screen_text": "POURQUOI DONNER ?",
+      "planned_duration_s": 1.9,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "Pourquoi donner ses actions",
+      "voice": {
+        "target_wpm": 212,
+        "relative_speed_pct": 103,
+        "pause_after_ms": 80,
+        "emphasis": "donner",
+        "intent": "hook"
+      }
+    },
+    {
+      "scene_id": "DON-S02",
+      "source_scene_record_id": "recX9S5MPMuFfadQG",
+      "order": 2,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "juste avant de les vendre ?",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Deux étapes : donation puis vente, calendrier visible",
+      "screen_text": "JUSTE AVANT DE VENDRE ?",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "juste avant de les vendre ?",
+      "voice": {
+        "target_wpm": 210,
+        "relative_speed_pct": 103,
+        "pause_after_ms": 220,
+        "emphasis": "avant",
+        "intent": "question"
+      }
+    },
+    {
+      "scene_id": "DON-S03",
+      "source_scene_record_id": "recHUYfgYANDoI6Lw",
+      "order": 3,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Parce qu’après une vraie donation,",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Acte de donation signé, changement de propriétaire",
+      "screen_text": "UNE VRAIE DONATION",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "Parce qu’après une vraie donation,",
+      "voice": {
+        "target_wpm": 200,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 140,
+        "emphasis": "vraie",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "DON-S04",
+      "source_scene_record_id": "recoHOzKIiI7ERsdy",
+      "order": 4,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "la valeur d’acquisition retenue",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Document fiscal, valeur d’acquisition surlignée",
+      "screen_text": "VALEUR D’ACQUISITION",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "la valeur d’acquisition retenue",
+      "voice": {
+        "target_wpm": 198,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 80,
+        "emphasis": "valeur d’acquisition",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "DON-S05",
+      "source_scene_record_id": "rectoccNGhsXC7tcp",
+      "order": 5,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "pour la plus-value du donataire",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Schéma donataire puis future cession",
+      "screen_text": "PLUS-VALUE DU DONATAIRE",
+      "planned_duration_s": 2.1,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "pour la plus-value du donataire",
+      "voice": {
+        "target_wpm": 195,
+        "relative_speed_pct": 99,
+        "pause_after_ms": 120,
+        "emphasis": "donataire",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "DON-S06",
+      "source_scene_record_id": "recnXq3AtcmR0aYWx",
+      "order": 6,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "est en principe la valeur retenue",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Deux cases donation / valeur avec « en principe »",
+      "screen_text": "EN PRINCIPE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "est en principe la valeur retenue",
+      "voice": {
+        "target_wpm": 192,
+        "relative_speed_pct": 98,
+        "pause_after_ms": 80,
+        "emphasis": "en principe",
+        "intent": "nuance"
+      }
+    },
+    {
+      "scene_id": "DON-S07",
+      "source_scene_record_id": "recarFDLnUtpWJmGK",
+      "order": 7,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "pour les droits de donation.",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Avis de droits de donation stylisé",
+      "screen_text": "DROITS DE DONATION",
+      "planned_duration_s": 1.9,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "pour les droits de donation.",
+      "voice": {
+        "target_wpm": 190,
+        "relative_speed_pct": 98,
+        "pause_after_ms": 200,
+        "emphasis": "droits de donation",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "DON-S08",
+      "source_scene_record_id": "recDDzuWJEai4Xoat",
+      "order": 8,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "La plus-value latente antérieure",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Courbe de valeur accumulée avant donation",
+      "screen_text": "PLUS-VALUE LATENTE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "La plus-value latente antérieure",
+      "voice": {
+        "target_wpm": 195,
+        "relative_speed_pct": 99,
+        "pause_after_ms": 80,
+        "emphasis": "latente",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "DON-S09",
+      "source_scene_record_id": "recktfbHA46PTLbHA",
+      "order": 9,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "peut donc changer de traitement.",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Avant/après fiscal sans annoncer zéro impôt",
+      "screen_text": "CHANGE DE TRAITEMENT",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "peut donc changer de traitement.",
+      "voice": {
+        "target_wpm": 190,
+        "relative_speed_pct": 98,
+        "pause_after_ms": 220,
+        "emphasis": "peut ; changer",
+        "intent": "nuance"
+      }
+    },
+    {
+      "scene_id": "DON-S10",
+      "source_scene_record_id": "recnSrUqHoFWFppRi",
+      "order": 10,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Mais il y a une contrepartie :",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Hibou stop visuel, balance avantage/contrepartie",
+      "screen_text": "IL Y A UNE CONTREPARTIE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "Mais il y a une contrepartie :",
+      "voice": {
+        "target_wpm": 182,
+        "relative_speed_pct": 96,
+        "pause_after_ms": 180,
+        "emphasis": "contrepartie",
+        "intent": "alerte"
+      }
+    },
+    {
+      "scene_id": "DON-S11",
+      "source_scene_record_id": "recosuv03rcl52eVz",
+      "order": 11,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "droits de donation éventuels,",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Droits potentiels avec point d’interrogation",
+      "screen_text": "DROITS ÉVENTUELS",
+      "planned_duration_s": 1.9,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "droits de donation éventuels,",
+      "voice": {
+        "target_wpm": 180,
+        "relative_speed_pct": 95,
+        "pause_after_ms": 120,
+        "emphasis": "éventuels",
+        "intent": "alerte"
+      }
+    },
+    {
+      "scene_id": "DON-S12",
+      "source_scene_record_id": "recQ6XXzRtI3RDaQa",
+      "order": 12,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "dépossession réelle du donateur",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Actifs passent réellement d’une main à une autre",
+      "screen_text": "SE DÉPOSSÉDER RÉELLEMENT",
+      "planned_duration_s": 2.1,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "dépossession réelle du donateur",
+      "voice": {
+        "target_wpm": 178,
+        "relative_speed_pct": 95,
+        "pause_after_ms": 180,
+        "emphasis": "réelle",
+        "intent": "alerte"
+      }
+    },
+    {
+      "scene_id": "DON-S13",
+      "source_scene_record_id": "rec06ksAB2XoGhQ6Y",
+      "order": 13,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "et contrôle serré si le prix revient",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Flux du prix avec retour vers donateur barré",
+      "screen_text": "SI LE PRIX REVIENT...",
+      "planned_duration_s": 2.2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "et contrôle serré si le prix revient",
+      "voice": {
+        "target_wpm": 178,
+        "relative_speed_pct": 95,
+        "pause_after_ms": 80,
+        "emphasis": "prix revient",
+        "intent": "avertissement"
+      }
+    },
+    {
+      "scene_id": "DON-S14",
+      "source_scene_record_id": "recV0F3KVsQs9jQG5",
+      "order": 14,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "en réalité chez lui.",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Flèche de retour stoppée, réalité économique",
+      "screen_text": "...CHEZ LE DONATEUR",
+      "planned_duration_s": 1.8,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "en réalité chez lui.",
+      "voice": {
+        "target_wpm": 175,
+        "relative_speed_pct": 94,
+        "pause_after_ms": 260,
+        "emphasis": "en réalité",
+        "intent": "avertissement"
+      }
+    },
+    {
+      "scene_id": "DON-S15",
+      "source_scene_record_id": "receYmBLDjvRCZKkz",
+      "order": 15,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Le mécanisme n’est pas « donner sur le papier ». C’est transmettre réellement avant de vendre.",
+        "script_sha256": "b8c298bb0a1548debdfbe8fe2043f1bb677034ab422ddf0a6bae9c1abe92ed43"
+      },
+      "visual_idea": "Papier barré puis transmission effective avant vente",
+      "screen_text": "TRANSMETTRE RÉELLEMENT",
+      "planned_duration_s": 2.6,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "Le mécanisme n’est pas « donner sur le papier ». C’est transmettre réellement avant de vendre.",
+      "voice": {
+        "target_wpm": 175,
+        "relative_speed_pct": 94,
+        "pause_after_ms": 320,
+        "emphasis": "transmettre réellement",
+        "intent": "conclusion"
+      }
+    }
+  ],
+  "audio": {
+    "status": "pending",
+    "engine": "chatterbox_multilingual",
+    "reference": null
+  },
+  "music": {
+    "status": "none_commercial",
+    "policy": "master sans morceau commercial ; cues seulement"
+  },
+  "subtitles": {
+    "status": "pending",
+    "source": "exact narration text"
+  },
+  "qc": {
+    "status": "NOT_RUN",
+    "technical": null
+  },
+  "validation": {
+    "human_required": true,
+    "publication_authorized": false,
+    "status": "STORYBOARD_READY"
+  }
+}

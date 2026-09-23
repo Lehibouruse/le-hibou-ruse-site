@@ -197,6 +197,32 @@ export async function POST(request) {
   const snapshottedEdition = String(current.fields?.["Version livre livrée"] || "").trim();
   const edition = snapshottedEdition || await currentEdition();
 
+  if (provider === "lemon_native") {
+    if (!email || !finalEdition(edition)) {
+      const reason = !email ? "Email client absent" : `Édition livre non finale: ${edition || "absente"}`;
+      await updateRecord(TABLES.sales, current.id, clearCommerceLease({ "Livraison statut": "manual_review", "Livraison erreur": reason }));
+      await journal(current, "Manual Review", reason);
+      return NextResponse.json({ ok: true, processed: 1, status: "manual_review", reason, provider });
+    }
+    const note = "Livraison native Lemon: contenu remis par le reçu/My Orders. Ce mode n'offre pas la preuve de watermark ni la révocation nominative Digify.";
+    await updateRecord(TABLES.sales, current.id, clearCommerceLease({
+      "Livraison statut": "delivered",
+      "Version livre livrée": edition,
+      "Livré le": new Date().toISOString(),
+      "Livraison erreur": note,
+    }));
+    await journal(current, "Completed", `Livraison Lemon native · édition ${edition} · accès géré par Lemon My Orders`, "https://app.lemonsqueezy.com/my-orders");
+    return NextResponse.json({
+      ok: true,
+      processed: 1,
+      status: "delivered",
+      provider,
+      edition,
+      delivery_surface: "lemon_my_orders",
+      limitations: ["no_digify_watermark", "no_proven_individual_refund_revocation"],
+    });
+  }
+
   if (!fileGuid || !email || !finalEdition(edition)) {
     const reason = !fileGuid ? "Digify File GUID absent de la vente et du produit" : !email ? "Email destinataire absent" : `Édition livre non finale: ${edition || "absente"}`;
     await updateRecord(TABLES.sales, current.id, clearCommerceLease({ "Livraison statut": "manual_review", "Livraison erreur": reason }));

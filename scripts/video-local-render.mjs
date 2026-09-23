@@ -29,6 +29,17 @@ function probe(path) {
   ]));
 }
 
+function ffmpegFilterPath(path) {
+  return resolve(path).replaceAll("\\", "/").replaceAll(":", "\\:").replaceAll("'", "\\'");
+}
+
+function anchorExpressions(anchor) {
+  const normalized = String(anchor || "center").toLowerCase();
+  if (["left", "gauche"].includes(normalized)) return { x: "0", y: "ih/2-(ih/zoom/2)" };
+  if (["right", "droite"].includes(normalized)) return { x: "iw-(iw/zoom)", y: "ih/2-(ih/zoom/2)" };
+  return { x: "iw/2-(iw/zoom/2)", y: "ih/2-(ih/zoom/2)" };
+}
+
 function validVisual(path) {
   if (!existsSync(path)) return false;
   try {
@@ -96,6 +107,8 @@ export function renderVideoContract(contractPathArg, outputArg) {
     const maxZoom = 1 + zoomPercent / 100;
     const frames = Math.max(1, Math.round(duration * 30));
     const increment = (maxZoom - 1) / frames;
+    const anchor = scene.framing?.anchor || scene.anchor || "center";
+    const pan = anchorExpressions(anchor);
 
     const fingerprint = hashObject({
       contract_version: contract.contract_version,
@@ -108,13 +121,14 @@ export function renderVideoContract(contractPathArg, outputArg) {
       image_sha256: imageHash,
       duration,
       zoom_percent: zoomPercent,
+      anchor,
     });
     const clip = resolve(work, `scene-${String(i + 1).padStart(2, "0")}-${fingerprint.slice(0, 16)}.mp4`);
 
     if (validVisual(clip)) {
       sceneCacheHits += 1;
     } else {
-      const vf = `scale=1200:2134:force_original_aspect_ratio=increase,crop=1200:2134,zoompan=z='if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1080x1920:fps=30,format=yuv420p`;
+      const vf = `scale=1200:2134:force_original_aspect_ratio=increase,crop=1200:2134,zoompan=z='if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))':x='${pan.x}':y='${pan.y}':d=${frames}:s=1080x1920:fps=30,format=yuv420p`;
       run("ffmpeg", [
         "-y", "-loglevel", "error", "-loop", "1", "-i", image,
         "-vf", vf, "-t", duration.toFixed(3), "-an",
@@ -144,13 +158,26 @@ export function renderVideoContract(contractPathArg, outputArg) {
     run("ffmpeg", ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", concatPath, "-c", "copy", visual]);
   }
 
-  run("ffmpeg", [
+  let subtitlePath = null;
+  if (contract.subtitles?.burn_in && contract.subtitles?.reference) {
+    subtitlePath = resolve(root, contract.subtitles.reference);
+    if (!existsSync(subtitlePath)) fail(`subtitles missing: ${subtitlePath}`);
+    if (contract.subtitles.sha256 && sha256(subtitlePath) !== contract.subtitles.sha256) fail("subtitle sha256 mismatch");
+  }
+
+  const muxArgs = [
     "-y", "-loglevel", "error", "-i", visual, "-i", audio,
     "-t", total.toFixed(3), "-map", "0:v:0", "-map", "1:a:0",
-    "-c:v", "copy",
-    "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
-    "-movflags", "+faststart", "-shortest", output,
-  ]);
+  ];
+  if (subtitlePath) {
+    muxArgs.push("-vf", `ass='${ffmpegFilterPath(subtitlePath)}'`,
+      "-c:v", "libx264", "-preset", preset, "-crf", "18", "-pix_fmt", "yuv420p");
+  } else {
+    muxArgs.push("-c:v", "copy");
+  }
+  muxArgs.push("-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
+    "-movflags", "+faststart", "-shortest", output);
+  run("ffmpeg", muxArgs);
 
   const data = probe(output);
   const video = data.streams.find(stream => stream.codec_type === "video");
@@ -171,6 +198,8 @@ export function renderVideoContract(contractPathArg, outputArg) {
     scene_cache_misses: sceneCacheMisses,
     visual_cache_hit: visualCacheHit,
     audio_sha256: audioHash,
+    subtitles_burned_in: Boolean(subtitlePath),
+    subtitles_sha256: subtitlePath ? sha256(subtitlePath) : null,
   };
 
   contract.scenes.forEach(scene => { scene.measured_duration_s = scene.planned_duration_s; });

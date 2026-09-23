@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Confidentialité" };
+export const metadata = { title: "Confidentialité", alternates: { canonical: "/confidentialite" } };
 
 export default function Page() {
   return <LegalPage title="Confidentialité">

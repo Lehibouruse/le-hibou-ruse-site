@@ -139,6 +139,8 @@ Le webhook d'activité Digify reste un canal distinct des credentials API d'ajou
 
 Endpoint canonique : `https://d4d5d6.com/api/commerce/digify-webhook` (route `/api/commerce/digify-webhook`).
 
+Protection : **Basic Auth** dédiée au webhook d'activité, distincte des credentials API Digify.
+
 Variables serveur attendues :
 - `DIGIFY_WEBHOOK_USERNAME`
 - `DIGIFY_WEBHOOK_PASSWORD`

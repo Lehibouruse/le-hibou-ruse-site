@@ -148,3 +148,29 @@ La compatibilité technique ne vaut pas test réel sur iPhone.
 5. seulement ensuite un pilote entier.
 
 Cela évite de télécharger ou configurer toute la stack avant d’avoir prouvé les deux briques les plus risquées.
+
+
+## 8. Preuves minimales avant extension du pilote
+
+Pour IMAGE_GEN_V1 :
+- exactement 3 candidats pour une seule scène ;
+- checkpoint exact, workflow hash, seed, dimensions et paramètres natifs enregistrés ;
+- temps mur et VRAM observés si disponibles ;
+- deuxième appel identique réutilisant le manifeste au lieu de recréer les images.
+
+Pour VOICE_GEN_V1 :
+- un hook, une unité explicative et une unité prudence ;
+- durée WAV mesurée par ffprobe ;
+- chiffres, acronymes, liaisons et termes fiscaux écoutés ;
+- paramètres natifs Chatterbox enregistrés ;
+- cible WPM conservée comme métrique Hibou, pas comme paramètre natif.
+
+Ordre recommandé pour OBO :
+1. OBO-S01 images ×3 ;
+2. OBO-S01 voix ;
+3. OBO-S11/OBO-S12 voix prudence ;
+4. rendu FFmpeg 3 scènes ;
+5. QC ;
+6. seulement après PASS, pilote complet.
+
+Aucun tunnel public ComfyUI, aucun service cloud payant et aucun fallback silencieux.

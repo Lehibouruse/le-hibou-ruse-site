@@ -22,5 +22,5 @@ function check(path) {
   assert.throws(()=>validateVideoContract(contract,process.cwd()),/storyboard contract is not render-ready/);
 }
 
-test("OBO storyboard is exact and deliberately non-renderable",()=>check("../examples/obo-storyboard-v1.json"));
-test("Donation-cession storyboard is exact and deliberately non-renderable",()=>check("../examples/donation-cession-storyboard-v1.json"));
+test("OBO storyboard is exact and deliberately non-renderable",()=>check("../docs/pilots/obo-storyboard-contract-v1.json"));
+test("Donation-cession storyboard is exact and deliberately non-renderable",()=>check("../docs/pilots/donation-cession-storyboard-contract-v1.json"));

@@ -88,5 +88,5 @@ export function collectPreflight(root = process.cwd()) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const report = collectPreflight();
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (process.argv.includes("--require-ready") && !report.decision.ready_for_model_smoke_test) process.exitCode = 2;
+  const requireReady = process.argv.includes("--require-ready") || process.argv.includes("--require-gpu");\n  if (requireReady && !report.decision.ready_for_model_smoke_test) process.exitCode = 2;
 }

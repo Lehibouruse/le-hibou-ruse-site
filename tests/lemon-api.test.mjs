@@ -109,6 +109,11 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
   assert.match(route, /variant\?\.attributes\?\.test_mode !== true/);
   assert.match(route, /mode: "test_only"/);
   assert.doesNotMatch(route, /checkout_live|webhook_live|action === "live"/);
+  assert.match(route, /action === "preflight"/);
+  assert.match(route, /missing_LEMON_SQUEEZY_TEST_API_KEY/);
+  assert.match(route, /test_live_id_collision/);
+  assert.match(route, /ready_for_inspect/);
+  assert.match(route, /live_api_key_present/);
 });
 
 test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () => {
@@ -123,6 +128,7 @@ test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () =
 
 test("le workflow Lemon est manuel, borné aux actions de test et échoue sur un 404 persistant", () => {
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /default: "preflight"/);
   assert.doesNotMatch(workflow, /schedule:/);
   assert.match(workflow, /inspect\|checkout_test\|webhook_test/);
   assert.doesNotMatch(workflow, /checkout_live|webhook_live/);

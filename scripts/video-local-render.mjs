@@ -45,6 +45,7 @@ export function validateVideoContract(contract, root) {
     if (!(key in contract)) fail(`missing ${key}`);
   }
   if (contract.contract_version !== "HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract version");
+  if ((contract.contract_state || "render_ready") === "storyboard") fail("storyboard contract is not render-ready; generate/select media first");
   if (contract.engine.width !== 1080 || contract.engine.height !== 1920 || contract.engine.fps !== 30) {
     fail("renderer requires 1080x1920@30");
   }

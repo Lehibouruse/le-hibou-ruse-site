@@ -53,6 +53,26 @@ async function commerceLaunchAuthorized() {
   return truthy(records[0]?.fields?.Valeur);
 }
 
+async function activeConfigurationValue(key, fallback = "") {
+  const safe = escapeFormula(key);
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: `AND({Actif}=1,{Clé}='${safe}')`,
+    pageSize: 1,
+    priorityAware: false,
+  });
+  const value = String(records[0]?.fields?.Valeur ?? "").trim();
+  return value || fallback;
+}
+
+async function deliveryProviderMode() {
+  const mode = (await activeConfigurationValue("delivery_provider_mode", "digify")).toLowerCase();
+  return ["digify", "lemon_native"].includes(mode) ? mode : "invalid";
+}
+
+async function lemonNativeDeliveryVerified() {
+  return truthy(await activeConfigurationValue("lemon_native_delivery_verified", "false"));
+}
+
 function finalEdition(value) {
   const edition = String(value || "").trim();
   return Boolean(edition && !edition.toLowerCase().includes("draft"));
@@ -112,12 +132,21 @@ export async function POST(request) {
   const staleId = await clearStaleDelivery();
   if (staleId) return NextResponse.json({ ok: true, processed: 1, status: "manual_review", reason: "stale_delivery_ambiguous", sale_id: staleId });
 
-  const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET);
+  const provider = await deliveryProviderMode();
+  const configured = provider === "digify"
+    ? Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET)
+    : provider === "lemon_native"
+      ? await lemonNativeDeliveryVerified()
+      : false;
   if (!(await commerceLaunchAuthorized())) {
-    return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured });
+    return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured, provider });
+  }
+  if (provider === "invalid") {
+    return NextResponse.json({ ok: false, processed: 0, reason: "delivery_provider_invalid", configured: false }, { status: 422 });
   }
   if (!configured) {
-    return NextResponse.json({ ok: true, processed: 0, reason: "delivery_not_configured", configured: false });
+    const reason = provider === "lemon_native" ? "lemon_native_delivery_not_verified" : "delivery_not_configured";
+    return NextResponse.json({ ok: true, processed: 0, reason, configured: false, provider });
   }
 
   const pending = await queryRecords(TABLES.sales, { filterByFormula: commercePendingFormula("delivery"), pageSize: 1 });

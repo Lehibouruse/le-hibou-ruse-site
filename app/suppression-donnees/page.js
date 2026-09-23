@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Suppression des données" };
+export const metadata = { title: "Suppression des données", alternates: { canonical: "/suppression-donnees" } };
 
 export default function Page() {
   return <LegalPage title="Suppression des données">

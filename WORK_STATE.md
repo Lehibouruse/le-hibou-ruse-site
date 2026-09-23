@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-23 08:10 Europe/Paris
+Dernière mise à jour : 2026-09-23 08:35 Europe/Paris
 
 ## Décisions actuelles
 
@@ -19,7 +19,8 @@ Branche : `hibou-local-video-pipeline-20260922` — PR #175 (draft, mergeable).
 - `.env.example` : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
 - Jobs : 116 historiques ; aucun Running/Retry/Pending. Anciens CREATE_VIDEO en Manual Review ; anciens CREATE_BOOK neutralisés sans relance.
 - Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement puis tests runtime bloqués avec `openai_calls=0`, sans effectuer d’appel OpenAI.
-- Dernier état exécutable entièrement vérifié avant les mises à jour documentaires : `0a6f519b6463704362405b58e987fc9b4d75d9ad`; Hibou CI #697 = success.
+- Head actuel vérifié : `013fdf63d444d146d84b5954b5e608841bbaf5ea`; Hibou CI #700 = success.
+- Production reste sur l'ancien comportement tant que #175 n'est pas déployée : `system_health_report` du 23/09/2026 06:12:22 UTC indique encore `openai.circuit_active=false` et `credit_paused=false`. Cette preuve interdit de marquer le coupe-circuit comme effectif en Production.
 - Rollback : revert du merge ou retour au main `da3dd1143b933e1e09d9f5c25b5bac7bb2ac2fd8`.
 
 ## Vercel
@@ -86,10 +87,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 - 16 blocs canoniques ; corpus conservé.
 - 757 occurrences exactes `[À VÉRIFIER]` après résolution réelle de 5 marqueurs du montage 21 (ancien total 762).
-- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **190/294 sections uniques**, 0 doublon, soit **104 absentes**.
-- Gaps exacts : `31–35`, `141–145`, `191–202`, `209–216`, `218`, `222–294`.
-- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, vraie activité d’auteur séparée du conseil #206, requalification artificielle en droits d’auteur écartée #207, vrai formateur occasionnel #208, intérêts CCA #217, dividendes SAS #219, remboursement principal CCA #220 et réduction de capital #221, plus donation-cession déjà vérifiée dans le chantier livre.
-- #203–208, #217, #219–221 cités ci-dessus sont dans le texte réel, sans agent API et sans nouveau marqueur `[À VÉRIFIER]`. Chapitre 10 = 23/35 ; chapitre 11 = 7/45.
+- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **199/294 sections uniques**, 0 doublon, soit **95 absentes**.
+- Gaps exacts : `31–35`, `141–145`, `191–202`, `222–294`.
+- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, puis toute la séquence #206–221 du chapitre 11.
+- Séquence #206–221 complète : auteur/conseil #206–207, formateur #208, anti-fractionnement #209, cumul de vrais statuts #210, micro-BNC #211, micro-BIC services #212, micro-vente #213, anti-éclatement fictif #214, fausse indépendance #215, vrai consulting parallèle #216, intérêts CCA #217, financement holding #218, dividendes SAS #219, remboursement principal CCA #220, réduction de capital #221. Chapitre 10 = 23/35 ; chapitre 11 = 16/45. Aucun nouveau marqueur `[À VÉRIFIER]`.
 - Charte canonique : ivoire, bleu nuit, vert canard, or discret.
 - Aucun marqueur ne disparaît sans vérification/réécriture exacte ; aucun remplacement du PDF commercial sans identification de l’édition et validation humaine.
 
@@ -119,13 +120,15 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 - X : aucun plan/crédit acheté.
 - Snapchat : capacité produit/API Snap externe non approuvée.
 
-## Commerce
+## Commerce et coûts
 
 - Lemon LIVE : Store 475333 / Product 1369573 / Variant 2140119 / checkout live référencé.
-- TEST séparé du LIVE. Blocage réel : clé `LEMON_SQUEEZY_TEST_API_KEY` dédiée + ressources TEST confirmées `test_mode=true`.
-- Ne jamais utiliser la clé LIVE pour simuler le TEST.
-- Digify déjà intégré historiquement ; ne pas réinstaller. Les tests commande TEST, webhook/déduplication, livraison/révocation restent à exécuter après clé TEST.
+- Lemon TEST est strictement séparé : `LEMON_SQUEEZY_TEST_API_KEY` dédiée, ressources obligatoirement `test_mode=true`, aucun fallback vers la clé LIVE et aucune livraison Digify pour une commande test. HMAC, déduplication et remboursement out-of-order sont couverts par les tests ; preuve dynamique bloquée uniquement par la clé/ressources TEST.
 - Fourniture immédiate et accusé de rétractation sont deux preuves distinctes.
+- Registre de coûts daté dans Configuration : Lemon = 0 $ fixe + 5 % + 0,50 $/transaction avant suppléments ; Vercel = Hobby gratuit mais 10 Go saturés ; OpenAI API = 0 € autorisé/cible.
+- Digify : essai gratuit 7 jours confirmé démarré le 17/09/2026, échéance théorique ~24/09 ; prix public Pro vérifié 190 $/mois ou 1 680 $/an. **Aucun abonnement payant n'est démontré et aucun abonnement ne doit être déclenché sans accord.** L'intégration technique reste prête.
+- Metricool : brand `lehibouruse` connecté ; promotion LinkedIn annoncée le 19/09 comme expirant sous 7 jours (~26/09) ; aucun plan payant démontré. X impose plan payant + add-on 10 €/mois/compte, non souscrit.
+- L'ancienne simulation `100 € de frais fixes` n'est plus une donnée constatée ; recalculer la contribution uniquement avec les coûts réellement engagés.
 
 ## Blocages humains précis
 
@@ -134,12 +137,13 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 3. **Lemon TEST** : créer/retrouver une clé API en mode Test et la stocker dans Vercel sous `LEMON_SQUEEZY_TEST_API_KEY`. Débloque inspect → checkout_test → webhook_test → tests Digify.
 4. **Reddit** : autoriser ultérieurement l’envoi du dossier et obtenir l’accord requis ; aucun contact tiers sans autorisation.
 5. **GPU local** : fournir un environnement local réellement accessible avec GPU adapté avant le premier essai FLUX/Chatterbox. Vérifier GPU/VRAM/RAM/stockage avant tout gros téléchargement.
-6. **Publication/remplacement commercial** : validation humaine explicite.
+6. **Digify** : décider explicitement avant/à la fin de l’essai s’il faut payer, remplacer la solution ou suspendre la livraison protégée. Ne pas souscrire automatiquement.
+7. **Publication/remplacement commercial** : validation humaine explicite.
 
 ## Prochaine action exécutable
 
 Sans validation humaine :
-1. poursuivre le livre par lots de 3–5 montages sourcés, prochaine zone naturelle `209–216` ou `218`, et rattacher chaque correction au passage exact ;
+1. poursuivre le livre par lots de 3–5 montages sourcés, prochaine zone naturelle `222–225` ou comblement `191–202`, et rattacher chaque correction au passage exact ;
 2. OBO et donation-cession étant storyboardés, utiliser le batch voix puis le promoteur d’assets dès qu’un GPU local est disponible ; en attendant, ne pas simuler de média généré ;
 3. conserver le runbook/preflight comme porte d’entrée unique de la première machine GPU, sans télécharger plusieurs modèles ;
 4. maintenir les expériences Growth et la matrice social/commerce sans publier.

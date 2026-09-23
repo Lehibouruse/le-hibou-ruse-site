@@ -9,7 +9,7 @@ Objectif : tester **un composant à la fois** sur une machine réellement access
 Depuis le dépôt :
 
 ```bash
-node scripts/local-video-preflight.mjs > local-video-preflight.json
+node scripts/video-local-preflight.mjs --require-gpu > local-video-preflight.json\n# alias historique équivalent : node scripts/local-video-preflight.mjs --require-gpu
 ```
 
 Le rapport vérifie :

@@ -79,8 +79,9 @@ Stack/licences vérifiées :
 
 Pilotes canoniques :
 1. Box Spread — moteur/reproductibilité.
-2. OBO — éditorial.
-3. Donation-cession — éditorial.
+2. OBO — éditorial, STORYBOARD_READY r2 : 18 scènes, 33,7 s, timing/prosodie PASS, aucun média généré.
+3. Donation-cession — éditorial, STORYBOARD_READY r2 : 18 scènes, 33,6 s, timing/prosodie PASS, aucun média généré.
+Les deux storyboards r2 ont été resegmentés car certaines unités du premier découpage 15 scènes imposaient un débit individuel incompatible avec la cible. Trois doublons techniques OBO S16–S18 ont été désolidarisés et conservés hors vidéo comme historique.
 La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors des trois pilotes.
 
 ## Livre
@@ -129,6 +130,13 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 - Digify : essai gratuit 7 jours confirmé démarré le 17/09/2026, échéance théorique ~24/09 ; prix public Pro vérifié 190 $/mois ou 1 680 $/an. **Aucun abonnement payant n'est démontré et aucun abonnement ne doit être déclenché sans accord.** L'intégration technique reste prête.
 - Metricool : brand `lehibouruse` connecté ; promotion LinkedIn annoncée le 19/09 comme expirant sous 7 jours (~26/09) ; aucun plan payant démontré. X impose plan payant + add-on 10 €/mois/compte, non souscrit.
 - L'ancienne simulation `100 € de frais fixes` n'est plus une donnée constatée ; recalculer la contribution uniquement avec les coûts réellement engagés.
+
+## Préflight GPU / runbook
+
+- Runbook : `docs/local-video-gpu-runbook.md`.
+- Script canonique : `scripts/video-local-preflight.mjs`.
+- Correction 23/09 : le script canonique accepte désormais `--require-ready` et l'alias historique `--require-gpu`, conformément à la documentation.
+- Test minimal imposé avant extension : un échantillon Chatterbox court, une scène FLUX ×3 candidats, preuve d'idempotence, ffprobe, temps mur/VRAM si disponible, aucun tunnel public et aucun fallback payant.
 
 ## Blocages humains précis
 

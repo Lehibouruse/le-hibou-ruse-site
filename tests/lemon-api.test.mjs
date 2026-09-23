@@ -101,7 +101,9 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
   assert.doesNotMatch(route, /authorization[^\n]{0,200}CRON_SECRET|Bearer[^\n]{0,200}CRON_SECRET/i);
   assert.match(route, /lemon_test_mode_only/);
   assert.match(route, /LEMON_SQUEEZY_TEST_API_KEY/);
-  assert.doesNotMatch(route, /process\.env\.LEMON_SQUEEZY_API_KEY/);
+  assert.doesNotMatch(route, /const testApiKey\s*=\s*text\(process\.env\.LEMON_SQUEEZY_API_KEY\)/);
+  assert.doesNotMatch(route, /apiKey:\s*process\.env\.LEMON_SQUEEZY_API_KEY/);
+  assert.match(route, /const testApiKey = text\(process\.env\.LEMON_SQUEEZY_TEST_API_KEY\)/);
   assert.match(route, /lemon_test_store_id/);
   assert.match(route, /lemon_test_product_id/);
   assert.match(route, /lemon_test_variant_id/);

@@ -132,6 +132,17 @@ Le test Digify ne dépend pas d'une fausse commande Lemon.
 - le fournisseur de livraison change ;
 - une régression est détectée.
 
+
+## Authentification du webhook d'activité Digify
+
+Le webhook d'activité Digify reste un canal distinct des credentials API d'ajout/retrait de destinataire.
+
+Variables serveur attendues :
+- `DIGIFY_WEBHOOK_USERNAME`
+- `DIGIFY_WEBHOOK_PASSWORD`
+
+Elles doivent être configurées ensemble et rester secrètes. Lorsque l'implémentation dérive ces valeurs depuis un secret serveur selon le mécanisme prévu par le runtime, la readiness peut accepter cette source dérivée sans exposer la valeur. Le webhook continue de n'accepter que les événements prévus et de rattacher les événements nominatifs au destinataire concerné.
+
 ## Sécurité webhook / livraison
 
 Le webhook Lemon :

@@ -2,7 +2,7 @@
 
 Date : 23/09/2026.
 
-Ces sections sont prêtes sur le fond mais **ne sont pas encore intégrées au champ `Contenu V1` du chapitre 10**. La tentative de réécriture du chapitre complet (~78 k caractères) a été refusée par la limite de payload de l’API Airtable. Le texte source du chapitre a été laissé intact.
+Ces sections ont d’abord été mises en staging après un refus de payload Airtable. Une écriture ultérieure a réussi : **elles sont désormais intégrées au champ `Contenu V1` du chapitre 10**. Vérification du 23/09/2026 : chapitre 10 = 23/35 sections, 87 191 caractères, 95 marqueurs `[À VÉRIFIER]`; il reste 191–202 à intégrer. Ce fichier est conservé comme copie versionnée des sections vérifiées.
 
 ## 204. Viser 70 % pile : légalement suffisant, opérationnellement fragile
 

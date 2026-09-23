@@ -52,3 +52,37 @@ Prérequis : FFmpeg + FFprobe. Les gros médias et modèles restent hors du dép
 ## Test complet Box Spread — 22/09/2026
 
 Le master de référence complet a été rendu à partir de 18 scènes et de l’audio/verbatim V1 existant : 42,6 s, 1080×1920, 30 fps, H.264/AAC, 15 919 538 octets, SHA-256 `64e99df73e5fd8c999893392f40ae6b0397f527b18429c75a3256ba0a24978c9`. Le rendu a utilisé `engine.preset=veryfast` compte tenu du CPU temporaire disponible. Le contrôle visuel a porté sur 1, 8, 15, 22, 29, 36 et 41 secondes. Ce fichier est un master de travail technique : publication non autorisée tant que la validation humaine n’est pas donnée.
+
+
+## États du contrat
+
+Le même contrat accompagne le contenu du storyboard au rendu. Le champ optionnel `contract_state` vaut :
+
+- `storyboard` : narration exacte conservée sous forme `text_reference`, candidats image éventuellement vides, aucune image sélectionnée et audio encore pending ;
+- `render_ready` : images sélectionnées et audio de référence présents, avec hashes et timings nécessaires au renderer ;
+- `rendered` : rendu effectué et résultats techniques/QC consignés.
+
+Un storyboard n’est jamais considéré comme un rendu prêt. `scripts/video-local-render.mjs` refuse explicitement `contract_state=storyboard` jusqu’à la sélection des médias.
+
+### Narration exacte
+
+Deux formes sont admises :
+
+1. `audio_reference` pour un contenu déjà calé sur une piste audio réelle : fichier, début/fin et SHA-256 ;
+2. `text_reference` pour la préparation éditoriale : texte exact de la scène et SHA-256 du script canonique.
+
+Le passage `text_reference → audio_reference` intervient seulement après génération/enregistrement de la voix et mesure réelle des durées.
+
+### Image
+
+Au stade storyboard :
+- `candidates=[]` ;
+- `selected=null` ;
+- `selection_reason=null`.
+
+Après génération ou réutilisation de médias :
+- au moins trois candidats pour une scène nouvellement générée selon VIDEO_METHOD_V2 ;
+- une image sélectionnée ;
+- motif de sélection documenté.
+
+Cette évolution évite d’inventer des médias pour satisfaire le schéma et permet la reprise scène par scène.

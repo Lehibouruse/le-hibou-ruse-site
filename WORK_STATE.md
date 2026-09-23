@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-23 07:38 Europe/Paris
+Dernière mise à jour : 2026-09-23 08:10 Europe/Paris
 
 ## Décisions actuelles
 
@@ -19,7 +19,7 @@ Branche : `hibou-local-video-pipeline-20260922` — PR #175 (draft, mergeable).
 - `.env.example` : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
 - Jobs : 116 historiques ; aucun Running/Retry/Pending. Anciens CREATE_VIDEO en Manual Review ; anciens CREATE_BOOK neutralisés sans relance.
 - Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement puis tests runtime bloqués avec `openai_calls=0`, sans effectuer d’appel OpenAI.
-- Head exécutable vérifié : `d8ed8466478c43536cd0723bb0eaf8dc06b43dd3`; Hibou CI #663 = success.
+- Dernier état exécutable entièrement vérifié avant les mises à jour documentaires : `0a6f519b6463704362405b58e987fc9b4d75d9ad`; Hibou CI #697 = success.
 - Rollback : revert du merge ou retour au main `da3dd1143b933e1e09d9f5c25b5bac7bb2ac2fd8`.
 
 ## Vercel
@@ -46,8 +46,8 @@ Box Spread :
 - Compatible techniquement H.264/AAC mobile ; lecture iPhone réelle non revendiquée.
 - Library durable : `/Le Hibou Rusé/Vidéos/Box Spread/Master technique 30fps 2026-09-22/`.
 - Sous-titres exacts et validation éditoriale finale restent à faire.
-- OBO `recyt2rDHKP50ZCbV` : storyboard 15 scènes Airtable, narration concaténée exactement égale au script, état STORYBOARD_READY.
-- Donation-cession `recnospVHwEtAwxMV` : storyboard 15 scènes Airtable, narration concaténée exactement égale au script, état STORYBOARD_READY.
+- OBO `recyt2rDHKP50ZCbV` : storyboard canonique 15 scènes Airtable, narration concaténée exactement égale au script, durée planifiée 30,2 s, état STORYBOARD_READY.
+- Donation-cession `recnospVHwEtAwxMV` : storyboard canonique 15 scènes Airtable, narration concaténée exactement égale au script, durée planifiée 30,5 s, état STORYBOARD_READY.
 - Contrats persistants : `docs/pilots/obo-storyboard-contract-v1.json` et `docs/pilots/donation-cession-storyboard-contract-v1.json`.
 
 Renderer :
@@ -63,7 +63,9 @@ Interfaces ajoutées :
 Environnement ChatGPT réellement testé :
 - Linux x86_64, 5 vCPU, ~5,8 GiB RAM, ~30 GiB libres, Node 22, Python 3.13, FFmpeg 7.1.5.
 - Aucun GPU NVIDIA visible : FLUX et Chatterbox ne sont PAS déclarés exécutés ici.
-- `scripts/local-video-preflight.mjs` détecte OS/CPU/RAM/disque/GPU/VRAM/outils sans téléchargement ; `docs/local-video-gpu-runbook.md` impose Chatterbox court puis une scène FLUX ×3 avant un pilote complet.
+- `scripts/video-local-preflight.mjs` est le préflight canonique : OS/CPU/RAM/disque/GPU/VRAM/Python/FFmpeg sans réseau ni téléchargement ; `scripts/local-video-preflight.mjs` n’est plus qu’un alias de compatibilité. `docs/local-video-gpu-runbook.md` impose Chatterbox court puis une scène FLUX ×3 avant un pilote complet.
+- `scripts/chatterbox-storyboard-batch.py` charge Chatterbox une seule fois pour un storyboard, génère un WAV par scène + master voix, ajoute les pauses et remplace les `text_reference` par des `audio_reference` mesurées, sans changer artificiellement les métadonnées WPM/intention en faux paramètres natifs.
+- `scripts/video-storyboard-promote.mjs` exige ensuite une image choisie pour chaque scène, vérifie/copie/hash les médias et passe seulement alors le contrat à `render_ready`; `publication_authorized=false` reste verrouillé.
 - FFmpeg courant : build GPL avec libx264.
 
 Stack/licences vérifiées :
@@ -84,10 +86,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 - 16 blocs canoniques ; corpus conservé.
 - 757 occurrences exactes `[À VÉRIFIER]` après résolution réelle de 5 marqueurs du montage 21 (ancien total 762).
-- Couverture recalculée directement depuis les titres du texte : **187/294 sections**, soit **107 absentes**.
-- Gaps exacts : `31–35`, `141–145`, `191–202`, `206–216`, `218`, `222–294`.
-- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, intérêts CCA #217, dividendes SAS #219, remboursement principal CCA #220 et réduction de capital #221, plus donation-cession déjà vérifiée dans le chantier livre.
-- #203, #204, #205, #217, #219, #220 et #221 sont dans le texte réel, sans agent API et sans nouveau marqueur `[À VÉRIFIER]`.
+- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **190/294 sections uniques**, 0 doublon, soit **104 absentes**.
+- Gaps exacts : `31–35`, `141–145`, `191–202`, `209–216`, `218`, `222–294`.
+- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, vraie activité d’auteur séparée du conseil #206, requalification artificielle en droits d’auteur écartée #207, vrai formateur occasionnel #208, intérêts CCA #217, dividendes SAS #219, remboursement principal CCA #220 et réduction de capital #221, plus donation-cession déjà vérifiée dans le chantier livre.
+- #203–208, #217, #219–221 cités ci-dessus sont dans le texte réel, sans agent API et sans nouveau marqueur `[À VÉRIFIER]`. Chapitre 10 = 23/35 ; chapitre 11 = 7/45.
 - Charte canonique : ivoire, bleu nuit, vert canard, or discret.
 - Aucun marqueur ne disparaît sans vérification/réécriture exacte ; aucun remplacement du PDF commercial sans identification de l’édition et validation humaine.
 
@@ -110,7 +112,8 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 - GitHub `Hibou Social Control Plane Sync` run 35782943645 : success, 5 connexions OAuth, aucune publication/achat.
 - `Hibou Social Metrics` run 35780665118 : `no_published_ids`, aucune métrique fictive.
 - Bluesky : dernier test 401 Invalid identifier or password ; backend prêt, secret app password à remplacer côté Vercel puis redeployer/retester.
-- Reddit : PR #171 ouverte, non draft, mergeable, head `3cbbb0a7781aadc1d1e8d374cc38f7c04610263a`; accord API/commercial externe manquant, aucun message tiers envoyé.
+- Reddit : son code utile a été porté sélectivement dans #175 ; il reste `unconfigured` tant que `REDDIT_API_APPROVED` n’est pas vrai. Les dry-runs restent locaux sans credentials ni side effects, le coffre OAuth peut stocker les tokens chiffrés, et une publication live reste impossible avant l’accord externe. Aucun message tiers ni appel Reddit réel n’a été envoyé.
+- Les IDs Reddit/Bluesky sont projetés vers les champs de contenu/métriques ; une métrique explicitement indisponible reste `null` au lieu d’être transformée en zéro.
 - LinkedIn : cible Page/organisation ; Community Management + credentials restent externes.
 - Pinterest : Trial Access/credentials/board.
 - X : aucun plan/crédit acheté.
@@ -136,9 +139,9 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 ## Prochaine action exécutable
 
 Sans validation humaine :
-1. poursuivre le livre par lots de 3–5 montages sourcés et rattacher chaque correction au passage exact ;
-2. OBO et donation-cession étant storyboardés, préparer leur passage `storyboard → render_ready` et, en attendant un GPU, poursuivre les scènes/contrats sans génération ;
-3. préparer les requêtes IMAGE_GEN/VOICE_GEN et le runbook local pour la première machine GPU, sans télécharger plusieurs modèles ;
+1. poursuivre le livre par lots de 3–5 montages sourcés, prochaine zone naturelle `209–216` ou `218`, et rattacher chaque correction au passage exact ;
+2. OBO et donation-cession étant storyboardés, utiliser le batch voix puis le promoteur d’assets dès qu’un GPU local est disponible ; en attendant, ne pas simuler de média généré ;
+3. conserver le runbook/preflight comme porte d’entrée unique de la première machine GPU, sans télécharger plusieurs modèles ;
 4. maintenir les expériences Growth et la matrice social/commerce sans publier.
 
 Après validation PR #175 :

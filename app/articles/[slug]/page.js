@@ -4,6 +4,24 @@ import { getRecords, TABLES } from "../../../lib/airtable";
 
 export const revalidate = 60;
 
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const articles = await getRecords(TABLES.articles);
+  const article = articles.find((record) => record.fields.Slug === slug && record.fields.Publié)?.fields;
+  if (!article) return { title: "Décryptage", robots: { index: false, follow: false } };
+  return {
+    title: article.Titre || "Décryptage",
+    description: article.Résumé || undefined,
+    alternates: { canonical: `/articles/${slug}` },
+    openGraph: {
+      title: article.Titre || "Décryptage",
+      description: article.Résumé || undefined,
+      url: `/articles/${slug}`,
+      type: "article",
+    },
+  };
+}
+
 export default async function ArticlePage({ params }) {
   const { slug } = await params;
   const articles = await getRecords(TABLES.articles);

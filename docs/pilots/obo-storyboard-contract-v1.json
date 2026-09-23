@@ -1,0 +1,462 @@
+{
+  "contract_version": "HIBOU_VIDEO_CONTRACT_V1",
+  "contract_state": "storyboard",
+  "content": {
+    "content_id": "recyt2rDHKP50ZCbV",
+    "script_version": 1,
+    "profile_version": "HIBOU_VIRAL_V1@2.0",
+    "method_version": "VIDEO_METHOD_V2"
+  },
+  "engine": {
+    "renderer": "ffmpeg",
+    "renderer_version": "video-local-render-v1",
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "preset": "medium"
+  },
+  "scenes": [
+    {
+      "scene_id": "OBO-S01",
+      "source_scene_record_id": "recsiqE3JDL4pgZVR",
+      "order": 1,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Il vend sa boîte…",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Portrait dirigeant français, bureau contemporain, dossier de cession au premier plan",
+      "screen_text": "IL VEND SA BOÎTE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "Il vend sa boîte…",
+      "voice": {
+        "target_wpm": 210,
+        "relative_speed_pct": 103,
+        "pause_after_ms": 180,
+        "emphasis": "vend sa boîte",
+        "intent": "hook"
+      }
+    },
+    {
+      "scene_id": "OBO-S02",
+      "source_scene_record_id": "rec4LXtWoKzpGA77m",
+      "order": 2,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "à une holding qu’il vient lui-même de créer.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Schéma simple dirigeant → holding nouvellement créée, style éditorial Hibou",
+      "screen_text": "À SA PROPRE HOLDING",
+      "planned_duration_s": 2.1,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "à une holding qu’il vient lui-même de créer.",
+      "voice": {
+        "target_wpm": 205,
+        "relative_speed_pct": 101,
+        "pause_after_ms": 180,
+        "emphasis": "propre holding",
+        "intent": "révélation"
+      }
+    },
+    {
+      "scene_id": "OBO-S03",
+      "source_scene_record_id": "recp2luTcz6vzGFd9",
+      "order": 3,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "C’est l’OBO.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Acronyme OBO apparaît net, hibou discret",
+      "screen_text": "OBO",
+      "planned_duration_s": 1.6,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "C’est l’OBO.",
+      "voice": {
+        "target_wpm": 210,
+        "relative_speed_pct": 103,
+        "pause_after_ms": 260,
+        "emphasis": "OBO",
+        "intent": "ponctuation forte"
+      }
+    },
+    {
+      "scene_id": "OBO-S04",
+      "source_scene_record_id": "recrgmUTe0NKEImnV",
+      "order": 4,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "La holding rachète les titres,",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Schéma holding achetant les titres de la société cible",
+      "screen_text": "LA HOLDING RACHÈTE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "La holding rachète les titres,",
+      "voice": {
+        "target_wpm": 198,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 120,
+        "emphasis": "rachète",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "OBO-S05",
+      "source_scene_record_id": "rec2U9xtWATtQVx2h",
+      "order": 5,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "souvent avec de la dette ;",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Contrat de financement + dette bancaire stylisée",
+      "screen_text": "DETTE",
+      "planned_duration_s": 1.8,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "souvent avec de la dette ;",
+      "voice": {
+        "target_wpm": 195,
+        "relative_speed_pct": 99,
+        "pause_after_ms": 220,
+        "emphasis": "dette",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "OBO-S06",
+      "source_scene_record_id": "recLVgGewzpbMrae3",
+      "order": 6,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "le dirigeant transforme une partie",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Dirigeant devant deux blocs patrimoine / liquidités",
+      "screen_text": "TRANSFORMER LE PATRIMOINE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "le dirigeant transforme une partie",
+      "voice": {
+        "target_wpm": 198,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 100,
+        "emphasis": "transforme",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "OBO-S07",
+      "source_scene_record_id": "recg2UMDhLcuvaYx0",
+      "order": 7,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "de son patrimoine professionnel en liquidités",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Actions se convertissant visuellement en liquidités",
+      "screen_text": "TITRES → LIQUIDITÉS",
+      "planned_duration_s": 2.2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "de son patrimoine professionnel en liquidités",
+      "voice": {
+        "target_wpm": 198,
+        "relative_speed_pct": 100,
+        "pause_after_ms": 160,
+        "emphasis": "liquidités",
+        "intent": "explication"
+      }
+    },
+    {
+      "scene_id": "OBO-S08",
+      "source_scene_record_id": "recR6Ti4qdAb8lX8q",
+      "order": 8,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "tout en restant au capital",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Camembert de détention stylisé",
+      "screen_text": "RESTER AU CAPITAL",
+      "planned_duration_s": 1.9,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "tout en restant au capital",
+      "voice": {
+        "target_wpm": 195,
+        "relative_speed_pct": 99,
+        "pause_after_ms": 120,
+        "emphasis": "capital",
+        "intent": "nuance"
+      }
+    },
+    {
+      "scene_id": "OBO-S09",
+      "source_scene_record_id": "recqknhTqHKLHRu9p",
+      "order": 9,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "ou au contrôle selon le montage.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Organigramme de contrôle avec flèches de vote",
+      "screen_text": "OU AU CONTRÔLE",
+      "planned_duration_s": 2.1,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "ou au contrôle selon le montage.",
+      "voice": {
+        "target_wpm": 192,
+        "relative_speed_pct": 98,
+        "pause_after_ms": 220,
+        "emphasis": "selon le montage",
+        "intent": "nuance"
+      }
+    },
+    {
+      "scene_id": "OBO-S10",
+      "source_scene_record_id": "rec9XxebMhlGMAQj5",
+      "order": 10,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "Mais ce n’est pas une vente magique",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Baguette magique barrée sur contrat de cession",
+      "screen_text": "PAS UNE VENTE MAGIQUE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "Mais ce n’est pas une vente magique",
+      "voice": {
+        "target_wpm": 190,
+        "relative_speed_pct": 98,
+        "pause_after_ms": 160,
+        "emphasis": "pas",
+        "intent": "alerte"
+      }
+    },
+    {
+      "scene_id": "OBO-S11",
+      "source_scene_record_id": "recwE1cCjoCs7Oy4X",
+      "order": 11,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "sans fiscalité :",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Feuille fiscale française stylisée",
+      "screen_text": "FISCALITÉ",
+      "planned_duration_s": 1.7,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "sans fiscalité :",
+      "voice": {
+        "target_wpm": 180,
+        "relative_speed_pct": 95,
+        "pause_after_ms": 220,
+        "emphasis": "fiscalité",
+        "intent": "alerte"
+      }
+    },
+    {
+      "scene_id": "OBO-S12",
+      "source_scene_record_id": "rec4YLvXlKIYQGW7f",
+      "order": 12,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "il faut une vraie valorisation,",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Expertise de valorisation avec multiples/DCF schématisés",
+      "screen_text": "VRAIE VALORISATION",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "il faut une vraie valorisation,",
+      "voice": {
+        "target_wpm": 185,
+        "relative_speed_pct": 97,
+        "pause_after_ms": 120,
+        "emphasis": "vraie",
+        "intent": "check"
+      }
+    },
+    {
+      "scene_id": "OBO-S13",
+      "source_scene_record_id": "rec768REofFq8yqPX",
+      "order": 13,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "un financement crédible et une logique économique.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Banquier + échéancier + activité réelle",
+      "screen_text": "FINANCEMENT + LOGIQUE ÉCO",
+      "planned_duration_s": 2.3,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "un financement crédible et une logique économique.",
+      "voice": {
+        "target_wpm": 185,
+        "relative_speed_pct": 97,
+        "pause_after_ms": 220,
+        "emphasis": "crédible ; logique économique",
+        "intent": "check"
+      }
+    },
+    {
+      "scene_id": "OBO-S14",
+      "source_scene_record_id": "recy3VpfirMuHDrct",
+      "order": 14,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "D4 quand on restructure réellement.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Hibou devant panneau D4, structure cohérente",
+      "screen_text": "D4 : RESTRUCTURATION RÉELLE",
+      "planned_duration_s": 2,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "D4 quand on restructure réellement.",
+      "voice": {
+        "target_wpm": 180,
+        "relative_speed_pct": 95,
+        "pause_after_ms": 260,
+        "emphasis": "réellement",
+        "intent": "conclusion prudente"
+      }
+    },
+    {
+      "scene_id": "OBO-S15",
+      "source_scene_record_id": "rec43nvlsLAWvTIhj",
+      "order": 15,
+      "narration_exact": {
+        "mode": "text_reference",
+        "text": "D6 si tout n’est qu’un aller-retour de cash sans substance.",
+        "script_sha256": "7b699b88682b9f11a63fac5e4347c53966ea1449b510d92ec17b691163c9ee78"
+      },
+      "visual_idea": "Flèches circulaires de cash barrées, D6 avertissement",
+      "screen_text": "D6 : CASH SANS SUBSTANCE",
+      "planned_duration_s": 2.5,
+      "measured_duration_s": null,
+      "zoom_percent": 3,
+      "image": {
+        "candidates": [],
+        "selected": null,
+        "selection_reason": null
+      },
+      "breath_unit": "D6 si tout n’est qu’un aller-retour de cash sans substance.",
+      "voice": {
+        "target_wpm": 175,
+        "relative_speed_pct": 94,
+        "pause_after_ms": 300,
+        "emphasis": "sans substance",
+        "intent": "avertissement"
+      }
+    }
+  ],
+  "audio": {
+    "status": "pending",
+    "engine": "chatterbox_multilingual",
+    "reference": null
+  },
+  "music": {
+    "status": "none_commercial",
+    "policy": "master sans morceau commercial ; cues seulement"
+  },
+  "subtitles": {
+    "status": "pending",
+    "source": "exact narration text"
+  },
+  "qc": {
+    "status": "NOT_RUN",
+    "technical": null
+  },
+  "validation": {
+    "human_required": true,
+    "publication_authorized": false,
+    "status": "STORYBOARD_READY"
+  }
+}

@@ -20,7 +20,8 @@ function check(path) {
     assert.equal(scene.narration_exact.mode, "text_reference");
     assert.equal(scene.narration_exact.script_sha256, canonicalScriptHash);
     assert.equal(scene.image.selected, null);
-    assert.equal(scene.image.candidates.length, 0);\n    assert(scene.planned_duration_s >= 1.5 && scene.planned_duration_s <= 2.5);
+    assert.equal(scene.image.candidates.length, 0);
+    assert(scene.planned_duration_s >= 1.5 && scene.planned_duration_s <= 2.5);
   }
 
   assert.throws(

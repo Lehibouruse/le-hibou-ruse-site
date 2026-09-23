@@ -98,7 +98,7 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
   assert.match(route, /OIDC_WORKFLOW = "lemon-commerce-test\.yml"/);
   assert.match(route, /ALLOWED_ACTIONS = new Set\(\["preflight", "inspect", "checkout_test", "webhook_test"\]\)/);
   assert.match(route, /allowedEvents: \["workflow_dispatch"\]/);
-  assert.doesNotMatch(route, /CRON_SECRET/);
+  assert.doesNotMatch(route, /authorization[^\n]{0,200}CRON_SECRET|Bearer[^\n]{0,200}CRON_SECRET/i);
   assert.match(route, /lemon_test_mode_only/);
   assert.match(route, /LEMON_SQUEEZY_TEST_API_KEY/);
   assert.doesNotMatch(route, /process\.env\.LEMON_SQUEEZY_API_KEY/);

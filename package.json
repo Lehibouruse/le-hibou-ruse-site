@@ -6,7 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "video:preflight": "node scripts/video-local-preflight.mjs --require-ready",
+    "video:status": "node scripts/video-pipeline-state.mjs",
+    "video:export": "node scripts/video-airtable-sync.mjs export",
+    "video:image-plan": "node scripts/video-image-plan.mjs",
+    "video:image-batch": "node scripts/video-image-batch.mjs",
+    "video:image-qc": "node scripts/video-image-qc.mjs",
+    "video:subtitles": "node scripts/video-subtitles.mjs",
+    "video:render": "node scripts/video-local-render.mjs",
+    "video:qc": "node scripts/video-master-qc.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

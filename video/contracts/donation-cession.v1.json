@@ -28,97 +28,116 @@
   "content_id": "recnospVHwEtAwxMV",
   "title": "Donation-cession : donner avant de vendre",
   "script_version": 1,
-  "planned_duration_s": 31,
+  "storyboard_revision": 2,
+  "planned_duration_s": 33.6,
   "exact_narration": "Pourquoi donner ses actions juste avant de les vendre ? Parce qu’après une vraie donation, la valeur d’acquisition retenue pour la plus-value du donataire est en principe la valeur retenue pour les droits de donation. La plus-value latente antérieure peut donc changer de traitement. Mais il y a une contrepartie : droits de donation éventuels, dépossession réelle du donateur et contrôle serré si le prix revient en réalité chez lui. Le mécanisme n’est pas « donner sur le papier ». C’est transmettre réellement avant de vendre.",
   "scenes": [
     {
       "order": 1,
       "scene_record_id": "recC1z0aa6jMAB1vy",
-      "planned_duration_s": 1.8,
+      "planned_duration_s": 1.5,
       "narration": "Pourquoi donner ses actions"
     },
     {
       "order": 2,
       "scene_record_id": "rec11yu5CtkCWjnYR",
-      "planned_duration_s": 1.8,
+      "planned_duration_s": 2,
       "narration": "juste avant de les vendre ?"
     },
     {
       "order": 3,
       "scene_record_id": "recv6emwvrAOdyzrY",
-      "planned_duration_s": 2,
+      "planned_duration_s": 1.8,
       "narration": "Parce qu’après une vraie donation,"
     },
     {
       "order": 4,
       "scene_record_id": "reclfRxIDPHlqz91h",
-      "planned_duration_s": 2.1,
-      "narration": "la valeur d’acquisition retenue pour la plus-value du donataire"
+      "planned_duration_s": 1.5,
+      "narration": "la valeur d’acquisition retenue"
     },
     {
       "order": 5,
       "scene_record_id": "recNl5az8SP3jxAGJ",
-      "planned_duration_s": 2.2,
-      "narration": "est en principe la valeur retenue"
+      "planned_duration_s": 1.8,
+      "narration": "pour la plus-value du donataire"
     },
     {
       "order": 6,
       "scene_record_id": "recBZW7Tp2NJ6HEw4",
-      "planned_duration_s": 2.2,
-      "narration": "pour les droits de donation."
+      "planned_duration_s": 2.1,
+      "narration": "est en principe la valeur retenue"
     },
     {
       "order": 7,
       "scene_record_id": "reczFd2RyPqbTA0F0",
-      "planned_duration_s": 2.3,
-      "narration": "La plus-value latente antérieure"
+      "planned_duration_s": 1.8,
+      "narration": "pour les droits de donation."
     },
     {
       "order": 8,
       "scene_record_id": "recyy8q6IpIW3o0xy",
-      "planned_duration_s": 2.2,
-      "narration": "peut donc changer de traitement."
+      "planned_duration_s": 1.5,
+      "narration": "La plus-value latente antérieure"
     },
     {
       "order": 9,
       "scene_record_id": "recjbnJgttIV0NITa",
-      "planned_duration_s": 2.1,
-      "narration": "Mais il y a une contrepartie :"
+      "planned_duration_s": 1.8,
+      "narration": "peut donc changer de traitement."
     },
     {
       "order": 10,
       "scene_record_id": "recUpxxJm5Jo1lF6k",
-      "planned_duration_s": 2.2,
-      "narration": "droits de donation éventuels,"
+      "planned_duration_s": 2.4,
+      "narration": "Mais il y a une contrepartie :"
     },
     {
       "order": 11,
       "scene_record_id": "rec1MyM477LmztpOD",
-      "planned_duration_s": 2,
-      "narration": "dépossession réelle du donateur"
+      "planned_duration_s": 1.7,
+      "narration": "droits de donation éventuels,"
     },
     {
       "order": 12,
       "scene_record_id": "recncaKDSYGh7t0Mw",
-      "planned_duration_s": 1.9,
-      "narration": "et contrôle serré"
+      "planned_duration_s": 1.7,
+      "narration": "dépossession réelle du donateur"
     },
     {
       "order": 13,
       "scene_record_id": "recKgE0BKk38LYRKY",
-      "planned_duration_s": 2,
-      "narration": "si le prix revient en réalité chez lui."
+      "planned_duration_s": 1.5,
+      "narration": "et contrôle serré"
     },
     {
       "order": 14,
       "scene_record_id": "recixmQ5E7DIdculb",
-      "planned_duration_s": 2,
-      "narration": "Le mécanisme n’est pas « donner sur le papier »."
+      "planned_duration_s": 2.4,
+      "narration": "si le prix revient en réalité"
     },
     {
       "order": 15,
       "scene_record_id": "recaeyeaozxBJhfYD",
-      "planned_duration_s": 2.2,
+      "planned_duration_s": 1.5,
+      "narration": "chez lui."
+    },
+    {
+      "order": 16,
+      "scene_record_id": "recGLPN3f8I5LuLtH",
+      "planned_duration_s": 1.7,
+      "narration": "Le mécanisme n’est pas"
+    },
+    {
+      "order": 17,
+      "scene_record_id": "recHch5gG4xdrO0EL",
+      "planned_duration_s": 2.4,
+      "narration": "« donner sur le papier »."
+    },
+    {
+      "order": 18,
+      "scene_record_id": "recrJb8C8H2KAbziX",
+      "planned_duration_s": 2.5,
       "narration": "C’est transmettre réellement avant de vendre."
     }
   ]

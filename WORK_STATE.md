@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-23 09:27 Europe/Paris
+Dernière mise à jour : 2026-09-23 09:45 Europe/Paris
 
 ## Décisions actuelles
 
@@ -87,10 +87,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 - 16 blocs canoniques ; corpus conservé.
 - 757 occurrences exactes `[À VÉRIFIER]` après résolution réelle de 5 marqueurs du montage 21 (ancien total 762).
-- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **203/294 sections uniques**, 0 doublon, soit **91 absentes**.
-- Gaps exacts : `31–35`, `141–145`, `191–202`, `226–294`.
-- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, puis toute la séquence #206–225 du chapitre 11.
-- Chapitre 10 = 23 sections (`171–190`, `203–205`). Chapitre 11 = **20 sections consécutives `206–225`**. Le champ Airtable `Montages couverts` du chapitre 11 a été réconcilié à 20 après une mise à jour partielle qui l'avait fait retomber à 6. Aucun nouveau marqueur `[À VÉRIFIER]` ; total exact du livre = 757.
+- Couverture recalculée directement depuis les en-têtes `## n.` du texte : **213/294 sections uniques**, 0 doublon, soit **81 absentes**.
+- Gaps exacts : `31–35`, `141–145`, `191–202`, `236–294`.
+- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, puis toute la séquence **#206–235** du chapitre 11.
+- Chapitre 10 = 23 sections (`171–190`, `203–205`). Chapitre 11 = **30 sections consécutives `206–235`**, `Montages couverts=30`, 82 106 caractères et 0 marqueur. Le jalon de 20–30 montages prioritaires vérifiés/répercutés est atteint, mais l'édition reste non validée tant que gaps/QC/maquette ne sont pas terminés. Total exact du livre = 757 marqueurs.
 - Charte canonique : ivoire, bleu nuit, vert canard, or discret.
 - Aucun marqueur ne disparaît sans vérification/réécriture exacte ; aucun remplacement du PDF commercial sans identification de l’édition et validation humaine.
 
@@ -150,7 +150,7 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 ## Prochaine action exécutable
 
 Sans validation humaine :
-1. poursuivre le livre par lots de 3–5 montages sourcés, prochaine zone naturelle `226–230` ou comblement prioritaire `191–202`, et rattacher chaque correction au passage exact ;
+1. combler en priorité le gap `191–202` par lots de 3–5 montages sourcés ; le chapitre 11 étant déjà à 82 k caractères, éviter de l'allonger mécaniquement avant d'avoir traité ce gap du chapitre 10 ;
 2. OBO et donation-cession étant storyboardés, utiliser le batch voix puis le promoteur d’assets dès qu’un GPU local est disponible ; en attendant, ne pas simuler de média généré ;
 3. conserver le runbook/preflight comme porte d’entrée unique de la première machine GPU, sans télécharger plusieurs modèles ;
 4. maintenir les expériences Growth et la matrice social/commerce sans publier.

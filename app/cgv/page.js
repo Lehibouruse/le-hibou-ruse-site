@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Conditions générales de vente" };
+export const metadata = { title: "Conditions générales de vente", alternates: { canonical: "/cgv" } };
 
 export default function Page() {
   return <LegalPage title="Conditions générales de vente">

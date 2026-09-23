@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-22 23:17 Europe/Paris
+Dernière mise à jour : 2026-09-23 07:38 Europe/Paris
 
 ## Décisions actuelles
 
@@ -19,7 +19,7 @@ Branche : `hibou-local-video-pipeline-20260922` — PR #175 (draft, mergeable).
 - `.env.example` : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
 - Jobs : 116 historiques ; aucun Running/Retry/Pending. Anciens CREATE_VIDEO en Manual Review ; anciens CREATE_BOOK neutralisés sans relance.
 - Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement puis tests runtime bloqués avec `openai_calls=0`, sans effectuer d’appel OpenAI.
-- Head vérifié avant ce commit : `845f1e4f50be916976dbe1393a8752bbb3e553b1`; Hibou CI #654 = success.
+- Head exécutable vérifié : `d8ed8466478c43536cd0723bb0eaf8dc06b43dd3`; Hibou CI #663 = success.
 - Rollback : revert du merge ou retour au main `da3dd1143b933e1e09d9f5c25b5bac7bb2ac2fd8`.
 
 ## Vercel
@@ -46,9 +46,12 @@ Box Spread :
 - Compatible techniquement H.264/AAC mobile ; lecture iPhone réelle non revendiquée.
 - Library durable : `/Le Hibou Rusé/Vidéos/Box Spread/Master technique 30fps 2026-09-22/`.
 - Sous-titres exacts et validation éditoriale finale restent à faire.
+- OBO `recyt2rDHKP50ZCbV` : storyboard 15 scènes Airtable, narration concaténée exactement égale au script, état STORYBOARD_READY.
+- Donation-cession `recnospVHwEtAwxMV` : storyboard 15 scènes Airtable, narration concaténée exactement égale au script, état STORYBOARD_READY.
+- Contrats persistants : `docs/pilots/obo-storyboard-contract-v1.json` et `docs/pilots/donation-cession-storyboard-contract-v1.json`.
 
 Renderer :
-- `scripts/video-local-render.mjs` : rendu FFmpeg déterministe, validation des hashes, cache par empreinte, reprise scène par scène.
+- `scripts/video-local-render.mjs` : rendu FFmpeg déterministe, validation des hashes, cache par empreinte, reprise scène par scène. Le contrat gère désormais `storyboard`, `render_ready`, `rendered`; le renderer refuse explicitement un storyboard sans médias.
 - Contrat : `HIBOU_VIDEO_CONTRACT_V1` + schema/documentation.
 - Les artefacts locaux et `.video-render-cache` sont ignorés par Git.
 
@@ -60,6 +63,7 @@ Interfaces ajoutées :
 Environnement ChatGPT réellement testé :
 - Linux x86_64, 5 vCPU, ~5,8 GiB RAM, ~30 GiB libres, Node 22, Python 3.13, FFmpeg 7.1.5.
 - Aucun GPU NVIDIA visible : FLUX et Chatterbox ne sont PAS déclarés exécutés ici.
+- `scripts/local-video-preflight.mjs` détecte OS/CPU/RAM/disque/GPU/VRAM/outils sans téléchargement ; `docs/local-video-gpu-runbook.md` impose Chatterbox court puis une scène FLUX ×3 avant un pilote complet.
 - FFmpeg courant : build GPL avec libx264.
 
 Stack/licences vérifiées :
@@ -80,10 +84,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 - 16 blocs canoniques ; corpus conservé.
 - 757 occurrences exactes `[À VÉRIFIER]` après résolution réelle de 5 marqueurs du montage 21 (ancien total 762).
-- Couverture canonique actuelle : 183/294 sections présentes ; 111 sections encore absentes.
-- Gaps identifiés : chapitre 2 = 31–35 ; chapitre 8 = 141–145 ; chapitre 10 = 191–205 partiellement comblé ; chapitre 11 = 206–250 partiellement comblé ; chapitre 12 = 251–280 ; chapitre 13 = 281–294.
-- Premier lot vérifié : régime mère-fille #21, apport-cession #203, intérêts CCA #217, remboursement principal CCA #220, plus donation-cession déjà vérifiée dans le chantier livre.
-- Les sections #203, #217 et #220 ont déjà été rédigées dans le livre sans agent API.
+- Couverture recalculée directement depuis les titres du texte : **187/294 sections**, soit **107 absentes**.
+- Gaps exacts : `31–35`, `141–145`, `191–202`, `206–216`, `218`, `222–294`.
+- Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, intérêts CCA #217, dividendes SAS #219, remboursement principal CCA #220 et réduction de capital #221, plus donation-cession déjà vérifiée dans le chantier livre.
+- #203, #204, #205, #217, #219, #220 et #221 sont dans le texte réel, sans agent API et sans nouveau marqueur `[À VÉRIFIER]`.
 - Charte canonique : ivoire, bleu nuit, vert canard, or discret.
 - Aucun marqueur ne disparaît sans vérification/réécriture exacte ; aucun remplacement du PDF commercial sans identification de l’édition et validation humaine.
 
@@ -133,7 +137,7 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 Sans validation humaine :
 1. poursuivre le livre par lots de 3–5 montages sourcés et rattacher chaque correction au passage exact ;
-2. préparer OBO puis donation-cession avec `HIBOU_VIDEO_CONTRACT_V1` et médias disponibles ;
+2. OBO et donation-cession étant storyboardés, préparer leur passage `storyboard → render_ready` et, en attendant un GPU, poursuivre les scènes/contrats sans génération ;
 3. préparer les requêtes IMAGE_GEN/VOICE_GEN et le runbook local pour la première machine GPU, sans télécharger plusieurs modèles ;
 4. maintenir les expériences Growth et la matrice social/commerce sans publier.
 

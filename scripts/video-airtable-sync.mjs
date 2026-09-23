@@ -69,7 +69,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords){
       title:String(content.Sujet||""),
       script_version:Number(content["Version script"]||1),
       profile_version:"HIBOU_VIRAL_V1@2.0",
-      method_version:"VIDEO_METHOD_V2",
+      method_version:"VIDEO_METHOD_V3",
       source:"airtable",
       exported_at:new Date().toISOString()
     },

@@ -13,6 +13,7 @@ test("pipeline state stops at human image selection after 3 candidates per scene
  writeFileSync(resolve(root,"voice/contract-audio-ready.json"),"{}"); writeFileSync(resolve(root,"voice/contract-mastered.json"),"{}"); writeFileSync(resolve(root,"subtitles.ass"),"x");
  writeFileSync(resolve(root,"images/image-plan.json"),"{}");
  writeFileSync(resolve(root,"images/batch-manifest.json"),JSON.stringify({results:{a:{status:"completed"},b:{status:"completed"},c:{status:"completed"}}}));
+ writeFileSync(resolve(root,"images/image-qc.json"),JSON.stringify({all_scenes_have_candidate:true}));
  writeFileSync(resolve(root,"images/selections.json"),JSON.stringify({s1:{candidates:["a","b","c"],selected:null}}));
  const s=inspectPipeline(root); assert.equal(s.gate,"HUMAN_IMAGE_SELECTION"); assert.equal(s.publication_authorized,false);
 });

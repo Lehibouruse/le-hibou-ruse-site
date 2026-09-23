@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Conditions d’utilisation" };
+export const metadata = { title: "Conditions d’utilisation", alternates: { canonical: "/conditions-utilisation" } };
 
 export default function Page() {
   return <LegalPage title="Conditions d’utilisation">

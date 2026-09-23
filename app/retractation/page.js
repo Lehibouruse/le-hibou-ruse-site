@@ -3,6 +3,7 @@ import WithdrawalForm from "../../components/WithdrawalForm";
 
 export const metadata = {
   title: "Rétractation",
+  alternates: { canonical: "/retractation" },
   robots: { index: true, follow: true },
 };
 

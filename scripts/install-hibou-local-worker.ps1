@@ -1,3 +1,7 @@
+param(
+  [switch]$StartWorker
+)
+
 $ErrorActionPreference = "Stop"
 
 Write-Host "=== Le Hibou Ruse - installation du worker local ROG ===" -ForegroundColor Cyan
@@ -92,19 +96,24 @@ Register-ScheduledTask `
   -Settings $Settings `
   -Principal $Principal | Out-Null
 
-Write-Host "Test du worker sur un seul job..." -ForegroundColor Cyan
-& $Node $Worker --once
+Write-Host "Diagnostic local sans réseau ni téléchargement..." -ForegroundColor Cyan
+& $Node $Worker --diagnostic
 if ($LASTEXITCODE -ne 0) {
-  throw "Le test du worker a echoue."
+  throw "Le diagnostic local du worker a echoue."
 }
-
-Start-ScheduledTask -TaskName $TaskName
-Start-Sleep -Seconds 3
 
 Write-Host ""
 Write-Host "Installation terminee." -ForegroundColor Green
-Write-Host "Worker Windows : $TaskName"
+Write-Host "Worker Windows enregistre : $TaskName"
 Write-Host "Stockage local : $MediaRoot"
-Write-Host "Health local : http://127.0.0.1:8765/health"
 Write-Host "Logs : $LogDir\worker.log"
-Write-Host "Le job test Renard place dans Airtable doit passer de Pending a Completed si YouTube autorise le telechargement."
+
+if ($StartWorker) {
+  Write-Host "Demarrage explicite du worker demande par -StartWorker." -ForegroundColor Yellow
+  Start-ScheduledTask -TaskName $TaskName
+  Start-Sleep -Seconds 3
+  Write-Host "Health local : http://127.0.0.1:8765/health"
+} else {
+  Write-Host "Le worker N'A PAS ete demarre. Aucun job Airtable ne sera execute par cette installation." -ForegroundColor Yellow
+  Write-Host "Apres validation, demarrer manuellement avec : Start-ScheduledTask -TaskName \"$TaskName\""
+}

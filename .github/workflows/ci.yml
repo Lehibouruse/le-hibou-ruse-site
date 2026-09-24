@@ -28,6 +28,8 @@ jobs:
       - run: npm ci
       - name: Unit tests
         run: npm test
+      - name: Security self-check
+        run: npm run security:self-check
       - name: Worker syntax check
         run: node --check scripts/hibou-worker.mjs
       - name: Production build

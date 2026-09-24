@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRecord, TABLES } from "../../../lib/airtable";
+import { createRecord, queryRecords, TABLES } from "../../../lib/airtable";
+import { escapeFormula } from "../../../lib/commerce.mjs";
 
 const MAX_BODY_BYTES = 10_000;
 const ALLOWED_ORIGINS = new Set([
@@ -47,6 +48,13 @@ export async function POST(request) {
     const need = clean(body.need, 2500);
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!validEmail || !context || !need) return json({ error: "Données invalides" }, 400);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const duplicates = await queryRecords(TABLES.leads, {
+      filterByFormula: `AND({Email}='${escapeFormula(email)}',{Contexte}='${escapeFormula(context)}',{Besoin}='${escapeFormula(need)}',LEFT({Date},10)='${today}')`,
+      pageSize: 1,
+    });
+    if (duplicates.length) return json({ ok: true, deduplicated: true });
 
     await createRecord(TABLES.leads, {
       Contact: contact || "Anonyme",

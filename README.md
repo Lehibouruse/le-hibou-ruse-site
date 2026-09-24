@@ -13,3 +13,11 @@ Site éditorial piloté par Airtable, avec file de jobs, orchestration idempoten
 Lemon Squeezy est la couche Merchant of Record. Digify est la couche prévue pour la livraison nominative et protégée des fichiers numériques. Aucun PDF payant n'est placé dans `public/`.
 
 Site connecté à Airtable.
+
+
+## Reprise du projet
+
+- État canonique courant : `WORK_STATE.md`
+- Index documentaire : `docs/README.md`
+
+Ne pas confondre code présent, runtime configuré, test réel réussi et production autorisée.

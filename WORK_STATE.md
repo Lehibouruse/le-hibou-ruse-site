@@ -1,42 +1,171 @@
-# Le Hibou Rusé — état de reprise
+# Le Hibou Rusé — état de reprise canonique
 
-Dernière mise à jour : 2026-09-13 UTC
+Dernière mise à jour : 24/09/2026.
 
-## Agent API autonome V1 — opérationnel et testé
+## Règle de lecture
 
-- Dépôt réel repris sans retour en arrière depuis `main` au commit `bb9eea0`.
-- `HIBOU_AGENT_V1` est versionné dans le code avec les instructions générales « LE HIBOU RUSÉ — AGENT PRINCIPAL ». Un prompt OpenAI hébergé peut être substitué par `HIBOU_OPENAI_PROMPT_ID` et `HIBOU_OPENAI_PROMPT_VERSION` sans modifier l'orchestrateur.
-- Routeur effectivement appliqué : règle déterministe sans IA lorsqu'elle suffit, Luna pour le simple, Terra pour l'intermédiaire, Sol uniquement après échec Terra confirmé et justifié. Deux escalades maximum, un retry API maximum par modèle et quatre appels IA maximum par Job par défaut.
-- Sortie JSON stricte : `completed`, `failed`, `waiting_for_human` ou `needs_escalation`.
-- Kill switch, plafonds par Job et budgets journaliers configurables par variables Vercel. Modèle, reasoning, jetons entrée/cachés/sortie, coût estimé, appels, escalades et IDs de réponse sont écrits dans Jobs et Journal.
-- `POST /api/orchestrator` utilise la Responses API avec contexte minimal, filtrage des clés sensibles, `store: false` et cache de prompt. Aucun secret n'est présent dans le dépôt.
-- Verrous Airtable avec bail, vérification de propriété et clé d'idempotence empêchent le double traitement.
-- Les crons `/api/orchestrator` et `/api/health` sont activés en production. Sur le plan Hobby, ils s'exécutent quotidiennement; une cadence plus courte nécessitera Pipedream ou un plan Vercel supérieur.
-- Un passage sans Job admissible sort avant toute lecture de budget ou tout appel OpenAI (`openai_calls: 0`). Le health check n'appelle jamais OpenAI.
+Toujours distinguer :
+1. **code présent dans `main`** ;
+2. **runtime réellement configuré** ;
+3. **test réel réussi** ;
+4. **production/publi­cation autorisée**.
 
-## Preuves production
+Une CI verte ne prouve ni un accès externe, ni un secret configuré, ni une publication réelle.
 
-- Déploiement manuel validé : `dpl_CDSq6GygVnRJibzWW2ehL6AX3e5o`, état `READY`, alias `https://le-hibou-ruse-site.vercel.app`.
-- Succès IA réel : Job `hibou-agent-v1-success-20260913102009` (`rec8xp72dHHEBqCjn`) passé de Pending à Running puis Completed avec `gpt-5.6-luna`, reasoning low, 1 686 jetons d'entrée, 71 de sortie, 1 appel, 0 escalade et coût estimé de 0,0004224 USD. Journal : `recpw0v3SQ9A7AHzC`.
-- Attente sûre réelle : Job `hibou-agent-v1-waiting-20260913102523` (`recybKXtWECNwc3ON`) terminé en Manual Review / `waiting_for_human`, sans boucle, sans retry, sans appel IA et à coût nul. Journal : `rec3KOKmqSHKXz3uv`.
-- Anti-doublon réel : Job `hibou-agent-v1-duplicate-20260913` (`rec83ZauQNcDpVgFz`) portant une clé déjà terminée a été clôturé Completed / dédupliqué, avec 0 appel IA et coût nul.
-- File vide réelle : déclenchement production terminé sans modifier les Jobs achevés et sans nouvel appel IA.
-- Tests locaux : 11 tests unitaires réussis et build Next.js de production réussi.
+## Matériel local confirmé
 
-## Variables Vercel
+Machine de référence :
+- ASUS ROG Strix G18 G814JI ;
+- Intel Core i9-13980HX ;
+- NVIDIA GeForce RTX 4070 Laptop GPU, 8 Go VRAM ;
+- 32 Go RAM ;
+- SSD NVMe ~1 To.
 
-- Secrets présents : `OPENAI_API_KEY`, `AIRTABLE_TOKEN`, `CRON_SECRET`. Leurs valeurs ne sont ni lues dans les journaux ni stockées dans GitHub ou Airtable.
-- Agent : `AI_ENABLED=true`, `HIBOU_AI_KILL_SWITCH=false`, Terra et Sol autorisés, plafonds d'escalade/retry/appels et budgets par Job/jour configurés pour Production, Preview et Development.
-- `LEMON_SQUEEZY_WEBHOOK_SECRET` reste à définir après création du webhook Lemon Squeezy.
+Le profil canonique est `video/hardware/rog-g814ji-rtx4070-8gb.json`. Le diagnostic runtime reste obligatoire avant génération lourde.
 
-## Suite utile, hors périmètre Agent V1
+## Vidéo locale
 
-1. Brancher Pipedream si une fréquence inférieure à une fois par jour est souhaitée sur Vercel Hobby.
-2. Finaliser le compte, le produit à 29 € et le webhook Lemon Squeezy; KYC, coordonnées bancaires et acceptation des conditions restent humains.
-3. Relier une interface produit à `POST /api/analyze-montage` si cette analyse doit être exposée aux utilisateurs.
-4. Compléter `Content Pipeline`, puis construire le MVP Remotion.
+Le socle vidéo est dans `main` :
+- contrat `HIBOU_VIDEO_CONTRACT_V1` ;
+- Airtable → scènes/storyboard ;
+- Chatterbox Multilingual local ;
+- ComfyUI local ;
+- génération séquentielle de candidats image ;
+- sous-titres, mastering audio, rendu FFmpeg 1080×1920 / 30 fps ;
+- QC, hashes, manifests ;
+- smoke test d'une seule scène ;
+- reporting Airtable qui distingue un smoke d'un pilote complet ;
+- installation Windows staged : diagnostic par défaut, installations lourdes uniquement avec switches explicites.
+
+Profil image de départ pour 8 Go VRAM :
+- FLUX.1-schnell FP8 ;
+- batch 1 ;
+- génération séquentielle ;
+- smoke 768×1344 ;
+- fallback 640×1136 en cas d'OOM ;
+- aucun fallback cloud payant silencieux.
+
+Preuve runtime encore attendue :
+1. diagnostic GPU/driver/CUDA/disque ;
+2. une scène voix Chatterbox ;
+3. trois images ComfyUI ;
+4. smoke complet ;
+5. trois scènes ;
+6. pilote complet + lecture iPhone.
+
+## Worker Windows
+
+Le worker local est opt-in :
+- exécution désactivée par défaut ;
+- queue inactive par défaut ;
+- démarrage explicite ;
+- health local uniquement ;
+- aucune lecture de cookies navigateur depuis une commande distante ;
+- aucun téléchargement automatique pendant un diagnostic.
+
+## Commerce
+
+- Lemon Squeezy = Merchant of Record.
+- TEST et LIVE restent séparés.
+- Le bootstrap TEST existe côté code.
+- Le consentement de fourniture numérique est feature-flagged.
+- Les replays ordinaires du parcours de consentement réutilisent le checkout déjà journalisé via un `request_id` stable.
+- Les commandes/remboursements sont dédupliqués.
+- Les liens d'accès publics n'énumèrent pas les commandes.
+
+Preuve encore nécessaire avant LIVE :
+- clé Lemon TEST installée côté Vercel ;
+- checkout TEST ;
+- webhook TEST ;
+- livraison/révocation TEST ;
+- confirmation durable du consentement ;
+- validation explicite avant activation LIVE.
+
+## Réseaux sociaux
+
+Les intégrations utilisent un control plane fail-closed. Un connecteur présent dans le code ne vaut jamais approbation externe.
+
+- Bluesky : métriques publiques possibles sans credentials lorsque l'URI du post existe.
+- Reddit : activation uniquement après accord externe requis et configuration correspondante.
+- Les autres réseaux conservent leurs propres OAuth/audits/contraintes.
+
+## Sécurité
+
+Déjà dans `main` :
+- trust boundaries et politique sécurité ;
+- auth explicite des routes sensibles ;
+- paid-AI fail-closed ;
+- CSP en Report-Only ;
+- inventaire statique de la surface API ;
+- Dependabot npm + GitHub Actions ;
+- scanner local de patterns sensibles ;
+- audit des GitHub Actions non épinglées ;
+- dry-run de rotation des secrets sans émission de valeurs ;
+- replay/idempotence des principales écritures publiques ;
+- politique WAF/rate-limit en mode observation, non enforced.
+
+Restent à prouver ou activer :
+- branch protection GitHub ;
+- observation navigateur CSP puis enforcement minimal ;
+- rate limiting distribué/Vercel-WAF après observation du trafic ;
+- exercice réel de rotation d'un secret TEST.
+
+## Sauvegardes / résilience
+
+Dans `main` :
+- Git bundle ;
+- exports Airtable safe/redacted ;
+- chiffrement AES-256-GCM disponible pour exports sensibles ;
+- manifest + SHA-256 ;
+- restore rehearsal local non destructif ;
+- planification Windows opt-in ;
+- copie indépendante : vérification avant copie, copie, re-vérification après copie.
+
+Restent à faire en runtime :
+- premier backup réel ;
+- rehearsal PASS sur ce backup ;
+- destination réellement indépendante choisie ;
+- première copie indépendante PASS ;
+- actifs Library prioritaires recopiés ;
+- RPO/RTO mesurés.
+
+## Airtable
+
+Airtable reste la source opérationnelle pour :
+- Roadmap ;
+- Content Pipeline ;
+- Montages ;
+- Livre ;
+- scènes vidéo ;
+- comptes sociaux ;
+- configuration non secrète ;
+- statuts et preuves.
+
+Aucun secret en clair ne doit être stocké dans les tables ordinaires.
+
+## Livre
+
+La liste canonique contient le socle Top 100+ des montages regroupés. Format des fiches :
+1. concept/mécanisme technique ;
+2. Exemple du Hibou, chiffré, narratif et provocateur ;
+3. risques associés uniquement lorsqu'ils existent.
+
+Rédaction prévue par lots de 10 fiches, cible globale d'environ 100 à 250 pages avant mise en forme.
+
+## Blocages humains réellement utiles
+
+1. PC : exécuter le diagnostic local puis le premier smoke vidéo.
+2. Lemon : ajouter la clé TEST directement dans Vercel, sans la transmettre dans le chat.
+3. GitHub : confirmer la branch protection de `main`.
+4. Vercel : activer/observer ultérieurement WAF/rate-limit selon le plan.
+5. Backup : choisir une vraie destination indépendante et lancer le premier backup réel.
+6. Accès sociaux : compléter uniquement les OAuth/approbations externes réellement nécessaires.
 
 ## Garde-fous
 
-- Ne pas publier les premières vidéos sans validation humaine.
-- Ne jamais enregistrer de token, clé ou mot de passe dans Airtable ou GitHub.
+- aucun secret dans Git/Airtable/docs ;
+- aucun fallback payant silencieux ;
+- aucun endpoint local exposé publiquement ;
+- aucun worker démarré implicitement ;
+- aucune publication automatique non validée ;
+- ne jamais inventer un runtime, un accès externe ou une preuve de test.

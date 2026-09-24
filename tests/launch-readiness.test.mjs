@@ -21,6 +21,7 @@ function readyInput() {
     config: {
       payment_provider: "lemon_squeezy",
       delivery_provider_mode: "digify",
+      digify_api_status: "CONNECTED_PRODUCTION_TESTED",
       checkout_url: "https://example.lemonsqueezy.com/buy/abc",
       lemon_live_checkout_id: "checkout-123",
       lemon_checkout_status: "LIVE_PUBLIC",
@@ -171,6 +172,15 @@ test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de sec
   assert.equal(result.ready, false);
   assert.ok(result.blockers.some((item) => item.key === "digify_api"));
   assert.equal(JSON.stringify(result).includes("server-root-secret"), false);
+});
+
+test("un essai Digify terminé bloque la readiness même si les credentials existent", () => {
+  const input = readyInput();
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.equal(result.checkoutUrl, "");
+  assert.ok(result.blockers.some((item) => item.key === "digify_delivery_available"));
 });
 
 

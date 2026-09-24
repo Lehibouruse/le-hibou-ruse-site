@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export default function DigitalSupplyConsentForm({ mode = "disabled" }) {
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
+  const requestId = useRef("");
 
   async function submit(event) {
     event.preventDefault();
@@ -13,11 +14,13 @@ export default function DigitalSupplyConsentForm({ mode = "disabled" }) {
     setError("");
     const form = event.currentTarget;
     const data = new FormData(form);
+    if (!requestId.current) requestId.current = globalThis.crypto?.randomUUID?.() || "";
     try {
       const response = await fetch("/api/commerce/digital-supply-consent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          request_id: requestId.current,
           immediate_supply_consent: data.get("immediate_supply_consent") === "on",
           withdrawal_loss_ack: data.get("withdrawal_loss_ack") === "on",
         }),

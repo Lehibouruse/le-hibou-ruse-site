@@ -137,6 +137,14 @@ test("Snapchat reste explicitement manuel tant que l'accès produit Snap n'est p
   assert.equal(snapchat.manual_only, true);
   assert.equal(snapchat.authorization_ready, false);
   const summary = socialGrantSummary(audit);
-  assert.equal(summary.oauth_providers, 8);
+  assert.equal(summary.oauth_providers, 9);
   assert.deepEqual(summary.manual_only, ["snapchat"]);
+});
+
+test("Reddit reste non autorisé tant que l'approbation externe n'est pas enregistrée", () => {
+  const audit = auditSocialGrants(ready, [], { REDDIT_API_APPROVED: "false" });
+  const reddit = audit.find((item) => item.provider === "reddit");
+  assert.equal(reddit.app_ready, false);
+  assert.equal(reddit.authorization_ready, false);
+  assert.match(reddit.blocker, /Autorisation explicite Reddit/);
 });

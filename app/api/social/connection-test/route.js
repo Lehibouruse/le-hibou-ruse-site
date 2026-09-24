@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const PROVIDERS = new Set(["youtube", "tiktok", "meta", "linkedin", "pinterest", "x", "threads", "bluesky"]);
+const PROVIDERS = new Set(["youtube", "tiktok", "meta", "linkedin", "pinterest", "x", "threads", "bluesky", "reddit"]);
 
 async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";

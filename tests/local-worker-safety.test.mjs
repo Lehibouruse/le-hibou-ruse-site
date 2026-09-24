@@ -48,3 +48,11 @@ test("tokenless bootstrap performs diagnostic only unless StartWorker is explici
   assert.match(bootstrap,/if \(\$StartWorker\)/);
   assert.doesNotMatch(bootstrap,/\$Worker --once/);
 });
+
+test("tokenless worker requires exact local job approval in addition to global execution opt-in",()=>{
+  assert.match(githubWorker,/HIBOU_LOCAL_APPROVED_JOB_ID/);
+  assert.match(githubWorker,/if \(!APPROVED_JOB_ID\)/);
+  assert.match(githubWorker,/x\.id === APPROVED_JOB_ID/);
+  assert.doesNotMatch(githubWorker,/APPROVED_JOB_ID === ["']ALL["']/);
+  assert.ok((publicQueue.jobs || []).every((job)=>job.active === false));
+});

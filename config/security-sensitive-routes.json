@@ -17,9 +17,9 @@
       ]
     },
     {
-      "path": "app/api/orchestrator/route.js",
+      "path": "app/api/analyze-montage/route.js",
       "required_all": [
-        "serviceAuthorized(request)",
+        "adminOrServiceAuthorized(request)",
         "serviceUnauthorized()"
       ]
     },
@@ -95,7 +95,21 @@
       ]
     },
     {
+      "path": "app/api/orchestrator/route.js",
+      "required_all": [
+        "serviceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
       "path": "app/api/social/authorization-queue/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/connection-test/route.js",
       "required_all": [
         "verifyGithubActionsToken",
         "Unauthorized"
@@ -107,13 +121,6 @@
         "adminOrServiceAuthorized",
         "verifyGithubActionsToken",
         "serviceUnauthorized()"
-      ]
-    },
-    {
-      "path": "app/api/social/connection-test/route.js",
-      "required_all": [
-        "verifyGithubActionsToken",
-        "Unauthorized"
       ]
     },
     {

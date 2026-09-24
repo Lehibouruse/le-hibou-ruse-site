@@ -14,6 +14,29 @@ const text=(v)=>String(v??"").trim();
 const stamp=()=>new Date().toISOString().replaceAll(":","-").replace(/\.\d{3}Z$/,"Z");
 const sha256=(buf)=>createHash("sha256").update(buf).digest("hex");
 const slug=(name)=>name.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase();
+const SENSITIVE_NAME=/(secret|token|password|authorization|cookie|credential|api[ _-]?key|clé[ _-]?api|access[ _-]?token|refresh[ _-]?token)/i;
+
+export function sanitizeValue(fieldName,value){
+  if(SENSITIVE_NAME.test(String(fieldName||""))) return "[REDACTED]";
+  if(Array.isArray(value)) return value.map((item)=>sanitizeValue(fieldName,item));
+  if(value&&typeof value==="object"){
+    return Object.fromEntries(Object.entries(value).map(([key,child])=>[key,sanitizeValue(key,child)]));
+  }
+  return value;
+}
+
+export function sanitizeRecord(tableName,record){
+  const fields=Object.fromEntries(
+    Object.entries(record?.fields||{}).map(([field,value])=>[field,sanitizeValue(field,value)])
+  );
+  if(String(tableName).toLowerCase()==="configuration"){
+    const key=String(fields["Clé"]??fields.key??"");
+    if(SENSITIVE_NAME.test(key)&&Object.prototype.hasOwnProperty.call(fields,"Valeur")){
+      fields["Valeur"]="[REDACTED]";
+    }
+  }
+  return {id:record?.id||"",createdTime:record?.createdTime||null,fields};
+}
 
 export function insideRepository(path,root=ROOT){
   const abs=resolve(path), base=resolve(root);
@@ -81,7 +104,7 @@ async function airtablePage(tableId,offset,token,fetchImpl=fetch){
   return data;
 }
 
-export async function exportAirtableTable(name,tableId,token,fetchImpl=fetch){
+export async function exportAirtableTable(name,tableId,token,fetchImpl=fetch,{redact=true}={}){
   if(!text(token)) throw new Error("AIRTABLE_TOKEN absent");
   const records=[];
   let offset="";
@@ -96,7 +119,8 @@ export async function exportAirtableTable(name,tableId,token,fetchImpl=fetch){
     base_id:PLAN.base_id,
     table:{name,id:tableId},
     record_count:records.length,
-    records,
+    records:redact?records.map((record)=>sanitizeRecord(name,record)):records,
+    redacted:Boolean(redact),
   };
 }
 
@@ -129,7 +153,7 @@ async function backupAirtable(dir,{includeSensitive=false,fetchImpl=fetch}={}){
     ...(includeSensitive?PLAN.sensitive_tables.map(([name,id])=>({name,id,sensitive:true})):[]),
   ];
   for(const table of tables){
-    const payload=await exportAirtableTable(table.name,table.id,token,fetchImpl);
+    const payload=await exportAirtableTable(table.name,table.id,token,fetchImpl,{redact:!table.sensitive});
     const json=Buffer.from(JSON.stringify(payload,null,2)+"\n","utf8");
     const gz=await gzipBuffer(json);
     const stored=table.sensitive?encryptBuffer(gz,passphrase):gz;

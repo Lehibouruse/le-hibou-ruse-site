@@ -1,0 +1,66 @@
+{
+  "schema": "HIBOU_PUBLIC_ABUSE_POLICY_V1",
+  "mode": "observe_first",
+  "note": "Initial thresholds are conservative starting points for a small site. Enforce only after reviewing real traffic/logs.",
+  "routes": [
+    {
+      "path": "/api/leads",
+      "method": "POST",
+      "class": "public_write",
+      "initial_observe_threshold_per_ip_per_minute": 5,
+      "hardening_already_present": ["origin_allowlist", "10kb_body_limit", "honeypot", "same_day_exact_dedup"],
+      "future_action": "429_after_observation"
+    },
+    {
+      "path": "/api/retractation",
+      "method": "POST",
+      "class": "consumer_rights_write",
+      "initial_observe_threshold_per_ip_per_minute": 10,
+      "hardening_already_present": ["origin_allowlist", "10kb_body_limit", "honeypot", "order_email_idempotence"],
+      "future_action": "429_after_observation",
+      "special_rule": "Do not use an aggressive threshold that could obstruct a legitimate withdrawal request."
+    },
+    {
+      "path": "/api/conversion-event",
+      "method": "POST",
+      "class": "analytics_write",
+      "initial_observe_threshold_per_ip_per_minute": 120,
+      "hardening_already_present": ["origin_allowlist", "10kb_body_limit", "event_id_dedup"],
+      "future_action": "429_after_observation"
+    },
+    {
+      "path": "/api/commerce/digital-supply-consent",
+      "method": "POST",
+      "class": "external_checkout_creation",
+      "initial_observe_threshold_per_ip_per_minute": 10,
+      "hardening_already_present": ["origin_allowlist", "4kb_body_limit", "feature_flag", "stable_request_id", "checkout_replay_reuse"],
+      "future_action": "429_after_observation"
+    },
+    {
+      "path": "/api/commerce/access",
+      "method": "GET",
+      "class": "public_polling_read",
+      "initial_observe_threshold_per_ip_per_minute": 90,
+      "hardening_already_present": ["uuid_validation", "non_enumerating_response", "no_store", "refund_wins"],
+      "future_action": "429_after_observation",
+      "special_rule": "Allow normal post-purchase polling bursts."
+    },
+    {
+      "path": "/api/commerce/lemon-webhook",
+      "method": "POST",
+      "class": "signed_provider_webhook",
+      "initial_observe_threshold_per_ip_per_minute": null,
+      "hardening_already_present": ["hmac_signature", "event_dedup", "refund_precedence"],
+      "future_action": "monitor_do_not_apply_strict_per_ip_limit",
+      "special_rule": "Provider webhooks should not be blocked by a consumer-style per-IP limit; rely on signature/idempotence and provider-aware monitoring."
+    }
+  ],
+  "rollout": [
+    "observe_only",
+    "review_7d_traffic",
+    "adjust_thresholds",
+    "enforce_non_webhook_routes",
+    "monitor_false_positives",
+    "document_exceptions"
+  ]
+}

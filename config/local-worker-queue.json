@@ -1,7 +1,7 @@
 {
-  "version": 7,
-  "note": "Corpus reequilibre: viser 10-15 formats courts par concurrent. Surplus Renard/Furet conserve mais desactive en reserve. Profils verifies recoltes automatiquement; Lezard Entreprendre reste en attente d'identification exacte.",
-  "target_shortform_videos": 160,
+  "version": 8,
+  "note": "Corpus équilibre V8 : surplus Furet désactivé car déjà au-dessus de la cible; jobs profil top15 conservés actifs pour les concurrents sous-représentés; doublons individuels Richissime/Stratège/Monsieur Chimp placés en réserve. Aucun job n'est exécuté sans approbation locale exacte du worker.",
+  "target_shortform_videos": 150,
   "jobs": [
     {
       "id": "profile-fiscaloo-top15-v1",
@@ -152,7 +152,7 @@
     },
     {
       "id": "reels-furet-top50-01-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -171,7 +171,7 @@
     },
     {
       "id": "reels-furet-top50-02-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -190,7 +190,7 @@
     },
     {
       "id": "reels-furet-top50-03-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -209,7 +209,7 @@
     },
     {
       "id": "reels-furet-top50-04-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -228,7 +228,7 @@
     },
     {
       "id": "reels-furet-top50-05-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -247,7 +247,7 @@
     },
     {
       "id": "reels-furet-top50-06-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -266,7 +266,7 @@
     },
     {
       "id": "reels-furet-top50-07-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -285,7 +285,7 @@
     },
     {
       "id": "reels-furet-top50-08-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -304,7 +304,7 @@
     },
     {
       "id": "reels-furet-top50-09-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -323,7 +323,7 @@
     },
     {
       "id": "reels-furet-top50-10-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -342,7 +342,7 @@
     },
     {
       "id": "reels-furet-top50-11-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -361,7 +361,7 @@
     },
     {
       "id": "reels-furet-top50-12-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -380,7 +380,7 @@
     },
     {
       "id": "reels-furet-top50-13-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -399,7 +399,7 @@
     },
     {
       "id": "reels-furet-top50-14-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -418,7 +418,7 @@
     },
     {
       "id": "reels-furet-top50-15-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -437,7 +437,7 @@
     },
     {
       "id": "reels-furet-top50-16-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -456,7 +456,7 @@
     },
     {
       "id": "reels-furet-top50-17-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -475,7 +475,7 @@
     },
     {
       "id": "reels-furet-top50-18-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -494,7 +494,7 @@
     },
     {
       "id": "reels-furet-top50-19-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -513,7 +513,7 @@
     },
     {
       "id": "reels-furet-top50-20-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1691,7 +1691,7 @@
     },
     {
       "id": "reels-richissime-01-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Richissime",
       "urls": [
@@ -1710,7 +1710,7 @@
     },
     {
       "id": "reels-stratege-impot-04-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Le Stratege de l'impot",
       "urls": [
@@ -1729,7 +1729,7 @@
     },
     {
       "id": "reels-stratege-impot-03-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Le Stratege de l'impot",
       "urls": [
@@ -1748,7 +1748,7 @@
     },
     {
       "id": "reels-stratege-impot-02-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Le Stratege de l'impot",
       "urls": [
@@ -1767,7 +1767,7 @@
     },
     {
       "id": "reels-stratege-impot-01-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Le Stratege de l'impot",
       "urls": [
@@ -2831,7 +2831,7 @@
     },
     {
       "id": "reels-monsieur-chimp-01-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Monsieur Chimp Finance",
       "urls": [

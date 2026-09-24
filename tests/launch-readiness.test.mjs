@@ -20,6 +20,7 @@ function readyInput() {
   return {
     config: {
       payment_provider: "lemon_squeezy",
+      delivery_provider_mode: "digify",
       checkout_url: "https://example.lemonsqueezy.com/buy/abc",
       lemon_live_checkout_id: "checkout-123",
       lemon_checkout_status: "LIVE_PUBLIC",
@@ -170,6 +171,41 @@ test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de sec
   assert.equal(result.ready, false);
   assert.ok(result.blockers.some((item) => item.key === "digify_api"));
   assert.equal(JSON.stringify(result).includes("server-root-secret"), false);
+});
+
+
+test("le mode Lemon natif vérifié ouvre la readiness sans dépendance Digify", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "lemon_native";
+  input.config.lemon_native_delivery_verified = "true";
+  delete input.product["Digify File GUID"];
+  delete input.env.DIGIFY_KEY_ID;
+  delete input.env.DIGIFY_SECRET;
+  delete input.env.DIGIFY_ADD_RECIPIENT_URL;
+  delete input.env.DIGIFY_REVOKE_RECIPIENT_URL;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.equal(result.deliveryMode, "lemon_native");
+  assert.ok(result.checks.some((item) => item.key === "lemon_native_delivery" && item.ok));
+  assert.equal(result.blockers.some((item) => item.key === "digify_api" || item.key === "digify_file"), false);
+});
+
+test("le mode Lemon natif reste fermé tant que le fichier n'est pas vérifié", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "lemon_native";
+  input.config.lemon_native_delivery_verified = "false";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "lemon_native_delivery"));
+});
+
+test("un provider de livraison inconnu bloque le checkout", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "mystery";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.equal(result.checkoutUrl, "");
+  assert.ok(result.blockers.some((item) => item.key === "delivery_provider"));
 });
 
 

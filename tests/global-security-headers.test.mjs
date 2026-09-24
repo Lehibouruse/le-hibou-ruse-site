@@ -20,6 +20,19 @@ test("HSTS does not opt into preload or unverified subdomain policy",()=>{
   assert.doesNotMatch(map["Strict-Transport-Security"],/includeSubDomains/i);
 });
 
-test("global CSP is deliberately not introduced without browser validation",()=>{
+test("CSP is deployed in report-only mode before enforcement",()=>{
   assert.equal(map["Content-Security-Policy"],undefined);
+  const csp=map["Content-Security-Policy-Report-Only"];
+  assert.ok(csp);
+  assert.match(csp,/default-src 'self'/);
+  assert.match(csp,/object-src 'none'/);
+  assert.match(csp,/frame-ancestors 'none'/);
+  assert.match(csp,/lemonsqueezy\.com/);
+  assert.match(csp,/vercel-insights\.com/);
+});
+
+test("report-only CSP does not pretend unsafe-inline/eval are final policy",()=>{
+  const csp=map["Content-Security-Policy-Report-Only"]||"";
+  assert.match(csp,/unsafe-inline/);
+  assert.match(csp,/unsafe-eval/);
 });

@@ -59,7 +59,8 @@ function saveProcessed(set) {
 
 function loadApprovedJobs() {
   try {
-    const parsed = JSON.parse(readFileSync(APPROVAL_FILE, "utf8"));
+    const raw = readFileSync(APPROVAL_FILE, "utf8").replace(/^\uFEFF/, "");
+    const parsed = JSON.parse(raw);
     const ids = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.job_ids) ? parsed.job_ids : [];
     return new Set(ids.map((value) => String(value || "").trim()).filter(Boolean));
   } catch {

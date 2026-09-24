@@ -1,0 +1,237 @@
+import { createHash } from "node:crypto";
+import { createServer } from "node:http";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawn } from "node:child_process";
+
+const ROOT = process.env.HIBOU_MEDIA_ROOT || path.join(os.homedir(), "HibouMedia");
+const POLL_MS = Math.max(5000, Number(process.env.HIBOU_WORKER_POLL_MS || 15000));
+const WORKER_ID = process.env.HIBOU_WORKER_ID || `ROG-${os.hostname()}`;
+const YTDLP = process.env.HIBOU_YTDLP || "yt-dlp";
+const LOG_DIR = path.join(process.env.LOCALAPPDATA || ROOT, "LeHibou");
+const LOG_FILE = path.join(LOG_DIR, "worker.log");
+const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
+const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
+const ONCE = process.argv.includes("--once");
+const ALLOWED_HOSTS = new Set([
+  "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+  "instagram.com", "www.instagram.com",
+  "tiktok.com", "www.tiktok.com", "vm.tiktok.com",
+]);
+
+mkdirSync(ROOT, { recursive: true });
+mkdirSync(LOG_DIR, { recursive: true });
+
+let state = {
+  started_at: new Date().toISOString(),
+  worker: WORKER_ID,
+  status: "starting",
+  queue_mode: "github-public-readonly",
+  current_job: null,
+  last_error: null,
+  processed: 0,
+};
+
+function log(message, data = null) {
+  const line = `[${new Date().toISOString()}] ${message}${data ? " " + JSON.stringify(data) : ""}`;
+  console.log(line);
+  appendFileSync(LOG_FILE, line + "\n", "utf8");
+}
+
+function loadProcessed() {
+  try {
+    const parsed = JSON.parse(readFileSync(STATE_FILE, "utf8"));
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveProcessed(set) {
+  writeFileSync(STATE_FILE, JSON.stringify([...set], null, 2), "utf8");
+}
+
+function safePart(value, fallback = "unknown") {
+  const cleaned = String(value || fallback)
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return cleaned || fallback;
+}
+
+function normalizeUrls(values) {
+  const raw = Array.isArray(values) ? values : String(values || "").split(/\r?\n/);
+  const urls = raw.map((x) => String(x).trim()).filter(Boolean);
+  return [...new Set(urls.map((value) => {
+    const url = new URL(value);
+    if (!ALLOWED_HOSTS.has(url.hostname.toLowerCase())) throw new Error(`Hôte non autorisé: ${url.hostname}`);
+    return url.toString();
+  }))];
+}
+
+function run(command, args, cwd) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, windowsHide: true, shell: false });
+    let stdout = "", stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; if (stdout.length > 200000) stdout = stdout.slice(-200000); });
+    child.stderr.on("data", (chunk) => { stderr += chunk; if (stderr.length > 200000) stderr = stderr.slice(-200000); });
+    child.on("error", reject);
+    child.on("close", (code) => code === 0
+      ? resolve({ code, stdout, stderr })
+      : reject(new Error(`${command} exit ${code}\n${stderr.slice(-12000)}`)));
+  });
+}
+
+function walk(dir) {
+  const out = [];
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) out.push(...walk(full));
+    else out.push(full);
+  }
+  return out;
+}
+
+function sha256(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+async function fetchQueue() {
+  const response = await fetch(`${QUEUE_URL}?t=${Date.now()}`, { headers: { "User-Agent": "Le-Hibou-ROG-Worker/1.0" } });
+  if (!response.ok) throw new Error(`Queue HTTP ${response.status}`);
+  const data = await response.json();
+  if (!data || !Array.isArray(data.jobs)) throw new Error("Format de queue invalide");
+  return data.jobs.filter((job) => job && job.active !== false);
+}
+
+async function downloadOne(url, dir, options = {}) {
+  mkdirSync(dir, { recursive: true });
+  const maxHeight = Math.max(360, Math.min(2160, Number(options.max_height || 1080)));
+  const subtitleLangs = Array.isArray(options.subtitle_languages) && options.subtitle_languages.length
+    ? options.subtitle_languages.join(",") : "fr,en";
+  const args = [
+    "--newline", "--no-progress", "--windows-filenames", "--restrict-filenames",
+    "--write-info-json", "--write-thumbnail", "--convert-thumbnails", "jpg",
+    "--write-subs", "--write-auto-subs", "--sub-langs", subtitleLangs,
+    "--sub-format", "srt/best",
+    "-f", `bv*[height<=${maxHeight}]+ba/b[height<=${maxHeight}]`,
+    "--merge-output-format", "mp4",
+    "-o", "%(uploader)s/%(upload_date)s - %(title)s [%(id)s].%(ext)s",
+    "--no-playlist",
+    url,
+  ];
+  const started = Date.now();
+  const result = await run(YTDLP, args, dir);
+  return {
+    url,
+    elapsed_s: Math.round((Date.now() - started) / 100) / 10,
+    stdout_tail: result.stdout.slice(-3000),
+    stderr_tail: result.stderr.slice(-3000),
+  };
+}
+
+async function processJob(job, processed) {
+  if (!job.id) throw new Error("Job sans id");
+  if (!["DOWNLOAD_VIDEO", "DOWNLOAD_BATCH"].includes(job.type)) throw new Error(`Type refusé: ${job.type}`);
+  const urls = normalizeUrls(job.urls);
+  if (!urls.length) throw new Error("Aucune URL");
+  const concurrent = safePart(job.concurrent || "concurrent");
+  const jobName = safePart(job.id);
+  const dir = path.join(ROOT, "competitors", concurrent, jobName);
+
+  state.current_job = job.id;
+  log("Job started", { job: job.id, urls: urls.length, dir });
+
+  const runs = [];
+  for (const url of urls) runs.push(await downloadOne(url, dir, job.options || {}));
+
+  const files = walk(dir);
+  const videos = files.filter((f) => /\.(mp4|mkv|webm|mov)$/i.test(f));
+  const hashes = videos.map((file) => ({
+    file: path.relative(ROOT, file),
+    sha256: sha256(file),
+    bytes: statSync(file).size,
+  }));
+  const result = {
+    schema: "HIBOU_LOCAL_RESULT_V1",
+    job: job.id,
+    worker: WORKER_ID,
+    output_dir: dir,
+    video_count: videos.length,
+    total_files: files.length,
+    videos: hashes,
+    runs,
+    completed_at: new Date().toISOString(),
+  };
+  writeFileSync(path.join(dir, "_hibou_result.json"), JSON.stringify(result, null, 2), "utf8");
+  processed.add(job.id);
+  saveProcessed(processed);
+  state.processed += 1;
+  state.current_job = null;
+  log("Job completed", { job: job.id, videos: videos.length, dir });
+}
+
+async function tick() {
+  const processed = loadProcessed();
+  const jobs = await fetchQueue();
+  const job = jobs.find((x) => !processed.has(x.id));
+  if (!job) return false;
+  try {
+    await processJob(job, processed);
+  } catch (error) {
+    const message = String(error?.stack || error).slice(0, 6000);
+    state.last_error = message;
+    state.current_job = null;
+    log("Job failed", { job: job?.id, error: message });
+    // Ne pas marquer processed : le worker retentera au prochain cycle après correction.
+  }
+  return true;
+}
+
+function healthServer() {
+  const port = Number(process.env.HIBOU_WORKER_HEALTH_PORT || 8765);
+  const server = createServer((req, res) => {
+    if (req.url !== "/health") { res.writeHead(404); res.end("not found"); return; }
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({
+      ...state,
+      media_root: ROOT,
+      queue_url: QUEUE_URL,
+      poll_ms: POLL_MS,
+      processed_jobs: [...loadProcessed()],
+      now: new Date().toISOString(),
+    }));
+  });
+  server.listen(port, "127.0.0.1", () => log("Health endpoint", { url: `http://127.0.0.1:${port}/health` }));
+}
+
+async function main() {
+  state.status = "running";
+  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE });
+  healthServer();
+  if (ONCE) {
+    await tick();
+    state.status = "stopped";
+    setTimeout(() => process.exit(0), 200);
+    return;
+  }
+  for (;;) {
+    try { await tick(); }
+    catch (error) {
+      state.last_error = String(error?.stack || error);
+      log("Poll failed", { error: state.last_error.slice(0, 3000) });
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
+}
+
+main().catch((error) => {
+  state.status = "crashed";
+  state.last_error = String(error?.stack || error);
+  log("Fatal", { error: state.last_error });
+  process.exit(1);
+});

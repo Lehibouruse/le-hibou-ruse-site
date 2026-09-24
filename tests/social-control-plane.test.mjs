@@ -150,3 +150,43 @@ test("X ne devient jamais pilotable par simple présence du code tant que l'acc�
   assert.equal(x.chatgpt_pilotable, false);
   assert.match(x.external_blocker, /aucune dépense automatique/i);
 });
+
+
+test("un provider AUTHORIZED n'affiche plus l'ancien setup comme blocage externe", () => {
+  const credentials = [{
+    provider: "youtube",
+    status: "Connected",
+    scopes: "https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
+  }];
+  const snapshot = buildSocialControlPlane({ readiness: youtubeReady, credentials, env: baseEnv });
+  const youtube = snapshot.providers.find((item) => item.provider === "youtube");
+  assert.equal(youtube.phase, "AUTHORIZED");
+  assert.equal(youtube.external_blocker, "");
+  assert.equal(youtube.authorization_session_step, "");
+});
+
+test("TikTok AUTHORIZED conserve seulement la contrainte d'audit public tant qu'elle n'est pas levée", () => {
+  const env = {
+    HIBOU_SOCIAL_VAULT_KEY: Buffer.alloc(32, 6).toString("base64url"),
+    TIKTOK_CLIENT_KEY: "tt-key",
+    TIKTOK_CLIENT_SECRET: "tt-secret",
+    TIKTOK_APP_AUDITED: "false",
+  };
+  const readiness = [{
+    provider: "tiktok",
+    ready: true,
+    scopes: "user.info.basic video.publish video.list",
+    redirect_uri: "https://example.com/tiktok",
+    error: "",
+  }];
+  const credentials = [{
+    provider: "tiktok",
+    status: "Connected",
+    scopes: "user.info.basic video.publish video.list",
+  }];
+  const snapshot = buildSocialControlPlane({ readiness, credentials, env });
+  const tiktok = snapshot.providers.find((item) => item.provider === "tiktok");
+  assert.equal(tiktok.phase, "AUTHORIZED");
+  assert.match(tiktok.external_blocker, /audit TikTok/i);
+  assert.match(tiktok.authorization_session_step, /audit TikTok/i);
+});

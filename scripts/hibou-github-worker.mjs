@@ -231,9 +231,93 @@ async function downloadOne(url, dir, options = {}) {
     subtitles: subtitleResult,
   };
 }
+function profileVideoUrl(entry, profileUrl) {
+  const direct = String(entry?.webpage_url || entry?.original_url || "").trim();
+  if (/^https?:\/\//i.test(direct)) return direct;
+
+  const source = new URL(profileUrl);
+  const id = String(entry?.id || "").trim();
+  if (!id) return "";
+
+  if (/youtube\.com$/i.test(source.hostname) || /youtu\.be$/i.test(source.hostname)) {
+    return `https://www.youtube.com/watch?v=${id}`;
+  }
+  if (/tiktok\.com$/i.test(source.hostname)) {
+    const handle = source.pathname.split("/").find((part) => part.startsWith("@"));
+    return handle ? `https://www.tiktok.com/${handle}/video/${id}` : "";
+  }
+  if (/instagram\.com$/i.test(source.hostname)) {
+    const shortcode = String(entry?.shortcode || id).trim();
+    return shortcode ? `https://www.instagram.com/reel/${shortcode}/` : "";
+  }
+  const raw = String(entry?.url || "").trim();
+  return /^https?:\/\//i.test(raw) ? raw : "";
+}
+
+async function discoverProfileShorts(profileUrl, options = {}) {
+  const discoveryLimit = Math.max(10, Math.min(100, Number(options.discovery_limit || 50)));
+  const selectTop = Math.max(1, Math.min(25, Number(options.select_top || 15)));
+  const args = [
+    "--flat-playlist",
+    "--dump-json",
+    "--playlist-end", String(discoveryLimit),
+    "--ignore-errors",
+    "--no-warnings",
+    "--sleep-requests", "1",
+  ];
+  if (/tiktok\.com/i.test(profileUrl)) {
+    args.push("--extractor-args", "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+  }
+  args.push(profileUrl);
+
+  const result = await run(YTDLP, args, ROOT);
+  const rows = String(result.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const candidates = [];
+  const seen = new Set();
+
+  for (let i = 0; i < rows.length; i += 1) {
+    let entry;
+    try { entry = JSON.parse(rows[i]); } catch { continue; }
+    let url = "";
+    try { url = profileVideoUrl(entry, profileUrl); } catch { url = ""; }
+    if (!url || seen.has(url)) continue;
+    try { normalizeUrls([url]); } catch { continue; }
+    seen.add(url);
+    candidates.push({
+      url,
+      id: String(entry?.id || ""),
+      title: String(entry?.title || entry?.description || "").slice(0, 300),
+      views: Number(entry?.view_count || entry?.play_count || 0),
+      likes: Number(entry?.like_count || 0),
+      duration: Number(entry?.duration || 0),
+      order: i,
+    });
+  }
+
+  const ranked = [...candidates].sort((a, b) => {
+    const viewDelta = Number(b.views || 0) - Number(a.views || 0);
+    if (viewDelta !== 0) return viewDelta;
+    return a.order - b.order;
+  });
+  const selected = ranked.slice(0, selectTop);
+  if (!selected.length) throw new Error(`Aucun format court decouvert depuis ${profileUrl}`);
+
+  return {
+    profile_url: profileUrl,
+    discovery_limit: discoveryLimit,
+    select_top: selectTop,
+    discovered_count: candidates.length,
+    ranking_basis: candidates.some((x) => Number(x.views || 0) > 0) ? "views_then_order" : "profile_order",
+    selected,
+    stdout_tail: result.stdout.slice(-3000),
+    stderr_tail: result.stderr.slice(-3000),
+  };
+}
+
 async function processJob(job, processed) {
   if (!job.id) throw new Error("Job sans id");
-  if (!["DOWNLOAD_VIDEO", "DOWNLOAD_BATCH"].includes(job.type)) throw new Error(`Type refusé: ${job.type}`);
+  const allowedTypes = ["DOWNLOAD_VIDEO", "DOWNLOAD_BATCH", "DOWNLOAD_PROFILE_TOP_SHORTS"];
+  if (!allowedTypes.includes(job.type)) throw new Error(`Type refusé: ${job.type}`);
   const urls = normalizeUrls(job.urls);
   if (!urls.length) throw new Error("Aucune URL");
   const concurrent = safePart(job.concurrent || "concurrent");
@@ -241,27 +325,47 @@ async function processJob(job, processed) {
   const dir = path.join(ROOT, "competitors", concurrent, jobName);
 
   state.current_job = job.id;
-  log("Job started", { job: job.id, urls: urls.length, dir });
+  log("Job started", { job: job.id, type: job.type, urls: urls.length, dir });
   await reportProgress(job, "Running", { local_path: dir });
 
   const runs = [];
-  for (const url of urls) runs.push(await downloadOne(url, dir, job.options || {}));
+  let discovery = null;
+
+  if (job.type === "DOWNLOAD_PROFILE_TOP_SHORTS") {
+    if (urls.length !== 1) throw new Error("Un job profil doit contenir une seule URL de profil");
+    discovery = await discoverProfileShorts(urls[0], job.options || {});
+    log("Profile discovery completed", { job: job.id, discovered: discovery.discovered_count, selected: discovery.selected.length, ranking: discovery.ranking_basis });
+    for (const item of discovery.selected) {
+      try {
+        const runResult = await downloadOne(item.url, dir, job.options || {});
+        runs.push({ ...runResult, selected_metadata: item, ok: true });
+      } catch (error) {
+        const message = String(error?.message || error).slice(0, 3000);
+        runs.push({ url: item.url, selected_metadata: item, ok: false, error: message });
+        log("Profile item skipped", { job: job.id, url: item.url, error: message.slice(0, 800) });
+      }
+    }
+  } else {
+    for (const url of urls) runs.push({ ...(await downloadOne(url, dir, job.options || {})), ok: true });
+  }
 
   const files = walk(dir);
   const videos = files.filter((f) => /\.(mp4|mkv|webm|mov)$/i.test(f));
+  if (!videos.length) throw new Error("Aucun fichier video non vide produit pour ce job");
   const hashes = videos.map((file) => ({
     file: path.relative(ROOT, file),
     sha256: sha256(file),
     bytes: statSync(file).size,
   }));
   const result = {
-    schema: "HIBOU_LOCAL_RESULT_V1",
+    schema: "HIBOU_LOCAL_RESULT_V2",
     job: job.id,
     worker: WORKER_ID,
     output_dir: dir,
     video_count: videos.length,
     total_files: files.length,
     videos: hashes,
+    discovery,
     runs,
     completed_at: new Date().toISOString(),
   };

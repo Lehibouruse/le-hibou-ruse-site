@@ -2,10 +2,23 @@ import { NextResponse } from "next/server";
 import { createRecord, TABLES } from "../../../lib/airtable";
 
 const MAX_BODY_BYTES = 10_000;
+const ALLOWED_ORIGINS = new Set([
+  "https://d4d5d6.com",
+  "https://www.d4d5d6.com",
+  "https://le-hibou-ruse-site.vercel.app",
+]);
+
 const clean = (value, max) => String(value || "")
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
   .trim()
   .slice(0, max);
+
+function allowedOrigin(request) {
+  const origin = request.headers.get("origin") || "";
+  if (!origin) return false;
+  try { return ALLOWED_ORIGINS.has(new URL(origin).origin); }
+  catch { return false; }
+}
 
 function json(body, status = 200) {
   return NextResponse.json(body, {
@@ -16,6 +29,7 @@ function json(body, status = 200) {
 
 export async function POST(request) {
   try {
+    if (!allowedOrigin(request)) return json({ error: "Origin refused" }, 403);
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.toLowerCase().includes("application/json")) return json({ error: "Format invalide" }, 415);
     const declaredLength = Number(request.headers.get("content-length") || 0);

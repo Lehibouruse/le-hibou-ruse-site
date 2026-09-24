@@ -8,6 +8,7 @@ import {
   runAgentJob,
 } from "../../../lib/hibou-agent.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
+import { serviceAuthorized, serviceUnauthorized } from "../../../lib/admin-auth.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -208,10 +209,7 @@ async function finalize(job, status, agentStatus, result, started, telemetry = {
 }
 
 export async function GET(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!serviceAuthorized(request)) return serviceUnauthorized();
 
   const candidates = await queryRecords(TABLES.jobs, {
     filterByFormula: eligibleJobsFormula(),

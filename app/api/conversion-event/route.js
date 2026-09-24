@@ -66,7 +66,7 @@ export async function POST(request) {
     return json({ ok: false, error: "Invalid event" }, 422);
   }
 
-  if (event === "landing" && await exists(eventId)) {
+  if (await exists(eventId)) {
     return json({ ok: true, deduplicated: true });
   }
 

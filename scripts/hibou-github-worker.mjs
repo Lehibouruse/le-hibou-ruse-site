@@ -12,6 +12,7 @@ const YTDLP = process.env.HIBOU_YTDLP || "yt-dlp";
 const LOG_DIR = path.join(process.env.LOCALAPPDATA || ROOT, "LeHibou");
 const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
+const APPROVAL_FILE = path.join(LOG_DIR, "approved-jobs.json");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
 const ONCE = process.argv.includes("--once");
@@ -54,6 +55,16 @@ function loadProcessed() {
 
 function saveProcessed(set) {
   writeFileSync(STATE_FILE, JSON.stringify([...set], null, 2), "utf8");
+}
+
+function loadApprovedJobs() {
+  try {
+    const parsed = JSON.parse(readFileSync(APPROVAL_FILE, "utf8"));
+    const ids = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.job_ids) ? parsed.job_ids : [];
+    return new Set(ids.map((value) => String(value || "").trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
 }
 
 function safePart(value, fallback = "unknown") {
@@ -214,13 +225,14 @@ async function tick() {
     state.status = "paused";
     return false;
   }
-  if (!APPROVED_JOB_ID) {
+  const approvedJobs = loadApprovedJobs();
+  if (!APPROVED_JOB_ID && approvedJobs.size === 0) {
     state.status = "waiting_local_job_approval";
     return false;
   }
   const processed = loadProcessed();
   const jobs = await fetchQueue();
-  const job = jobs.find((x) => x.id === APPROVED_JOB_ID && !processed.has(x.id));
+  const job = jobs.find((x) => (x.id === APPROVED_JOB_ID || approvedJobs.has(x.id)) && !processed.has(x.id));
   if (!job) return false;
   try {
     await processJob(job, processed);
@@ -248,6 +260,7 @@ function healthServer() {
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,
+      approved_manifest_count: loadApprovedJobs().size,
       processed_jobs: [...loadProcessed()],
       now: new Date().toISOString(),
     }));
@@ -311,7 +324,7 @@ async function main() {
     return;
   }
   state.status = EXECUTION_ENABLED ? "running" : "paused";
-  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE, execution_enabled: EXECUTION_ENABLED, approved_job_id: APPROVED_JOB_ID || null });
+  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE, execution_enabled: EXECUTION_ENABLED, approved_job_id: APPROVED_JOB_ID || null, approved_manifest_count: loadApprovedJobs().size });
   healthServer();
   if (ONCE) {
     await tick();

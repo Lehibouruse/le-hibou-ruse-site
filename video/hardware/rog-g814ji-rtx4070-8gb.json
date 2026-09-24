@@ -48,9 +48,10 @@
     "full_fp16_flux_first_run": false,
     "human_review_before_full_pilot": true
   },
-  "status": "UNVERIFIED_EXAMPLE_ONLY",
-  "verified": false,
-  "do_not_use_without_runtime_match": true,
+  "status": "USER_CONFIRMED_RUNTIME_TO_BE_MEASURED",
+  "verified": true,
+  "do_not_use_without_runtime_match": false,
   "verification_command": "npm run video:gpu-check:windows",
-  "warning": "Historical/example profile only. The user's exact PC model and VRAM have not yet been verified from a runtime diagnostic."
+  "warning": "Hardware identity is confirmed. Before generation, still measure actual free VRAM/RAM/disk and driver/CUDA state; never skip runtime preflight.",
+  "verification_source": "User-confirmed hardware identity from prior project discussion; runtime diagnostic still required before heavy generation."
 }

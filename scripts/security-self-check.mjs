@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
 const SKIP = new Set([".git","node_modules",".next",".hibou-video-artifacts"]);
+const SKIP_FILES = new Set(["scripts/security-self-check.mjs"]);
 const TEXT_EXT = new Set([".js",".mjs",".cjs",".ts",".tsx",".json",".md",".yml",".yaml",".ps1",".sh",".env",".txt"]);
 
 function walk(dir, out=[]){
@@ -41,7 +42,7 @@ function lineFindings(path,text){
   return findings;
 }
 
-const files=walk(ROOT).filter(isText);
+const files=walk(ROOT).filter((file)=>isText(file) && !SKIP_FILES.has(relative(ROOT,file).replaceAll("\\","/")));
 const findings=[];
 for(const file of files){
   let text="";

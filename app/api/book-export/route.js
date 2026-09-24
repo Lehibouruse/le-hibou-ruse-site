@@ -1,6 +1,6 @@
 import { getRecords, TABLES, configMap } from "../../../lib/airtable";
 import { renderBookDocument } from "../../../lib/book-renderer.mjs";
-import { bookContent, hasBookContent } from "../../../lib/book-content.mjs";
+import { hasBookContent } from "../../../lib/book-content.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";

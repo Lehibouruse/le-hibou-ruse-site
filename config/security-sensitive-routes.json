@@ -1,0 +1,162 @@
+{
+  "schema": "HIBOU_SENSITIVE_ROUTE_AUTH_MATRIX_V1",
+  "note": "Static regression guard only. Passing this matrix does not replace runtime security tests.",
+  "routes": [
+    {
+      "path": "app/api/admin/retention-audit/route.js",
+      "required_all": [
+        "adminAuthorized(request)",
+        "adminUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/agent-worker/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/orchestrator/route.js",
+      "required_all": [
+        "serviceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/book-export/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/book-finalizer/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/book-preview/route.js",
+      "required_all": [
+        "timingSafeEqual",
+        "WWW-Authenticate",
+        "BOOK_PREVIEW_PASSWORD"
+      ]
+    },
+    {
+      "path": "app/api/book-reconcile/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/book-scheduler/route.js",
+      "required_all": [
+        "serviceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/commerce/delivery/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/commerce/digify-contract-test/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/commerce/lemon-bootstrap/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/commerce/lemon-live-bootstrap/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/commerce/revoke/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/authorization-queue/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/control-plane/route.js",
+      "required_all": [
+        "adminOrServiceAuthorized",
+        "verifyGithubActionsToken",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/social/connection-test/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/preflight/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/review-pack/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/social/validation-plan/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/system-watchdog/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    },
+    {
+      "path": "app/api/wake/route.js",
+      "required_all": [
+        "verifyGithubActionsToken",
+        "Unauthorized"
+      ]
+    }
+  ]
+}

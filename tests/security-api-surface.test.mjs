@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyRoute } from "../scripts/security-api-surface.mjs";
+import { auditApi, classifyRoute } from "../scripts/security-api-surface.mjs";
 
 test("classifies OIDC/admin protected routes",()=>{
   const r=classifyRoute(`
@@ -47,4 +47,22 @@ test("marks unguarded mutating routes for review",()=>{
 test("classifies read-only GET routes separately",()=>{
   const r=classifyRoute(`export async function GET(){ return Response.json({ok:true}); }`);
   assert.equal(r.classification,"public_read");
+});
+
+
+test("full API surface has zero unreviewed routes",()=>{
+  const report=auditApi();
+  assert.equal(report.needs_review.length,0,JSON.stringify(report.needs_review,null,2));
+});
+
+test("classifies signed Meta callbacks and canonical Lemon aliases",()=>{
+  assert.equal(classifyRoute(`
+    export async function POST(request){
+      const payload=verifyMetaSignedRequest("x","secret");
+      return Response.json(payload);
+    }`).classification,"signed_webhook");
+  assert.equal(classifyRoute(`
+    import { POST as canonicalPost } from "../../commerce/lemon-webhook/route";
+    export async function POST(request){ return canonicalPost(request); }
+  `).classification,"signed_webhook");
 });

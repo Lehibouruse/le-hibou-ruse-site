@@ -5,6 +5,7 @@ import { BOOK_EDITORIAL_VERSION, bookInstructions } from "../../../lib/book-edit
 import { bookQualityGate } from "../../../lib/book-quality.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 import { creditPausePatch, isCreditExhausted, openOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
+import { PAID_AI_DISABLED_BY_POLICY } from "../../../lib/hibou-agent.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -215,6 +216,7 @@ export async function GET(request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  if (PAID_AI_DISABLED_BY_POLICY) return NextResponse.json({ ok: true, processed: 0, reason: "paid_ai_disabled_by_policy", openai_calls: 0 });
 
   let claimedJob = null;
   try {

@@ -10,6 +10,7 @@ import {
   nextSpecialTarget,
   specialQuality,
 } from "../../../lib/book-finalizer.mjs";
+import { PAID_AI_DISABLED_BY_POLICY } from "../../../lib/hibou-agent.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,6 +96,7 @@ async function generate(kind, chapters) {
 export async function POST(request) {
   try {
     await authenticate(request);
+    if (PAID_AI_DISABLED_BY_POLICY) return NextResponse.json({ ok: true, processed: 0, reason: "paid_ai_disabled_by_policy", openai_calls: 0 });
     if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY absent");
 
     const records = await queryRecords(TABLES.book, { pageSize: 100, priorityAware: false });

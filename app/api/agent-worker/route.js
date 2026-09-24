@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createRecord, getRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { failureDisposition } from "../../../lib/agent-runtime.mjs";
 import { toolsForAction, isAgenticAction, workerInstructions } from "../../../lib/agent-capabilities.mjs";
-import { estimateCost, getAgentConfig, HIBOU_AGENT_INSTRUCTIONS, HIBOU_AGENT_PROMPT_VERSION, routeJob } from "../../../lib/hibou-agent.mjs";
+import { estimateCost, getAgentConfig, HIBOU_AGENT_INSTRUCTIONS, HIBOU_AGENT_PROMPT_VERSION, PAID_AI_DISABLED_BY_POLICY, routeJob } from "../../../lib/hibou-agent.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 import { eligibleJobsFormula } from "../../../lib/job-eligibility.mjs";
 import { creditPausePatch, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
@@ -93,6 +93,7 @@ function openAiError(response, data, label = "OpenAI Responses API") {
 }
 
 async function claim(body = {}) {
+  if (PAID_AI_DISABLED_BY_POLICY) return { ok: true, claimed: false, reason: "paid_ai_disabled_by_policy" };
   const circuit = await readOpenAiCircuit();
   if (circuit.active) {
     return {
@@ -130,6 +131,7 @@ async function claim(body = {}) {
 }
 
 async function openaiStep(body) {
+  if (PAID_AI_DISABLED_BY_POLICY) throw new Error("OpenAI API désactivée par politique projet");
   const job = await ownedJob(body.record_id, body.lock_token);
   const action = actionName(job);
   if (!isAgenticAction(action, parameters(job))) throw new Error("Action agentique refusée");
@@ -167,6 +169,7 @@ async function openaiStep(body) {
 }
 
 async function openaiStepStatus(body) {
+  if (PAID_AI_DISABLED_BY_POLICY) throw new Error("OpenAI API désactivée par politique projet");
   const job = await ownedJob(body.record_id, body.lock_token);
   const responseId = String(body.response_id || "");
   if (!/^resp_[A-Za-z0-9_-]+$/.test(responseId)) throw new Error("Response ID OpenAI invalide");

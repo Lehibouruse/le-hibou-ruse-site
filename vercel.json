@@ -3,9 +3,9 @@
   "git": {
     "deploymentEnabled": {
       "**": false,
-      "hibou-agent/**": true,
       "main": true
-    }
+    },
+    "ignoreCommand": "git diff HEAD^ HEAD --quiet -- app components lib public package.json package-lock.json proxy.js vercel.json"
   },
   "crons": [
     {

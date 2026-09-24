@@ -28,7 +28,8 @@
     "security:self-check": "node scripts/security-self-check.mjs",
     "backup:local": "node scripts/backup-project-local.mjs --all",
     "backup:rehearse": "node scripts/restore-rehearsal-local.mjs",
-    "media:inventory": "node scripts/media-storage-inventory.mjs"
+    "media:inventory": "node scripts/media-storage-inventory.mjs",
+    "forensic:package": "node scripts/forensic-package-local.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

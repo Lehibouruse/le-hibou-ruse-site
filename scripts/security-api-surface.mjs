@@ -38,6 +38,8 @@ export function classifyRoute(source){
     /verifyLemonSignature\s*\(/,
     /x-signature/i,
     /verify[A-Za-z0-9_]*(?:Signature|Webhook)\s*\(/,
+    /verifyMetaSignedRequest\s*\(/,
+    /commerce\/lemon-webhook\/route/,
     /createHmac\s*\(/,
   ]);
   const browserGuard=has(source,[

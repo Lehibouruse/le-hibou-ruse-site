@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { createRecord, TABLES } from "../../../lib/airtable";
+import { createRecord, queryRecords, TABLES } from "../../../lib/airtable";
+import { escapeFormula } from "../../../lib/commerce.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +72,23 @@ export async function POST(request) {
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   if (!firstName || !lastName || !validEmail || !contractReference) {
     return json({ ok: false, error: "Données invalides" }, 422);
+  }
+
+  const existing = await queryRecords(TABLES.withdrawals, {
+    filterByFormula: `AND({E-mail accusé}='${escapeFormula(email)}',{Référence contrat}='${escapeFormula(contractReference)}')`,
+    pageSize: 1,
+  });
+  if (existing.length) {
+    const fields = existing[0].fields || {};
+    const requestId = clean(fields["Demande ID"], 180);
+    const submittedAt = clean(fields["Date demande"], 180);
+    return json({
+      ok: true,
+      deduplicated: true,
+      request_id: requestId,
+      submitted_at: submittedAt,
+      receipt_text: receiptText({ requestId, submittedAt, firstName, lastName, email, contractReference }),
+    });
   }
 
   const requestId = randomUUID();

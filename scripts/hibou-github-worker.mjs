@@ -17,6 +17,7 @@ const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local
 const ONCE = process.argv.includes("--once");
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
 const EXECUTION_ENABLED = String(process.env.HIBOU_LOCAL_EXECUTION_ENABLED || "").trim().toLowerCase() === "true";
+const APPROVED_JOB_ID = String(process.env.HIBOU_LOCAL_APPROVED_JOB_ID || "").trim();
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -213,9 +214,13 @@ async function tick() {
     state.status = "paused";
     return false;
   }
+  if (!APPROVED_JOB_ID) {
+    state.status = "waiting_local_job_approval";
+    return false;
+  }
   const processed = loadProcessed();
   const jobs = await fetchQueue();
-  const job = jobs.find((x) => !processed.has(x.id));
+  const job = jobs.find((x) => x.id === APPROVED_JOB_ID && !processed.has(x.id));
   if (!job) return false;
   try {
     await processJob(job, processed);
@@ -242,6 +247,7 @@ function healthServer() {
       report_url: REPORT_URL,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
+      approved_job_id: APPROVED_JOB_ID || null,
       processed_jobs: [...loadProcessed()],
       now: new Date().toISOString(),
     }));
@@ -305,7 +311,7 @@ async function main() {
     return;
   }
   state.status = EXECUTION_ENABLED ? "running" : "paused";
-  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE, execution_enabled: EXECUTION_ENABLED });
+  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE, execution_enabled: EXECUTION_ENABLED, approved_job_id: APPROVED_JOB_ID || null });
   healthServer();
   if (ONCE) {
     await tick();

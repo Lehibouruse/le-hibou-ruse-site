@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "note": "Corpus équilibre V8 : surplus Furet désactivé car déjà au-dessus de la cible; jobs profil top15 conservés actifs pour les concurrents sous-représentés; doublons individuels Richissime/Stratège/Monsieur Chimp placés en réserve. Aucun job n'est exécuté sans approbation locale exacte du worker.",
   "target_shortform_videos": 150,
   "jobs": [
@@ -1102,7 +1102,7 @@
     },
     {
       "id": "reels-finance-panthere-tiktok-7649878022354504993-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1117,11 +1117,12 @@
       },
       "label": "Finance Panthere TikTok 7649878022354504993",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7634292064515083553-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1136,11 +1137,12 @@
       },
       "label": "Finance Panthere TikTok 7634292064515083553",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7631693479185354016-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1155,11 +1157,12 @@
       },
       "label": "Finance Panthere TikTok 7631693479185354016",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7635000346640747809-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1174,11 +1177,12 @@
       },
       "label": "Finance Panthere TikTok 7635000346640747809",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7641873502626204961-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1193,11 +1197,12 @@
       },
       "label": "Finance Panthere TikTok 7641873502626204961",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7629063822749289761-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1212,11 +1217,12 @@
       },
       "label": "Finance Panthere TikTok 7629063822749289761",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7645058924604820768-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1231,11 +1237,12 @@
       },
       "label": "Finance Panthere TikTok 7645058924604820768",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7642825784956112161-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1250,11 +1257,12 @@
       },
       "label": "Finance Panthere TikTok 7642825784956112161",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7630923023440268576-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1269,11 +1277,12 @@
       },
       "label": "Finance Panthere TikTok 7630923023440268576",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7630587558539414816-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1288,11 +1297,12 @@
       },
       "label": "Finance Panthere TikTok 7630587558539414816",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7633139197016100129-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1307,11 +1317,12 @@
       },
       "label": "Finance Panthere TikTok 7633139197016100129",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7636891104876547360-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1326,11 +1337,12 @@
       },
       "label": "Finance Panthere TikTok 7636891104876547360",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7630036576214469921-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1345,11 +1357,12 @@
       },
       "label": "Finance Panthere TikTok 7630036576214469921",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-tiktok-7629795204467363104-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -1364,7 +1377,8 @@
       },
       "label": "Finance Panthere TikTok 7629795204467363104",
       "created_at": "2026-09-24T22:18:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-furet-top100-051-v1",
@@ -2736,7 +2750,7 @@
     },
     {
       "id": "reels-finance-panthere-01-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -2751,7 +2765,8 @@
       },
       "label": "Finance Panthère YouTube — 22/04/2026 — à absorber",
       "created_at": "2026-09-24T22:10:00+02:00",
-      "batch_id": "competitor-reels-150-v1"
+      "batch_id": "competitor-reels-150-v1",
+      "paused_reason": "Temporary pause 2026-09-24: repeated yt-dlp/TikTok extraction failures; preserve URL for later retry after extractor update."
     },
     {
       "id": "reels-finance-panthere-02-v1",
@@ -3070,5 +3085,6 @@
       "created_at": "2026-09-24T21:40:00+02:00"
     }
   ],
-  "approved_batch_id": "balanced-competitors-night-v1"
+  "approved_batch_id": "balanced-competitors-night-v1",
+  "notes": "\n2026-09-24: Finance Panthere direct TikTok jobs temporarily paused so worker can continue with other competitors; URLs preserved for retry."
 }

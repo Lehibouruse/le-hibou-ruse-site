@@ -150,7 +150,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, processed: 0, reason: "delivery_provider_invalid", configured: false }, { status: 422 });
   }
   if (!configured) {
-    const reason = provider === "lemon_native" ? "lemon_native_delivery_not_verified" : "digify_delivery_not_available";
+    const reason = provider === "lemon_native" ? "lemon_native_delivery_not_verified" : "delivery_not_configured";
     return NextResponse.json({ ok: true, processed: 0, reason, configured: false, provider });
   }
 

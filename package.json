@@ -29,7 +29,8 @@
     "backup:local": "node scripts/backup-project-local.mjs --all",
     "backup:rehearse": "node scripts/restore-rehearsal-local.mjs",
     "media:inventory": "node scripts/media-storage-inventory.mjs",
-    "forensic:package": "node scripts/forensic-package-local.mjs"
+    "forensic:package": "node scripts/forensic-package-local.mjs",
+    "corpus:dashboard": "node scripts/corpus-dashboard-sync.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "note": "Queue publique en lecture seule pour le worker ROG. Seuls DOWNLOAD_VIDEO et DOWNLOAD_BATCH sur hôtes autorisés sont exécutés.",
+  "jobs": [
+    {
+      "id": "test-renard-prix-transfert-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=pqm2Cu-TDEY"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "created_at": "2026-09-24T21:40:00+02:00"
+    }
+  ]
+}

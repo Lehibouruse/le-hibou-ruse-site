@@ -6,7 +6,7 @@ const source=readFileSync(new URL("../app/api/analyze-montage/route.js",import.m
 
 test("montage analysis requires admin or service auth before any paid-AI path",()=>{
   const auth=source.indexOf("adminOrServiceAuthorized(request)");
-  const policy=source.indexOf("PAID_AI_DISABLED_BY_POLICY");
+  const policy=source.indexOf("if (PAID_AI_DISABLED_BY_POLICY)");
   const openai=source.indexOf('fetch("https://api.openai.com/v1/responses"');
   assert.ok(auth>=0);
   assert.ok(policy>auth);

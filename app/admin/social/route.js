@@ -8,6 +8,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SETUP = {
+  reddit: {
+    label: "Reddit",
+    portal: "https://support.reddithelp.com/hc/en-us/articles/14945211791892-Developer-Platform-Accessing-Reddit-Data",
+    note: "Connecteur désactivé tant que l’approbation API commerciale Reddit n’est pas enregistrée. Après accord seulement : app Web OAuth, compte Hibou, test lecture, puis communauté cible validée avant publication.",
+  },
   youtube: {
     label: "YouTube",
     portal: "https://console.cloud.google.com/apis/credentials",

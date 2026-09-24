@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { bookQualityGate } from "../../../lib/book-quality.mjs";
+import { bookContent } from "../../../lib/book-content.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
@@ -81,7 +82,7 @@ export async function POST(request) {
   for (const chapter of chapters) {
     if (reconciled.length >= MAX_RECONCILIATIONS) break;
     const fields = chapter.fields || {};
-    const content = String(fields["Contenu V1"] || "").trim();
+    const content = bookContent(fields);
     const start = Number(fields["Source début"] || 0);
     const end = Number(fields["Source fin"] || 0);
     if (!content || !Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) continue;

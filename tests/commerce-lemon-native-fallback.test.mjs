@@ -44,5 +44,5 @@ test("le fallback refuse toujours une édition non finale", () => {
 test("Digify est aussi fermé quand son statut commercial n'est plus actif", () => {
   assert.match(delivery, /activeConfigurationValue\("digify_api_status", ""\)/);
   assert.match(delivery, /digifyDeliveryAvailable/);
-  assert.match(delivery, /digify_delivery_not_available/);
+  assert.match(delivery, /delivery_not_configured/);
 });

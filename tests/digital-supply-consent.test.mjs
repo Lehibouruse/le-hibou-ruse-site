@@ -37,6 +37,10 @@ test("la route est désactivée par défaut et sépare TEST et LIVE", () => {
   assert.match(route, /checkoutCustomData/);
   assert.match(route, /immediate_supply_consent !== true/);
   assert.match(route, /withdrawal_loss_ack !== true/);
+  assert.match(route, /request_id/);
+  assert.match(route, /existingConsentRequest\(requestId\)/);
+  assert.match(route, /"URL résultat"/);
+  assert.match(route, /deduplicated: true/);
   assert.doesNotMatch(route, /first_name|last_name|email/);
 });
 
@@ -48,5 +52,8 @@ test("le site public active la page de consentement uniquement lorsque le featur
   assert.match(page, /purchaseEvent = consentEnabled \? "purchase_consent_opened" : "checkout_opened"/);
   assert.match(form, /immediate_supply_consent/);
   assert.match(form, /withdrawal_loss_ack/);
+  assert.match(form, /requestId = useRef/);
+  assert.match(form, /randomUUID/);
+  assert.match(form, /request_id: requestId\.current/);
   assert.match(form, /type="checkbox" required/);
 });

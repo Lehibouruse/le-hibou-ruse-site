@@ -155,29 +155,63 @@ async function reportProgress(job, status, data = {}) {
 async function downloadOne(url, dir, options = {}) {
   mkdirSync(dir, { recursive: true });
   const maxHeight = Math.max(360, Math.min(2160, Number(options.max_height || 1080)));
-  const subtitleLangs = Array.isArray(options.subtitle_languages) && options.subtitle_languages.length
-    ? options.subtitle_languages.join(",") : "fr,en";
-  const args = [
+  const outputTemplate = "%(uploader)s/%(upload_date)s - %(title)s [%(id)s].%(ext)s";
+
+  // Phase 1: the MP4 is the priority. Do not let optional subtitles block the media.
+  const mediaArgs = [
     "--newline", "--no-progress", "--windows-filenames", "--restrict-filenames",
-    "--write-info-json", "--write-thumbnail", "--convert-thumbnails", "jpg",
-    "--write-subs", "--write-auto-subs", "--sub-langs", subtitleLangs,
-    "--sub-format", "srt/best",
+    "--write-info-json",
+    "--write-thumbnail", "--convert-thumbnails", "jpg",
+    "--retries", "10",
+    "--fragment-retries", "10",
+    "--retry-sleep", "http:exp=1:20",
+    "--sleep-requests", "1",
     "-f", `bv*[height<=${maxHeight}]+ba/b[height<=${maxHeight}]`,
     "--merge-output-format", "mp4",
-    "-o", "%(uploader)s/%(upload_date)s - %(title)s [%(id)s].%(ext)s",
+    "-o", outputTemplate,
     "--no-playlist",
     url,
   ];
+
   const started = Date.now();
-  const result = await run(YTDLP, args, dir);
+  const mediaResult = await run(YTDLP, mediaArgs, dir);
+
+  // Phase 2: subtitles are optional enrichment only.
+  let subtitleResult = { attempted: false, ok: null, error: "" };
+  if (options.download_subtitles === true) {
+    const subtitleLangs = Array.isArray(options.subtitle_languages) && options.subtitle_languages.length
+      ? options.subtitle_languages.join(",") : "fr";
+    const subtitleArgs = [
+      "--skip-download",
+      "--write-subs", "--write-auto-subs",
+      "--sub-langs", subtitleLangs,
+      "--sub-format", "srt/best",
+      "--retries", "3",
+      "--retry-sleep", "http:2",
+      "--sleep-requests", "2",
+      "-o", outputTemplate,
+      "--no-playlist",
+      url,
+    ];
+    subtitleResult.attempted = true;
+    try {
+      await run(YTDLP, subtitleArgs, dir);
+      subtitleResult.ok = true;
+    } catch (error) {
+      subtitleResult.ok = false;
+      subtitleResult.error = String(error?.message || error).slice(0, 1500);
+      log("Optional subtitles skipped", { url, error: subtitleResult.error });
+    }
+  }
+
   return {
     url,
     elapsed_s: Math.round((Date.now() - started) / 100) / 10,
-    stdout_tail: result.stdout.slice(-3000),
-    stderr_tail: result.stderr.slice(-3000),
+    stdout_tail: mediaResult.stdout.slice(-3000),
+    stderr_tail: mediaResult.stderr.slice(-3000),
+    subtitles: subtitleResult,
   };
 }
-
 async function processJob(job, processed) {
   if (!job.id) throw new Error("Job sans id");
   if (!["DOWNLOAD_VIDEO", "DOWNLOAD_BATCH"].includes(job.type)) throw new Error(`Type refusé: ${job.type}`);

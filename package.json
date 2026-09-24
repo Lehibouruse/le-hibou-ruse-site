@@ -33,7 +33,9 @@
     "corpus:dashboard": "node scripts/corpus-dashboard-sync.mjs",
     "forensic:competitors": "node scripts/competitor-forensic-batch.mjs",
     "forensic:first": "node scripts/competitor-forensic-batch.mjs --limit=1",
-    "analytics:sync": "node scripts/analytics-pilotage-sync.mjs"
+    "analytics:sync": "node scripts/analytics-pilotage-sync.mjs",
+    "security:api-surface": "node scripts/security-api-surface.mjs",
+    "security:api-surface:strict": "node scripts/security-api-surface.mjs --strict"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 const worker=readFileSync(new URL("../scripts/hibou-local-worker.mjs",import.meta.url),"utf8");
 const installer=readFileSync(new URL("../scripts/install-hibou-local-worker.ps1",import.meta.url),"utf8");
 const bootstrap=readFileSync(new URL("../scripts/bootstrap-hibou-local-worker.ps1",import.meta.url),"utf8");
+const githubWorker=readFileSync(new URL("../scripts/hibou-github-worker.mjs",import.meta.url),"utf8");
+const publicQueue=JSON.parse(readFileSync(new URL("../config/local-worker-queue.json",import.meta.url),"utf8"));
 const docs=readFileSync(new URL("../docs/HIBOU_LOCAL_WORKER.md",import.meta.url),"utf8");
 
 test("local worker refuses browser-cookie extraction from Airtable commands",()=>{
@@ -28,6 +30,20 @@ test("docs do not claim an unverified exact ROG model",()=>{
 
 test("one-command bootstrap is side-effect free unless StartWorker is explicit",()=>{
   assert.match(bootstrap,/\[switch\]\$StartWorker/);
+  assert.match(bootstrap,/--diagnostic/);
+  assert.match(bootstrap,/if \(\$StartWorker\)/);
+  assert.doesNotMatch(bootstrap,/\$Worker --once/);
+});
+
+test("tokenless worker is execution-gated and queue jobs are inactive by default",()=>{
+  assert.match(githubWorker,/HIBOU_LOCAL_EXECUTION_ENABLED/);
+  assert.match(githubWorker,/execution_enabled: EXECUTION_ENABLED/);
+  assert.match(githubWorker,/if \(!EXECUTION_ENABLED\)/);
+  assert.ok((publicQueue.jobs || []).every((job)=>job.active === false));
+});
+test("tokenless bootstrap performs diagnostic only unless StartWorker is explicit",()=>{
+  assert.match(bootstrap,/\[switch\]\$StartWorker/);
+  assert.match(bootstrap,/HIBOU_LOCAL_EXECUTION_ENABLED", "false"/);
   assert.match(bootstrap,/--diagnostic/);
   assert.match(bootstrap,/if \(\$StartWorker\)/);
   assert.doesNotMatch(bootstrap,/\$Worker --once/);

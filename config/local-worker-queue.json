@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "note": "Queue publique en lecture seule pour le worker ROG. Seuls DOWNLOAD_VIDEO et DOWNLOAD_BATCH sur hôtes autorisés sont exécutés.",
+  "note": "Queue publique en lecture seule. Les jobs restent inactifs par défaut et le worker exige HIBOU_LOCAL_EXECUTION_ENABLED=true.",
   "jobs": [
     {
       "id": "test-renard-prix-transfert-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [

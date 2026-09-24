@@ -14,6 +14,8 @@ const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const ONCE = process.argv.includes("--once");
+const DIAGNOSTIC = process.argv.includes("--diagnostic");
+const EXECUTION_ENABLED = String(process.env.HIBOU_LOCAL_EXECUTION_ENABLED || "").trim().toLowerCase() === "true";
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -176,6 +178,10 @@ async function processJob(job, processed) {
 }
 
 async function tick() {
+  if (!EXECUTION_ENABLED) {
+    state.status = "paused";
+    return false;
+  }
   const processed = loadProcessed();
   const jobs = await fetchQueue();
   const job = jobs.find((x) => !processed.has(x.id));
@@ -202,6 +208,7 @@ function healthServer() {
       media_root: ROOT,
       queue_url: QUEUE_URL,
       poll_ms: POLL_MS,
+      execution_enabled: EXECUTION_ENABLED,
       processed_jobs: [...loadProcessed()],
       now: new Date().toISOString(),
     }));
@@ -210,8 +217,22 @@ function healthServer() {
 }
 
 async function main() {
-  state.status = "running";
-  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE });
+  if (DIAGNOSTIC) {
+    process.stdout.write(JSON.stringify({
+      schema: "HIBOU_GITHUB_WORKER_DIAGNOSTIC_V1",
+      generated_at: new Date().toISOString(),
+      worker: WORKER_ID,
+      media_root: ROOT,
+      queue_url: QUEUE_URL,
+      execution_enabled: EXECUTION_ENABLED,
+      network_tested: false,
+      queue_fetched: false,
+      downloads_performed: false
+    }, null, 2) + "\n");
+    return;
+  }
+  state.status = EXECUTION_ENABLED ? "running" : "paused";
+  log("Hibou GitHub worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE, execution_enabled: EXECUTION_ENABLED });
   healthServer();
   if (ONCE) {
     await tick();

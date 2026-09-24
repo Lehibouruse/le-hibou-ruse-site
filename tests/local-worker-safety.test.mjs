@@ -35,12 +35,18 @@ test("one-command bootstrap is side-effect free unless StartWorker is explicit",
   assert.doesNotMatch(bootstrap,/\$Worker --once/);
 });
 
-test("tokenless worker is execution-gated and queue jobs are inactive by default",()=>{
+test("tokenless worker is execution-gated and remote queue alone cannot authorize execution",()=>{
   assert.match(githubWorker,/HIBOU_LOCAL_EXECUTION_ENABLED/);
   assert.match(githubWorker,/execution_enabled: EXECUTION_ENABLED/);
   assert.match(githubWorker,/if \(!EXECUTION_ENABLED\)/);
-  assert.ok((publicQueue.jobs || []).every((job)=>job.active === false));
+  assert.match(githubWorker,/approved-jobs\.json/);
+  assert.match(githubWorker,/if \(approvedJobs\.size === 0\)/);
+  assert.match(githubWorker,/approvedJobMatches\(x, approvedJobs\)/);
+  const active=(publicQueue.jobs || []).filter((job)=>job.active !== false);
+  assert.ok(active.length > 0);
+  assert.ok(active.every((job)=>job.batch_id === "competitor-reels-150-v1"));
 });
+
 test("tokenless bootstrap performs diagnostic only unless StartWorker is explicit",()=>{
   assert.match(bootstrap,/\[switch\]\$StartWorker/);
   assert.match(bootstrap,/HIBOU_LOCAL_EXECUTION_ENABLED", "false"/);
@@ -49,10 +55,17 @@ test("tokenless bootstrap performs diagnostic only unless StartWorker is explici
   assert.doesNotMatch(bootstrap,/\$Worker --once/);
 });
 
-test("tokenless worker requires exact local job approval in addition to global execution opt-in",()=>{
+test("local approval is content-bound, not only ID-bound",()=>{
   assert.match(githubWorker,/HIBOU_LOCAL_APPROVED_JOB_ID/);
-  assert.match(githubWorker,/if \(!APPROVED_JOB_ID\)/);
-  assert.match(githubWorker,/x\.id === APPROVED_JOB_ID/);
-  assert.doesNotMatch(githubWorker,/APPROVED_JOB_ID === ["']ALL["']/);
-  assert.ok((publicQueue.jobs || []).every((job)=>job.active === false));
+  assert.match(githubWorker,/function approvalSnapshot\(job\)/);
+  assert.match(githubWorker,/function approvedJobMatches\(job, approvedJobs\)/);
+  assert.match(githubWorker,/expected === approvalSnapshotJson\(job\)/);
+  assert.doesNotMatch(githubWorker,/parsed\?\.job_ids/);
+  assert.match(bootstrap,/\[switch\]\$ApproveCorpus150/);
+  assert.match(bootstrap,/\[string\]\$ApproveJobId/);
+  assert.match(bootstrap,/HIBOU_LOCAL_JOB_APPROVAL_V2/);
+  assert.match(bootstrap,/jobs = \$snapshots/);
+  assert.match(bootstrap,/Test-Path \$ApprovalFile/);
+  assert.match(bootstrap,/exactement 150 jobs actifs/);
 });
+

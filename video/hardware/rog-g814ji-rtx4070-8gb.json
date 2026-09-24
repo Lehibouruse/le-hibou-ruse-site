@@ -1,0 +1,51 @@
+{
+  "schema": "HIBOU_LOCAL_HARDWARE_PROFILE_V1",
+  "profile_id": "ROG_G814JI_RTX4070_8GB",
+  "device": {
+    "model": "ASUS ROG Strix G18 G814JI",
+    "cpu": "Intel Core i9-13980HX",
+    "cpu_cores": 24,
+    "cpu_threads": 32,
+    "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU",
+    "vram_gb": 8,
+    "ram_gb": 32,
+    "storage": "NVMe SSD ~1 TB"
+  },
+  "voice": {
+    "engine": "chatterbox_multilingual",
+    "python": "3.11",
+    "device": "cuda",
+    "generation_mode": "one_scene_first",
+    "fallback_policy": "no_paid_cloud_fallback"
+  },
+  "image": {
+    "engine": "comfyui_local",
+    "model_family": "FLUX.1-schnell",
+    "precision": "fp8",
+    "candidates_per_scene": 3,
+    "generate_sequentially": true,
+    "smoke_profile": {
+      "width": 768,
+      "height": 1344,
+      "batch_size": 1,
+      "steps": 4
+    },
+    "fallback_profile": {
+      "width": 640,
+      "height": 1136,
+      "batch_size": 1,
+      "steps": 4
+    },
+    "final_video_target": {
+      "width": 1080,
+      "height": 1920
+    },
+    "policy": "start with smoke_profile; on CUDA OOM or excessive RAM pressure, retry once with fallback_profile; never silently switch to cloud"
+  },
+  "safeguards": {
+    "public_comfyui_endpoint": false,
+    "paid_api_fallback": false,
+    "full_fp16_flux_first_run": false,
+    "human_review_before_full_pilot": true
+  }
+}

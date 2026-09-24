@@ -248,6 +248,15 @@ Write-Host "Demarrage auto utilisateur : $StartupCmd"
 if ($StartWorker) {
   [Environment]::SetEnvironmentVariable("HIBOU_LOCAL_EXECUTION_ENABLED", "true", "User")
   $env:HIBOU_LOCAL_EXECUTION_ENABLED = "true"
+
+  # Stop old Hibou worker process before replacing it with the current version.
+  Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*hibou-github-worker.mjs*" } |
+    ForEach-Object {
+      try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+    }
+  Start-Sleep -Milliseconds 500
+
   Start-Process -FilePath $Node -ArgumentList "`"$Worker`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
   Start-Sleep -Seconds 2
   Write-Host "Worker active explicitement. Etat local : http://127.0.0.1:8765/health"

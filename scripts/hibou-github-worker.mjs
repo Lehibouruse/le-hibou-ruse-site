@@ -13,6 +13,7 @@ const LOG_DIR = path.join(process.env.LOCALAPPDATA || ROOT, "LeHibou");
 const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const APPROVAL_FILE = path.join(LOG_DIR, "approved-jobs.json");
+const FAILED_FILE = path.join(LOG_DIR, "failed-jobs.json");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
 const ONCE = process.argv.includes("--once");
@@ -55,6 +56,19 @@ function loadProcessed() {
 
 function saveProcessed(set) {
   writeFileSync(STATE_FILE, JSON.stringify([...set], null, 2), "utf8");
+}
+
+function loadFailedJobs() {
+  try {
+    const parsed = JSON.parse(readFileSync(FAILED_FILE, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveFailedJobs(map) {
+  writeFileSync(FAILED_FILE, JSON.stringify(map, null, 2), "utf8");
 }
 
 function loadApprovedJobs() {
@@ -266,8 +280,17 @@ async function tick() {
     return false;
   }
   const processed = loadProcessed();
+  const failed = loadFailedJobs();
+  const now = Date.now();
   const jobs = await fetchQueue();
-  const job = jobs.find((x) => (x.id === APPROVED_JOB_ID || approvedJobs.has(x.id)) && !processed.has(x.id));
+  const job = jobs.find((x) => {
+    const approved = x.id === APPROVED_JOB_ID || approvedJobs.has(x.id);
+    if (!approved || processed.has(x.id)) return false;
+    const info = failed[x.id];
+    if (!info) return true;
+    const retryAfter = Number(info.retry_after || 0);
+    return retryAfter > 0 && retryAfter <= now;
+  });
   if (!job) return false;
   try {
     await processJob(job, processed);
@@ -277,8 +300,18 @@ async function tick() {
     state.current_job = null;
     log("Job failed", { job: job?.id, error: message });
     await reportProgress(job, "Error", { error: message });
+    const failed = loadFailedJobs();
+    const prev = failed[job.id] || {};
+    const attempts = Number(prev.attempts || 0) + 1;
+    failed[job.id] = {
+      attempts,
+      last_error: message.slice(0, 1500),
+      failed_at: new Date().toISOString(),
+      retry_after: Date.now() + (attempts >= 2 ? 6 * 60 * 60 * 1000 : 60 * 1000),
+    };
+    saveFailedJobs(failed);
     if (ONCE) throw error;
-    // Ne pas marquer processed : le worker retentera au prochain cycle après correction.
+    // Le job en erreur est temporairement saute afin que le corpus continue.
   }
   return true;
 }
@@ -298,6 +331,7 @@ function healthServer() {
       approved_job_id: APPROVED_JOB_ID || null,
       approved_manifest_count: loadApprovedJobs().size,
       processed_jobs: [...loadProcessed()],
+      failed_jobs: loadFailedJobs(),
       now: new Date().toISOString(),
     }));
   });

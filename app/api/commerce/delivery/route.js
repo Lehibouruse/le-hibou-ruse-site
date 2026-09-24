@@ -73,6 +73,11 @@ async function lemonNativeDeliveryVerified() {
   return truthy(await activeConfigurationValue("lemon_native_delivery_verified", "false"));
 }
 
+async function digifyDeliveryAvailable() {
+  const status = (await activeConfigurationValue("digify_api_status", "")).toUpperCase();
+  return ["CONNECTED_PRODUCTION_TESTED", "ACTIVE"].includes(status);
+}
+
 function finalEdition(value) {
   const edition = String(value || "").trim();
   return Boolean(edition && !edition.toLowerCase().includes("draft"));
@@ -134,7 +139,7 @@ export async function POST(request) {
 
   const provider = await deliveryProviderMode();
   const configured = provider === "digify"
-    ? Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET)
+    ? Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET) && await digifyDeliveryAvailable()
     : provider === "lemon_native"
       ? await lemonNativeDeliveryVerified()
       : false;
@@ -145,7 +150,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, processed: 0, reason: "delivery_provider_invalid", configured: false }, { status: 422 });
   }
   if (!configured) {
-    const reason = provider === "lemon_native" ? "lemon_native_delivery_not_verified" : "delivery_not_configured";
+    const reason = provider === "lemon_native" ? "lemon_native_delivery_not_verified" : "digify_delivery_not_available";
     return NextResponse.json({ ok: true, processed: 0, reason, configured: false, provider });
   }
 

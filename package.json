@@ -21,7 +21,10 @@
     "video:comfyui-binding": "node scripts/video-comfyui-binding-discover.mjs",
     "video:smoke-report": "node scripts/video-airtable-smoke-report.mjs",
     "video:install:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-local-install-windows.ps1",
-    "video:comfyui:start:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-start-comfyui-windows.ps1"
+    "video:comfyui:start:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-start-comfyui-windows.ps1",
+    "backup:plan": "node scripts/backup-hibou-safe.mjs",
+    "backup:create": "node scripts/backup-hibou-safe.mjs --create",
+    "backup:verify": "node scripts/verify-hibou-backup.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

@@ -242,6 +242,7 @@ async function tick() {
     state.current_job = null;
     log("Job failed", { job: job?.id, error: message });
     await reportProgress(job, "Error", { error: message });
+    if (ONCE) throw error;
     // Ne pas marquer processed : le worker retentera au prochain cycle après correction.
   }
   return true;

@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const leads=readFileSync(new URL("../app/api/leads/route.js",import.meta.url),"utf8");
 const conversion=readFileSync(new URL("../app/api/conversion-event/route.js",import.meta.url),"utf8");
 const withdrawal=readFileSync(new URL("../app/api/retractation/route.js",import.meta.url),"utf8");
+const consent=readFileSync(new URL("../app/api/commerce/digital-supply-consent/route.js",import.meta.url),"utf8");
 
 test("public Airtable write routes enforce bounded JSON payloads",()=>{
   for(const source of [leads,conversion,withdrawal]){
@@ -32,4 +33,24 @@ test("conversion and withdrawal routes require trusted origins",()=>{
 test("conversion events deduplicate every event_id before Airtable write",()=>{
   assert.match(conversion,/if \(await exists\(eventId\)\)/);
   assert.doesNotMatch(conversion,/event === "landing" && await exists/);
+});
+
+
+test("lead and withdrawal writes are idempotent against ordinary replays",()=>{
+  assert.match(leads,/queryRecords\(TABLES\.leads/);
+  assert.match(leads,/LEFT\(\{Date\},10\)/);
+  assert.match(leads,/deduplicated: true/);
+  assert.match(withdrawal,/queryRecords\(TABLES\.withdrawals/);
+  assert.match(withdrawal,/\{Référence contrat\}/);
+  assert.match(withdrawal,/deduplicated: true/);
+});
+
+test("digital-supply consent bounds payloads and deduplicates stable request ids",()=>{
+  assert.match(consent,/MAX_BODY_BYTES = 4_000/);
+  assert.match(consent,/content-length/i);
+  assert.match(consent,/Buffer\.byteLength/);
+  assert.match(consent,/UUID_RE/);
+  assert.match(consent,/existingConsentRequest\(requestId\)/);
+  assert.match(consent,/URL résultat/);
+  assert.match(consent,/deduplicated: true/);
 });

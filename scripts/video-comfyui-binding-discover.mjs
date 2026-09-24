@@ -2,6 +2,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+const DEFAULT_HARDWARE_PROFILE = resolve("video/hardware/rog-g814ji-rtx4070-8gb.json");
+
 function fail(message){ throw new Error(message); }
 function entries(workflow){
   return Object.entries(workflow||{}).filter(([,node])=>node&&typeof node==="object"&&node.inputs&&node.class_type);
@@ -43,6 +45,24 @@ function rankSize([,node]){
 function best(list,rank){
   return list.map(item=>({item,score:rank(item)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||String(a.item[0]).localeCompare(String(b.item[0])))[0]||null;
 }
+export function bindingProfiles(hardwareProfile={}) {
+  const smoke=hardwareProfile?.image?.smoke_profile || {width:768,height:1344,batch_size:1};
+  const fallback=hardwareProfile?.image?.fallback_profile || null;
+  return {
+    hardware_profile_id:String(hardwareProfile?.profile_id||"").trim()||null,
+    profile:{
+      width:Number(smoke.width||768),
+      height:Number(smoke.height||1344),
+      batch_size:Number(smoke.batch_size||1)
+    },
+    fallback_profile:fallback?{
+      width:Number(fallback.width),
+      height:Number(fallback.height),
+      batch_size:Number(fallback.batch_size||1)
+    }:null
+  };
+}
+
 export function discoverBinding(workflow){
   const nodes=entries(workflow);
   if(!nodes.length) fail("workflow has no API-format nodes");
@@ -69,7 +89,25 @@ if(import.meta.url===`file://${process.argv[1]}`){
   if(!workflowPath) fail("usage: video-comfyui-binding-discover.mjs workflow-api.json [binding-candidate.json]");
   const workflow=JSON.parse(readFileSync(resolve(workflowPath),"utf8"));
   const result=discoverBinding(workflow);
-  const output={workflow_path:resolve(workflowPath),endpoint:"http://127.0.0.1:8188",prompt:result.prompt,seed:result.seed,size:result.size,profile:{width:768,height:1344,batch_size:1},output_node_ids:result.output_node_ids,style_prefix:"",style_suffix:"",timeout_seconds:900,max_retries:1,discovery:result};
+  let hardwareProfile={};
+  try { hardwareProfile=JSON.parse(readFileSync(DEFAULT_HARDWARE_PROFILE,"utf8")); } catch {}
+  const profiles=bindingProfiles(hardwareProfile);
+  const output={
+    workflow_path:resolve(workflowPath),
+    endpoint:"http://127.0.0.1:8188",
+    prompt:result.prompt,
+    seed:result.seed,
+    size:result.size,
+    hardware_profile_id:profiles.hardware_profile_id,
+    profile:profiles.profile,
+    fallback_profile:profiles.fallback_profile,
+    output_node_ids:result.output_node_ids,
+    style_prefix:"",
+    style_suffix:"",
+    timeout_seconds:900,
+    max_retries:1,
+    discovery:result
+  };
   if(outPath) writeFileSync(resolve(outPath),JSON.stringify(output,null,2));
   process.stdout.write(JSON.stringify(output,null,2)+"\n");
 }

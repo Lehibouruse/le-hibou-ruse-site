@@ -31,8 +31,18 @@ test("le checkout Lemon bootstrap est toujours test_mode, français et borné au
     description: "Test",
     redirectUrl: "https://le-hibou-ruse-site.vercel.app/merci?order=[order_identifier]",
     receiptLinkUrl: "https://le-hibou-ruse-site.vercel.app/merci?order=[order_identifier]",
+    checkoutCustomData: {
+      consent_id: "consent-123",
+      consent_at: "2026-09-22T20:30:00.000Z",
+      consent_version: "DIGITAL_SUPPLY_V1",
+      immediate_supply_consent: "true",
+      withdrawal_loss_ack: "true",
+    },
   });
   assert.equal(payload.data.attributes.test_mode, true);
+  assert.equal(payload.data.attributes.checkout_data.custom.consent_id, "consent-123");
+  assert.equal(payload.data.attributes.checkout_data.custom.immediate_supply_consent, "true");
+  assert.equal(payload.data.attributes.checkout_data.custom.withdrawal_loss_ack, "true");
   assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [34]);
   assert.equal(payload.data.attributes.checkout_options.locale, "fr");
   assert.equal(payload.data.relationships.store.data.id, "12");
@@ -86,12 +96,14 @@ test("un checkout stocké est relu chez Lemon avant réutilisation", async () =>
 
 test("la route bootstrap refuse toute action live et n'accepte que le workflow manuel OIDC dédié", () => {
   assert.match(route, /OIDC_WORKFLOW = "lemon-commerce-test\.yml"/);
-  assert.match(route, /ALLOWED_ACTIONS = new Set\(\["inspect", "checkout_test", "webhook_test"\]\)/);
+  assert.match(route, /ALLOWED_ACTIONS = new Set\(\["preflight", "inspect", "checkout_test", "webhook_test"\]\)/);
   assert.match(route, /allowedEvents: \["workflow_dispatch"\]/);
-  assert.doesNotMatch(route, /CRON_SECRET/);
+  assert.doesNotMatch(route, /authorization[^\n]{0,200}CRON_SECRET|Bearer[^\n]{0,200}CRON_SECRET/i);
   assert.match(route, /lemon_test_mode_only/);
   assert.match(route, /LEMON_SQUEEZY_TEST_API_KEY/);
-  assert.doesNotMatch(route, /process\.env\.LEMON_SQUEEZY_API_KEY/);
+  assert.doesNotMatch(route, /const testApiKey\s*=\s*text\(process\.env\.LEMON_SQUEEZY_API_KEY\)/);
+  assert.doesNotMatch(route, /apiKey:\s*process\.env\.LEMON_SQUEEZY_API_KEY/);
+  assert.match(route, /const testApiKey = text\(process\.env\.LEMON_SQUEEZY_TEST_API_KEY\)/);
   assert.match(route, /lemon_test_store_id/);
   assert.match(route, /lemon_test_product_id/);
   assert.match(route, /lemon_test_variant_id/);
@@ -99,6 +111,11 @@ test("la route bootstrap refuse toute action live et n'accepte que le workflow m
   assert.match(route, /variant\?\.attributes\?\.test_mode !== true/);
   assert.match(route, /mode: "test_only"/);
   assert.doesNotMatch(route, /checkout_live|webhook_live|action === "live"/);
+  assert.match(route, /action === "preflight"/);
+  assert.match(route, /missing_LEMON_SQUEEZY_TEST_API_KEY/);
+  assert.match(route, /test_live_id_collision/);
+  assert.match(route, /ready_for_inspect/);
+  assert.match(route, /live_api_key_present/);
 });
 
 test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () => {
@@ -113,8 +130,9 @@ test("le checkout test est vérifié chez Lemon avant d'être réutilisé", () =
 
 test("le workflow Lemon est manuel, borné aux actions de test et échoue sur un 404 persistant", () => {
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /default: "preflight"/);
   assert.doesNotMatch(workflow, /schedule:/);
-  assert.match(workflow, /inspect\|checkout_test\|webhook_test/);
+  assert.match(workflow, /preflight\|inspect\|checkout_test\|webhook_test/);
   assert.doesNotMatch(workflow, /checkout_live|webhook_live/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /for attempt in 1 2 3/);

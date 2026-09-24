@@ -57,14 +57,44 @@ function saveProcessed(set) {
   writeFileSync(STATE_FILE, JSON.stringify([...set], null, 2), "utf8");
 }
 
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
+  }
+  return value;
+}
+
+function approvalSnapshot(job) {
+  return stableValue({
+    id: String(job?.id || "").trim(),
+    type: String(job?.type || "").trim(),
+    concurrent: String(job?.concurrent || "").trim(),
+    batch_id: String(job?.batch_id || "").trim(),
+    urls: Array.isArray(job?.urls) ? job.urls.map((value) => String(value || "").trim()) : [],
+    options: job?.options && typeof job.options === "object" ? job.options : {},
+  });
+}
+
+function approvalSnapshotJson(job) {
+  return JSON.stringify(approvalSnapshot(job));
+}
+
 function loadApprovedJobs() {
   try {
     const parsed = JSON.parse(readFileSync(APPROVAL_FILE, "utf8"));
-    const ids = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.job_ids) ? parsed.job_ids : [];
-    return new Set(ids.map((value) => String(value || "").trim()).filter(Boolean));
+    const jobs = Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+    return new Map(jobs
+      .map((job) => [String(job?.id || "").trim(), approvalSnapshotJson(job)])
+      .filter(([id]) => Boolean(id)));
   } catch {
-    return new Set();
+    return new Map();
   }
+}
+
+function approvedJobMatches(job, approvedJobs) {
+  const expected = approvedJobs.get(String(job?.id || "").trim());
+  return Boolean(expected && expected === approvalSnapshotJson(job));
 }
 
 function safePart(value, fallback = "unknown") {
@@ -226,13 +256,16 @@ async function tick() {
     return false;
   }
   const approvedJobs = loadApprovedJobs();
-  if (!APPROVED_JOB_ID && approvedJobs.size === 0) {
+  if (approvedJobs.size === 0) {
     state.status = "waiting_local_job_approval";
     return false;
   }
   const processed = loadProcessed();
   const jobs = await fetchQueue();
-  const job = jobs.find((x) => (x.id === APPROVED_JOB_ID || approvedJobs.has(x.id)) && !processed.has(x.id));
+  const job = jobs.find((x) =>
+    approvedJobMatches(x, approvedJobs)
+    && (!APPROVED_JOB_ID || x.id === APPROVED_JOB_ID)
+    && !processed.has(x.id));
   if (!job) return false;
   try {
     await processJob(job, processed);

@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "note": "Queue publique en lecture seule. Collecte concurrentielle progressive, jobs executes sequentiellement par le ROG lorsque HIBOU_LOCAL_EXECUTION_ENABLED=true.",
+  "note": "Queue publique en lecture seule. Les lots peuvent être préparés à l’avance mais restent inactifs par défaut ; exécution seulement après opt-in explicite du worker et activation volontaire d’un job.",
   "jobs": [
     {
       "id": "wave1-renard-finance-top10-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_BATCH",
       "concurrent": "Renard Finance",
       "urls": [
@@ -30,7 +30,7 @@
     },
     {
       "id": "wave1-ecureuil-furet-top10-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_BATCH",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [

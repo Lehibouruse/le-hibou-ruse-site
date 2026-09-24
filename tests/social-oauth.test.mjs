@@ -27,11 +27,16 @@ const base = {
   PINTEREST_APP_SECRET: "pin-secret",
 };
 
-test("les neuf providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
+test("huit providers sont prêts et Reddit reste fail-closed sans approbation externe", () => {
   const readiness = oauthProviderReadiness(base);
   assert.equal(readiness.length, 9);
-  assert.equal(readiness.every((item) => item.ready), true);
-  assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
+  const reddit = readiness.find((item) => item.provider === "reddit");
+  const others = readiness.filter((item) => item.provider !== "reddit");
+  assert.equal(others.length, 8);
+  assert.equal(others.every((item) => item.ready), true);
+  assert.equal(others.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
+  assert.equal(reddit?.ready, false);
+  assert.match(String(reddit?.error || ""), /autorisation API commerciale/i);
 });
 
 test("YouTube demande l'accès offline sans exposer le client secret", () => {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminAuthorized, adminUnauthorized } from "../../../../lib/admin-auth.mjs";
 import { queryAllRecords, TABLES } from "../../../../lib/airtable";
-import { retentionAudit } from "../../../../lib/data-retention.mjs";
+import { retentionAudit, retentionPlan } from "../../../../lib/data-retention.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,8 @@ export async function GET(request) {
   ]);
 
   const audit = retentionAudit({ conversionEvents, automationLogs, prospects, sales });
-  return NextResponse.json(audit, {
+  const plan = retentionPlan({ conversionEvents, automationLogs, prospects, sales });
+  return NextResponse.json({ ...audit, plan }, {
     headers: {
       "Cache-Control": "no-store, max-age=0",
       "X-Robots-Tag": "noindex, nofollow, noarchive",

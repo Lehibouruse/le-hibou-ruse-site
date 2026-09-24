@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const OIDC_WORKFLOW = "lemon-commerce-test.yml";
-const ALLOWED_ACTIONS = new Set(["inspect", "checkout_test", "webhook_test"]);
+const ALLOWED_ACTIONS = new Set(["preflight", "inspect", "checkout_test", "webhook_test"]);
 
 function text(value) { return String(value ?? "").trim(); }
 function truthy(value) { return ["1", "true", "yes", "oui", "on"].includes(text(value).toLowerCase()); }
@@ -221,6 +221,47 @@ export async function POST(request) {
 
     const state = await loadState();
     const testApiKey = text(process.env.LEMON_SQUEEZY_TEST_API_KEY);
+
+    if (action === "preflight") {
+      const testOnly = truthy(state.config.lemon_test_mode_only);
+      const liveIds = {
+        store: text(state.config.lemon_store_id),
+        product: text(state.config.lemon_product_id || state.productRecord?.fields?.["Lemon Squeezy Product ID"]),
+        variant: text(state.config.lemon_variant_id || state.productRecord?.fields?.["Lemon Squeezy Variant ID"]),
+      };
+      const testIds = {
+        store: text(state.config.lemon_test_store_id),
+        product: text(state.config.lemon_test_product_id),
+        variant: text(state.config.lemon_test_variant_id),
+      };
+      const collisions = Object.keys(testIds).filter((key) => testIds[key] && liveIds[key] && testIds[key] === liveIds[key]);
+      const webhookSecretReady = Boolean(text(process.env.LEMON_SQUEEZY_WEBHOOK_SECRET || process.env.CRON_SECRET));
+      const blockers = [];
+      if (!testOnly) blockers.push("lemon_test_mode_only_not_true");
+      if (!testApiKey) blockers.push("missing_LEMON_SQUEEZY_TEST_API_KEY");
+      if (!webhookSecretReady) blockers.push("missing_webhook_signing_secret");
+      if (collisions.length) blockers.push("test_live_id_collision");
+      const result = {
+        ok: true,
+        mode: "test_only",
+        action,
+        ready_for_inspect: blockers.length === 0,
+        test_api_key_present: Boolean(testApiKey),
+        live_api_key_present: Boolean(text(process.env.LEMON_SQUEEZY_API_KEY)),
+        lemon_test_mode_only: testOnly,
+        webhook_signing_secret_ready: webhookSecretReady,
+        stored_test_ids_present: {
+          store: Boolean(testIds.store),
+          product: Boolean(testIds.product),
+          variant: Boolean(testIds.variant),
+        },
+        test_live_id_collisions: collisions,
+        blockers,
+      };
+      await journal(action, blockers.length ? "Blocked" : "Completed", JSON.stringify(result));
+      return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+    }
+
     const inspected = await inspectLemon(state, testApiKey);
     const baseUrl = testBaseUrl(state.config);
     const result = {

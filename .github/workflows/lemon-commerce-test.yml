@@ -6,9 +6,10 @@ on:
       action:
         description: "Safe Lemon test action"
         required: true
-        default: "inspect"
+        default: "preflight"
         type: choice
         options:
+          - preflight
           - inspect
           - checkout_test
           - webhook_test
@@ -36,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$ACTION" in
-            inspect|checkout_test|webhook_test) ;;
+            preflight|inspect|checkout_test|webhook_test) ;;
             *) echo "Unsupported action" >&2; exit 2 ;;
           esac
 
@@ -85,4 +86,4 @@ jobs:
             echo "Lemon bootstrap HTTP failure: $http_code" >&2
             exit 1
           fi
-          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; assert d.get("mode") == "test_only"; print("lemon_test_ok=true")' <<< "$response"
+          python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("ok") is True; assert d.get("mode") == "test_only"; print("lemon_test_ok=true action="+str(d.get("action","")))' <<< "$response"

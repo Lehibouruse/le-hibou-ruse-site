@@ -39,3 +39,10 @@ test("le fallback refuse toujours une édition non finale", () => {
   assert.match(nativeBlock, /!finalEdition\(edition\)/);
   assert.match(nativeBlock, /manual_review/);
 });
+
+
+test("Digify est aussi fermé quand son statut commercial n'est plus actif", () => {
+  assert.match(delivery, /activeConfigurationValue\("digify_api_status", ""\)/);
+  assert.match(delivery, /digifyDeliveryAvailable/);
+  assert.match(delivery, /digify_delivery_not_available/);
+});

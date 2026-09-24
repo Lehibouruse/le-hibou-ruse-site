@@ -117,3 +117,14 @@ Après validation du téléchargement réel sur le ROG :
 5. branchement ComfyUI/FLUX et Chatterbox de la PR vidéo pour faire du ROG le worker complet de production.
 
 Le design reste local-first, gratuit/quasi gratuit et automatisé. Les réglages image/voix seront choisis après mesure de la VRAM réelle.
+
+
+## Reporting distant optionnel
+
+Le téléchargement local peut rester **sans token serveur**. Le reporting vers `/api/local-worker-status` est une capacité séparée et désactivée si aucun secret n'est fourni.
+
+Pour l'activer, `HIBOU_LOCAL_REPORT_TOKEN` doit être configuré **à la fois** :
+- côté serveur/Vercel ;
+- localement sur le PC worker.
+
+Le worker envoie alors `Authorization: Bearer …`. Sans token local, il saute le reporting. Sans token serveur, l'endpoint renvoie `503 reporting_disabled`. Le bootstrap ne crée ni ne demande ce secret automatiquement.

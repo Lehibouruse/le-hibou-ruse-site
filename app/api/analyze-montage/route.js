@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { PAID_AI_DISABLED_BY_POLICY } from "../../../lib/hibou-agent.mjs";
+import { adminOrServiceAuthorized, serviceUnauthorized } from "../../../lib/admin-auth.mjs";
 
 export const runtime = "nodejs";
 
@@ -71,6 +72,7 @@ function lines(values) {
 }
 
 export async function POST(request) {
+  if (!adminOrServiceAuthorized(request)) return serviceUnauthorized();
   try {
     if (PAID_AI_DISABLED_BY_POLICY) return NextResponse.json({ error: "OpenAI API désactivée par politique projet", reason: "paid_ai_disabled_by_policy", openai_calls: 0 }, { status: 503 });
     const apiKey = process.env.OPENAI_API_KEY;

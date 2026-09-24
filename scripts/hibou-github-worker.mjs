@@ -13,6 +13,7 @@ const LOG_DIR = path.join(process.env.LOCALAPPDATA || ROOT, "LeHibou");
 const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
+const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
 const ONCE = process.argv.includes("--once");
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
 const EXECUTION_ENABLED = String(process.env.HIBOU_LOCAL_EXECUTION_ENABLED || "").trim().toLowerCase() === "true";
@@ -110,6 +111,34 @@ async function fetchQueue() {
   return data.jobs.filter((job) => job && job.active !== false);
 }
 
+async function reportProgress(job, status, data = {}) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(REPORT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
+      body: JSON.stringify({
+        job_id: job.id,
+        concurrent: job.concurrent || "",
+        label: job.label || "",
+        status,
+        worker: WORKER_ID,
+        video_count: Number(data.video_count || 0),
+        bytes: Number(data.bytes || 0),
+        local_path: data.local_path || "",
+        completed_at: data.completed_at || "",
+        error: data.error || "",
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!response.ok) log("Progress report rejected", { job: job.id, status, http: response.status });
+  } catch (error) {
+    log("Progress report failed", { job: job?.id, status, error: String(error?.message || error).slice(0, 500) });
+  }
+}
+
 async function downloadOne(url, dir, options = {}) {
   mkdirSync(dir, { recursive: true });
   const maxHeight = Math.max(360, Math.min(2160, Number(options.max_height || 1080)));
@@ -147,6 +176,7 @@ async function processJob(job, processed) {
 
   state.current_job = job.id;
   log("Job started", { job: job.id, urls: urls.length, dir });
+  await reportProgress(job, "Running", { local_path: dir });
 
   const runs = [];
   for (const url of urls) runs.push(await downloadOne(url, dir, job.options || {}));
@@ -174,6 +204,7 @@ async function processJob(job, processed) {
   saveProcessed(processed);
   state.processed += 1;
   state.current_job = null;
+  await reportProgress(job, "Completed", { local_path: dir, video_count: videos.length, bytes: hashes.reduce((sum, item) => sum + Number(item.bytes || 0), 0), completed_at: result.completed_at });
   log("Job completed", { job: job.id, videos: videos.length, dir });
 }
 
@@ -193,6 +224,7 @@ async function tick() {
     state.last_error = message;
     state.current_job = null;
     log("Job failed", { job: job?.id, error: message });
+    await reportProgress(job, "Error", { error: message });
     // Ne pas marquer processed : le worker retentera au prochain cycle après correction.
   }
   return true;
@@ -207,6 +239,7 @@ function healthServer() {
       ...state,
       media_root: ROOT,
       queue_url: QUEUE_URL,
+      report_url: REPORT_URL,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       processed_jobs: [...loadProcessed()],

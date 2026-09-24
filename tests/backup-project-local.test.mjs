@@ -42,3 +42,18 @@ test("Airtable export paginates without leaking the token into payload",async()=
   assert.equal(calls.length,2);
   assert.equal(calls.every(x=>x.authorization==="Bearer token-never-write"),true);
 });
+
+
+test("safe exports redact secret-like fields even outside sensitive tables",async()=>{
+  const fake=async()=>new Response(JSON.stringify({records:[{id:"rec1",fields:{
+    Name:"Visible",
+    api_key:"should-not-leak",
+    nested:{refresh_token:"hidden",value:"ok"}
+  }}]}),{status:200,headers:{"Content-Type":"application/json"}});
+  const out=await exportAirtableTable("Configuration","tblTest","token-never-write",fake);
+  assert.equal(out.redacted,true);
+  assert.equal(out.records[0].fields.Name,"Visible");
+  assert.equal(out.records[0].fields.api_key,"[REDACTED]");
+  assert.equal(out.records[0].fields.nested.refresh_token,"[REDACTED]");
+  assert.equal(out.records[0].fields.nested.value,"ok");
+});

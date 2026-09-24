@@ -3,6 +3,7 @@ import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../li
 import { canonicalSale, escapeFormula, lemonOrder, resolveLemonWebhookSecret, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
 import { saleAttribution } from "../../../../lib/attribution.mjs";
 import { refundDeliveryStatus } from "../../../../lib/commerce-lease.mjs";
+import { digitalSupplyConsentAudit, validDigitalSupplyCustomData } from "../../../../lib/digital-supply-consent.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,14 +38,17 @@ async function matchingProduct(order) {
 
 async function currentCommerceState() {
   const records = await queryRecords(TABLES.configuration, {
-    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized'))",
+    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized',{Clé}='digital_supply_consent_checkout_mode'))",
     pageSize: 10,
     priorityAware: false,
   });
   const values = Object.fromEntries(records.map((record) => [String(record.fields?.Clé || ""), record.fields?.Valeur]));
+  const consentMode = String(values.digital_supply_consent_checkout_mode || "disabled").trim().toLowerCase();
   return {
     edition: String(values.book_current_edition || "").trim(),
     launchAuthorized: truthy(values.commerce_launch_authorized),
+    consentMode,
+    consentRequired: consentMode === "live",
   };
 }
 
@@ -96,6 +100,7 @@ function orderAuditNotes(order, reasons = []) {
     `product_id=${order.productId}`,
     `variant_id=${order.variantId}`,
     `test_mode=${order.testMode}`,
+    ...digitalSupplyConsentAudit(order.customData),
     ...reasons,
   ].filter(Boolean).join("; ");
 }
@@ -223,8 +228,11 @@ export async function POST(request) {
   const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
   const attribution = attributionFields(order);
   const refundedBeforeCreate = Boolean(refundMarker);
+  const consentValid = validDigitalSupplyCustomData(order.customData);
+  const consentSatisfied = !commerce.consentRequired || consentValid;
   const ready = Boolean(
     launchAuthorized
+    && consentSatisfied
     && product
     && fileGuid
     && order.status === "paid"
@@ -236,6 +244,7 @@ export async function POST(request) {
   const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? "pending" : "manual_review";
   const reasons = [];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
+  if (commerce.consentRequired && !consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
   if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);

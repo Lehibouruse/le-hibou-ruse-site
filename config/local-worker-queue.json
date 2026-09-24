@@ -1,6 +1,6 @@
 {
   "version": 5,
-  "note": "Corpus 150 Reels prepare et active dans la queue. Execution locale autorisee uniquement si l'ID du job figure aussi dans le manifeste local approved-jobs.json cree explicitement par le bootstrap -ApproveCorpus150.",
+  "note": "Cible 150 formats courts actifs. Telechargement MP4 prioritaire; sous-titres desactives par defaut (FR uniquement si actives plus tard).",
   "target_shortform_videos": 150,
   "jobs": [
     {
@@ -14,9 +14,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Le secret pour être riche",
       "created_at": "2026-09-24T22:22:00+02:00",
@@ -33,9 +33,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Quel statut éviter pour son premier IDR ?",
       "created_at": "2026-09-24T22:22:00+02:00",
@@ -52,9 +52,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Holding : SAS, SASU, SARL ou EURL ?",
       "created_at": "2026-09-24T22:22:00+02:00",
@@ -71,9 +71,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Les trois avantages du statut LMP",
       "created_at": "2026-09-24T22:22:00+02:00",
@@ -90,9 +90,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "L'intérêt de relier les SCI à une holding",
       "created_at": "2026-09-24T22:22:00+02:00",
@@ -109,9 +109,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #01 — Franchise garage carrosserie",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -128,9 +128,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #02 — Rachat d’actions multinationales",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -147,9 +147,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #03 — Livraison Chronopost",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -166,9 +166,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #04 — Frais aéroport Ryanair",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -185,9 +185,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #05 — Retrait offre emploi",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -204,9 +204,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #06 — Panne sur autoroute",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -223,9 +223,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #07 — Facture d'eau explosée",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -242,9 +242,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #08 — Pote qui rembourse pas",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -261,9 +261,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #09 — Casse voiture non responsable",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -280,9 +280,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #10 — Retenue sur salaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -299,9 +299,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #11 — iPhone à 1 euro",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -318,9 +318,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #12 — Facture opticien lunettes",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -337,9 +337,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #13 — Amende SNCF contrôle",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -356,9 +356,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #14 — Grosse commande fast-food",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -375,9 +375,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #15 — Trop-perçu CAF",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -394,9 +394,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #16 — Remboursement fibre indisponible",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -413,9 +413,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #17 — Vice caché voiture occasion",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -432,9 +432,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #18 — Prélèvement inconnu compte",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -451,9 +451,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #19 — Heures sup volées",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -470,9 +470,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #20 — Clause non-concurrence",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -489,9 +489,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #21 — Facture restaurant groupe",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -508,9 +508,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #22 — OBO immobilier",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -527,9 +527,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #23 — Loyer meublé étudiant",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -546,9 +546,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #24 — Devis funéraire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -565,9 +565,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #25 — Location voiture rayure",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -584,9 +584,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #26 — Fuite d'eau appartement",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -603,9 +603,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #27 — Bail étudiant garant",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -622,9 +622,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #28 — Frais itinérance data",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -641,9 +641,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #29 — Tatouage raté",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -660,9 +660,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #30 — Fourrière voiture",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -679,9 +679,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #31 — Prêt de voiture entre potes",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -698,9 +698,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #32 — Vol surbooké volontaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -717,9 +717,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #33 — Assurance annulation ski",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -736,9 +736,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #34 — Frais de succession bancaires",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -755,9 +755,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #35 — Retrait DAB avalé",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -774,9 +774,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #36 — Faux avis Google",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -793,9 +793,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #37 — Refus SAV Apple",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -812,9 +812,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #38 — Restaurant addition",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -831,9 +831,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #39 — Concession voiture occasion",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -850,9 +850,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #40 — Frais résiliation box",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -869,9 +869,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #41 — Contravention parking FPS",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -888,9 +888,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #42 — Blanchiment par l’art",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -907,9 +907,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #43 — Transmission des grandes fortunes",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -926,9 +926,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #44 — Contrôle métro bus",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -945,9 +945,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #45 — Caution Airbnb festival",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -964,9 +964,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #46 — Radar automatique flash",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -983,9 +983,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #47 — Boîte mail spam",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1002,9 +1002,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #48 — Salle / traiteur annulation",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1021,9 +1021,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #49 — Péage ticket perdu",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1040,9 +1040,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 50 #50 — Waze pour le train",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1059,9 +1059,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #01 — Uniforme au travail",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1078,9 +1078,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #02 — Auto-école / attente permis",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1097,9 +1097,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #03 — Dégâts voiture sur parking",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1116,9 +1116,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #04 — Supplément bagage aérien",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1135,9 +1135,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #05 — Voiture rayée sur parking magasin",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1154,9 +1154,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #06 — Rupture conventionnelle",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1173,9 +1173,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #07 — Opticien",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1192,9 +1192,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #08 — Dépôt de garantie logement",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1211,9 +1211,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #09 — Livreur abîme le parquet",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1230,9 +1230,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #10 — Carte cadeau périmée",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1249,9 +1249,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #11 — Abonnement annuel",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1268,9 +1268,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #12 — Colis perdu La Poste",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1287,9 +1287,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #13 — Vinted / colis perdu",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1306,9 +1306,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #14 — Tapage nocturne",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1325,9 +1325,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #15 — Airbnb annulé par l’hôte",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1344,9 +1344,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #16 — Trop-perçu CAF",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1363,9 +1363,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #17 — Coiffeur raté",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1382,9 +1382,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #18 — Frais cachés restaurant",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1401,9 +1401,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #19 — Baby-sitter non déclarée",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1420,9 +1420,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #20 — Vinted / litige acheteur",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1439,9 +1439,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #21 — Voyage scolaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1458,9 +1458,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #22 — Feu rouge",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1477,9 +1477,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #23 — Huissier à domicile",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1496,9 +1496,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #24 — Carte grise / voiture d’occasion",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1515,9 +1515,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #25 — Petit excès de vitesse",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1534,9 +1534,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #26 — Stationnement devant garage",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1553,9 +1553,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #27 — Moto volée / assurance",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1572,9 +1572,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #28 — Addition au restaurant",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1591,9 +1591,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #29 — Frais de résiliation internet",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1610,9 +1610,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #30 — Alcoolémie au volant",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1629,9 +1629,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #31 — Retard de salaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1648,9 +1648,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #32 — Pressing abîme un vêtement",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1667,9 +1667,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #33 — Voiture à la fourrière",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1686,9 +1686,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #34 — Radiation France Travail",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1705,9 +1705,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #35 — Vice caché voiture occasion",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1724,9 +1724,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #36 — Panier repas entreprise",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1743,9 +1743,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #37 — Vol de carte bancaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1762,9 +1762,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #38 — Micro-rayure voiture de location",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1781,9 +1781,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #39 — Dette / huissier",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1800,9 +1800,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #40 — Frais de découvert bancaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1819,9 +1819,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #41 — Lave-linge après garantie",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1838,9 +1838,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #42 — Frais d’agence sur bail",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1857,9 +1857,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #43 — Toucher davantage d’aides",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1876,9 +1876,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #44 — Dentiste / devis élevé",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1895,9 +1895,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #45 — Résiliation salle de sport",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1914,9 +1914,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #46 — Rachat d’or",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1933,9 +1933,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #47 — Frais de notaire",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1952,9 +1952,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #48 — Prime d’intérim",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1971,9 +1971,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #49 — Contrôle transport / amende",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -1990,9 +1990,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 50 #50 — Vinted / litige acheteur",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2009,9 +2009,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthère YouTube — 22/04/2026 — à absorber",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2028,9 +2028,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthère YouTube — 18/05/2026 — probable doublon TikTok",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2047,9 +2047,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthère YouTube — 25/04/2026 — à absorber",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2066,9 +2066,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthère YouTube — 24/04/2026 — à absorber",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2085,9 +2085,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthère YouTube — 01/05/2026 — à absorber",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2104,9 +2104,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Découverte concurrent / clone format — Monsieur Chimp Finance",
       "created_at": "2026-09-24T22:10:00+02:00",
@@ -2123,9 +2123,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7649878022354504993",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2142,9 +2142,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7634292064515083553",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2161,9 +2161,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7631693479185354016",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2180,9 +2180,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7635000346640747809",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2199,9 +2199,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7641873502626204961",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2218,9 +2218,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7629063822749289761",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2237,9 +2237,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7645058924604820768",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2256,9 +2256,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7642825784956112161",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2275,9 +2275,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7630923023440268576",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2294,9 +2294,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7630587558539414816",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2313,9 +2313,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7633139197016100129",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2332,9 +2332,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7636891104876547360",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2351,9 +2351,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7630036576214469921",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2370,9 +2370,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Finance Panthere TikTok 7629795204467363104",
       "created_at": "2026-09-24T22:18:00+02:00",
@@ -2389,9 +2389,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Fond Top 100 #51 — Devis artisan gonflé",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2408,9 +2408,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Fond Top 100 #52 — Passeport RDV mairie",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2427,9 +2427,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 100 #53 — Achat VEFA avec récupération de TVA",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2446,9 +2446,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 100 #54 — Colis jamais reçu",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2465,9 +2465,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 100 #56 — Coiffeur ratage",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2484,9 +2484,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 100 #57 — Dépannage serrurier",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2503,9 +2503,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Top 100 #58 — Démission payée",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2522,9 +2522,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Renard Fond Top 100 #59 — Vinted acheteur menteur",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2541,9 +2541,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #51 — Photographe mariage / photos floues",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2560,9 +2560,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #52 — Produit soldé défectueux",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2579,9 +2579,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #53 — Démission / solde de tout compte",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2598,9 +2598,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #54 — Retard / annulation vol low cost",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2617,9 +2617,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #55 — Colis Amazon volé dans le hall",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2636,9 +2636,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #56 — Propriétaire facture l’état des lieux",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2655,9 +2655,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #57 — Chronopost livré mais absent",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2674,9 +2674,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #58 — Dentiste / devis trop cher",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2693,9 +2693,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #59 — Récupération de points permis",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2712,9 +2712,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #60 — Frais bancaires d’incident",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2731,9 +2731,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #61 — Augmentation / prime de partage de la valeur",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2750,9 +2750,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #62 — Deux mois de dépôt de garantie meublé",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2769,9 +2769,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #63 — Frais de notaire succession",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2788,9 +2788,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #64 — Licenciement pendant arrêt maladie",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2807,9 +2807,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #65 — Prélèvement non autorisé",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2826,9 +2826,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #66 — Canapé livré endommagé",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2845,9 +2845,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "label": "Furet Fond Top 100 #67 — Retard Amazon Prime",
       "created_at": "2026-09-24T22:19:00+02:00",
@@ -2873,9 +2873,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "created_at": "2026-09-24T21:55:00+02:00"
     },
@@ -2899,9 +2899,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "created_at": "2026-09-24T21:56:00+02:00"
     },
@@ -2916,9 +2916,9 @@
       "options": {
         "max_height": 1080,
         "subtitle_languages": [
-          "fr",
-          "en"
-        ]
+          "fr"
+        ],
+        "download_subtitles": false
       },
       "created_at": "2026-09-24T21:40:00+02:00"
     }

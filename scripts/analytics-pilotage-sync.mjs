@@ -29,8 +29,11 @@ function isPaidStatus(value){
   return ["paid","paye","payee","completed","complete","succeeded","success"].includes(v);
 }
 function isRefunded(value){
-  const v=norm(value);
-  return ["true","1","yes","oui","refunded","rembourse","remboursee"].includes(v);
+  const raw=text(value);
+  if(!raw) return false;
+  const v=norm(raw);
+  if(["false","0","no","non","none","null"].includes(v)) return false;
+  return true;
 }
 export function summarizeAnalytics({events=[],sales=[],date}={}){
   const target=date||new Date().toISOString().slice(0,10);

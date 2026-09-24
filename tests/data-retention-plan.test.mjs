@@ -32,7 +32,7 @@ test("retention plan proposes purge only after published periods and never auto-
 });
 
 test("invalid dates are routed to manual review instead of deletion",()=>{
-  const plan=retentionPlan({now,prospects:[rec("bad",{Date:"not-a-date"})]});
+  const plan=retentionPlan({now,prospects:[rec("bad",{Date:"not-a-date"},"also-not-a-date")]});
   assert.equal(plan.actions[0].action,"manual_review");
   assert.equal(plan.counts.manual_review,1);
 });

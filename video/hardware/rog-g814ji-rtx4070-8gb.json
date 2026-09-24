@@ -47,5 +47,10 @@
     "paid_api_fallback": false,
     "full_fp16_flux_first_run": false,
     "human_review_before_full_pilot": true
-  }
+  },
+  "status": "UNVERIFIED_EXAMPLE_ONLY",
+  "verified": false,
+  "do_not_use_without_runtime_match": true,
+  "verification_command": "npm run video:gpu-check:windows",
+  "warning": "Historical/example profile only. The user's exact PC model and VRAM have not yet been verified from a runtime diagnostic."
 }

@@ -1,0 +1,43 @@
+{
+  "schema": "HIBOU_BACKUP_PLAN_V1",
+  "base_id": "appWyUX7TYPNrDbyP",
+  "safe_tables": [
+    ["Roadmap", "tblnvDaggsXY9bcOa"],
+    ["Content Pipeline", "tblRfS6laFuNBrDX1"],
+    ["Montages", "tbl0rkv9c2ZJRUhGz"],
+    ["Livre", "tblIoXioiPj3Rxhft"],
+    ["Site & Legal", "tbl6253anwyBOh78X"],
+    ["Site CMS", "tblkve6jfAgxfhCqB"],
+    ["Articles site", "tblSi46CBgAUHp3LL"],
+    ["Produits site", "tblVaks8DSkziKEqB"],
+    ["Configuration", "tblXZsL4gTTSXG72d"],
+    ["Benchmark concurrents", "tblSgKKbhiLPMqm9O"],
+    ["Corpus source intégral", "tblZsTkrlvzbwU9rr"],
+    ["Veille concurrentielle", "tbl1CFgFNEMSenp53"],
+    ["Profils vidéo", "tblV4cbgdRQku6NYx"],
+    ["Scènes vidéo", "tblHjUmH1p2STleJ3"],
+    ["Benchmark voix", "tblTUwOZJNXQjXFzy"],
+    ["Méthodologie vidéo", "tblCOtKclFGr8afDa"],
+    ["Sujets concurrents", "tbl0CHUoi498t53V9"],
+    ["Stack IA vidéo", "tblKtti9ooxshimKI"]
+  ],
+  "sensitive_tables": [
+    ["Demandes montage", "tblftjdWCg4xwUnIR"],
+    ["Ventes", "tblcwJtw4k7xEmT7n"],
+    ["Journal automatisations", "tblmbRJCreMtyUVna"],
+    ["Jobs", "tblRLb9bWBzpBnD20"],
+    ["Social Credentials", "tblnSFykeeEKWNCv2"],
+    ["Conversion Events", "tbl7I3YhW09Ztuj2q"],
+    ["Rétractations", "tbliAfXj1s7JBPQvB"],
+    ["Local Worker Queue", "tbl8VTZsY6uv3z9Y7"],
+    ["Local Worker Status", "tbl4ch9NK9B5CohVN"]
+  ],
+  "policy": {
+    "default_network_access": false,
+    "default_sensitive_export": false,
+    "sensitive_requires_encryption": true,
+    "backup_root_must_be_outside_repository": true,
+    "secrets_in_manifest": false,
+    "offsite_copy_required_for_complete_strategy": true
+  }
+}

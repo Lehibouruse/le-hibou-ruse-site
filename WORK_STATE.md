@@ -1,6 +1,6 @@
 # Le Hibou Rusé — état de reprise
 
-Dernière mise à jour : 2026-09-23 — infrastructure vidéo prioritaire
+Dernière mise à jour : 2026-09-24 — sécurité Production + infrastructure vidéo
 
 ## Décisions actuelles
 
@@ -11,26 +11,26 @@ Dernière mise à jour : 2026-09-23 — infrastructure vidéo prioritaire
 - Gros médias, caches et modèles hors Git/Vercel.
 - Priorité opérationnelle actuelle : infrastructure de production vidéo. Le livre est hors de la passe active.
 
-## Coupe-circuit IA et branche canonique
+## Coupe-circuit IA et branches de référence
 
-Branche : `hibou-local-video-pipeline-20260922` — PR #175 (draft, mergeable).
+**Sécurisation Production :** branche `hibou-production-paid-ai-kill-switch` — PR #177 (draft, mergeable). **Workbench vidéo/social :** branche `hibou-local-video-pipeline-20260922` — PR #175. Ne plus utiliser #175 comme véhicule de déploiement du coupe-circuit OpenAI.
 
 - Politique fail-closed : `PAID_AI_DISABLED_BY_POLICY=true`.
-- Six points d’entrée payants verrouillés : orchestrator, agent-worker, wake, analyze-montage, book-scheduler, book-finalizer.
+- PR #177 verrouille les six points d’entrée payants : orchestrator, agent-worker, wake, analyze-montage, book-scheduler, book-finalizer. Agent-worker refuse aussi `openaiStep`/`openaiStepStatus` sous la politique.
 - `.env.example` : `AI_ENABLED=false`, kill switch actif, budgets/appels IA à zéro.
-- Jobs : 116 historiques ; aucun Running/Retry/Pending. Anciens CREATE_VIDEO en Manual Review ; anciens CREATE_BOOK neutralisés sans relance.
-- Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement puis tests runtime bloqués avec `openai_calls=0`, sans effectuer d’appel OpenAI.
-- Dernier head exécutable vert avant la synchronisation documentaire courante : `3c068e2fbad3fb808119ea74e06ffdc924472224`; Hibou CI #712 = success. Les commits documentaires suivants sont revalidés par CI avant d'être considérés comme stables.
-- Production reste sur l'ancien comportement tant que #175 n'est pas déployée : `system_health_report` du 23/09/2026 06:12:22 UTC indique encore `openai.circuit_active=false` et `credit_paused=false`. Cette preuve interdit de marquer le coupe-circuit comme effectif en Production.
-- Rollback : revert du merge ou retour au main `da3dd1143b933e1e09d9f5c25b5bac7bb2ac2fd8`.
+- Le wake déterministe reste utilisable pour les jobs ne nécessitant pas OpenAI ; social, commerce, domaine et traitements déterministes ne sont pas coupés globalement.
+- PR #177 head `441239095e0f1a62db293cafa97ed3fe94ea713e` : Hibou CI #762 = success le 24/09/2026. Le workflow historique Furet a été supprimé de cette PR afin de ne plus générer d’échecs parasites après fusion.
+- Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement autorisé de #177 puis tests runtime fail-closed avec `openai_calls=0`, sans requête OpenAI réelle.
+- Production reste sur l'ancien comportement tant que #177 n'est pas déployée ; ne pas marquer le coupe-circuit comme effectif avant cette preuve.
+- Rollback : revert du merge de #177 ou retour au `main` précédent.
 
 ## Vercel
 
 - Alerte Vercel du 22/09/2026 13:11 UTC : 100 % des 10 Go de Function Storage Hobby utilisés.
 - Dépôt léger (~1,5 Mo), mais ~58 routes API et au moins 100 commits main depuis le 12/09 : accumulation de bundles/déploiements = hypothèse dominante, sans prétendre connaître le breakdown Vercel interne.
-- PR #175 réduit les futurs déploiements : suppression de l’exception `hibou-agent/**`, déploiement Git uniquement sur `main`.
+- PR #177 porte la correction Production des futurs déploiements : suppression de l’exception `hibou-agent/**`, déploiement Git uniquement sur `main`.
 - `ignoreCommand` inclut désormais `lib/` : une modification backend de `lib/` doit déclencher le déploiement main au lieu d’être ignorée.
-- Workflow historique `furet-transcript-probe.yml` supprimé sur la branche : il ne doit plus polluer chaque commit après fusion.
+- Workflow historique `furet-transcript-probe.yml` supprimé de #177 : il ne doit plus polluer chaque commit après fusion.
 - Ne rien supprimer à l’aveugle et ne pas changer de plan. Après déploiement, mesurer le stockage avant/après et attendre la rétention Hobby avant suppression ciblée.
 
 ## Vidéo — Box Spread et moteur reproductible
@@ -129,7 +129,7 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 - Lemon TEST est strictement séparé : `LEMON_SQUEEZY_TEST_API_KEY` dédiée, ressources obligatoirement `test_mode=true`, aucun fallback vers la clé LIVE et aucune livraison Digify pour une commande test. HMAC, déduplication et remboursement out-of-order sont couverts par les tests ; preuve dynamique bloquée uniquement par la clé/ressources TEST. Runbook canonique : `docs/WORK_LEMON_TEST_RUNBOOK.md`, réconcilié le 23/09 avec l'état LIVE déjà public et le TEST fail-closed.
 - Fourniture immédiate et accusé de rétractation sont deux preuves distinctes.
 - Registre de coûts daté dans Configuration : Lemon = 0 $ fixe + 5 % + 0,50 $/transaction avant suppléments ; Vercel = Hobby gratuit mais 10 Go saturés ; OpenAI API = 0 € autorisé/cible.
-- Digify : e-mail du 18/09/2026 à 20:59 confirme un essai gratuit de 7 jours. Documentation officielle Digify août 2026 : essai sans engagement et sans carte bancaire ; à l'expiration, le compte devient gratuit, **sans upgrade/facturation automatique**. Les fichiers envoyés/data rooms possédés ne sont toutefois plus accessibles aux destinataires jusqu'à un éventuel upgrade. Échéance théorique d'après cet e-mail : ~25/09 (activation exacte pouvant être légèrement antérieure). Aucun abonnement payant n'est démontré ni autorisé.
+- Digify : e-mail reçu le 24/09/2026 à 00:23 UTC confirme que **l’essai est terminé**. Aucun abonnement payant ni upgrade automatique n’est démontré. Le compte gratuit et l’intégration technique peuvent subsister, mais la livraison protégée aux destinataires doit être considérée indisponible sans choix volontaire d’un plan/accès adapté. Aucun upgrade n’est autorisé automatiquement.
 - Metricool : brand `lehibouruse` connecté ; promotion LinkedIn annoncée le 19/09 comme expirant sous 7 jours (~26/09) ; aucun plan payant démontré. X impose plan payant + add-on 10 €/mois/compte, non souscrit.
 - L'ancienne simulation `100 € de frais fixes` n'est plus une donnée constatée ; recalculer la contribution uniquement avec les coûts réellement engagés.
 
@@ -142,12 +142,12 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 ## Blocages humains précis
 
-1. **PR #175** : autorisation Marc pour fusion/déploiement Production. Débloque preuve runtime du coupe-circuit OpenAI + règles Vercel.
+1. **PR #177** : autorisation Marc pour fusion/déploiement Production. C’est désormais la PR minimale dédiée au coupe-circuit OpenAI + règles Vercel. #175 reste le workbench vidéo/social.
 2. **Bluesky** : remplacer dans Vercel Production la valeur complète de `BLUESKY_APP_PASSWORD`, redéployer, puis relancer identité/lecture. Ne jamais partager le secret dans le chat.
 3. **Lemon TEST** : créer/retrouver une clé API en mode Test et la stocker dans Vercel sous `LEMON_SQUEEZY_TEST_API_KEY`. Débloque inspect → checkout_test → webhook_test → commande/remboursement TEST. Les tests Digify restent séparés et une commande TEST ne doit jamais déclencher Digify.
 4. **Reddit** : autoriser ultérieurement l’envoi du dossier et obtenir l’accord requis ; aucun contact tiers sans autorisation.
 5. **GPU local** : fournir un environnement local réellement accessible avec GPU adapté avant le premier essai FLUX/Chatterbox. Vérifier GPU/VRAM/RAM/stockage avant tout gros téléchargement.
-6. **Digify** : aucune action n'est nécessaire pour éviter une facturation automatique. Décision humaine seulement si Marc veut maintenir l'accès protégé des destinataires après l'essai ; sinon le compte repasse gratuit et l'accès partagé est suspendu.
+6. **Digify** : l’essai est terminé depuis le 24/09. Aucune action n’est nécessaire pour éviter une facturation automatique démontrée. Décision humaine uniquement si Marc veut réactiver une livraison protégée payante ; sinon ne rien souscrire.
 7. **Publication/remplacement commercial** : validation humaine explicite.
 
 ## Prochaine action exécutable
@@ -160,8 +160,8 @@ Sans validation humaine :
 5. Donation-cession vient après OBO en réutilisant exactement la même usine ;
 6. ne télécharger aucun modèle optionnel Whisper/DINOv2 tant qu'un gain réel n'est pas nécessaire ; ils restent des modules gratuits d'assistance, non des dépendances du cœur.
 
-Après validation PR #175 :
-1. fusionner/déployer ;
+Après validation PR #177 :
+1. fusionner/déployer #177 uniquement ;
 2. vérifier les six endpoints payants bloqués, `openai_calls=0`, sans appel OpenAI ;
 3. mesurer Function Storage Vercel après déploiement/rétention ;
 4. conserver le site, commerce et social déterministes fonctionnels.

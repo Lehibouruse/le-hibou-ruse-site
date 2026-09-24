@@ -1,7 +1,1916 @@
 {
-  "version": 2,
-  "note": "Queue publique en lecture seule. Les lots peuvent être préparés à l’avance mais restent inactifs par défaut ; exécution seulement après opt-in explicite du worker et activation volontaire d’un job.",
+  "version": 3,
+  "note": "File active de collecte short-form. Jobs unitaires pour retries independants. Priorite: Reels/Shorts/TikTok deja qualifies dans Airtable.",
+  "target_shortform_videos": 150,
   "jobs": [
+    {
+      "id": "reels-renard-top50-01-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=bkF_sZgBRsU"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #01 — Franchise garage carrosserie",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-02-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=KQxjChS1p6s"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #02 — Rachat d’actions multinationales",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-03-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=CbFERLNN8AU"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #03 — Livraison Chronopost",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-04-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=oe3BiQXm_gk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #04 — Frais aéroport Ryanair",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-05-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=H-X9P9QR2n4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #05 — Retrait offre emploi",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-06-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=Mm1bdOvJqnY"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #06 — Panne sur autoroute",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-07-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=xlEX2Bh4wW4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #07 — Facture d'eau explosée",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-08-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=0hVlMXzcWKY"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #08 — Pote qui rembourse pas",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-09-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=wLUvgtBtU7k"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #09 — Casse voiture non responsable",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-10-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=zzH1utt0mos"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #10 — Retenue sur salaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-11-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=c7HaT_71s-4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #11 — iPhone à 1 euro",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-12-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=PhmCkevFQZQ"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #12 — Facture opticien lunettes",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-13-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=YTwL352ADPk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #13 — Amende SNCF contrôle",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-14-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=7rTGNdQse08"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #14 — Grosse commande fast-food",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-15-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=EOoqBy12DI0"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #15 — Trop-perçu CAF",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-16-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=ZVtdkZYDKdc"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #16 — Remboursement fibre indisponible",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-17-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=Oysbr6SurI4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #17 — Vice caché voiture occasion",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-18-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=LTrJkpQ4CfE"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #18 — Prélèvement inconnu compte",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-19-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=0jv5_naB3Vg"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #19 — Heures sup volées",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-20-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=Ja_LuXpNKWk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #20 — Clause non-concurrence",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-21-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=n0xC2n6oTKw"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #21 — Facture restaurant groupe",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-22-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=5q_G2zUQXg4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #22 — OBO immobilier",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-23-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=njeGhoApZsA"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #23 — Loyer meublé étudiant",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-24-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=hHkOBE3p5ps"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #24 — Devis funéraire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-25-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=ywnmvV0xfxY"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #25 — Location voiture rayure",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-26-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=8CXw3lxuNzk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #26 — Fuite d'eau appartement",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-27-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=pYU2y2YXjaE"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #27 — Bail étudiant garant",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-28-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=cQFWS50Sz5U"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #28 — Frais itinérance data",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-29-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=AvSWZMJh7Ys"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #29 — Tatouage raté",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-30-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=tXKTBLnWRbk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #30 — Fourrière voiture",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-31-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=qm30okJah_I"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #31 — Prêt de voiture entre potes",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-32-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=YrfrCjHURIE"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #32 — Vol surbooké volontaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-33-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=k3DnasytDVs"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #33 — Assurance annulation ski",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-34-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=04rchoeXUu0"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #34 — Frais de succession bancaires",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-35-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=n7VwycnTyLo"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #35 — Retrait DAB avalé",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-36-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=_gVBzMwFJCk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #36 — Faux avis Google",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-37-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=kvm8iewvQFw"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #37 — Refus SAV Apple",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-38-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=gS6YbOOFSDg"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #38 — Restaurant addition",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-39-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=SmqjZCk5CeM"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #39 — Concession voiture occasion",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-40-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=vnfaxIoLfcg"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #40 — Frais résiliation box",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-41-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=KD4mdoJL4ic"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #41 — Contravention parking FPS",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-42-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=C3kk1_6bzAA"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #42 — Blanchiment par l’art",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-43-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=FbPz0dUTDwQ"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #43 — Transmission des grandes fortunes",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-44-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=F1oxW2oU184"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #44 — Contrôle métro bus",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-45-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=1mtkjV4qV8M"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #45 — Caution Airbnb festival",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-46-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=8T4Cb7W4wf0"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #46 — Radar automatique flash",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-47-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=7RZwWvqpD6Y"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #47 — Boîte mail spam",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-48-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=i3UK_ahwM8o"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #48 — Salle / traiteur annulation",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-49-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=bYppXZfVg-U"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #49 — Péage ticket perdu",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-renard-top50-50-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=i1WM-xRshJA"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 50 #50 — Waze pour le train",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-01-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7680439152348810528"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #01 — Uniforme au travail",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-02-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7662815671595584800"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #02 — Auto-école / attente permis",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-03-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7685271593848687904"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #03 — Dégâts voiture sur parking",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-04-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7658733810405723425"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #04 — Supplément bagage aérien",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-05-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7670576542489005344"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #05 — Voiture rayée sur parking magasin",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-06-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7669321126752898337"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #06 — Rupture conventionnelle",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-07-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7668748582505155873"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #07 — Opticien",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-08-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7658419859876891937"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #08 — Dépôt de garantie logement",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-09-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7670958281191476512"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #09 — Livreur abîme le parquet",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-10-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7675787140436856097"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #10 — Carte cadeau périmée",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-11-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7658231342898908448"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #11 — Abonnement annuel",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-12-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7670814780138999072"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #12 — Colis perdu La Poste",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-13-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7657314016615730465"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #13 — Vinted / colis perdu",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-14-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7666752155809778976"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #14 — Tapage nocturne",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-15-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7660971142198463776"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #15 — Airbnb annulé par l’hôte",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-16-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7688241169968418080"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #16 — Trop-perçu CAF",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-17-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7674138980530572577"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #17 — Coiffeur raté",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-18-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7660122418207362337"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #18 — Frais cachés restaurant",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-19-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7678775884739808545"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #19 — Baby-sitter non déclarée",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-20-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7669700323140832545"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #20 — Vinted / litige acheteur",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-21-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7682089312384519457"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #21 — Voyage scolaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-22-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7684157212213710112"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #22 — Feu rouge",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-23-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7666351584284118304"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #23 — Huissier à domicile",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-24-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7678400266063875360"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #24 — Carte grise / voiture d’occasion",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-25-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7659097356138319137"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #25 — Petit excès de vitesse",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-26-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7661907161890540832"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #26 — Stationnement devant garage",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-27-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7680607110031297825"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #27 — Moto volée / assurance",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-28-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7672272222970547488"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #28 — Addition au restaurant",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-29-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7663447785869413665"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #29 — Frais de résiliation internet",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-30-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7663221570269170976"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #30 — Alcoolémie au volant",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-31-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7671913189944069408"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #31 — Retard de salaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-32-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7660390834298260769"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #32 — Pressing abîme un vêtement",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-33-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7664202312298122528"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #33 — Voiture à la fourrière",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-34-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7664873059421113633"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #34 — Radiation France Travail",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-35-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7658983254522957088"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #35 — Vice caché voiture occasion",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-36-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7682361908292373792"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #36 — Panier repas entreprise",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-37-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7667448064155700512"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #37 — Vol de carte bancaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-38-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7671164994112834849"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #38 — Micro-rayure voiture de location",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-39-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7683786074606390560"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #39 — Dette / huissier",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-40-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7657608952842161441"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #40 — Frais de découvert bancaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-41-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7660025434217794848"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #41 — Lave-linge après garantie",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-42-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7670208600316431648"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #42 — Frais d’agence sur bail",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-43-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7681942617558404385"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #43 — Toucher davantage d’aides",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-44-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7687289744169979168"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #44 — Dentiste / devis élevé",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-45-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7677285194423913760"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #45 — Résiliation salle de sport",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-46-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7668286681782701344"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #46 — Rachat d’or",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-47-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7663917392430419232"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #47 — Frais de notaire",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-48-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7662379402067545376"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #48 — Prime d’intérim",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-49-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7657984948216876321"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #49 — Contrôle transport / amende",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-furet-top50-50-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7677833560979426593"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 50 #50 — Vinted / litige acheteur",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-01-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.youtube.com/watch?v=7S-KxukqzBc"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthère YouTube — 22/04/2026 — à absorber",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-02-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.youtube.com/watch?v=oaymIp2gcTg"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthère YouTube — 18/05/2026 — probable doublon TikTok",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-03-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.youtube.com/watch?v=tGXzSVz9FxM"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthère YouTube — 25/04/2026 — à absorber",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-04-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.youtube.com/watch?v=6ZbTHkDV2RI"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthère YouTube — 24/04/2026 — à absorber",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-05-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.youtube.com/watch?v=jFO_7egPGXk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthère YouTube — 01/05/2026 — à absorber",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-monsieur-chimp-01-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Monsieur Chimp Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=SJzcD0LvjGM"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Découverte concurrent / clone format — Monsieur Chimp Finance",
+      "created_at": "2026-09-24T22:10:00+02:00"
+    },
     {
       "id": "wave1-renard-finance-top10-v1",
       "active": false,

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { configMap, createRecord, queryAllRecords, queryRecords, TABLES } from "../../../../lib/airtable";
 import { createLiveLemonCheckout, createTestLemonCheckout } from "../../../../lib/lemon-api.mjs";
@@ -72,6 +71,10 @@ export async function POST(request) {
   if (!allowedOrigin(request)) return NextResponse.json({ ok: false, error: "Origin refused" }, { status: 403 });
   const contentType = clean(request.headers.get("content-type")).toLowerCase();
   if (!contentType.includes("application/json")) return NextResponse.json({ ok: false, error: "Format invalide" }, { status: 415 });
+  const declaredLength = Number(request.headers.get("content-length") || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "Requête trop volumineuse" }, { status: 413 });
+  }
   const raw = await request.text();
   if (Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES) return NextResponse.json({ ok: false, error: "Requête trop volumineuse" }, { status: 413 });
   let body = {};

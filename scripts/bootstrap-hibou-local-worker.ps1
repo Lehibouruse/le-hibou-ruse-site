@@ -257,9 +257,22 @@ if ($StartWorker) {
     }
   Start-Sleep -Milliseconds 500
 
+  Write-Host "Premier telechargement de validation..." -ForegroundColor Cyan
+  & $Node $Worker --once
+  if ($LASTEXITCODE -ne 0) {
+    throw "Le premier telechargement a echoue. Voir l'erreur ci-dessus."
+  }
+
   Start-Process -FilePath $Node -ArgumentList "`"$Worker`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
   Start-Sleep -Seconds 2
-  Write-Host "Worker active explicitement. Etat local : http://127.0.0.1:8765/health"
+
+  try {
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 5
+    Write-Host ("Worker actif. Statut: {0} | approuves: {1} | traites: {2}" -f $health.status, $health.approved_manifest_count, $health.processed_jobs.Count) -ForegroundColor Green
+  } catch {
+    Write-Host "Worker lance, mais health local pas encore disponible." -ForegroundColor Yellow
+  }
+  Write-Host "Etat local : http://127.0.0.1:8765/health"
 } else {
   Write-Host "Aucun job ne sera execute maintenant. Pour activer le corpus autorise : relancer avec -ApproveCorpus150 -StartWorker." -ForegroundColor Yellow
 }

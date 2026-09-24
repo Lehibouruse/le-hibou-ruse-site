@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const ROOT = process.env.HIBOU_MEDIA_ROOT || path.join(os.homedir(), "HibouMedia");
 const POLL_MS = Math.max(5000, Number(process.env.HIBOU_WORKER_POLL_MS || 15000));
@@ -216,19 +216,59 @@ function healthServer() {
   server.listen(port, "127.0.0.1", () => log("Health endpoint", { url: `http://127.0.0.1:${port}/health` }));
 }
 
+function localDiagnostic() {
+  const check = (command, args = ["--version"]) => {
+    const r = spawnSync(command, args, { encoding: "utf8", windowsHide: true, shell: false });
+    return {
+      available: r.status === 0,
+      command: [command, ...args].join(" "),
+      version: String(r.stdout || r.stderr || "").split(/\r?\n/)[0].trim(),
+    };
+  };
+  const python = process.platform === "win32"
+    ? [check("py", ["-3.11", "--version"]), check("python", ["--version"])]
+    : [check("python3.11", ["--version"]), check("python3", ["--version"])];
+  const nvidia = spawnSync("nvidia-smi", [
+    "--query-gpu=name,memory.total,driver_version",
+    "--format=csv,noheader,nounits",
+  ], { encoding: "utf8", windowsHide: true, shell: false });
+  const gpus = nvidia.status === 0
+    ? String(nvidia.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+        const [name, memoryTotalMiB, driverVersion] = line.split(",").map((x) => x.trim());
+        return { name, memory_total_mib: Number(memoryTotalMiB), memory_total_gib: Math.round((Number(memoryTotalMiB) / 1024) * 10) / 10, driver_version: driverVersion };
+      })
+    : [];
+  const maxVramGiB = gpus.reduce((max, gpu) => Math.max(max, Number(gpu.memory_total_gib || 0)), 0);
+  const videoProfile = maxVramGiB >= 12 ? "comfortable"
+    : maxVramGiB >= 8 ? "low_vram_sequential"
+    : maxVramGiB > 0 ? "lightweight_or_remote"
+    : "gpu_not_detected";
+  return {
+    schema: "HIBOU_GITHUB_WORKER_DIAGNOSTIC_V2",
+    generated_at: new Date().toISOString(),
+    worker: WORKER_ID,
+    media_root: ROOT,
+    queue_url: QUEUE_URL,
+    execution_enabled: EXECUTION_ENABLED,
+    node: { available: true, version: process.version },
+    ffmpeg: check("ffmpeg"),
+    ytdlp: check(YTDLP),
+    python_candidates: python,
+    nvidia_smi_available: nvidia.status === 0,
+    gpus,
+    video_profile: videoProfile,
+    recommended_first_step: videoProfile === "low_vram_sequential"
+      ? "Chatterbox one scene, then ComfyUI local with FP8/low-VRAM profile and sequential candidates"
+      : "Run the dedicated video preflight before model installation",
+    network_tested: false,
+    queue_fetched: false,
+    downloads_performed: false,
+  };
+}
+
 async function main() {
   if (DIAGNOSTIC) {
-    process.stdout.write(JSON.stringify({
-      schema: "HIBOU_GITHUB_WORKER_DIAGNOSTIC_V1",
-      generated_at: new Date().toISOString(),
-      worker: WORKER_ID,
-      media_root: ROOT,
-      queue_url: QUEUE_URL,
-      execution_enabled: EXECUTION_ENABLED,
-      network_tested: false,
-      queue_fetched: false,
-      downloads_performed: false
-    }, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(localDiagnostic(), null, 2) + "\n");
     return;
   }
   state.status = EXECUTION_ENABLED ? "running" : "paused";

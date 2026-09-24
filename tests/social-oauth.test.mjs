@@ -27,9 +27,9 @@ const base = {
   PINTEREST_APP_SECRET: "pin-secret",
 };
 
-test("les huit providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
+test("les neuf providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
   const readiness = oauthProviderReadiness(base);
-  assert.equal(readiness.length, 8);
+  assert.equal(readiness.length, 9);
   assert.equal(readiness.every((item) => item.ready), true);
   assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
 });

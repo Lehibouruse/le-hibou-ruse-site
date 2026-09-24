@@ -1,0 +1,50 @@
+{
+  "schema": "HIBOU_LOCAL_HARDWARE_PROFILE_V1",
+  "profile_id": "DETECT_AT_RUNTIME",
+  "device": {
+    "model": null,
+    "cpu": "Intel Core i9 family — exact model unverified",
+    "gpu": "NVIDIA GeForce RTX family — exact model unverified",
+    "vram_gb": null,
+    "ram_gb": null,
+    "storage": null,
+    "verification_required": true,
+    "verification_command": "npm run video:gpu-check:windows"
+  },
+  "voice": {
+    "engine": "chatterbox_multilingual",
+    "python": "3.11",
+    "device": "cuda_if_available",
+    "generation_mode": "one_scene_first",
+    "fallback_policy": "no_paid_cloud_fallback"
+  },
+  "image": {
+    "engine": "comfyui_local",
+    "model_family": "FLUX.1-schnell_or_lighter_after_preflight",
+    "candidates_per_scene": 3,
+    "generate_sequentially": true,
+    "profiles": {
+      "vram_12_plus": {
+        "policy": "comfortable_local_smoke_then_measure"
+      },
+      "vram_8_to_12": {
+        "precision": "fp8_or_equivalent_low_vram",
+        "width": 768,
+        "height": 1344,
+        "batch_size": 1,
+        "steps": 4,
+        "policy": "sequential_candidates"
+      },
+      "vram_below_8": {
+        "policy": "lighter_model_or_lower_resolution; do not assume FLUX is practical"
+      }
+    },
+    "final_video_target": { "width": 1080, "height": 1920 }
+  },
+  "safeguards": {
+    "public_comfyui_endpoint": false,
+    "paid_api_fallback": false,
+    "human_review_before_full_pilot": true,
+    "do_not_guess_hardware": true
+  }
+}

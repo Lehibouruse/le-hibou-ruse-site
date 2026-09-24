@@ -1,64 +1,42 @@
-# Premier lancement local — ASUS ROG Strix G18 G814JI
+# Premier lancement local — PC gaming Windows
 
-Matériel de référence vérifié pour Le Hibou Rusé :
-- Intel Core i9-13980HX ;
-- NVIDIA GeForce RTX 4070 Laptop GPU — 8 Go de VRAM ;
-- 32 Go de RAM ;
-- SSD NVMe ~1 To.
+Le modèle exact du GPU, la VRAM, la RAM et le stockage doivent être détectés localement avant tout choix de modèle lourd. Ne pas supposer un modèle ROG ou RTX précis.
 
-Le profil machine canonique est `video/hardware/rog-g814ji-rtx4070-8gb.json`.
+Profil canonique : `video/hardware/detect-at-runtime.json`.
 
-## 1. Vérification rapide
+## 1. Diagnostic
 
 ```powershell
 npm run video:gpu-check:windows
 node scripts/video-local-preflight.mjs
 ```
 
-Le diagnostic reste utile pour vérifier pilote/CUDA/Python/FFmpeg, mais le choix d’architecture n’est plus en attente du modèle GPU.
+Aucun modèle n’est téléchargé et aucun fallback payant n’est activé.
 
-## 2. Voix d’abord — Chatterbox Multilingual
+## 2. Voix — une scène
 
-Utiliser Python 3.11 et CUDA. Premier test : une seule scène OBO.
+Après validation du préflight et installation locale de Chatterbox :
 
 ```powershell
 npm run video:smoke -- video/contracts/obo.v1.json .hibou-video-artifacts/smoke-obo --scene=1 --run-voice
 ```
 
-Critère de passage : WAV français intelligible, durée mesurée, aucun mot coupé, aucun fallback cloud/payant.
+## 3. Image — profil selon la VRAM réellement mesurée
 
-## 3. Image — profil 8 Go
-
-Premier modèle : **FLUX.1-schnell FP8** dans ComfyUI local. Ne pas commencer par FLUX FP16 complet.
-
-Profil smoke :
-- 768 × 1344 ;
-- batch 1 ;
-- 4 steps ;
-- 3 candidats générés séquentiellement.
-
-Fallback si CUDA OOM ou pression RAM excessive :
-- 640 × 1136 ;
-- batch 1 ;
-- 4 steps.
-
-Le renderer final reste 1080 × 1920.
-
-Exporter le workflow ComfyUI au format API puis détecter automatiquement les nœuds :
+Exporter un workflow ComfyUI au format API puis détecter ses vrais nœuds :
 
 ```powershell
 npm run video:comfyui-binding -- C:\chemin\workflow-api.json C:\chemin\hibou-binding-candidate.json
 ```
 
-Le binding proposé détecte prompt, seed, dimensions et sortie image. Vérifier visuellement ces IDs avant le premier run.
-
-Puis :
+Repères Hibou :
+- ≥ 12 Go : smoke local confortable puis mesure ;
+- 8–12 Go : profil low-VRAM, batch 1, candidats séquentiels, FP8/quantification adaptée ;
+- < 8 Go : modèle/résolution plus légers avant d’envisager FLUX.
 
 ```powershell
 npm run video:smoke -- video/contracts/obo.v1.json .hibou-video-artifacts/smoke-obo C:\chemin\hibou-binding.json --scene=1 --run-image
 ```
-
-Attendu : trois images distinctes, batch 1, seeds déterministes et manifeste persistant.
 
 ## 4. Smoke complet
 
@@ -67,24 +45,15 @@ npm run video:smoke -- video/contracts/obo.v1.json .hibou-video-artifacts/smoke-
 npm run video:smoke-report -- summarize .hibou-video-artifacts/smoke-obo
 ```
 
-Le statut réussi est volontairement `LOCAL_SMOKE_PASS — FULL_PIPELINE_NOT_RUN`. Il n’autorise aucune publication.
+Le statut `LOCAL_SMOKE_PASS — FULL_PIPELINE_NOT_RUN` n’autorise aucune publication.
 
-## 5. Passage au pilote
+## 5. Montée en charge
 
-Seulement après revue humaine de la scène smoke :
-1. 3 scènes ;
-2. rendu FFmpeg ;
-3. QC technique ;
-4. pilote 18 scènes ;
-5. revue iPhone ;
-6. seulement ensuite généralisation.
+1. une scène ;
+2. trois scènes ;
+3. rendu FFmpeg + QC ;
+4. pilote complet ;
+5. lecture iPhone ;
+6. généralisation.
 
-## Garde-fous
-
-- ComfyUI uniquement en loopback/local ;
-- aucun fallback API payant ;
-- aucun lancement simultané de plusieurs candidats sur 8 Go ;
-- pas de FLUX FP16 complet au premier run ;
-- caches et modèles hors Git/Vercel ;
-- arrêter sur OOM plutôt que basculer vers le cloud ;
-- conserver modèle, précision, dimensions, seed, hashes et temps de génération.
+Garde-fous : loopback uniquement, aucun fallback API payant, aucun gros modèle avant diagnostic, arrêt sur OOM plutôt que bascule cloud, modèles/caches/médias hors Git et Vercel.

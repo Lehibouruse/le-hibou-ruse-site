@@ -1,42 +1,61 @@
-# Le Hibou Rusé — état de reprise
+# Le Hibou Rusé — état de reprise canonique
 
-Dernière mise à jour : 2026-09-13 UTC
+Dernière mise à jour : 24/09/2026.
 
-## Agent API autonome V1 — opérationnel et testé
+## Production / main
+Le dépôt `main` contient les garde-fous paid-AI, le socle commerce Lemon TEST, le consentement numérique feature-flagged, les métriques publiques Bluesky, le worker Windows local durci et le pipeline vidéo local déterministe.
 
-- Dépôt réel repris sans retour en arrière depuis `main` au commit `bb9eea0`.
-- `HIBOU_AGENT_V1` est versionné dans le code avec les instructions générales « LE HIBOU RUSÉ — AGENT PRINCIPAL ». Un prompt OpenAI hébergé peut être substitué par `HIBOU_OPENAI_PROMPT_ID` et `HIBOU_OPENAI_PROMPT_VERSION` sans modifier l'orchestrateur.
-- Routeur effectivement appliqué : règle déterministe sans IA lorsqu'elle suffit, Luna pour le simple, Terra pour l'intermédiaire, Sol uniquement après échec Terra confirmé et justifié. Deux escalades maximum, un retry API maximum par modèle et quatre appels IA maximum par Job par défaut.
-- Sortie JSON stricte : `completed`, `failed`, `waiting_for_human` ou `needs_escalation`.
-- Kill switch, plafonds par Job et budgets journaliers configurables par variables Vercel. Modèle, reasoning, jetons entrée/cachés/sortie, coût estimé, appels, escalades et IDs de réponse sont écrits dans Jobs et Journal.
-- `POST /api/orchestrator` utilise la Responses API avec contexte minimal, filtrage des clés sensibles, `store: false` et cache de prompt. Aucun secret n'est présent dans le dépôt.
-- Verrous Airtable avec bail, vérification de propriété et clé d'idempotence empêchent le double traitement.
-- Les crons `/api/orchestrator` et `/api/health` sont activés en production. Sur le plan Hobby, ils s'exécutent quotidiennement; une cadence plus courte nécessitera Pipedream ou un plan Vercel supérieur.
-- Un passage sans Job admissible sort avant toute lecture de budget ou tout appel OpenAI (`openai_calls: 0`). Le health check n'appelle jamais OpenAI.
+Toujours distinguer : **code prêt**, **runtime configuré**, **test réel réussi**, **production autorisée**.
 
-## Preuves production
+## Vidéo locale
+Le pipeline couvre storyboard, Chatterbox local, ComfyUI local, smoke test d’une scène, trois candidats image, rendu FFmpeg 1080×1920/30 fps, sous-titres, mastering audio, hashes/manifests, QC et reporting Airtable.
 
-- Déploiement manuel validé : `dpl_CDSq6GygVnRJibzWW2ehL6AX3e5o`, état `READY`, alias `https://le-hibou-ruse-site.vercel.app`.
-- Succès IA réel : Job `hibou-agent-v1-success-20260913102009` (`rec8xp72dHHEBqCjn`) passé de Pending à Running puis Completed avec `gpt-5.6-luna`, reasoning low, 1 686 jetons d'entrée, 71 de sortie, 1 appel, 0 escalade et coût estimé de 0,0004224 USD. Journal : `recpw0v3SQ9A7AHzC`.
-- Attente sûre réelle : Job `hibou-agent-v1-waiting-20260913102523` (`recybKXtWECNwc3ON`) terminé en Manual Review / `waiting_for_human`, sans boucle, sans retry, sans appel IA et à coût nul. Journal : `rec3KOKmqSHKXz3uv`.
-- Anti-doublon réel : Job `hibou-agent-v1-duplicate-20260913` (`rec83ZauQNcDpVgFz`) portant une clé déjà terminée a été clôturé Completed / dédupliqué, avec 0 appel IA et coût nul.
-- File vide réelle : déclenchement production terminé sans modifier les Jobs achevés et sans nouvel appel IA.
-- Tests locaux : 11 tests unitaires réussis et build Next.js de production réussi.
+Blocage réel actuel : **diagnostic matériel du PC**. L’utilisateur a indiqué Intel Core i9 + NVIDIA GeForce RTX, mais le modèle exact et la VRAM ne doivent pas être supposés.
 
-## Variables Vercel
+Première commande : `npm run video:gpu-check:windows`.
 
-- Secrets présents : `OPENAI_API_KEY`, `AIRTABLE_TOKEN`, `CRON_SECRET`. Leurs valeurs ne sont ni lues dans les journaux ni stockées dans GitHub ou Airtable.
-- Agent : `AI_ENABLED=true`, `HIBOU_AI_KILL_SWITCH=false`, Terra et Sol autorisés, plafonds d'escalade/retry/appels et budgets par Job/jour configurés pour Production, Preview et Development.
-- `LEMON_SQUEEZY_WEBHOOK_SECRET` reste à définir après création du webhook Lemon Squeezy.
+## Worker PC
+Mode recommandé pour la première activation : worker GitHub sans token, queue publique en lecture seule et exécution désactivée par défaut.
 
-## Suite utile, hors périmètre Agent V1
+Le worker Airtable avec token reste un mode avancé bidirectionnel.
 
-1. Brancher Pipedream si une fréquence inférieure à une fois par jour est souhaitée sur Vercel Hobby.
-2. Finaliser le compte, le produit à 29 € et le webhook Lemon Squeezy; KYC, coordonnées bancaires et acceptation des conditions restent humains.
-3. Relier une interface produit à `POST /api/analyze-montage` si cette analyse doit être exposée aux utilisateurs.
-4. Compléter `Content Pipeline`, puis construire le MVP Remotion.
+## Commerce
+- Lemon Squeezy = Merchant of Record.
+- TEST séparé de LIVE.
+- Consentement numérique piloté par feature flag.
+- Aucun checkout LIVE implicite.
+- La livraison réelle n’est pas considérée comme prouvée avant test de bout en bout.
+
+## Réseaux sociaux
+- Bluesky : métriques publiques sans secret lorsque l’URI du post existe.
+- Reddit : code préparé derrière approbation externe explicite ; aucun appel ne doit partir avant le gate.
+- Les autres réseaux gardent leurs blocages propres.
+
+## Airtable
+Airtable reste la source opérationnelle structurée pour Roadmap, Content Pipeline, Montages, Livre et états d’exécution.
+
+## Bibliothèque
+Le dossier `/Le Hibou Rusé` est organisé en :
+- `00_Pilotage`
+- `01_Livre/00_Références`
+- `01_Livre/01_Brouillons`
+- `01_Livre/02_Exports`
+- `Vidéos/<Sujet>`, avec anciens POC rangés sous `Archives`
+
+## Prochaines preuves humaines
+1. Diagnostic GPU/VRAM.
+2. Une scène Chatterbox.
+3. Trois images ComfyUI.
+4. Une scène rendue, puis un pilote.
+5. Checkout TEST Lemon.
+6. Accord Reddit avant activation.
+
+## Sécurité / résilience
+Trois chantiers P1 sont suivis dans Airtable : audit cybersécurité, sauvegardes/restauration, puis test réel de reprise/rotation des secrets.
 
 ## Garde-fous
-
-- Ne pas publier les premières vidéos sans validation humaine.
-- Ne jamais enregistrer de token, clé ou mot de passe dans Airtable ou GitHub.
+- aucun secret dans GitHub/Airtable/docs ;
+- aucun fallback payant silencieux ;
+- aucun endpoint local exposé publiquement ;
+- aucune publication sans validation appropriée ;
+- ne jamais inventer un état runtime ou un modèle matériel.

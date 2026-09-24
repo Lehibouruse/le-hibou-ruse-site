@@ -137,6 +137,6 @@ test("Snapchat reste explicitement manuel tant que l'accès produit Snap n'est p
   assert.equal(snapchat.manual_only, true);
   assert.equal(snapchat.authorization_ready, false);
   const summary = socialGrantSummary(audit);
-  assert.equal(summary.oauth_providers, 8);
+  assert.equal(summary.oauth_providers, 9);
   assert.deepEqual(summary.manual_only, ["snapchat"]);
 });

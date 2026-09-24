@@ -5,7 +5,7 @@ Ce dispositif prépare une **première couche de sauvegarde**. Il ne constitue p
 ## Principe
 
 - GitHub : bundle Git complet.
-- Airtable métier non sensible : export JSON compressé.
+- Airtable métier non sensible : export JSON compressé avec redaction défensive des champs dont le nom ressemble à un secret.
 - Tables pouvant contenir PII, tokens chiffrés ou journaux sensibles : **exclues par défaut**.
 - Export sensible uniquement avec `--include-sensitive` et `HIBOU_BACKUP_PASSPHRASE`; chiffrement AES-256-GCM.
 - Aucun token/mot de passe n'est écrit dans le manifeste.
@@ -70,3 +70,22 @@ L'outil produit des exports de preuve, pas encore un import automatique aveugle.
 4. faire un **test réel de restauration** ;
 5. mesurer RPO/RTO ;
 6. documenter la rotation des secrets après incident.
+
+
+## Répétition de restauration
+
+Après création d'une sauvegarde :
+
+```powershell
+npm run backup:rehearse -- C:\chemin\vers\la-sauvegarde
+```
+
+Cette commande :
+- vérifie les SHA-256 du manifeste ;
+- décompresse et parse les exports Airtable non sensibles ;
+- vérifie qu'ils ont bien été redacted ;
+- lance `git bundle verify` ;
+- clone réellement le bundle dans un dossier temporaire et compare le HEAD attendu ;
+- **n'écrit jamais dans Airtable**.
+
+Une vraie restauration Airtable doit rester séparée et d'abord viser une base de test.

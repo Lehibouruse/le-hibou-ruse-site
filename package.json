@@ -22,10 +22,11 @@
     "video:smoke-report": "node scripts/video-airtable-smoke-report.mjs",
     "video:install:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-local-install-windows.ps1",
     "video:comfyui:start:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-start-comfyui-windows.ps1",
-    "backup:plan": "node scripts/backup-hibou-safe.mjs",
+    "backup:plan": "node scripts/backup-project-local.mjs --plan",
     "backup:create": "node scripts/backup-hibou-safe.mjs --create",
     "backup:verify": "node scripts/verify-hibou-backup.mjs",
-    "security:self-check": "node scripts/security-self-check.mjs"
+    "security:self-check": "node scripts/security-self-check.mjs",
+    "backup:local": "node scripts/backup-project-local.mjs --all"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

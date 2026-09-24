@@ -4,6 +4,10 @@ import { dirname, resolve } from "node:path";
 import { runImageGen } from "./video-local-adapters.mjs";
 
 function fail(message){throw new Error(message);}
+export function isCudaOom(error){
+  const message=String(error?.message||error||"");
+  return /(?:cuda[^\n]{0,80})?out of memory|cuda error[^\n]{0,80}memory|cublas_status_alloc_failed|torch\.outofmemoryerror/i.test(message);
+}
 function loadExisting(path,contentId){
   if(!path||!existsSync(path)) return {schema:"HIBOU_IMAGE_BATCH_V1",content_id:contentId,results:{}};
   try{
@@ -35,15 +39,29 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     const key=item.candidate_id;
     if(outputsStillExist(state.results[key])){cacheHits+=1;continue;}
     try{
-      const result=await runner(item.request);
+      let result;
+      let fallbackUsed=false;
+      let primaryError="";
+      try{
+        result=await runner(item.request);
+      }catch(error){
+        if(!isCudaOom(error)||!item.fallback_request) throw error;
+        primaryError=String(error?.message||error).slice(0,500);
+        result=await runner(item.fallback_request);
+        fallbackUsed=true;
+      }
       state.results[key]={
         status:"completed",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,
-        job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,error:""
+        job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,
+        fallback_used:fallbackUsed,primary_error:primaryError,error:""
       };
       generated+=1;
       writeState(manifestPath,state);
     }catch(error){
-      state.results[key]={status:"error",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,outputs:[],error:String(error?.message||error)};
+      state.results[key]={
+        status:"error",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,outputs:[],
+        fallback_used:false,error:String(error?.message||error).slice(0,700)
+      };
       writeState(manifestPath,state);
       throw error;
     }

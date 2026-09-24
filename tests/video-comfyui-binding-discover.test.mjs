@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { discoverBinding } from "../scripts/video-comfyui-binding-discover.mjs";
+import { bindingProfiles, discoverBinding } from "../scripts/video-comfyui-binding-discover.mjs";
 
 test("discovers common ComfyUI text, seed and output nodes",()=>{
   const wf={
@@ -27,4 +27,14 @@ test("returns incomplete instead of inventing missing nodes",()=>{
   assert.equal(r.status,"INCOMPLETE");
   assert.equal(r.prompt,null);
   assert.equal(r.seed,null);
+});
+
+test("confirmed hardware profile supplies smoke and OOM fallback sizes",()=>{
+ const p=bindingProfiles({
+   profile_id:"ROG_G814JI_RTX4070_8GB",
+   image:{smoke_profile:{width:768,height:1344,batch_size:1},fallback_profile:{width:640,height:1136,batch_size:1}}
+ });
+ assert.equal(p.hardware_profile_id,"ROG_G814JI_RTX4070_8GB");
+ assert.deepEqual(p.profile,{width:768,height:1344,batch_size:1});
+ assert.deepEqual(p.fallback_profile,{width:640,height:1136,batch_size:1});
 });

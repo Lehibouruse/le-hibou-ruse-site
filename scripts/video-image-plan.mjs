@@ -26,24 +26,21 @@ export function buildImagePlan(contract,binding){
     const prompt=[prefix,core,suffix].filter(Boolean).join(" ");
     for(let candidate=1;candidate<=3;candidate+=1){
       const seed=seedFor(contentId,scene.scene_id,candidate);
-      const overrides={
+      const baseOverrides={
         [String(binding.prompt.node_id)]:{[binding.prompt.input]:prompt},
         [String(binding.seed.node_id)]:{[binding.seed.input]:seed}
       };
-      if(binding?.size?.node_id&&binding?.profile?.width&&binding?.profile?.height){
-        overrides[String(binding.size.node_id)]={
-          ...(overrides[String(binding.size.node_id)]||{}),
-          [binding.size.width_input||"width"]:Number(binding.profile.width),
-          [binding.size.height_input||"height"]:Number(binding.profile.height),
-          ...(binding.size.batch_input?{[binding.size.batch_input]:Number(binding.profile.batch_size||1)}:{})
-        };
-      }
-      requests.push({
-        candidate_id:`${scene.scene_id}-C${candidate}`,
-        scene_id:scene.scene_id,
-        candidate,
-        seed,
-        request:{
+      const requestForProfile=(profile)=>{
+        const overrides=structuredClone(baseOverrides);
+        if(binding?.size?.node_id&&profile?.width&&profile?.height){
+          overrides[String(binding.size.node_id)]={
+            ...(overrides[String(binding.size.node_id)]||{}),
+            [binding.size.width_input||"width"]:Number(profile.width),
+            [binding.size.height_input||"height"]:Number(profile.height),
+            ...(binding.size.batch_input?{[binding.size.batch_input]:Number(profile.batch_size||1)}:{})
+          };
+        }
+        return {
           interface:"IMAGE_GEN_V1",
           engine:"comfyui",
           content_id:contentId,
@@ -54,7 +51,19 @@ export function buildImagePlan(contract,binding){
           output_node_ids:binding.output_node_ids.map(String),
           timeout_seconds:Number(binding.timeout_seconds||600),
           max_retries:Number(binding.max_retries??1)
-        }
+        };
+      };
+      const request=requestForProfile(binding.profile);
+      const fallbackRequest=binding?.fallback_profile?.width&&binding?.fallback_profile?.height&&binding?.size?.node_id
+        ?requestForProfile(binding.fallback_profile)
+        :null;
+      requests.push({
+        candidate_id:`${scene.scene_id}-C${candidate}`,
+        scene_id:scene.scene_id,
+        candidate,
+        seed,
+        request,
+        fallback_request:fallbackRequest
       });
     }
   }

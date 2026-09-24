@@ -15,6 +15,7 @@ const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const APPROVAL_FILE = path.join(LOG_DIR, "approved-jobs.json");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
+const REPORT_TOKEN = String(process.env.HIBOU_LOCAL_REPORT_TOKEN || "").trim();
 const ONCE = process.argv.includes("--once");
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
 const EXECUTION_ENABLED = String(process.env.HIBOU_LOCAL_EXECUTION_ENABLED || "").trim().toLowerCase() === "true";
@@ -124,12 +125,16 @@ async function fetchQueue() {
 }
 
 async function reportProgress(job, status, data = {}) {
+  if (!REPORT_TOKEN) {
+    log("Progress report skipped", { job: job?.id, status, reason: "report_token_missing" });
+    return;
+  }
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(REPORT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
+      headers: { "Content-Type": "application/json", "User-Agent": "Le-Hibou-ROG-Worker/1.0", Authorization: `Bearer ${REPORT_TOKEN}` },
       body: JSON.stringify({
         job_id: job.id,
         concurrent: job.concurrent || "",
@@ -257,6 +262,7 @@ function healthServer() {
       media_root: ROOT,
       queue_url: QUEUE_URL,
       report_url: REPORT_URL,
+      report_token_present: Boolean(REPORT_TOKEN),
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

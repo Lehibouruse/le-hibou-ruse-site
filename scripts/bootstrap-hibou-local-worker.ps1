@@ -1,4 +1,4 @@
-param([switch]$StartWorker, [switch]$ApproveCorpus150)
+param([switch]$StartWorker, [switch]$ApproveCorpus150, [string]$ApproveJobId = "")
 
 $ErrorActionPreference = "Stop"
 
@@ -67,162 +67,43 @@ $env:HIBOU_LOCAL_EXECUTION_ENABLED = "false"
 
 
 $ApprovalFile = Join-Path $env:LOCALAPPDATA "LeHibou\approved-jobs.json"
-if ($ApproveCorpus150) {
-  $approvedIds = @(
-  "reels-richissime-01-v1",
-  "reels-stratege-impot-04-v1",
-  "reels-stratege-impot-03-v1",
-  "reels-stratege-impot-02-v1",
-  "reels-stratege-impot-01-v1",
-  "reels-renard-top50-01-v1",
-  "reels-renard-top50-02-v1",
-  "reels-renard-top50-03-v1",
-  "reels-renard-top50-04-v1",
-  "reels-renard-top50-05-v1",
-  "reels-renard-top50-06-v1",
-  "reels-renard-top50-07-v1",
-  "reels-renard-top50-08-v1",
-  "reels-renard-top50-09-v1",
-  "reels-renard-top50-10-v1",
-  "reels-renard-top50-11-v1",
-  "reels-renard-top50-12-v1",
-  "reels-renard-top50-13-v1",
-  "reels-renard-top50-14-v1",
-  "reels-renard-top50-15-v1",
-  "reels-renard-top50-16-v1",
-  "reels-renard-top50-17-v1",
-  "reels-renard-top50-18-v1",
-  "reels-renard-top50-19-v1",
-  "reels-renard-top50-20-v1",
-  "reels-renard-top50-21-v1",
-  "reels-renard-top50-22-v1",
-  "reels-renard-top50-23-v1",
-  "reels-renard-top50-24-v1",
-  "reels-renard-top50-25-v1",
-  "reels-renard-top50-26-v1",
-  "reels-renard-top50-27-v1",
-  "reels-renard-top50-28-v1",
-  "reels-renard-top50-29-v1",
-  "reels-renard-top50-30-v1",
-  "reels-renard-top50-31-v1",
-  "reels-renard-top50-32-v1",
-  "reels-renard-top50-33-v1",
-  "reels-renard-top50-34-v1",
-  "reels-renard-top50-35-v1",
-  "reels-renard-top50-36-v1",
-  "reels-renard-top50-37-v1",
-  "reels-renard-top50-38-v1",
-  "reels-renard-top50-39-v1",
-  "reels-renard-top50-40-v1",
-  "reels-renard-top50-41-v1",
-  "reels-renard-top50-42-v1",
-  "reels-renard-top50-43-v1",
-  "reels-renard-top50-44-v1",
-  "reels-renard-top50-45-v1",
-  "reels-renard-top50-46-v1",
-  "reels-renard-top50-47-v1",
-  "reels-renard-top50-48-v1",
-  "reels-renard-top50-49-v1",
-  "reels-renard-top50-50-v1",
-  "reels-furet-top50-01-v1",
-  "reels-furet-top50-02-v1",
-  "reels-furet-top50-03-v1",
-  "reels-furet-top50-04-v1",
-  "reels-furet-top50-05-v1",
-  "reels-furet-top50-06-v1",
-  "reels-furet-top50-07-v1",
-  "reels-furet-top50-08-v1",
-  "reels-furet-top50-09-v1",
-  "reels-furet-top50-10-v1",
-  "reels-furet-top50-11-v1",
-  "reels-furet-top50-12-v1",
-  "reels-furet-top50-13-v1",
-  "reels-furet-top50-14-v1",
-  "reels-furet-top50-15-v1",
-  "reels-furet-top50-16-v1",
-  "reels-furet-top50-17-v1",
-  "reels-furet-top50-18-v1",
-  "reels-furet-top50-19-v1",
-  "reels-furet-top50-20-v1",
-  "reels-furet-top50-21-v1",
-  "reels-furet-top50-22-v1",
-  "reels-furet-top50-23-v1",
-  "reels-furet-top50-24-v1",
-  "reels-furet-top50-25-v1",
-  "reels-furet-top50-26-v1",
-  "reels-furet-top50-27-v1",
-  "reels-furet-top50-28-v1",
-  "reels-furet-top50-29-v1",
-  "reels-furet-top50-30-v1",
-  "reels-furet-top50-31-v1",
-  "reels-furet-top50-32-v1",
-  "reels-furet-top50-33-v1",
-  "reels-furet-top50-34-v1",
-  "reels-furet-top50-35-v1",
-  "reels-furet-top50-36-v1",
-  "reels-furet-top50-37-v1",
-  "reels-furet-top50-38-v1",
-  "reels-furet-top50-39-v1",
-  "reels-furet-top50-40-v1",
-  "reels-furet-top50-41-v1",
-  "reels-furet-top50-42-v1",
-  "reels-furet-top50-43-v1",
-  "reels-furet-top50-44-v1",
-  "reels-furet-top50-45-v1",
-  "reels-furet-top50-46-v1",
-  "reels-furet-top50-47-v1",
-  "reels-furet-top50-48-v1",
-  "reels-furet-top50-49-v1",
-  "reels-furet-top50-50-v1",
-  "reels-finance-panthere-01-v1",
-  "reels-finance-panthere-02-v1",
-  "reels-finance-panthere-03-v1",
-  "reels-finance-panthere-04-v1",
-  "reels-finance-panthere-05-v1",
-  "reels-monsieur-chimp-01-v1",
-  "reels-finance-panthere-tiktok-7649878022354504993-v1",
-  "reels-finance-panthere-tiktok-7634292064515083553-v1",
-  "reels-finance-panthere-tiktok-7631693479185354016-v1",
-  "reels-finance-panthere-tiktok-7635000346640747809-v1",
-  "reels-finance-panthere-tiktok-7641873502626204961-v1",
-  "reels-finance-panthere-tiktok-7629063822749289761-v1",
-  "reels-finance-panthere-tiktok-7645058924604820768-v1",
-  "reels-finance-panthere-tiktok-7642825784956112161-v1",
-  "reels-finance-panthere-tiktok-7630923023440268576-v1",
-  "reels-finance-panthere-tiktok-7630587558539414816-v1",
-  "reels-finance-panthere-tiktok-7633139197016100129-v1",
-  "reels-finance-panthere-tiktok-7636891104876547360-v1",
-  "reels-finance-panthere-tiktok-7630036576214469921-v1",
-  "reels-finance-panthere-tiktok-7629795204467363104-v1",
-  "reels-renard-top100-051-v1",
-  "reels-renard-top100-052-v1",
-  "reels-renard-top100-053-v1",
-  "reels-renard-top100-054-v1",
-  "reels-renard-top100-056-v1",
-  "reels-renard-top100-057-v1",
-  "reels-renard-top100-058-v1",
-  "reels-renard-top100-059-v1",
-  "reels-furet-top100-051-v1",
-  "reels-furet-top100-052-v1",
-  "reels-furet-top100-053-v1",
-  "reels-furet-top100-054-v1",
-  "reels-furet-top100-055-v1",
-  "reels-furet-top100-056-v1",
-  "reels-furet-top100-057-v1",
-  "reels-furet-top100-058-v1",
-  "reels-furet-top100-059-v1",
-  "reels-furet-top100-060-v1",
-  "reels-furet-top100-061-v1",
-  "reels-furet-top100-062-v1",
-  "reels-furet-top100-063-v1",
-  "reels-furet-top100-064-v1",
-  "reels-furet-top100-065-v1",
-  "reels-furet-top100-066-v1",
-  "reels-furet-top100-067-v1"
-  )
-  $approvalPayload = @{ batch_id = "competitor-reels-150-v1"; approved_at = (Get-Date).ToUniversalTime().ToString("o"); job_ids = $approvedIds }
-  $approvalPayload | ConvertTo-Json -Depth 4 | Set-Content -Path $ApprovalFile -Encoding ASCII
-  Write-Host "Corpus local approuve : $($approvedIds.Count) jobs." -ForegroundColor Green
+if ($ApproveCorpus150 -or -not [string]::IsNullOrWhiteSpace($ApproveJobId)) {
+  Write-Host "Capture locale de la définition exacte des jobs approuvés..." -ForegroundColor Cyan
+  $queue = Invoke-RestMethod -UseBasicParsing -Uri $QueueUrl
+  if (-not $queue.jobs) { throw "Queue distante invalide ou vide." }
+
+  if ($ApproveCorpus150) {
+    $selected = @($queue.jobs | Where-Object { $_.batch_id -eq "competitor-reels-150-v1" -and $_.active -ne $false })
+    if ($selected.Count -ne 150) {
+      throw "Le corpus attendu doit contenir exactement 150 jobs actifs ; trouvé : $($selected.Count)."
+    }
+    $approvalKind = "corpus150"
+  } else {
+    $selected = @($queue.jobs | Where-Object { $_.id -eq $ApproveJobId })
+    if ($selected.Count -ne 1) { throw "Job introuvable ou non unique : $ApproveJobId" }
+    $approvalKind = "single_job"
+  }
+
+  $snapshots = @()
+  foreach ($job in $selected) {
+    $snapshots += [ordered]@{
+      id = [string]$job.id
+      type = [string]$job.type
+      concurrent = [string]$job.concurrent
+      batch_id = [string]$job.batch_id
+      urls = @($job.urls)
+      options = $job.options
+    }
+  }
+  $approvalPayload = [ordered]@{
+    schema = "HIBOU_LOCAL_JOB_APPROVAL_V2"
+    approval_kind = $approvalKind
+    approved_at = (Get-Date).ToUniversalTime().ToString("o")
+    queue_url = $QueueUrl
+    jobs = $snapshots
+  }
+  $approvalPayload | ConvertTo-Json -Depth 12 | Set-Content -Path $ApprovalFile -Encoding UTF8
+  Write-Host "Approbation locale figée : $($snapshots.Count) job(s)." -ForegroundColor Green
 }
 
 $Node = (Get-Command node).Source
@@ -246,10 +127,12 @@ Write-Host "Stockage : $MediaRoot"
 Write-Host "Demarrage auto utilisateur : $StartupCmd"
 
 if ($StartWorker) {
+  if (-not (Test-Path $ApprovalFile)) {
+    throw "Aucun manifeste d'approbation local. Utiliser -ApproveJobId <id> ou -ApproveCorpus150 avant -StartWorker."
+  }
   [Environment]::SetEnvironmentVariable("HIBOU_LOCAL_EXECUTION_ENABLED", "true", "User")
   $env:HIBOU_LOCAL_EXECUTION_ENABLED = "true"
 
-  # Stop old Hibou worker process before replacing it with the current version.
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -like "*hibou-github-worker.mjs*" } |
     ForEach-Object {
@@ -257,22 +140,21 @@ if ($StartWorker) {
     }
   Start-Sleep -Milliseconds 500
 
-  Write-Host "Premier telechargement de validation..." -ForegroundColor Cyan
+  Write-Host "Premier téléchargement de validation sur un job approuvé localement..." -ForegroundColor Cyan
   & $Node $Worker --once
   if ($LASTEXITCODE -ne 0) {
-    throw "Le premier telechargement a echoue. Voir l'erreur ci-dessus."
+    throw "Le premier téléchargement approuvé a échoué. Voir l'erreur ci-dessus."
   }
 
   Start-Process -FilePath $Node -ArgumentList "`"$Worker`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
   Start-Sleep -Seconds 2
-
   try {
     $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 5
-    Write-Host ("Worker actif. Statut: {0} | approuves: {1} | traites: {2}" -f $health.status, $health.approved_manifest_count, $health.processed_jobs.Count) -ForegroundColor Green
+    Write-Host ("Worker actif. Statut: {0} | approuvés: {1} | traités: {2}" -f $health.status, $health.approved_manifest_count, $health.processed_jobs.Count) -ForegroundColor Green
   } catch {
-    Write-Host "Worker lance, mais health local pas encore disponible." -ForegroundColor Yellow
+    Write-Host "Worker lancé, mais health local pas encore disponible." -ForegroundColor Yellow
   }
   Write-Host "Etat local : http://127.0.0.1:8765/health"
 } else {
-  Write-Host "Aucun job ne sera execute maintenant. Pour activer le corpus autorise : relancer avec -ApproveCorpus150 -StartWorker." -ForegroundColor Yellow
+  Write-Host "Aucun job ne sera exécuté maintenant. Pour un job : -ApproveJobId <id> -StartWorker ; pour le corpus : -ApproveCorpus150 -StartWorker." -ForegroundColor Yellow
 }

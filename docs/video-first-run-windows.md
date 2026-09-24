@@ -1,10 +1,10 @@
 # Premier lancement local — PC gaming Windows
 
-Le matériel exact doit être **détecté au runtime** avant de choisir les réglages image/voix.
+Le matériel de référence est **confirmé par l’utilisateur** : ASUS ROG Strix G18 G814JI, Intel Core i9-13980HX, NVIDIA GeForce RTX 4070 Laptop 8 Go, 32 Go RAM et SSD NVMe d’environ 1 To.
 
-Profil canonique : `video/hardware/detect-at-runtime.json`.
+Profil canonique : `video/hardware/rog-g814ji-rtx4070-8gb.json`.
 
-Le fichier historique `video/hardware/rog-g814ji-rtx4070-8gb.json` est conservé uniquement comme **hypothèse/profil d'exemple non vérifié**. Ne pas l'utiliser comme vérité tant que le diagnostic local n'a pas confirmé modèle, VRAM, RAM et stockage.
+Le diagnostic runtime reste obligatoire avant tout téléchargement/génération lourde : il sert à vérifier pilote, CUDA visible, VRAM réellement disponible, RAM et espace disque du moment. Il ne sert plus à deviner l’identité du matériel.
 
 ## 1. Diagnostic
 

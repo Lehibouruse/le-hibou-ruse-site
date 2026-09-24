@@ -1,4 +1,4 @@
-param([switch]$StartWorker, [switch]$ApproveCorpus150)
+param([switch]$StartWorker, [switch]$ApproveCorpus150, [switch]$ApproveBalancedNight)
 
 $ErrorActionPreference = "Stop"
 
@@ -225,6 +225,35 @@ if ($ApproveCorpus150) {
   Write-Host "Corpus local approuve : $($approvedIds.Count) jobs." -ForegroundColor Green
 }
 
+if ($ApproveBalancedNight) {
+  $nightIds = @(
+    "profile-fiscaloo-top15-v1",
+    "profile-professeur-finances-top15-v1",
+    "profile-richissime-top15-v1",
+    "profile-astuces-fiscales-top15-v1",
+    "profile-hibou-finance-top15-v1",
+    "profile-oeil-hibou-top15-v1",
+    "profile-stratege-impot-top15-v1"
+  )
+
+  $existingIds = @()
+  if (Test-Path $ApprovalFile) {
+    try {
+      $existingApproval = Get-Content -Raw -Path $ApprovalFile | ConvertFrom-Json
+      if ($existingApproval.job_ids) { $existingIds = @($existingApproval.job_ids) }
+      elseif ($existingApproval -is [System.Array]) { $existingIds = @($existingApproval) }
+    } catch {}
+  }
+  $approvedIds = @($existingIds + $nightIds | Sort-Object -Unique)
+  $approvalPayload = @{
+    batch_id = "balanced-competitors-night-v1"
+    approved_at = (Get-Date).ToUniversalTime().ToString("o")
+    job_ids = $approvedIds
+  }
+  $approvalPayload | ConvertTo-Json -Depth 4 | Set-Content -Path $ApprovalFile -Encoding ASCII
+  Write-Host "Extension corpus approuvee : $($nightIds.Count) jobs profils ; $($approvedIds.Count) autorisations locales au total." -ForegroundColor Green
+}
+
 $Node = (Get-Command node).Source
 
 $StartupDir = [Environment]::GetFolderPath("Startup")
@@ -269,5 +298,5 @@ if ($StartWorker) {
   }
   Write-Host "Etat local : http://127.0.0.1:8765/health"
 } else {
-  Write-Host "Aucun job ne sera execute maintenant. Pour activer le corpus autorise : relancer avec -ApproveCorpus150 -StartWorker." -ForegroundColor Yellow
+  Write-Host "Aucun job ne sera execute maintenant. Pour activer : relancer avec -ApproveCorpus150 -StartWorker, ou -ApproveBalancedNight -StartWorker pour ajouter les profils reequilibres." -ForegroundColor Yellow
 }

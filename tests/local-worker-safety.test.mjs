@@ -35,11 +35,13 @@ test("one-command bootstrap is side-effect free unless StartWorker is explicit",
   assert.doesNotMatch(bootstrap,/\$Worker --once/);
 });
 
-test("tokenless worker is execution-gated and queue jobs are inactive by default",()=>{
+test("tokenless worker is execution-gated even when the public queue contains active jobs",()=>{
   assert.match(githubWorker,/HIBOU_LOCAL_EXECUTION_ENABLED/);
   assert.match(githubWorker,/execution_enabled: EXECUTION_ENABLED/);
   assert.match(githubWorker,/if \(!EXECUTION_ENABLED\)/);
-  assert.ok((publicQueue.jobs || []).every((job)=>job.active === false));
+  assert.ok((publicQueue.jobs || []).some((job)=>job.active === true));
+  assert.ok((publicQueue.jobs || []).every((job)=>typeof job.id === "string" && job.id.length > 0));
+  assert.doesNotMatch(githubWorker,/approved_batch_id/);
 });
 test("tokenless bootstrap performs diagnostic only unless StartWorker is explicit",()=>{
   assert.match(bootstrap,/\[switch\]\$StartWorker/);
@@ -51,8 +53,16 @@ test("tokenless bootstrap performs diagnostic only unless StartWorker is explici
 
 test("tokenless worker requires exact local job approval in addition to global execution opt-in",()=>{
   assert.match(githubWorker,/HIBOU_LOCAL_APPROVED_JOB_ID/);
-  assert.match(githubWorker,/if \(!APPROVED_JOB_ID\)/);
-  assert.match(githubWorker,/x\.id === APPROVED_JOB_ID/);
+  assert.match(githubWorker,/approved-jobs\.json/);
+  assert.match(githubWorker,/if \(!APPROVED_JOB_ID && approvedJobs\.size === 0\)/);
+  assert.match(githubWorker,/x\.id === APPROVED_JOB_ID \|\| approvedJobs\.has\(x\.id\)/);
   assert.doesNotMatch(githubWorker,/APPROVED_JOB_ID === ["']ALL["']/);
-  assert.ok((publicQueue.jobs || []).every((job)=>job.active === false));
+  assert.doesNotMatch(githubWorker,/approved_batch_id/);
+});
+
+test("bootstrap writes local corpus approvals only behind an explicit switch",()=>{
+  assert.match(bootstrap,/\[switch\]\$ApproveCorpus150/);
+  assert.match(bootstrap,/if \(\$ApproveCorpus150\)/);
+  assert.match(bootstrap,/approved-jobs\.json/);
+  assert.match(bootstrap,/HIBOU_LOCAL_EXECUTION_ENABLED", "false"/);
 });

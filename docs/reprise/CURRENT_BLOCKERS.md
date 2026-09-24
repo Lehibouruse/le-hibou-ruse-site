@@ -3,9 +3,10 @@
 Ce fichier décrit les dépendances qui empêchent encore une preuve de bout en bout. Il ne remplace pas Airtable, qui reste la source opérationnelle détaillée.
 
 ## Vidéo locale
-- À prouver : modèle GPU/VRAM réel, puis une voix Chatterbox et trois images ComfyUI sur une scène.
+- Matériel confirmé : ASUS ROG Strix G18 G814JI / i9-13980HX / RTX 4070 Laptop 8 Go / 32 Go RAM / SSD NVMe ~1 To.
+- À prouver au runtime : pilote/CUDA, VRAM/RAM/disque disponibles, puis une voix Chatterbox et trois images ComfyUI sur une scène.
 - Ensuite : trois scènes, renderer FFmpeg + QC, pilote complet, lecture iPhone.
-- Aucun gros modèle avant diagnostic matériel.
+- Aucun gros modèle avant préflight runtime.
 
 ## Commerce
 - Code TEST présent.

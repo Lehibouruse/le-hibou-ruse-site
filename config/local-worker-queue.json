@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "note": "File active de collecte short-form. Jobs unitaires pour retries independants. Priorite: Reels/Shorts/TikTok deja qualifies dans Airtable.",
+  "version": 4,
+  "note": "Cible 150 formats courts actifs. Priorite Reels/Shorts/TikTok; jobs unitaires pour reprise independante.",
   "target_shortform_videos": 150,
   "jobs": [
     {
@@ -1910,6 +1910,708 @@
       },
       "label": "Découverte concurrent / clone format — Monsieur Chimp Finance",
       "created_at": "2026-09-24T22:10:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7649878022354504993-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7649878022354504993"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7649878022354504993",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7634292064515083553-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7634292064515083553"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7634292064515083553",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7631693479185354016-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7631693479185354016"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7631693479185354016",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7635000346640747809-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7635000346640747809"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7635000346640747809",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7641873502626204961-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7641873502626204961"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7641873502626204961",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7629063822749289761-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7629063822749289761"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7629063822749289761",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7645058924604820768-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7645058924604820768"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7645058924604820768",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7642825784956112161-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7642825784956112161"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7642825784956112161",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7630923023440268576-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7630923023440268576"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7630923023440268576",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7630587558539414816-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7630587558539414816"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7630587558539414816",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7633139197016100129-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7633139197016100129"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7633139197016100129",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7636891104876547360-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7636891104876547360"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7636891104876547360",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7630036576214469921-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7630036576214469921"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7630036576214469921",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-finance-panthere-tiktok-7629795204467363104-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Finance Panthere",
+      "urls": [
+        "https://www.tiktok.com/@financepanthere/video/7629795204467363104"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Finance Panthere TikTok 7629795204467363104",
+      "created_at": "2026-09-24T22:18:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-051-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=j0xsXuNQmrk"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Fond Top 100 #51 — Devis artisan gonflé",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-052-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=nXGwZI_lmyY"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Fond Top 100 #52 — Passeport RDV mairie",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-053-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=F5UHt74GwnE"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 100 #53 — Achat VEFA avec récupération de TVA",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-054-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=hL6s93ACTXU"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 100 #54 — Colis jamais reçu",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-056-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=4a8IGsRhm7U"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 100 #56 — Coiffeur ratage",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-057-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=8PAXaP58ILI"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 100 #57 — Dépannage serrurier",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-058-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=MnhUqHy-keg"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Top 100 #58 — Démission payée",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-renard-top100-059-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=gkro0knhgTA"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Renard Fond Top 100 #59 — Vinted acheteur menteur",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-051-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7663388249561386272"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #51 — Photographe mariage / photos floues",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-052-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7662017368989732128"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #52 — Produit soldé défectueux",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-053-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7662275661360336161"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #53 — Démission / solde de tout compte",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-054-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7657448736301255969"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #54 — Retard / annulation vol low cost",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-055-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7670427018076376352"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #55 — Colis Amazon volé dans le hall",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-056-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7661156763940441377"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #56 — Propriétaire facture l’état des lieux",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-057-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7667077220426403105"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #57 — Chronopost livré mais absent",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-058-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7664329181358050592"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #58 — Dentiste / devis trop cher",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-059-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7686205180165016865"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #59 — Récupération de points permis",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-060-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7662643092025036065"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #60 — Frais bancaires d’incident",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-061-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7685640719872068896"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #61 — Augmentation / prime de partage de la valeur",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-062-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7666010257910435104"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #62 — Deux mois de dépôt de garantie meublé",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-063-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7668567234456997152"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #63 — Frais de notaire succession",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-064-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7667834764778425632"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #64 — Licenciement pendant arrêt maladie",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-065-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7665043358686973217"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #65 — Prélèvement non autorisé",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-066-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7680236490445638945"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #66 — Canapé livré endommagé",
+      "created_at": "2026-09-24T22:19:00+02:00"
+    },
+    {
+      "id": "reels-furet-top100-067-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7658630915496693024"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Furet Fond Top 100 #67 — Retard Amazon Prime",
+      "created_at": "2026-09-24T22:19:00+02:00"
     },
     {
       "id": "wave1-renard-finance-top10-v1",

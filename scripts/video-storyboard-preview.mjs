@@ -23,6 +23,17 @@ function assTime(seconds){
 function assEscape(v){
   return String(v||"").replaceAll("\\","\\\\").replaceAll("{","\\{").replaceAll("}","\\}").replace(/\r?\n/g,"\\N");
 }
+function wrapAssText(value,maxChars=30){
+  const words=String(value||"").trim().split(/\s+/).filter(Boolean);
+  const lines=[]; let line="";
+  for(const word of words){
+    const next=line?line+" "+word:word;
+    if(line && next.length>maxChars){ lines.push(line); line=word; }
+    else line=next;
+  }
+  if(line) lines.push(line);
+  return assEscape(lines.join("\n"));
+}
 export function validateStoryboardPreview(contract){
   if(contract.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract_version");
   if(contract.method_version!=="VIDEO_METHOD_V3") fail("preview requires VIDEO_METHOD_V3");
@@ -59,11 +70,11 @@ Style: Meta,Arial,34,&H00D6C7A1,&H00D6C7A1,&H00162A3A,&H80162A3A,0,0,0,0,100,100
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 `;
   const lines=[];
-  lines.push(`Dialogue: 0,0:00:00.00,${assTime(total)},Banner,,0,0,0,,PREVIEW TECHNIQUE — NON PUBLIABLE · ${assEscape(contract.title)}`);
+  lines.push(`Dialogue: 0,0:00:00.00,${assTime(total)},Banner,,0,0,0,,PREVIEW TECHNIQUE — NON PUBLIABLE`);
   let cursor=0;
   for(const scene of contract.scenes){
     const start=cursor,end=cursor+Number(scene.planned_duration_s);
-    lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Scene,,0,0,0,,{\\pos(540,900)}${assEscape(scene.narration)}`);
+    lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Scene,,0,0,0,,{\\pos(540,900)}${wrapAssText(scene.narration,28)}`);
     lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Meta,,0,0,0,,SCÈNE ${String(scene.order).padStart(2,"0")} / ${contract.scenes.length} · ${Number(scene.planned_duration_s).toFixed(1)} s · VIDEO_METHOD_V3`);
     cursor=end;
   }

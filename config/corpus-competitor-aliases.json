@@ -1,0 +1,28 @@
+{
+  "schema": "HIBOU_CORPUS_ALIASES_V1",
+  "aliases": {
+    "renard-finance": "Renard Finance",
+    "renardfinance": "Renard Finance",
+    "renard": "Renard Finance",
+    "ecureuil-finance": "Écureuil Finance / Le Furet Futé",
+    "ecureuilfinance": "Écureuil Finance / Le Furet Futé",
+    "le-furet-fute": "Écureuil Finance / Le Furet Futé",
+    "furet-fute": "Écureuil Finance / Le Furet Futé",
+    "furet": "Écureuil Finance / Le Furet Futé",
+    "finance-panthere": "Finance Panthère",
+    "financepanthere": "Finance Panthère",
+    "loeil-du-hibou": "L’Œil du Hibou",
+    "oeil-du-hibou": "L’Œil du Hibou",
+    "lezard-entreprendre": "Lézard Entreprendre",
+    "fiscaloo": "Fiscaloo",
+    "professeur-finances": "Professeur Finances",
+    "hibou-finance": "Hibou Finance",
+    "le-lynx-malin": "Le Lynx Malin",
+    "richissime": "Richissime",
+    "chat-stratege": "Chat Stratège",
+    "le-stratege-de-limpot": "Le Stratège de l'impôt",
+    "le-stratege-patrimonial": "Le Stratège Patrimonial",
+    "ton-amie-la-banquiere": "Ton amie la banquière",
+    "monsieur-chimp-finance": "Monsieur Chimp Finance"
+  }
+}

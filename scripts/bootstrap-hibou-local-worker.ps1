@@ -61,7 +61,7 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 }
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal | Out-Null
 
-Write-Host "Diagnostic local uniquement — aucun acces a la queue et aucun telechargement..." -ForegroundColor Cyan
+Write-Host "Diagnostic local uniquement - aucun acces a la queue et aucun telechargement..." -ForegroundColor Cyan
 & $Node $Worker --diagnostic
 if ($LASTEXITCODE -ne 0) { throw "Le diagnostic du worker a echoue." }
 

@@ -30,7 +30,9 @@
     "backup:rehearse": "node scripts/restore-rehearsal-local.mjs",
     "media:inventory": "node scripts/media-storage-inventory.mjs",
     "forensic:package": "node scripts/forensic-package-local.mjs",
-    "corpus:dashboard": "node scripts/corpus-dashboard-sync.mjs"
+    "corpus:dashboard": "node scripts/corpus-dashboard-sync.mjs",
+    "forensic:competitors": "node scripts/competitor-forensic-batch.mjs",
+    "forensic:first": "node scripts/competitor-forensic-batch.mjs --limit=1"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

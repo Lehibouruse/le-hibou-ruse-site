@@ -38,14 +38,17 @@ async function matchingProduct(order) {
 
 async function currentCommerceState() {
   const records = await queryRecords(TABLES.configuration, {
-    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized'))",
+    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized',{Clé}='digital_supply_consent_checkout_mode'))",
     pageSize: 10,
     priorityAware: false,
   });
   const values = Object.fromEntries(records.map((record) => [String(record.fields?.Clé || ""), record.fields?.Valeur]));
+  const consentMode = String(values.digital_supply_consent_checkout_mode || "disabled").trim().toLowerCase();
   return {
     edition: String(values.book_current_edition || "").trim(),
     launchAuthorized: truthy(values.commerce_launch_authorized),
+    consentMode,
+    consentRequired: consentMode === "live",
   };
 }
 
@@ -226,9 +229,10 @@ export async function POST(request) {
   const attribution = attributionFields(order);
   const refundedBeforeCreate = Boolean(refundMarker);
   const consentValid = validDigitalSupplyCustomData(order.customData);
+  const consentSatisfied = !commerce.consentRequired || consentValid;
   const ready = Boolean(
     launchAuthorized
-    && consentValid
+    && consentSatisfied
     && product
     && fileGuid
     && order.status === "paid"
@@ -240,7 +244,7 @@ export async function POST(request) {
   const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? "pending" : "manual_review";
   const reasons = [];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
-  if (!consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
+  if (commerce.consentRequired && !consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
   if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);

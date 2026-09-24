@@ -40,12 +40,12 @@ test("la route est désactivée par défaut et sépare TEST et LIVE", () => {
   assert.doesNotMatch(route, /first_name|last_name|email/);
 });
 
-test("le site public passe par la page de consentement et non directement par Lemon", () => {
+test("le site public active la page de consentement uniquement lorsque le feature flag est test ou live", () => {
   const page = readFileSync(new URL("../app/page.js", import.meta.url), "utf8");
   const form = readFileSync(new URL("../components/DigitalSupplyConsentForm.js", import.meta.url), "utf8");
-  assert.match(page, /const purchaseUrl = checkoutUrl \? "\/achat-guide" : ""/);
-  assert.match(page, /event="purchase_consent_opened"/);
-  assert.doesNotMatch(page, /event="checkout_opened" className="button" href=\{checkoutUrl\}/);
+  assert.match(page, /consentEnabled = \["test", "live"\]\.includes\(consentMode\)/);
+  assert.match(page, /consentEnabled \? "\/achat-guide" : checkoutUrl/);
+  assert.match(page, /purchaseEvent = consentEnabled \? "purchase_consent_opened" : "checkout_opened"/);
   assert.match(form, /immediate_supply_consent/);
   assert.match(form, /withdrawal_loss_ack/);
   assert.match(form, /type="checkbox" required/);

@@ -66,31 +66,30 @@ $env:HIBOU_WORKER_POLL_MS = "15000"
 $env:HIBOU_LOCAL_EXECUTION_ENABLED = "false"
 
 $Node = (Get-Command node).Source
-$Action = New-ScheduledTaskAction -Execute $Node -Argument "`"$Worker`"" -WorkingDirectory $InstallDir
-$Trigger = New-ScheduledTaskTrigger -AtLogOn
-$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 20 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
 
-if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
-  Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-}
-Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal | Out-Null
+$StartupDir = [Environment]::GetFolderPath("Startup")
+$StartupCmd = Join-Path $StartupDir "LeHibouWorker.cmd"
+$CmdContent = @"
+@echo off
+start "" /min "$Node" "$Worker"
+"@
+Set-Content -Path $StartupCmd -Value $CmdContent -Encoding ASCII
 
 Write-Host "Diagnostic local uniquement - aucun acces a la queue et aucun telechargement..." -ForegroundColor Cyan
 & $Node $Worker --diagnostic
 if ($LASTEXITCODE -ne 0) { throw "Le diagnostic du worker a echoue." }
 
 Write-Host ""
-Write-Host "Worker Hibou installe mais inactif par defaut." -ForegroundColor Green
+Write-Host "Worker Hibou installe." -ForegroundColor Green
 Write-Host "Stockage : $MediaRoot"
+Write-Host "Demarrage auto utilisateur : $StartupCmd"
 
 if ($StartWorker) {
   [Environment]::SetEnvironmentVariable("HIBOU_LOCAL_EXECUTION_ENABLED", "true", "User")
   $env:HIBOU_LOCAL_EXECUTION_ENABLED = "true"
-  Start-ScheduledTask -TaskName $TaskName
+  Start-Process -FilePath $Node -ArgumentList "`"$Worker`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
   Start-Sleep -Seconds 2
   Write-Host "Worker active explicitement. Etat local : http://127.0.0.1:8765/health"
 } else {
-  Write-Host "Aucun job ne sera execute. Pour activer plus tard : relancer ce script avec -StartWorker." -ForegroundColor Yellow
+  Write-Host "Aucun job ne sera execute maintenant. Pour activer : relancer ce script avec -StartWorker." -ForegroundColor Yellow
 }

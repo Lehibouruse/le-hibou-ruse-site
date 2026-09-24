@@ -1,6 +1,10 @@
+param(
+  [switch]$StartWorker
+)
+
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Le Hibou Ruse - activation du ROG sans token ===" -ForegroundColor Cyan
+Write-Host "=== Le Hibou Ruse - installation du worker local sans token ===" -ForegroundColor Cyan
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
 $Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
@@ -38,10 +42,12 @@ Invoke-WebRequest -UseBasicParsing -Uri $WorkerUrl -OutFile $Worker
 [Environment]::SetEnvironmentVariable("HIBOU_MEDIA_ROOT", $MediaRoot, "User")
 [Environment]::SetEnvironmentVariable("HIBOU_QUEUE_URL", $QueueUrl, "User")
 [Environment]::SetEnvironmentVariable("HIBOU_WORKER_POLL_MS", "15000", "User")
+[Environment]::SetEnvironmentVariable("HIBOU_LOCAL_EXECUTION_ENABLED", "false", "User")
 
 $env:HIBOU_MEDIA_ROOT = $MediaRoot
 $env:HIBOU_QUEUE_URL = $QueueUrl
 $env:HIBOU_WORKER_POLL_MS = "15000"
+$env:HIBOU_LOCAL_EXECUTION_ENABLED = "false"
 
 $Node = (Get-Command node).Source
 $Action = New-ScheduledTaskAction -Execute $Node -Argument "`"$Worker`"" -WorkingDirectory $InstallDir
@@ -55,15 +61,20 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 }
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal | Out-Null
 
-Write-Host "Lancement du test Renard..." -ForegroundColor Cyan
-& $Node $Worker --once
-if ($LASTEXITCODE -ne 0) { throw "Le test du worker a echoue." }
-
-Start-ScheduledTask -TaskName $TaskName
-Start-Sleep -Seconds 2
+Write-Host "Diagnostic local uniquement — aucun acces a la queue et aucun telechargement..." -ForegroundColor Cyan
+& $Node $Worker --diagnostic
+if ($LASTEXITCODE -ne 0) { throw "Le diagnostic du worker a echoue." }
 
 Write-Host ""
-Write-Host "ROG active pour Le Hibou Ruse — aucun token Airtable necessaire." -ForegroundColor Green
+Write-Host "Worker Hibou installe mais inactif par defaut." -ForegroundColor Green
 Write-Host "Stockage : $MediaRoot"
-Write-Host "Etat local : http://127.0.0.1:8765/health"
-Write-Host "Logs : $InstallDir\worker.log"
+
+if ($StartWorker) {
+  [Environment]::SetEnvironmentVariable("HIBOU_LOCAL_EXECUTION_ENABLED", "true", "User")
+  $env:HIBOU_LOCAL_EXECUTION_ENABLED = "true"
+  Start-ScheduledTask -TaskName $TaskName
+  Start-Sleep -Seconds 2
+  Write-Host "Worker active explicitement. Etat local : http://127.0.0.1:8765/health"
+} else {
+  Write-Host "Aucun job ne sera execute. Pour activer plus tard : relancer ce script avec -StartWorker." -ForegroundColor Yellow
+}

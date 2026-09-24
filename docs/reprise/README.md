@@ -14,7 +14,7 @@ Objectif : permettre à une nouvelle session de reprendre le projet sans reconst
 
 - Ne jamais déduire qu'une fonctionnalité est opérationnelle parce que son code existe.
 - Distinguer : code présent → runtime configuré → test réel réussi → production autorisée.
-- Ne pas supposer le modèle GPU ni la VRAM : les détecter.
+- Matériel confirmé : ASUS ROG Strix G18 G814JI, Intel Core i9-13980HX, NVIDIA GeForce RTX 4070 Laptop 8 Go, 32 Go RAM, SSD NVMe ~1 To. Le préflight runtime reste obligatoire avant génération lourde pour vérifier pilote/CUDA, ressources libres et stockage.
 - Ne jamais réintroduire un fallback API payant silencieux.
 - Ne jamais publier, acheter, rembourser, activer un worker ou un connecteur externe sans le niveau d'autorisation prévu par son runbook.
 - Ne jamais stocker de secret dans Git, Airtable, Library ou les rapports de reprise.

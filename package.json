@@ -26,7 +26,8 @@
     "backup:create": "node scripts/backup-hibou-safe.mjs --create",
     "backup:verify": "node scripts/verify-hibou-backup.mjs",
     "security:self-check": "node scripts/security-self-check.mjs",
-    "backup:local": "node scripts/backup-project-local.mjs --all"
+    "backup:local": "node scripts/backup-project-local.mjs --all",
+    "backup:rehearse": "node scripts/restore-rehearsal-local.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

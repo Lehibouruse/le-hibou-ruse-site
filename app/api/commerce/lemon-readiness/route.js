@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { configMap, queryRecords, TABLES } from "../../../../lib/airtable";
-import { listLemonProducts, listLemonStores, listLemonVariants, lemonResourceId, lemonResourceName } from "../../../../lib/lemon-api.mjs";
+import { listLemonFiles, listLemonProducts, listLemonStores, listLemonVariants, lemonResourceId, lemonResourceName, summarizeLemonFiles } from "../../../../lib/lemon-api.mjs";
 import { resolveLemonWebhookSecret } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
 
@@ -63,6 +63,7 @@ export async function POST(request) {
     let productStatus = "";
     let productTestMode = null;
     let buyNowUrl = "";
+    let variantFiles = [];
 
     if (storeId) {
       const lemonProducts = await listLemonProducts(storeId);
@@ -92,6 +93,7 @@ export async function POST(request) {
           || null;
         variantId = lemonResourceId(variant);
         variantPriceCents = Number.isFinite(Number(variant?.attributes?.price)) ? Number(variant?.attributes?.price) : null;
+        if (variantId) variantFiles = summarizeLemonFiles(await listLemonFiles(variantId));
       }
     }
 
@@ -114,6 +116,10 @@ export async function POST(request) {
       expected_store_id: configuredStoreId,
       expected_product_id: text(productRecord?.fields?.["Lemon Squeezy Product ID"] || config.lemon_product_id),
       expected_variant_id: text(productRecord?.fields?.["Lemon Squeezy Variant ID"] || config.lemon_variant_id),
+      variant_file_count: variantFiles.length,
+      variant_published_file_count: variantFiles.filter((file) => file.status === "published" && file.test_mode === false).length,
+      variant_files: variantFiles,
+      native_file_delivery_ready: variantFiles.some((file) => file.status === "published" && file.test_mode === false),
       blockers: [],
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

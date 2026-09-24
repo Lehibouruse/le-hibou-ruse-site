@@ -6,7 +6,9 @@ import {
   buildLiveCheckoutPayload,
   buildTestWebhookPayload,
   lemonRequest,
+  listLemonFiles,
   retrieveLemonCheckout,
+  summarizeLemonFiles,
 } from "../lib/lemon-api.mjs";
 
 const route = readFileSync(new URL("../app/api/commerce/lemon-bootstrap/route.js", import.meta.url), "utf8");
@@ -161,4 +163,50 @@ test("le checkout live exige une description transparente de l’édition numér
   assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [2140119]);
   assert.match(payload.data.attributes.product_options.description, /édition numérique/i);
   assert.throws(() => buildLiveCheckoutPayload({ ...input, description: "Guide complet" }), /description transparente/);
+});
+
+
+test("le readiness Lemon liste les fichiers du variant sans exposer leurs URL signées", async () => {
+  let seenUrl = "";
+  const fetchImpl = async (url) => {
+    seenUrl = url;
+    return jsonResponse({ data: [{
+      id: "88",
+      attributes: {
+        variant_id: 2140119,
+        name: "guide.pdf",
+        extension: "pdf",
+        download_url: "https://app.lemonsqueezy.com/download/secret?signature=do-not-expose",
+        size: 123456,
+        size_formatted: "120 KB",
+        version: "1.0",
+        status: "published",
+        test_mode: false,
+      },
+    }] });
+  };
+  const files = await listLemonFiles("2140119", { apiKey: "secret-live-key", fetchImpl });
+  assert.match(seenUrl, /\/v1\/files\?/);
+  assert.match(seenUrl, /filter%5Bvariant_id%5D=2140119/);
+  const summary = summarizeLemonFiles(files);
+  assert.deepEqual(summary, [{
+    id: "88",
+    name: "guide.pdf",
+    extension: "pdf",
+    size: 123456,
+    size_formatted: "120 KB",
+    version: "1.0",
+    status: "published",
+    test_mode: false,
+  }]);
+  assert.equal(JSON.stringify(summary).includes("download_url"), false);
+  assert.equal(JSON.stringify(summary).includes("signature"), false);
+});
+
+test("la route readiness expose la disponibilité de livraison native sans mutation", () => {
+  const source = readFileSync(new URL("../app/api/commerce/lemon-readiness/route.js", import.meta.url), "utf8");
+  assert.match(source, /listLemonFiles\(variantId\)/);
+  assert.match(source, /native_file_delivery_ready/);
+  assert.match(source, /variant_published_file_count/);
+  assert.doesNotMatch(source, /create.*File|upload.*File|delete.*File/i);
 });

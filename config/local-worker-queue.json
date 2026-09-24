@@ -1,7 +1,59 @@
 {
-  "version": 1,
-  "note": "Queue publique en lecture seule. Les jobs restent inactifs par défaut et le worker exige HIBOU_LOCAL_EXECUTION_ENABLED=true.",
+  "version": 2,
+  "note": "Queue publique en lecture seule. Collecte concurrentielle progressive, jobs executes sequentiellement par le ROG lorsque HIBOU_LOCAL_EXECUTION_ENABLED=true.",
   "jobs": [
+    {
+      "id": "wave1-renard-finance-top10-v1",
+      "active": true,
+      "type": "DOWNLOAD_BATCH",
+      "concurrent": "Renard Finance",
+      "urls": [
+        "https://www.youtube.com/watch?v=bkF_sZgBRsU",
+        "https://www.youtube.com/watch?v=KQxjChS1p6s",
+        "https://www.youtube.com/watch?v=CbFERLNN8AU",
+        "https://www.youtube.com/watch?v=oe3BiQXm_gk",
+        "https://www.youtube.com/watch?v=H-X9P9QR2n4",
+        "https://www.youtube.com/watch?v=Mm1bdOvJqnY",
+        "https://www.youtube.com/watch?v=xlEX2Bh4wW4",
+        "https://www.youtube.com/watch?v=0hVlMXzcWKY",
+        "https://www.youtube.com/watch?v=wLUvgtBtU7k",
+        "https://www.youtube.com/watch?v=zzH1utt0mos"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "created_at": "2026-09-24T21:55:00+02:00"
+    },
+    {
+      "id": "wave1-ecureuil-furet-top10-v1",
+      "active": true,
+      "type": "DOWNLOAD_BATCH",
+      "concurrent": "Ecureuil Finance - Le Furet Fute",
+      "urls": [
+        "https://www.tiktok.com/@lefutetfute/video/7680439152348810528",
+        "https://www.tiktok.com/@lefutetfute/video/7662815671595584800",
+        "https://www.tiktok.com/@lefutetfute/video/7685271593848687904",
+        "https://www.tiktok.com/@lefutetfute/video/7658733810405723425",
+        "https://www.tiktok.com/@lefutetfute/video/7670576542489005344",
+        "https://www.tiktok.com/@lefutetfute/video/7669321126752898337",
+        "https://www.tiktok.com/@lefutetfute/video/7668748582505155873",
+        "https://www.tiktok.com/@lefutetfute/video/7658419859876891937",
+        "https://www.tiktok.com/@lefutetfute/video/7670958281191476512",
+        "https://www.tiktok.com/@lefutetfute/video/7675787140436856097"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "created_at": "2026-09-24T21:56:00+02:00"
+    },
     {
       "id": "test-renard-prix-transfert-v1",
       "active": false,

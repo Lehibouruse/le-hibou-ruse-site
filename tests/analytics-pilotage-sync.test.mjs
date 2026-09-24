@@ -35,3 +35,13 @@ test("non-EUR paid sale is not converted or invented",()=>{
   assert.equal(out.revenue_eur,0);
   assert.equal(out.revenue_currency_complete,false);
 });
+
+test("refund timestamp excludes a sale even if an old status still says paid",()=>{
+  const out=summarizeAnalytics({
+    date:"2026-09-24",
+    events:[],
+    sales:[s("paid",29,"2026-09-24T11:00:00Z","EUR","2026-09-24T12:00:00Z")]
+  });
+  assert.equal(out.paid_sales,0);
+  assert.equal(out.revenue_eur,0);
+});

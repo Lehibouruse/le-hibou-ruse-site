@@ -19,7 +19,9 @@
     "video:gpu-check:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-windows-gpu-check.ps1",
     "video:smoke": "node scripts/video-smoke-one-scene.mjs",
     "video:comfyui-binding": "node scripts/video-comfyui-binding-discover.mjs",
-    "video:smoke-report": "node scripts/video-airtable-smoke-report.mjs"
+    "video:smoke-report": "node scripts/video-airtable-smoke-report.mjs",
+    "video:install:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-local-install-windows.ps1",
+    "video:comfyui:start:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-start-comfyui-windows.ps1"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",

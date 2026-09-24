@@ -36,7 +36,8 @@
     "analytics:sync": "node scripts/analytics-pilotage-sync.mjs",
     "security:api-surface": "node scripts/security-api-surface.mjs",
     "security:api-surface:strict": "node scripts/security-api-surface.mjs --strict",
-    "backup:copy-independent": "node scripts/copy-backup-independent.mjs"
+    "backup:copy-independent": "node scripts/copy-backup-independent.mjs",
+    "video:doctor:windows": "node scripts/video-doctor.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

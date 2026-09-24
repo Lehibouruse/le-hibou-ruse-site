@@ -1,8 +1,155 @@
 {
-  "version": 6,
-  "note": "Cible 150 formats courts actifs. TikTok d'abord pour le worker deja lance; MP4 prioritaire dans la prochaine version auto-mise-a-jour.",
-  "target_shortform_videos": 150,
+  "version": 7,
+  "note": "Corpus reequilibre: viser 10-15 formats courts par concurrent. Surplus Renard/Furet conserve mais desactive en reserve. Profils verifies recoltes automatiquement; Lezard Entreprendre reste en attente d'identification exacte.",
+  "target_shortform_videos": 160,
   "jobs": [
+    {
+      "id": "profile-fiscaloo-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "Fiscaloo",
+      "urls": [
+        "https://www.youtube.com/@fiscaloo/shorts"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "Fiscaloo — top 15 formats courts",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
+    {
+      "id": "profile-professeur-finances-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "Professeur Finances",
+      "urls": [
+        "https://www.tiktok.com/@professeurfinances"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "Professeur Finances — top 15 formats courts",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
+    {
+      "id": "profile-richissime-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "Richissime",
+      "urls": [
+        "https://www.youtube.com/@richissime/shorts"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "Richissime — top 15 formats courts",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
+    {
+      "id": "profile-astuces-fiscales-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "Astuces fiscales et juridiques",
+      "urls": [
+        "https://www.youtube.com/@jean-noel_loper/shorts"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "Astuces fiscales et juridiques — top 15 formats courts",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
+    {
+      "id": "profile-hibou-finance-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "Hibou Finance",
+      "urls": [
+        "https://www.youtube.com/channel/UC5ODnVlyf-J59hLrI28ZYcQ/shorts"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "Hibou Finance — top 15 formats courts",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
+    {
+      "id": "profile-oeil-hibou-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "L Oeil du Hibou",
+      "urls": [
+        "https://www.instagram.com/loeil_du.hibou/reels/"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "L’Oeil du Hibou — top 15 Reels",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
+    {
+      "id": "profile-stratege-impot-top15-v1",
+      "active": true,
+      "type": "DOWNLOAD_PROFILE_TOP_SHORTS",
+      "concurrent": "Le Stratege de l impot",
+      "urls": [
+        "https://www.youtube.com/@strategeimpot/shorts"
+      ],
+      "options": {
+        "discovery_limit": 50,
+        "select_top": 15,
+        "max_height": 1080,
+        "download_subtitles": false,
+        "subtitle_languages": [
+          "fr"
+        ]
+      },
+      "label": "Le Stratège de l’impôt — top 15 formats courts",
+      "batch_id": "balanced-competitors-night-v1",
+      "created_at": "2026-09-24T20:54:07.176Z"
+    },
     {
       "id": "reels-furet-top50-01-v1",
       "active": true,
@@ -385,7 +532,7 @@
     },
     {
       "id": "reels-furet-top50-21-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -404,7 +551,7 @@
     },
     {
       "id": "reels-furet-top50-22-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -423,7 +570,7 @@
     },
     {
       "id": "reels-furet-top50-23-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -442,7 +589,7 @@
     },
     {
       "id": "reels-furet-top50-24-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -461,7 +608,7 @@
     },
     {
       "id": "reels-furet-top50-25-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -480,7 +627,7 @@
     },
     {
       "id": "reels-furet-top50-26-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -499,7 +646,7 @@
     },
     {
       "id": "reels-furet-top50-27-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -518,7 +665,7 @@
     },
     {
       "id": "reels-furet-top50-28-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -537,7 +684,7 @@
     },
     {
       "id": "reels-furet-top50-29-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -556,7 +703,7 @@
     },
     {
       "id": "reels-furet-top50-30-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -575,7 +722,7 @@
     },
     {
       "id": "reels-furet-top50-31-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -594,7 +741,7 @@
     },
     {
       "id": "reels-furet-top50-32-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -613,7 +760,7 @@
     },
     {
       "id": "reels-furet-top50-33-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -632,7 +779,7 @@
     },
     {
       "id": "reels-furet-top50-34-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -651,7 +798,7 @@
     },
     {
       "id": "reels-furet-top50-35-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -670,7 +817,7 @@
     },
     {
       "id": "reels-furet-top50-36-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -689,7 +836,7 @@
     },
     {
       "id": "reels-furet-top50-37-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -708,7 +855,7 @@
     },
     {
       "id": "reels-furet-top50-38-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -727,7 +874,7 @@
     },
     {
       "id": "reels-furet-top50-39-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -746,7 +893,7 @@
     },
     {
       "id": "reels-furet-top50-40-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -765,7 +912,7 @@
     },
     {
       "id": "reels-furet-top50-41-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -784,7 +931,7 @@
     },
     {
       "id": "reels-furet-top50-42-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -803,7 +950,7 @@
     },
     {
       "id": "reels-furet-top50-43-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -822,7 +969,7 @@
     },
     {
       "id": "reels-furet-top50-44-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -841,7 +988,7 @@
     },
     {
       "id": "reels-furet-top50-45-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -860,7 +1007,7 @@
     },
     {
       "id": "reels-furet-top50-46-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -879,7 +1026,7 @@
     },
     {
       "id": "reels-furet-top50-47-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -898,7 +1045,7 @@
     },
     {
       "id": "reels-furet-top50-48-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -917,7 +1064,7 @@
     },
     {
       "id": "reels-furet-top50-49-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -936,7 +1083,7 @@
     },
     {
       "id": "reels-furet-top50-50-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1221,7 +1368,7 @@
     },
     {
       "id": "reels-furet-top100-051-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1240,7 +1387,7 @@
     },
     {
       "id": "reels-furet-top100-052-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1259,7 +1406,7 @@
     },
     {
       "id": "reels-furet-top100-053-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1278,7 +1425,7 @@
     },
     {
       "id": "reels-furet-top100-054-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1297,7 +1444,7 @@
     },
     {
       "id": "reels-furet-top100-055-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1316,7 +1463,7 @@
     },
     {
       "id": "reels-furet-top100-056-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1335,7 +1482,7 @@
     },
     {
       "id": "reels-furet-top100-057-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1354,7 +1501,7 @@
     },
     {
       "id": "reels-furet-top100-058-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1373,7 +1520,7 @@
     },
     {
       "id": "reels-furet-top100-059-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1392,7 +1539,7 @@
     },
     {
       "id": "reels-furet-top100-060-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1411,7 +1558,7 @@
     },
     {
       "id": "reels-furet-top100-061-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1430,7 +1577,7 @@
     },
     {
       "id": "reels-furet-top100-062-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1449,7 +1596,7 @@
     },
     {
       "id": "reels-furet-top100-063-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1468,7 +1615,7 @@
     },
     {
       "id": "reels-furet-top100-064-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1487,7 +1634,7 @@
     },
     {
       "id": "reels-furet-top100-065-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1506,7 +1653,7 @@
     },
     {
       "id": "reels-furet-top100-066-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1525,7 +1672,7 @@
     },
     {
       "id": "reels-furet-top100-067-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Ecureuil Finance - Le Furet Fute",
       "urls": [
@@ -1924,7 +2071,7 @@
     },
     {
       "id": "reels-renard-top50-16-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -1943,7 +2090,7 @@
     },
     {
       "id": "reels-renard-top50-17-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -1962,7 +2109,7 @@
     },
     {
       "id": "reels-renard-top50-18-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -1981,7 +2128,7 @@
     },
     {
       "id": "reels-renard-top50-19-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2000,7 +2147,7 @@
     },
     {
       "id": "reels-renard-top50-20-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2019,7 +2166,7 @@
     },
     {
       "id": "reels-renard-top50-21-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2038,7 +2185,7 @@
     },
     {
       "id": "reels-renard-top50-22-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2057,7 +2204,7 @@
     },
     {
       "id": "reels-renard-top50-23-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2076,7 +2223,7 @@
     },
     {
       "id": "reels-renard-top50-24-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2095,7 +2242,7 @@
     },
     {
       "id": "reels-renard-top50-25-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2114,7 +2261,7 @@
     },
     {
       "id": "reels-renard-top50-26-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2133,7 +2280,7 @@
     },
     {
       "id": "reels-renard-top50-27-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2152,7 +2299,7 @@
     },
     {
       "id": "reels-renard-top50-28-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2171,7 +2318,7 @@
     },
     {
       "id": "reels-renard-top50-29-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2190,7 +2337,7 @@
     },
     {
       "id": "reels-renard-top50-30-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2209,7 +2356,7 @@
     },
     {
       "id": "reels-renard-top50-31-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2228,7 +2375,7 @@
     },
     {
       "id": "reels-renard-top50-32-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2247,7 +2394,7 @@
     },
     {
       "id": "reels-renard-top50-33-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2266,7 +2413,7 @@
     },
     {
       "id": "reels-renard-top50-34-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2285,7 +2432,7 @@
     },
     {
       "id": "reels-renard-top50-35-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2304,7 +2451,7 @@
     },
     {
       "id": "reels-renard-top50-36-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2323,7 +2470,7 @@
     },
     {
       "id": "reels-renard-top50-37-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2342,7 +2489,7 @@
     },
     {
       "id": "reels-renard-top50-38-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2361,7 +2508,7 @@
     },
     {
       "id": "reels-renard-top50-39-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2380,7 +2527,7 @@
     },
     {
       "id": "reels-renard-top50-40-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2399,7 +2546,7 @@
     },
     {
       "id": "reels-renard-top50-41-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2418,7 +2565,7 @@
     },
     {
       "id": "reels-renard-top50-42-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2437,7 +2584,7 @@
     },
     {
       "id": "reels-renard-top50-43-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2456,7 +2603,7 @@
     },
     {
       "id": "reels-renard-top50-44-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2475,7 +2622,7 @@
     },
     {
       "id": "reels-renard-top50-45-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2494,7 +2641,7 @@
     },
     {
       "id": "reels-renard-top50-46-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2513,7 +2660,7 @@
     },
     {
       "id": "reels-renard-top50-47-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2532,7 +2679,7 @@
     },
     {
       "id": "reels-renard-top50-48-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2551,7 +2698,7 @@
     },
     {
       "id": "reels-renard-top50-49-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2570,7 +2717,7 @@
     },
     {
       "id": "reels-renard-top50-50-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2608,7 +2755,7 @@
     },
     {
       "id": "reels-finance-panthere-02-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -2627,7 +2774,7 @@
     },
     {
       "id": "reels-finance-panthere-03-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -2646,7 +2793,7 @@
     },
     {
       "id": "reels-finance-panthere-04-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -2665,7 +2812,7 @@
     },
     {
       "id": "reels-finance-panthere-05-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Finance Panthere",
       "urls": [
@@ -2703,7 +2850,7 @@
     },
     {
       "id": "reels-renard-top100-051-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2722,7 +2869,7 @@
     },
     {
       "id": "reels-renard-top100-052-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2741,7 +2888,7 @@
     },
     {
       "id": "reels-renard-top100-053-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2760,7 +2907,7 @@
     },
     {
       "id": "reels-renard-top100-054-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2779,7 +2926,7 @@
     },
     {
       "id": "reels-renard-top100-056-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2798,7 +2945,7 @@
     },
     {
       "id": "reels-renard-top100-057-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2817,7 +2964,7 @@
     },
     {
       "id": "reels-renard-top100-058-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2836,7 +2983,7 @@
     },
     {
       "id": "reels-renard-top100-059-v1",
-      "active": true,
+      "active": false,
       "type": "DOWNLOAD_VIDEO",
       "concurrent": "Renard Finance",
       "urls": [
@@ -2923,5 +3070,5 @@
       "created_at": "2026-09-24T21:40:00+02:00"
     }
   ],
-  "approved_batch_id": "competitor-reels-150-v1"
+  "approved_batch_id": "balanced-competitors-night-v1"
 }

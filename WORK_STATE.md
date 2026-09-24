@@ -9,7 +9,7 @@ Dernière mise à jour : 2026-09-24 — sécurité Production + infrastructure v
 - APIs sociales, Lemon Squeezy, Digify et automatisations déterministes restent pertinentes.
 - Aucune publication sociale publique, aucun achat réel, aucun abonnement/plan payant et aucun remplacement commercial du livre sans validation humaine explicite.
 - Gros médias, caches et modèles hors Git/Vercel.
-- Priorité opérationnelle actuelle : infrastructure de production vidéo. Le livre est hors de la passe active.
+- Priorités opérationnelles actuelles : sécurisation Production (#177), infrastructure vidéo reproductible, puis progression du livre par lots vérifiés sans bloquer sur le GPU.
 
 ## Coupe-circuit IA et branches de référence
 
@@ -21,7 +21,7 @@ Dernière mise à jour : 2026-09-24 — sécurité Production + infrastructure v
 - Le wake déterministe reste utilisable pour les jobs ne nécessitant pas OpenAI ; social, commerce, domaine et traitements déterministes ne sont pas coupés globalement.
 - PR #177 head `441239095e0f1a62db293cafa97ed3fe94ea713e` : Hibou CI #762 = success le 24/09/2026. Le workflow historique Furet a été supprimé de cette PR afin de ne plus générer d’échecs parasites après fusion.
 - Production n’est PAS encore déclarée protégée : la preuve finale exige fusion/déploiement autorisé de #177 puis tests runtime fail-closed avec `openai_calls=0`, sans requête OpenAI réelle.
-- Production reste sur l'ancien comportement tant que #177 n'est pas déployée ; ne pas marquer le coupe-circuit comme effectif avant cette preuve.
+- Production reste sur l'ancien comportement tant que #177 n'est pas déployée. Preuve runtime la plus récente : System Watchdog run `36039517328` du 24/09 18:11 UTC retourne `circuit.active=false` avec l'ancien motif OpenAI crédit ; ne pas marquer le coupe-circuit comme effectif avant déploiement et preuve fail-closed.
 - Rollback : revert du merge de #177 ou retour au `main` précédent.
 
 ## Vercel
@@ -91,7 +91,8 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 - 16 blocs canoniques ; corpus conservé.
 - 757 occurrences exactes `[À VÉRIFIER]` après résolution réelle de 5 marqueurs du montage 21 (ancien total 762).
 - Couverture recalculée directement depuis les en-têtes `## n.` du texte : **213/294 sections uniques**, 0 doublon, soit **81 absentes**.
-- Gaps exacts : `31–35`, `141–145`, `191–202`, `236–294`.
+- Gaps intégrés exacts à ce stade : `31–35`, `141–145`, `191–202`, `236–294`.
+- Nouveau lot **236–240 vérifié et prêt à assembler**, mais volontairement non compté dans les 213 tant qu'il n'est pas inséré dans le chapitre canonique. Draft durable : `docs/book/sections-236-240-verified.md`. Corrections clés : management fees relus à la lumière de CE 4 oct. 2023 n°466887 ; rente viagère 70/50/40/30 = fraction d'assiette, pas taux ; viager = plus-value au fait générateur de la vente ; prix fixe échelonné ≠ rente viagère.
 - Lots vérifiés/intégrés comprennent désormais notamment : mère-fille #21, apport-cession #203, seuil/marge de remploi #204, remploi circulaire/anti-abus #205, puis toute la séquence **#206–235** du chapitre 11.
 - Chapitre 10 = 23 sections (`171–190`, `203–205`). Chapitre 11 = **30 sections consécutives `206–235`**, `Montages couverts=30`, 82 106 caractères et 0 marqueur. Le jalon de 20–30 montages prioritaires vérifiés/répercutés est atteint, mais l'édition reste non validée tant que gaps/QC/maquette ne sont pas terminés. Total exact du livre = 757 marqueurs.
 - Charte canonique : ivoire, bleu nuit, vert canard, or discret.
@@ -111,27 +112,28 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 ## Social
 
-- Instagram, Facebook, YouTube, Threads, TikTok : OAuth/auth + lecture prouvés. Les anciennes notes demandant encore de créer les apps ont été corrigées.
-- Connexion ≠ publication : `Publication testée` reste séparée.
-- GitHub `Hibou Social Control Plane Sync` run 35782943645 : success, 5 connexions OAuth, aucune publication/achat.
-- `Hibou Social Metrics` run 35780665118 : `no_published_ids`, aucune métrique fictive.
-- Bluesky : dernier test 401 Invalid identifier or password ; backend prêt, secret app password à remplacer côté Vercel puis redeployer/retester.
-- Reddit : son code utile a été porté sélectivement dans #175 ; il reste `unconfigured` tant que `REDDIT_API_APPROVED` n’est pas vrai. Les dry-runs restent locaux sans credentials ni side effects, le coffre OAuth peut stocker les tokens chiffrés, et une publication live reste impossible avant l’accord externe. Aucun message tiers ni appel Reddit réel n’a été envoyé.
-- Les IDs Reddit/Bluesky sont projetés vers les champs de contenu/métriques ; une métrique explicitement indisponible reste `null` au lieu d’être transformée en zéro.
-- LinkedIn : cible Page/organisation ; Community Management + credentials restent externes.
-- Pinterest : Trial Access/credentials/board.
-- X : aucun plan/crédit acheté.
-- Snapchat : capacité produit/API Snap externe non approuvée.
+- Production `Hibou Social Control Plane Sync` run **36030401854** du 24/09 16:52 UTC = SUCCESS : 9 providers dans ce control plane, 5 OAuth directs connectés et sans reauth (YouTube, Instagram, Facebook, TikTok, Threads), 5 fully-authorized-with-analytics.
+- Routage opérationnel ≠ accès API direct : lecture 7/9 prête (5 direct + 2 Metricool), publication 7/9 via Metricool, analytics 7/9 via Metricool ; 2 bloqués dans le routage courant. Aucune publication, aucun OAuth lancé, aucun achat API et aucun secret exposé.
+- Blocages directs externes actuels : LinkedIn Community Management, Pinterest Trial Access, X API + billing, Snapchat product approval.
+- `Hibou Social Metrics` run **36034661579** du 24/09 17:29 UTC = SUCCESS : `processed=0`, `reason=no_published_ids`. Growth : 2 visiteurs attribués, 0 checkout, 0 achat, aucune publication déclenchée.
+- Bluesky reste hors de ce résumé 9-provider : dernier test distant = HTTP 401 identifiant/mot de passe. Le code/métriques publiques sont préservés dans #175 ; action humaine unique = remplacer en privé le vrai `BLUESKY_APP_PASSWORD`, puis redéployer et tester identité/lecture sans publier.
+- PR historique Reddit/Bluesky **#171 est fermée sans merge depuis le 24/09**, mais ses briques utiles sont reprises dans #175 (`social-reddit.mjs`, métriques Bluesky, tests, documentation). Ne pas traiter #171 comme dépendance.
+- Reddit reste fail-closed tant que `REDDIT_API_APPROVED=true` n'a pas été établi après accord externe. Dossier commercial prêt, aucun formulaire/message tiers envoyé, aucun appel Reddit live. Scopes proposés : `identity read submit`; subreddit laissé vide jusqu'à choix et vérification des règles.
+- Les métriques explicitement indisponibles restent `null`, jamais zéro inventé ; le score Reddit reste distinct des likes.
 
 ## Commerce et coûts
 
-- Lemon LIVE : Store 475333 / Product 1369573 / Variant 2140119 / checkout live référencé.
-- Lemon TEST est strictement séparé : `LEMON_SQUEEZY_TEST_API_KEY` dédiée, ressources obligatoirement `test_mode=true`, aucun fallback vers la clé LIVE et aucune livraison Digify pour une commande test. HMAC, déduplication et remboursement out-of-order sont couverts par les tests ; preuve dynamique bloquée uniquement par la clé/ressources TEST. Runbook canonique : `docs/WORK_LEMON_TEST_RUNBOOK.md`, réconcilié le 23/09 avec l'état LIVE déjà public et le TEST fail-closed.
-- Fourniture immédiate et accusé de rétractation sont deux preuves distinctes.
-- Registre de coûts daté dans Configuration : Lemon = 0 $ fixe + 5 % + 0,50 $/transaction avant suppléments ; Vercel = Hobby gratuit mais 10 Go saturés ; OpenAI API = 0 € autorisé/cible.
-- Digify : e-mail reçu le 24/09/2026 à 00:23 UTC confirme que **l’essai est terminé**. Aucun abonnement payant ni upgrade automatique n’est démontré. Le compte gratuit et l’intégration technique peuvent subsister, mais la livraison protégée aux destinataires doit être considérée indisponible sans choix volontaire d’un plan/accès adapté. Aucun upgrade n’est autorisé automatiquement.
-- Metricool : brand `lehibouruse` connecté ; promotion LinkedIn annoncée le 19/09 comme expirant sous 7 jours (~26/09) ; aucun plan payant démontré. X impose plan payant + add-on 10 €/mois/compte, non souscrit.
-- L'ancienne simulation `100 € de frais fixes` n'est plus une donnée constatée ; recalculer la contribution uniquement avec les coûts réellement engagés.
+- Lemon LIVE : Store 475333 / Product 1369573 / Variant 2140119 / checkout live référencé, mais **vente temporairement pausée** depuis le 24/09 : `commerce_launch_authorized=false`.
+- Motif de la pause : l'essai Digify est terminé et aucun provider de livraison de remplacement n'est encore vérifié. Le produit/checkout Lemon n'ont pas été supprimés.
+- Preuve runtime Production : System Watchdog run **36039517328** (24/09 18:11 UTC) = `launch_ready=false`, `commerce_active=0`, `commerce_stuck=0`, blocker unique `launch_authorized`.
+- Table Ventes vérifiée : **aucune commande réelle payée en attente** ; uniquement une ancienne ligne « Configuration en attente » sans ID commande ni e-mail client. La pause n'abandonne donc aucun acheteur.
+- Digify : essai terminé le 24/09, aucun abonnement payant démontré. `digify_api_status=TRIAL_ENDED_NOT_DELIVERABLE`. Les anciens tests API restent des preuves historiques, pas une preuve de disponibilité commerciale actuelle.
+- #175 prépare un fallback `lemon_native` : inspecteur de fichiers en lecture seule, URLs signées non exposées, route de livraison séparée de Digify et readiness provider-aware. **État actuel volontairement fermé :** `delivery_provider_mode=digify`, `lemon_native_delivery_verified=false`.
+- Le workbench refuse désormais Digify si son statut commercial n'est plus actif, même si des credentials historiques sont encore présents. CI verte avant le dernier commit documentaire : #777 sur `3512ca77...`.
+- Lemon TEST reste strictement séparé : clé `LEMON_SQUEEZY_TEST_API_KEY` dédiée, ressources obligatoirement `test_mode=true`, aucun fallback LIVE et aucun effet Digify pour une commande TEST.
+- Fourniture immédiate et accusé de rétractation restent deux preuves distinctes.
+- Registre de coûts : Lemon = 0 $ fixe + 5 % + 0,50 $/transaction avant suppléments ; Vercel Hobby = dernier signal 100 % / 10 Go Function Storage ; OpenAI API = 0 € autorisé/cible ; Digify = essai terminé ; Metricool = aucun plan payant démontré.
+- L'ancienne simulation `100 € de frais fixes` n'est pas une donnée constatée ; recalculer la contribution avec les coûts réellement engagés.
 
 ## Préflight GPU / runbook
 
@@ -142,10 +144,10 @@ La vidéo d’introduction reste un asset de marque séparé ; le CCA reste hors
 
 ## Blocages humains précis
 
-1. **PR #177** : autorisation Marc pour fusion/déploiement Production. C’est désormais la PR minimale dédiée au coupe-circuit OpenAI + règles Vercel. #175 reste le workbench vidéo/social.
+1. **PR #177** : autorisation Marc pour fusion/déploiement Production. C’est la PR minimale dédiée au coupe-circuit OpenAI + règles Vercel ; #175 reste le workbench. CI #762 verte, mais Production prouve encore `circuit.active=false` tant que #177 n'est pas déployée.
 2. **Bluesky** : remplacer dans Vercel Production la valeur complète de `BLUESKY_APP_PASSWORD`, redéployer, puis relancer identité/lecture. Ne jamais partager le secret dans le chat.
 3. **Lemon TEST** : créer/retrouver une clé API en mode Test et la stocker dans Vercel sous `LEMON_SQUEEZY_TEST_API_KEY`. Débloque inspect → checkout_test → webhook_test → commande/remboursement TEST. Les tests Digify restent séparés et une commande TEST ne doit jamais déclencher Digify.
-4. **Reddit** : autoriser ultérieurement l’envoi du dossier et obtenir l’accord requis ; aucun contact tiers sans autorisation.
+4. **Reddit** : autoriser ultérieurement l’envoi du dossier commercial déjà préparé ; PR #171 est fermée sans merge mais le code utile est conservé dans #175. Aucun contact tiers sans autorisation.
 5. **GPU local** : fournir un environnement local réellement accessible avec GPU adapté avant le premier essai FLUX/Chatterbox. Vérifier GPU/VRAM/RAM/stockage avant tout gros téléchargement.
 6. **Digify** : l’essai est terminé depuis le 24/09. Aucune action n’est nécessaire pour éviter une facturation automatique démontrée. Décision humaine uniquement si Marc veut réactiver une livraison protégée payante ; sinon ne rien souscrire.
 7. **Publication/remplacement commercial** : validation humaine explicite.

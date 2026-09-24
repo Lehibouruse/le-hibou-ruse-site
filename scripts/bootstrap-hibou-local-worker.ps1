@@ -1,3 +1,7 @@
+param(
+  [switch]$StartWorker
+)
+
 $ErrorActionPreference = "Stop"
 
 Write-Host "=== Le Hibou Ruse - activation du ROG ===" -ForegroundColor Cyan

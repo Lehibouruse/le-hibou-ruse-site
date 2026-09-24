@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const BASE_ID = process.env.HIBOU_AIRTABLE_BASE_ID || "appWyUX7TYPNrDbyP";
 const TABLE_ID = process.env.HIBOU_LOCAL_WORKER_TABLE_ID || "tbl8VTZsY6uv3z9Y7";
@@ -15,6 +15,7 @@ const YTDLP = process.env.HIBOU_YTDLP || "yt-dlp";
 const LOG_DIR = path.join(process.env.LOCALAPPDATA || ROOT, "LeHibou");
 const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const ONCE = process.argv.includes("--once");
+const DIAGNOSTIC = process.argv.includes("--diagnostic");
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -167,8 +168,8 @@ async function downloadOne(url, dir, options) {
     "--merge-output-format", "mp4",
     "-o", "%(uploader)s/%(upload_date)s - %(title)s [%(id)s].%(ext)s",
   ];
-  if (options.cookies_from_browser && ["chrome", "edge", "firefox"].includes(String(options.cookies_from_browser))) {
-    args.push("--cookies-from-browser", String(options.cookies_from_browser));
+  if (options.cookies_from_browser) {
+    throw new Error("cookies_from_browser refusé en V1 : aucun accès aux cookies du navigateur depuis une commande Airtable");
   }
   if (options.no_playlist !== false) args.push("--no-playlist");
   args.push(url);
@@ -288,7 +289,51 @@ function healthServer() {
   });
 }
 
+
+function localDiagnostic() {
+  const check = (command, args = ["--version"]) => {
+    const r = spawnSync(command, args, { encoding: "utf8", windowsHide: true, shell: false });
+    return {
+      available: r.status === 0,
+      command: [command, ...args].join(" "),
+      version: String(r.stdout || r.stderr || "").split(/\r?\n/)[0].trim(),
+    };
+  };
+  const nvidia = spawnSync("nvidia-smi", [
+    "--query-gpu=name,memory.total,driver_version",
+    "--format=csv,noheader,nounits",
+  ], { encoding: "utf8", windowsHide: true, shell: false });
+  const gpus = nvidia.status === 0
+    ? String(nvidia.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+        const [name, memoryTotalMiB, driverVersion] = line.split(",").map((x) => x.trim());
+        return { name, memory_total_mib: Number(memoryTotalMiB), driver_version: driverVersion };
+      })
+    : [];
+  return {
+    schema: "HIBOU_LOCAL_WORKER_DIAGNOSTIC_V1",
+    generated_at: new Date().toISOString(),
+    worker: WORKER_ID,
+    platform: process.platform,
+    arch: process.arch,
+    media_root: ROOT,
+    airtable_token_present: Boolean(TOKEN),
+    node: { available: true, version: process.version },
+    git: check("git"),
+    ytdlp: check(YTDLP),
+    ffmpeg: check("ffmpeg"),
+    nvidia_smi_available: nvidia.status === 0,
+    gpus,
+    network_tested: false,
+    airtable_tested: false,
+    downloads_performed: false,
+  };
+}
+
 async function main() {
+  if (DIAGNOSTIC) {
+    process.stdout.write(JSON.stringify(localDiagnostic(), null, 2) + "\n");
+    return;
+  }
   state.status = "running";
   log("Hibou local worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE });
   healthServer();

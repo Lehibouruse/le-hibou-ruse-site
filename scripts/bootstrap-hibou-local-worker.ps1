@@ -221,7 +221,7 @@ if ($ApproveCorpus150) {
   "reels-furet-top100-067-v1"
   )
   $approvalPayload = @{ batch_id = "competitor-reels-150-v1"; approved_at = (Get-Date).ToUniversalTime().ToString("o"); job_ids = $approvedIds }
-  $approvalPayload | ConvertTo-Json -Depth 4 | Set-Content -Path $ApprovalFile -Encoding UTF8
+  $approvalPayload | ConvertTo-Json -Depth 4 | Set-Content -Path $ApprovalFile -Encoding ASCII
   Write-Host "Corpus local approuve : $($approvedIds.Count) jobs." -ForegroundColor Green
 }
 

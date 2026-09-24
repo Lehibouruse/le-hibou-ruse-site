@@ -257,12 +257,7 @@ if ($StartWorker) {
     }
   Start-Sleep -Milliseconds 500
 
-  Write-Host "Premier telechargement de validation..." -ForegroundColor Cyan
-  & $Node $Worker --once
-  if ($LASTEXITCODE -ne 0) {
-    throw "Le premier telechargement a echoue. Voir l'erreur ci-dessus."
-  }
-
+  Write-Host "Demarrage explicite du worker autorise. Aucun run --once n'est force par le bootstrap." -ForegroundColor Cyan
   Start-Process -FilePath $Node -ArgumentList "`"$Worker`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
   Start-Sleep -Seconds 2
 

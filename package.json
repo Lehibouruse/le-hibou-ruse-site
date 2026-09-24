@@ -35,7 +35,7 @@
     "forensic:first": "node scripts/competitor-forensic-batch.mjs --limit=1"
   },
   "dependencies": {
-    "@vercel/analytics": "^1.5.0",
+    "@vercel/analytics": "^2.0.1",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

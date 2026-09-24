@@ -28,7 +28,10 @@ export default async function Home() {
   const logoUrl = "/hibou-monocle.webp";
   const readiness = commercialReadiness({ config, product, chapters: bookRecords, legal: legalRecords });
   const checkoutUrl = readiness.checkoutUrl;
-  const purchaseUrl = checkoutUrl ? "/achat-guide" : "";
+  const consentMode = String(config.digital_supply_consent_checkout_mode || "disabled").trim().toLowerCase();
+  const consentEnabled = ["test", "live"].includes(consentMode);
+  const purchaseUrl = checkoutUrl ? (consentEnabled ? "/achat-guide" : checkoutUrl) : "";
+  const purchaseEvent = consentEnabled ? "purchase_consent_opened" : "checkout_opened";
   const ctaText = config.ebook_cta || product["CTA texte"] || "Acheter le guide — 29 €";
   const articles = articleRecords
     .filter((record) => record.fields.Publié && record.fields["À la une"])
@@ -61,7 +64,7 @@ export default async function Home() {
           </ul>
           <div className="not-basic"><strong>Vous n’apprendrez pas ici les montages que l’on retrouve partout.</strong><span>PEA · assurance-vie · PER · Girardin · 150-0 B ter · LMNP · SCPI…</span></div>
           <p className="ebook-goal"><strong>L’objectif :</strong> des montages plus élaborés, plus originaux et parfois plus gris. Toujours avec leurs conditions, leurs limites et leur niveau de risque D4, D5 ou D6.</p>
-          <div className="price"><span className="price-amount">{config.ebook_price || product["Prix €"] || 29}&nbsp;€</span> <small>paiement unique</small></div>{purchaseUrl ? <><TrackedLink event="purchase_consent_opened" className="button" href={purchaseUrl}>{ctaText}</TrackedLink><p className="checkout-note">Paiement sécurisé par Lemon Squeezy, Merchant of Record · accès protégé envoyé par e-mail</p></> : <><button className="button disabled" disabled>{ctaText} · bientôt disponible</button><p className="checkout-note">Ouverture commerciale après validation des dépendances techniques.</p></>}
+          <div className="price"><span className="price-amount">{config.ebook_price || product["Prix €"] || 29}&nbsp;€</span> <small>paiement unique</small></div>{purchaseUrl ? <><TrackedLink event={purchaseEvent} className="button" href={purchaseUrl} {...(!consentEnabled ? { target: "_blank", rel: "noopener noreferrer" } : {})}>{ctaText}</TrackedLink><p className="checkout-note">Paiement sécurisé par Lemon Squeezy, Merchant of Record · accès protégé envoyé par e-mail</p></> : <><button className="button disabled" disabled>{ctaText} · bientôt disponible</button><p className="checkout-note">Ouverture commerciale après validation des dépendances techniques.</p></>}
         </div><div className="book-mark" aria-label="Couverture du guide"><img src={logoUrl} alt="" /><span>LE GUIDE DU</span><strong>HIBOU<br />RUSÉ</strong><small>COMPRENDRE · EXPLOITER · ARBITRER</small></div></section>
 
         <section className="method" id="methode"><div className="method-inner"><div><div className="eyebrow"><span /> D4 → D6</div><h2>{method.Titre || "Jusqu’où peut-on optimiser ?"}</h2><p className="method-intro">{method["Sous-titre"] || "Trois niveaux de montage. Trois niveaux d’audace."}</p></div><div className="levels"><article><b>D4</b><div><h3>Solide et documenté</h3><p>Montage légal, propre et difficile à contester lorsque les conditions sont réellement remplies.</p></div></article><article><b>D5</b><div><h3>Agressif mais argumentable</h3><p>On pousse les textes, exceptions et interactions plus loin. Le montage reste défendable, mais exige une documentation sérieuse.</p></div></article><article><b>D6</b><div><h3>Limite (borderline selon interprétation)</h3><p>Optimisation très agressive : le montage peut tenir ou tomber selon les faits, la rédaction et l’interprétation retenue.</p></div></article></div></div></section>

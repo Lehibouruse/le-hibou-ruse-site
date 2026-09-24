@@ -21,12 +21,28 @@ function Refresh-Path {
 
 function Ensure-WingetPackage {
   param([string]$Command, [string]$Id)
-  if (Get-Command $Command -ErrorAction SilentlyContinue) { Write-Host "$Command deja disponible."; return }
-  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw "winget est requis pour installer $Command." }
-  Write-Host "Installation de $Id..."
-  winget install --id $Id -e --accept-source-agreements --accept-package-agreements
-  if ($LASTEXITCODE -ne 0) { throw "Echec installation $Id (code $LASTEXITCODE)." }
+
   Refresh-Path
+  if (Get-Command $Command -ErrorAction SilentlyContinue) {
+    Write-Host "$Command deja disponible."
+    return
+  }
+
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    throw "winget est requis pour installer $Command."
+  }
+
+  Write-Host "Installation/verif de $Id..."
+  winget install --id $Id -e --accept-source-agreements --accept-package-agreements
+  $wingetCode = $LASTEXITCODE
+
+  Refresh-Path
+  if (Get-Command $Command -ErrorAction SilentlyContinue) {
+    Write-Host "$Command est disponible. Code winget ignore: $wingetCode"
+    return
+  }
+
+  throw "Impossible de rendre $Command disponible (winget code $wingetCode)."
 }
 
 Ensure-WingetPackage -Command "node" -Id "OpenJS.NodeJS.LTS"

@@ -15,6 +15,7 @@ const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const APPROVAL_FILE = path.join(LOG_DIR, "approved-jobs.json");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
+const REPORT_TOKEN = String(process.env.HIBOU_LOCAL_REPORT_TOKEN || "").trim();
 const ONCE = process.argv.includes("--once");
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
 const EXECUTION_ENABLED = String(process.env.HIBOU_LOCAL_EXECUTION_ENABLED || "").trim().toLowerCase() === "true";
@@ -57,15 +58,44 @@ function saveProcessed(set) {
   writeFileSync(STATE_FILE, JSON.stringify([...set], null, 2), "utf8");
 }
 
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
+  }
+  return value;
+}
+
+function approvalSnapshot(job) {
+  return stableValue({
+    id: String(job?.id || "").trim(),
+    type: String(job?.type || "").trim(),
+    concurrent: String(job?.concurrent || "").trim(),
+    batch_id: String(job?.batch_id || "").trim(),
+    urls: Array.isArray(job?.urls) ? job.urls.map((value) => String(value || "").trim()) : [],
+    options: job?.options && typeof job.options === "object" ? job.options : {},
+  });
+}
+
+function approvalSnapshotJson(job) {
+  return JSON.stringify(approvalSnapshot(job));
+}
+
 function loadApprovedJobs() {
   try {
-    const raw = readFileSync(APPROVAL_FILE, "utf8").replace(/^\uFEFF/, "");
-    const parsed = JSON.parse(raw);
-    const ids = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.job_ids) ? parsed.job_ids : [];
-    return new Set(ids.map((value) => String(value || "").trim()).filter(Boolean));
+    const parsed = JSON.parse(readFileSync(APPROVAL_FILE, "utf8"));
+    const jobs = Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+    return new Map(jobs
+      .map((job) => [String(job?.id || "").trim(), approvalSnapshotJson(job)])
+      .filter(([id]) => Boolean(id)));
   } catch {
-    return new Set();
+    return new Map();
   }
+}
+
+function approvedJobMatches(job, approvedJobs) {
+  const expected = approvedJobs.get(String(job?.id || "").trim());
+  return Boolean(expected && expected === approvalSnapshotJson(job));
 }
 
 function safePart(value, fallback = "unknown") {
@@ -125,12 +155,16 @@ async function fetchQueue() {
 }
 
 async function reportProgress(job, status, data = {}) {
+  if (!REPORT_TOKEN) {
+    log("Progress report skipped", { job: job?.id, status, reason: "report_token_missing" });
+    return;
+  }
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(REPORT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
+      headers: { "Content-Type": "application/json", "User-Agent": "Le-Hibou-ROG-Worker/1.0", Authorization: `Bearer ${REPORT_TOKEN}` },
       body: JSON.stringify({
         job_id: job.id,
         concurrent: job.concurrent || "",
@@ -227,13 +261,16 @@ async function tick() {
     return false;
   }
   const approvedJobs = loadApprovedJobs();
-  if (!APPROVED_JOB_ID && approvedJobs.size === 0) {
+  if (approvedJobs.size === 0) {
     state.status = "waiting_local_job_approval";
     return false;
   }
   const processed = loadProcessed();
   const jobs = await fetchQueue();
-  const job = jobs.find((x) => (x.id === APPROVED_JOB_ID || approvedJobs.has(x.id)) && !processed.has(x.id));
+  const job = jobs.find((x) =>
+    approvedJobMatches(x, approvedJobs)
+    && (!APPROVED_JOB_ID || x.id === APPROVED_JOB_ID)
+    && !processed.has(x.id));
   if (!job) return false;
   try {
     await processJob(job, processed);
@@ -259,6 +296,7 @@ function healthServer() {
       media_root: ROOT,
       queue_url: QUEUE_URL,
       report_url: REPORT_URL,
+      report_token_present: Boolean(REPORT_TOKEN),
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

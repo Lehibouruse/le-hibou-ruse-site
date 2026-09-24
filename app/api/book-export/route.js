@@ -1,5 +1,6 @@
 import { getRecords, TABLES, configMap } from "../../../lib/airtable";
 import { renderBookDocument } from "../../../lib/book-renderer.mjs";
+import { bookContent, hasBookContent } from "../../../lib/book-content.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ function truthy(value) {
 function chapterReady(record) {
   const fields = record?.fields || {};
   return Boolean(
-    String(fields["Contenu V1"] || "").trim()
+    hasBookContent(fields)
     && fields["Prêt export"] === true
     && fields["Validation humaine"] === true
     && String(fields["QC éditorial"] || "").toLowerCase() !== "fail",
@@ -36,7 +37,7 @@ export async function GET(request) {
   ]);
   const config = configMap(configuration);
   const edition = config.book_current_edition || "V1.0-draft";
-  const populated = chapters.filter((record) => String(record.fields?.["Contenu V1"] || "").trim());
+  const populated = chapters.filter((record) => hasBookContent(record.fields));
   const notReady = chapters.filter((record) => !chapterReady(record));
 
   if (!chapters.length) return new Response("Livre introuvable", { status: 404 });
@@ -54,7 +55,7 @@ export async function GET(request) {
         qc: record.fields?.["QC éditorial"] || "",
         human: record.fields?.["Validation humaine"] === true,
         ready_export: record.fields?.["Prêt export"] === true,
-        has_content: Boolean(String(record.fields?.["Contenu V1"] || "").trim()),
+        has_content: hasBookContent(record.fields),
       })),
     }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }

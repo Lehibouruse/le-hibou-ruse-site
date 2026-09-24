@@ -1,8 +1,98 @@
 {
-  "version": 4,
-  "note": "Cible 150 formats courts actifs. Priorite Reels/Shorts/TikTok; jobs unitaires pour reprise independante.",
+  "version": 5,
+  "note": "Cible 150 formats courts actifs. Diversification progressive des concurrents; jobs unitaires.",
   "target_shortform_videos": 150,
   "jobs": [
+    {
+      "id": "reels-richissime-01-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Richissime",
+      "urls": [
+        "https://www.youtube.com/watch?v=UgNx_iSjYSo"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Le secret pour être riche",
+      "created_at": "2026-09-24T22:22:00+02:00"
+    },
+    {
+      "id": "reels-stratege-impot-04-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Le Stratege de l'impot",
+      "urls": [
+        "https://www.youtube.com/watch?v=Zpq1UrIP5W4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Quel statut éviter pour son premier IDR ?",
+      "created_at": "2026-09-24T22:22:00+02:00"
+    },
+    {
+      "id": "reels-stratege-impot-03-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Le Stratege de l'impot",
+      "urls": [
+        "https://www.youtube.com/watch?v=a6MokgvoojE"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Holding : SAS, SASU, SARL ou EURL ?",
+      "created_at": "2026-09-24T22:22:00+02:00"
+    },
+    {
+      "id": "reels-stratege-impot-02-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Le Stratege de l'impot",
+      "urls": [
+        "https://www.youtube.com/watch?v=jFK4nKZaCBs"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "Les trois avantages du statut LMP",
+      "created_at": "2026-09-24T22:22:00+02:00"
+    },
+    {
+      "id": "reels-stratege-impot-01-v1",
+      "active": true,
+      "type": "DOWNLOAD_VIDEO",
+      "concurrent": "Le Stratege de l'impot",
+      "urls": [
+        "https://www.youtube.com/watch?v=rlo50WCfip4"
+      ],
+      "options": {
+        "max_height": 1080,
+        "subtitle_languages": [
+          "fr",
+          "en"
+        ]
+      },
+      "label": "L'intérêt de relier les SCI à une holding",
+      "created_at": "2026-09-24T22:22:00+02:00"
+    },
     {
       "id": "reels-renard-top50-01-v1",
       "active": true,

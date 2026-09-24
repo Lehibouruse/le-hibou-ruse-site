@@ -77,7 +77,7 @@ jobs:
           PY
           python3 crawl.py
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: finance-panthere-archive-covers
           path: |

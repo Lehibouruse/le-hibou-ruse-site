@@ -45,7 +45,7 @@ jobs:
               if i>=0: print("SNIP",re.sub(r"\s+"," ",s[max(0,i-300):i+1000])[:1400])
           PY
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ecureuil-indexers
           path: out/

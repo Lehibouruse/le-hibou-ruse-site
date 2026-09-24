@@ -49,7 +49,7 @@ jobs:
           echo "videos_with_images=$(find visuals -mindepth 1 -maxdepth 1 -type d | wc -l)"
 
       - name: Upload visual corpus artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: renard-top50-visual-corpus
           path: |

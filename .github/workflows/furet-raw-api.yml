@@ -58,7 +58,7 @@ jobs:
               print('bitrateInfo',v.get('bitrateInfo'))
           PY
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: furet-raw-api
           path: raw.json

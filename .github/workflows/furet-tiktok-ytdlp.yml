@@ -29,7 +29,7 @@ jobs:
           head -c 20000 profile.json || true
           exit 0
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: furet-tiktok-ytdlp-metadata
           path: |

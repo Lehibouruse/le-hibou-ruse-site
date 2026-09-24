@@ -46,7 +46,7 @@ jobs:
                   print("ERR",repr(e))
           PY
       - name: Upload probe pages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: finance-panthere-archive-probe
           path: page*.html

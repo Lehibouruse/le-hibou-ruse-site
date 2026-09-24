@@ -46,7 +46,7 @@ jobs:
           done
 
       - name: Upload clean transcripts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: renard-51-100-clean-transcripts
           path: |

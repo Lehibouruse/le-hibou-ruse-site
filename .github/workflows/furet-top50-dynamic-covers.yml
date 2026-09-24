@@ -63,7 +63,7 @@ jobs:
           PY
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: furet-top50-dynamic-covers
           path: |

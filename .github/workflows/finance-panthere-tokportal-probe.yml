@@ -43,7 +43,7 @@ jobs:
                       print("SNIP",z[:250])
           PY
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: finance-panthere-tokportal-probe
           path: out/

@@ -25,11 +25,15 @@ const base = {
   THREADS_APP_SECRET: "threads-secret",
   PINTEREST_APP_ID: "pin-id",
   PINTEREST_APP_SECRET: "pin-secret",
+  REDDIT_API_APPROVED: "true",
+  REDDIT_CLIENT_ID: "reddit-id",
+  REDDIT_CLIENT_SECRET: "reddit-secret",
+  REDDIT_USER_AGENT: "LeHibouRuse/1.0 test",
 };
 
-test("les huit providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
+test("les neuf providers OAuth exposent un callback HTTPS sur le domaine canonique", () => {
   const readiness = oauthProviderReadiness(base);
-  assert.equal(readiness.length, 8);
+  assert.equal(readiness.length, 9);
   assert.equal(readiness.every((item) => item.ready), true);
   assert.equal(readiness.every((item) => item.redirect_uri.startsWith("https://d4d5d6.com/api/social/oauth/")), true);
 });

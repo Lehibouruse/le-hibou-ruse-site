@@ -126,9 +126,9 @@ test("le résumé distingue direct, webhook, Metricool et blocages", () => {
       gateway("facebook", { webhook_configured: true }),
     ],
   });
-  assert.equal(plan.summary.total, 9);
+  assert.equal(plan.summary.total, 11);
   assert.equal(plan.summary.direct, 1);
   assert.equal(plan.summary.webhook, 1);
   assert.equal(plan.summary.metricool, 1);
-  assert.equal(plan.summary.blocked, 6);
+  assert.equal(plan.summary.blocked, 8);
 });

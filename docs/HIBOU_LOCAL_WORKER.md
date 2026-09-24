@@ -4,13 +4,7 @@
 
 Transformer le ROG de Marc en worker local sans port public et sans cloud payant pour les tâches média lourdes. Airtable sert de file de commandes. Le ROG interroge la table `Local Worker Queue` toutes les 15 secondes, exécute localement les tâches autorisées, puis écrit le résultat dans Airtable.
 
-Matériel cible validé :
-
-- ASUS ROG Strix G18 G814JI ;
-- Intel Core i9-13980HX, 24 cœurs / 32 threads ;
-- NVIDIA GeForce RTX 4070 Laptop, 8 Go VRAM ;
-- 32 Go RAM ;
-- environ 1 To SSD NVMe.
+Matériel cible : PC gaming Windows de Marc avec Intel Core i9 et NVIDIA GeForce RTX. Le modèle exact, la VRAM, la RAM et le stockage doivent être relevés par diagnostic avant toute hypothèse de capacité. Ne pas considérer un modèle ROG précis comme confirmé tant que le rapport GPU réel n'a pas été obtenu.
 
 ## Architecture V1
 
@@ -43,7 +37,7 @@ Depuis PowerShell dans le dépôt :
 powershell -ExecutionPolicy Bypass -File .\scripts\install-hibou-local-worker.ps1
 ```
 
-Le script installe/vérifie Node, Git, yt-dlp et FFmpeg, demande une seule fois un token Airtable, crée une tâche Windows au logon et lance un test réel.
+Le script installe/vérifie Node, Git, yt-dlp et FFmpeg, demande une seule fois un token Airtable et crée une tâche Windows au logon. **Par défaut il ne démarre pas le worker et ne télécharge rien.** Il exécute seulement un diagnostic local sans réseau. Pour démarrer explicitement après validation : ajouter `-StartWorker`.
 
 ## Job test déjà créé
 
@@ -60,7 +54,7 @@ Premier job :
 - sous-titres FR/EN disponibles
 - fusion MP4
 
-Une fois le worker installé, ce job doit passer automatiquement de `Pending` à `Running`, puis `Completed`, avec le chemin local et le SHA-256 du fichier.
+Le job de validation reste **Paused** tant que le PC et le worker n'ont pas été validés. Il ne doit être remis en `Pending` qu'après démarrage explicite du worker.
 
 ## Tâches autorisées en V1
 
@@ -73,7 +67,7 @@ Hôtes autorisés :
 - Instagram ;
 - TikTok.
 
-Le worker ne contourne pas de DRM. Les éventuelles authentifications de navigateur restent locales et ne sont utilisées que si `cookies_from_browser` est explicitement ajouté dans `Options JSON`.
+Le worker ne contourne pas de DRM. La V1 refuse explicitement `cookies_from_browser` : une commande Airtable ne peut pas demander au worker de lire les cookies du navigateur.
 
 ## Format Options JSON
 
@@ -87,16 +81,6 @@ Le worker ne contourne pas de DRM. Les éventuelles authentifications de navigat
   "merge_mp4": true
 }
 ```
-
-Option locale facultative pour une plateforme nécessitant une session déjà ouverte :
-
-```json
-{
-  "cookies_from_browser": "chrome"
-}
-```
-
-Valeurs admises : `chrome`, `edge`, `firefox`.
 
 ## Stockage
 
@@ -132,4 +116,4 @@ Après validation du téléchargement réel sur le ROG :
 4. raccordement au registre de veille concurrentielle ;
 5. branchement ComfyUI/FLUX et Chatterbox de la PR vidéo pour faire du ROG le worker complet de production.
 
-Le design reste local-first, gratuit/quasi gratuit, automatisé et compatible avec la limite de 8 Go VRAM.
+Le design reste local-first, gratuit/quasi gratuit et automatisé. Les réglages image/voix seront choisis après mesure de la VRAM réelle.

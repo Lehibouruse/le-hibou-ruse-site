@@ -38,7 +38,8 @@
     "security:api-surface:strict": "node scripts/security-api-surface.mjs --strict",
     "backup:copy-independent": "node scripts/copy-backup-independent.mjs",
     "video:doctor:windows": "node scripts/video-doctor.mjs",
-    "video:image:regen": "node scripts/video-image-regenerate.mjs"
+    "video:style:compile": "node scripts/video-style-profile.mjs",
+    "video:style:apply": "node scripts/video-style-apply.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

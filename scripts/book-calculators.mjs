@@ -29,10 +29,10 @@ export const CALCULATOR_CATALOG=Object.freeze({
     description:"Split a user-supplied eligible value between the recorded 75% exempt fraction and residual fraction before other rules."
   },
   apport_cession_reinvestment:{
-    source_mechanism:"Apport-cession — réinvestissement 60 %",
+    source_mechanism:"Apport-cession — réinvestissement 70 % (réforme 2026)",
     as_of:"2026-09-24",
     revalidate_before_publication:true,
-    description:"Compute the minimum reinvestment amount from a user-supplied disposal proceeds figure under the recorded 60% condition."
+    description:"Compute the minimum reinvestment amount from user-supplied disposal proceeds under the current 70% condition for cessions covered by the 2026 reform. Transaction-date applicability is external."
   },
   tax_late_interest:{
     source_mechanism:"Retard fiscal — intérêt de retard",
@@ -90,7 +90,7 @@ export function dutreilExemption({eligible_value,exemption_rate=0.75}){
   };
 }
 
-export function apportCessionReinvestment({sale_proceeds,reinvestment_rate=0.60}){
+export function apportCessionReinvestment({sale_proceeds,reinvestment_rate=0.70}){
   const proceeds=finite("sale_proceeds",sale_proceeds);
   const rate=ratio("reinvestment_rate",reinvestment_rate);
   return {
@@ -98,7 +98,8 @@ export function apportCessionReinvestment({sale_proceeds,reinvestment_rate=0.60}
     sale_proceeds:money(proceeds),
     reinvestment_rate:rate,
     minimum_reinvestment_amount:money(proceeds*rate),
-    timing_and_asset_eligibility_checked:false
+    timing_and_asset_eligibility_checked:false,
+    transaction_date_applicability_checked:false
   };
 }
 

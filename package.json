@@ -40,6 +40,7 @@
     "video:doctor:windows": "node scripts/video-doctor.mjs",
     "video:style:compile": "node scripts/video-style-profile.mjs",
     "video:style:apply": "node scripts/video-style-apply.mjs",
+    "video:asset-graph": "node scripts/video-asset-graph.mjs",
     "video:image:factory": "node scripts/video-image-factory.mjs",
     "video:master": "node scripts/video-master.mjs",
     "video:voice-qc": "node scripts/video-voice-qc.mjs",

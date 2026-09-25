@@ -5,9 +5,11 @@ import { bearerSecretAuthorized } from "../../../lib/admin-auth.mjs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ ok: false }, { status: 401 });
+  if (!bearerSecretAuthorized(request, process.env.CRON_SECRET)) {
+    return NextResponse.json({ ok: false }, {
+      status: 401,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   const started = Date.now();
@@ -18,12 +20,25 @@ export async function GET(request) {
     ]);
     return NextResponse.json({
       ok: true,
-      checks: { site: "ok", airtable: "ok", jobs: jobs.length ? "ok" : "empty", journal: journal.length ? "ok" : "empty" },
+      checks: {
+        site: "ok",
+        airtable: "ok",
+        jobs: jobs.length ? "ok" : "empty",
+        journal: journal.length ? "ok" : "empty",
+      },
       openai_calls: 0,
       duration_ms: Date.now() - started,
       checked_at: new Date().toISOString(),
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return NextResponse.json({ ok: false, checks: { site: "ok", airtable: "error" }, openai_calls: 0, checked_at: new Date().toISOString() }, { status: 503 });
+    return NextResponse.json({
+      ok: false,
+      checks: { site: "ok", airtable: "error" },
+      openai_calls: 0,
+      checked_at: new Date().toISOString(),
+    }, {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 }

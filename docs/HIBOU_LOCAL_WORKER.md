@@ -1,88 +1,109 @@
-# Hibou Local Worker — ROG
+# Hibou Local Worker — architecture canonique
 
 ## But
 
-Transformer le ROG de Marc en worker local sans port public et sans cloud payant pour les tâches média lourdes. Airtable sert de file de commandes. Le ROG interroge la table `Local Worker Queue` toutes les 15 secondes, exécute localement les tâches autorisées, puis écrit le résultat dans Airtable.
+Le worker local transforme le PC Windows de Marc en exécuteur média local-first pour les tâches lourdes : collecte de vidéos publiques autorisées, forensic FFmpeg/Whisper, puis à terme génération et rendu vidéo. Il n'expose aucun port public et ne dépend d'aucun token Airtable pour lire la file de travail.
 
-Matériel cible : PC gaming Windows de Marc avec Intel Core i9 et NVIDIA GeForce RTX. Le modèle exact, la VRAM, la RAM et le stockage doivent être relevés par diagnostic avant toute hypothèse de capacité. Ne pas considérer un modèle ROG précis comme confirmé tant que le rapport GPU réel n'a pas été obtenu.
+Le modèle exact, la VRAM réellement disponible, le pilote/CUDA, la RAM et l'espace disque doivent être relevés par le diagnostic runtime avant de choisir un profil de génération lourd. L'inventaire nominal de la machine sert au dimensionnement, pas de preuve de disponibilité au moment du run.
 
-## Architecture V1
+## Architecture canonique
 
 ```text
-ChatGPT / Airtable
-       |
-       v
-Local Worker Queue
-       |
-       | HTTPS sortant uniquement
-       v
+GitHub main
+  ├─ config/local-worker-queue.json       file publique, lecture seule
+  └─ scripts/hibou-github-worker.mjs      worker canonique
+              |
+              | HTTPS sortant
+              v
 ROG Windows
-  ├─ yt-dlp : collecte de vidéos publiques
-  ├─ FFmpeg : normalisation / extraction / rendu
-  ├─ futur ComfyUI : images locales
-  ├─ futur Chatterbox : voix locale
-  └─ stockage %USERPROFILE%\HibouMedia
-       |
-       v
-Airtable : statut + métadonnées + hashes
+  ├─ opt-in global local obligatoire
+  ├─ approbation locale exacte des jobs
+  ├─ yt-dlp / FFmpeg
+  ├─ forensic local
+  ├─ futur ComfyUI / Chatterbox
+  └─ %USERPROFILE%\HibouMedia
+              |
+              +--> health loopback 127.0.0.1:8765
+              |
+              +--> reporting distant optionnel, authentifié séparément
 ```
 
-Le worker n'ouvre aucun tunnel, n'expose aucun port sur Internet et ne stocke aucun secret dans GitHub/Airtable.
+Airtable n'est **plus** la file d'exécution du worker. Il reçoit éventuellement de la télémétrie via l'endpoint serveur authentifié ; le worker n'a donc pas besoin d'un PAT Airtable pour exécuter les jobs média.
 
-## Installation
+## Les trois verrous d'exécution
 
-Depuis PowerShell dans le dépôt :
+Une entrée active dans GitHub ne suffit jamais à lancer un job.
+
+1. `HIBOU_LOCAL_EXECUTION_ENABLED=true` doit être activé localement.
+2. Le job exact doit être approuvé localement via :
+   - `%LOCALAPPDATA%\LeHibou\approved-jobs.json`, ou
+   - `HIBOU_LOCAL_APPROVED_JOB_ID` pour un job unique.
+3. Le job doit être d'un type et viser un hôte autorisés par le worker.
+
+Sans le premier verrou, le worker reste `paused`. Sans approbation locale, il reste `waiting_local_job_approval`.
+
+## Installation / mise à jour
+
+La voie canonique est :
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-hibou-local-worker.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-hibou-local-worker.ps1
 ```
 
-Le script installe/vérifie Node, Git, yt-dlp et FFmpeg, demande une seule fois un token Airtable et crée une tâche Windows au logon. **Par défaut il ne démarre pas le worker et ne télécharge rien.** Il exécute seulement un diagnostic local sans réseau. Pour démarrer explicitement après validation : ajouter `-StartWorker`.
+Sans option, le bootstrap :
 
-## Job test déjà créé
+- installe/vérifie les outils requis ;
+- télécharge la version courante du worker canonique ;
+- positionne `HIBOU_LOCAL_EXECUTION_ENABLED=false` ;
+- lance uniquement le diagnostic local ;
+- ne télécharge aucun média ;
+- ne demande aucun token Airtable.
 
-Table Airtable : `Local Worker Queue` (`tbl8VTZsY6uv3z9Y7`).
+Pour autoriser explicitement le corpus prévu puis démarrer :
 
-Premier job :
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-hibou-local-worker.ps1 -ApproveCorpus150 -StartWorker
+```
 
-- `test-renard-prix-transfert`
-- type `DOWNLOAD_VIDEO`
-- URL `https://www.youtube.com/watch?v=pqm2Cu-TDEY`
-- 1080p maximum
-- info JSON
-- miniature
-- sous-titres FR/EN disponibles
-- fusion MP4
+Ou, pour ajouter uniquement la vague rééquilibrée prévue :
 
-Le job de validation reste **Paused** tant que le PC et le worker n'ont pas été validés. Il ne doit être remis en `Pending` qu'après démarrage explicite du worker.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-hibou-local-worker.ps1 -ApproveBalancedNight -StartWorker
+```
 
-## Tâches autorisées en V1
+Ces switches écrivent des IDs exacts dans le manifeste local d'approbation. Ils ne constituent pas une autorisation générique de commandes futures.
+
+## Ancienne voie Airtable directe
+
+`scripts/hibou-local-worker.mjs` est conservé uniquement pour historique/diagnostic. Il est **fail-closed** : aucune exécution de job n'est permise par défaut.
+
+`scripts/install-hibou-local-worker.ps1` est également conservé pour compatibilité, mais redirige désormais vers le bootstrap tokenless canonique et ne demande plus de PAT Airtable.
+
+Un opt-in `HIBOU_ENABLE_LEGACY_AIRTABLE_WORKER=true` existe uniquement pour reprise contrôlée d'un ancien environnement. Il ne doit pas être utilisé dans le fonctionnement normal.
+
+## Tâches autorisées
+
+Le worker GitHub accepte uniquement les types explicitement codés, actuellement :
 
 - `DOWNLOAD_VIDEO`
 - `DOWNLOAD_BATCH`
+- `DOWNLOAD_PROFILE_TOP_SHORTS`
 
-Hôtes autorisés :
+Hôtes de collecte autorisés :
 
 - YouTube ;
 - Instagram ;
 - TikTok.
 
-Le worker ne contourne pas de DRM. La V1 refuse explicitement `cookies_from_browser` : une commande Airtable ne peut pas demander au worker de lire les cookies du navigateur.
+Il ne contourne pas de DRM et n'extrait pas les cookies navigateur sur instruction distante.
 
-## Format Options JSON
+Pour `DOWNLOAD_PROFILE_TOP_SHORTS`, la découverte reste bornée ; la sélection utilise les vues lorsqu'elles sont réellement disponibles, sinon l'ordre du profil. Une erreur sur un élément peut être isolée sans bloquer tout le corpus.
 
-```json
-{
-  "max_height": 1080,
-  "write_info_json": true,
-  "write_thumbnail": true,
-  "write_subtitles": true,
-  "subtitle_languages": ["fr", "en"],
-  "merge_mp4": true
-}
-```
+## Priorité média
 
-## Stockage
+Le téléchargement MP4 est prioritaire. Les sous-titres sont un enrichissement optionnel et ne doivent plus faire échouer une vidéo déjà récupérable. Cela évite notamment qu'un 429 sur les sous-titres bloque tout le corpus.
+
+## Stockage local
 
 Par défaut :
 
@@ -90,15 +111,40 @@ Par défaut :
 %USERPROFILE%\HibouMedia\competitors\<concurrent>\<job>\...
 ```
 
-Les fichiers lourds restent hors Git/Vercel/Airtable. Airtable ne reçoit que l'état, le chemin local, les métadonnées, erreurs et hashes.
+Chaque job terminé produit un résultat local avec chemins, tailles et SHA-256. Les fichiers lourds ne sont pas poussés dans GitHub/Airtable/Vercel.
 
-## Observabilité
+Les politiques de stockage et de sauvegarde sont suivies séparément : aucune suppression automatique n'est autorisée par le worker.
 
-Health local, uniquement loopback :
+## Reporting distant
+
+Le reporting est optionnel et séparé de l'exécution.
+
+Endpoint par défaut :
+
+```text
+https://d4d5d6.com/api/local-worker-status
+```
+
+Il n'est utilisé que si `HIBOU_LOCAL_REPORT_TOKEN` est présent localement. Le serveur doit connaître le même secret. Sans token, le téléchargement continue localement et le reporting est simplement sauté.
+
+Ne jamais stocker ce secret dans GitHub, Airtable, un log ou une capture.
+
+## Observabilité locale
+
+Health loopback uniquement :
 
 ```text
 http://127.0.0.1:8765/health
 ```
+
+Le health expose notamment :
+
+- état du worker ;
+- opt-in d'exécution ;
+- nombre de jobs localement approuvés ;
+- jobs traités ;
+- jobs en échec et prochain retry ;
+- présence du token de reporting, jamais sa valeur.
 
 Logs :
 
@@ -106,23 +152,62 @@ Logs :
 %LOCALAPPDATA%\LeHibou\worker.log
 ```
 
-## Étape suivante
+État local :
 
-Après validation du téléchargement réel sur le ROG :
+- `processed-jobs.json`
+- `failed-jobs.json`
+- `approved-jobs.json`
 
-1. extraction automatique des frames/cuts via FFmpeg ;
-2. transcription locale Whisper/faster-whisper ;
-3. métriques visuelles : durée plans, densité texte, rythme, zooms ;
-4. raccordement au registre de veille concurrentielle ;
-5. branchement ComfyUI/FLUX et Chatterbox de la PR vidéo pour faire du ROG le worker complet de production.
+## Diagnostic
 
-Le design reste local-first, gratuit/quasi gratuit et automatisé. Les réglages image/voix seront choisis après mesure de la VRAM réelle.
+Le diagnostic est volontairement non destructif :
 
+```powershell
+node .\scripts\hibou-github-worker.mjs --diagnostic
+```
 
-## Reporting distant optionnel
+Il relève Node, FFmpeg, yt-dlp, Python et NVIDIA/nvidia-smi lorsqu'ils sont présents. Il ne lit pas la queue, ne télécharge rien et n'effectue pas de test réseau externe.
 
-Le téléchargement local peut rester **sans token serveur**. Le reporting vers `/api/local-worker-status` est séparé et fail-closed.
+Pour la stack de production vidéo complète, utiliser ensuite le video doctor dédié ; ne déduire ni VRAM libre ni compatibilité CUDA de la seule fiche technique.
 
-Pour l'activer, `HIBOU_LOCAL_REPORT_TOKEN` doit être configuré à la fois côté serveur/Vercel et localement sur le PC. Le bootstrap ne crée ni ne demande ce secret automatiquement.
+## Kill switch
 
-Sans token local, le worker saute le reporting. Sans token serveur, l'endpoint renvoie `503 reporting_disabled`.
+Pour stopper l'exécution locale :
+
+1. arrêter le processus worker ;
+2. positionner `HIBOU_LOCAL_EXECUTION_ENABLED=false` ;
+3. ne pas ajouter de nouvelle approbation locale.
+
+Une queue distante modifiée ne doit jamais suffire à contourner ces trois actions.
+
+## Sécurité — invariants
+
+- aucun port Internet entrant ;
+- queue distante en lecture seule ;
+- allowlist d'hôtes ;
+- allowlist de types de jobs ;
+- opt-in local global ;
+- approbation locale exacte ;
+- reporting authentifié séparément ;
+- aucun secret dans la queue ;
+- aucun cookie navigateur lu depuis une commande distante ;
+- health uniquement sur `127.0.0.1` ;
+- erreurs temporaires isolées pour ne pas transformer une panne d'un job en boucle incontrôlée.
+
+## Suite
+
+La chaîne cible est :
+
+```text
+corpus local
+→ forensic local
+→ manifests mesurés
+→ HIBOU_VIDEO_STYLE_PROFILE_V1
+→ Asset Graph / Scene Compositor
+→ ComfyUI + Chatterbox locaux
+→ FFmpeg
+→ QC
+→ master soumis à validation humaine
+```
+
+Le worker ne constitue jamais une autorisation de publication publique.

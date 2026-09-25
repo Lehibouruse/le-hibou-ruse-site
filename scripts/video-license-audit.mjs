@@ -38,7 +38,10 @@ export function classifyFfmpegVersion(text){
 export function auditRepositoryLicensePins(p=policy(),installerText=readFileSync(INSTALLER_PATH,"utf8")){
   const flux=(p.components||[]).find(x=>x.id==="flux1-schnell-fp8");
   const chatter=(p.components||[]).find(x=>x.id==="chatterbox-tts-0.1.7");
-  if(!flux||!chatter) fail("required approved components absent from policy");
+  const comfy=(p.components||[]).find(x=>x.id==="comfyui");
+  const faster=(p.components||[]).find(x=>x.id==="faster-whisper");
+  const opencv=(p.components||[]).find(x=>x.id==="opencv-python-headless-4.14.0.94");
+  if(!flux||!chatter||!comfy||!faster||!opencv) fail("required approved components absent from policy");
   const checks=[
     {id:"flux_artifact_url",ok:installerText.includes("Comfy-Org/flux1-schnell")},
     {id:"flux_hash_pin",ok:installerText.toLowerCase().includes(clean(flux.sha256))},
@@ -46,7 +49,11 @@ export function auditRepositoryLicensePins(p=policy(),installerText=readFileSync
     {id:"unknown_license_blocked",ok:p.gates?.unknown_model_license==="block"},
     {id:"noncommercial_blocked",ok:p.gates?.noncommercial_model_in_commercial_pipeline==="block"},
     {id:"voice_rights_blocked_when_unknown",ok:p.gates?.voice_reference_rights_unknown==="block"},
-    {id:"custom_node_unknown_blocked",ok:p.gates?.custom_comfyui_node_license_unknown==="block"}
+    {id:"custom_node_unknown_blocked",ok:p.gates?.custom_comfyui_node_license_unknown==="block"},
+    {id:"comfyui_version_pin",ok:installerText.includes('$ComfyVersion = "0.37.0"') && comfy.version==="0.37.0"},
+    {id:"faster_whisper_pin",ok:faster.version==="1.2.1"},
+    {id:"opencv_pin",ok:opencv.version==="4.14.0.94"},
+    {id:"forensic_unpinned_blocked",ok:p.gates?.unpinned_top_level_forensic_dependency==="block"}
   ];
   return {schema:"HIBOU_VIDEO_LICENSE_AUDIT_V1",checks,ok:checks.every(x=>x.ok)};
 }

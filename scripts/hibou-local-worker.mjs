@@ -16,6 +16,7 @@ const LOG_DIR = path.join(process.env.LOCALAPPDATA || ROOT, "LeHibou");
 const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const ONCE = process.argv.includes("--once");
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
+const LEGACY_EXECUTION_ENABLED = String(process.env.HIBOU_ENABLE_LEGACY_AIRTABLE_WORKER || "").trim().toLowerCase() === "true";
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -334,8 +335,21 @@ async function main() {
     process.stdout.write(JSON.stringify(localDiagnostic(), null, 2) + "\n");
     return;
   }
+  if (!LEGACY_EXECUTION_ENABLED) {
+    state.status = "disabled_by_policy";
+    process.stdout.write(JSON.stringify({
+      ok: false,
+      status: state.status,
+      reason: "legacy_airtable_worker_disabled",
+      canonical_worker: "scripts/hibou-github-worker.mjs",
+      canonical_bootstrap: "scripts/bootstrap-hibou-local-worker.ps1",
+      network_access: false,
+      jobs_executed: 0
+    }, null, 2) + "\n");
+    return;
+  }
   state.status = "running";
-  log("Hibou local worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE });
+  log("Hibou legacy Airtable worker starting", { worker: WORKER_ID, root: ROOT, once: ONCE });
   healthServer();
 
   if (ONCE) {

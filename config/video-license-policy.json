@@ -1,0 +1,107 @@
+{
+  "schema": "HIBOU_VIDEO_LICENSE_POLICY_V1",
+  "reviewed_at": "2026-09-25",
+  "purpose": "Allow local commercial video production only with components/models whose current upstream license has been reviewed. This is an engineering gate, not legal advice.",
+  "components": [
+    {
+      "id": "flux1-schnell-fp8",
+      "kind": "model",
+      "status": "approved",
+      "commercial_use": true,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/Comfy-Org/flux1-schnell",
+      "upstream": "https://github.com/black-forest-labs/flux",
+      "artifact": "flux1-schnell-fp8.safetensors",
+      "sha256": "ead426278b49030e9da5df862994f25ce94ab2ee4df38b556ddddb3db093bf72",
+      "notes": "Repackaged FP8 checkpoint identifies black-forest-labs/FLUX.1-schnell as base model and Apache-2.0."
+    },
+    {
+      "id": "flux1-dev-family",
+      "kind": "model_family",
+      "status": "blocked_for_commercial_pipeline",
+      "commercial_use": false,
+      "license": "FLUX.1-dev Non-Commercial License",
+      "source": "https://github.com/black-forest-labs/flux",
+      "blocked_name_patterns": ["flux.1-dev", "flux1-dev", "flux.1-krea-dev", "flux1-krea-dev", "flux.1-fill-dev", "flux1-fill-dev", "flux.1-canny-dev", "flux1-canny-dev", "flux.1-depth-dev", "flux1-depth-dev", "flux.1-redux-dev", "flux1-redux-dev", "flux.1-kontext-dev", "flux1-kontext-dev"],
+      "notes": "Do not use in the commercial Hibou production path unless a separate commercial license is documented and the policy is explicitly updated."
+    },
+    {
+      "id": "chatterbox-tts-0.1.7",
+      "kind": "voice_model_and_code",
+      "status": "approved_with_voice_rights_gate",
+      "commercial_use": true,
+      "license": "MIT",
+      "source": "https://github.com/resemble-ai/chatterbox",
+      "model_source": "https://huggingface.co/ResembleAI/chatterbox",
+      "notes": "MIT licensing does not grant rights to clone or imitate a person's voice. Only approved Hibou-owned/authorized voice references may be used."
+    },
+    {
+      "id": "comfyui",
+      "kind": "local_inference_tool",
+      "status": "approved_local_separate_process",
+      "commercial_use": true,
+      "license": "GPL-3.0",
+      "source": "https://github.com/Comfy-Org/ComfyUI",
+      "notes": "Use as a separately installed local process over loopback/API. Do not vendor or redistribute a modified/bundled copy in a proprietary Hibou package without satisfying GPL obligations."
+    },
+    {
+      "id": "faster-whisper",
+      "kind": "speech_recognition_code",
+      "status": "approved",
+      "commercial_use": true,
+      "license": "MIT",
+      "source": "https://github.com/SYSTRAN/faster-whisper"
+    },
+    {
+      "id": "whisper-models",
+      "kind": "speech_recognition_model",
+      "status": "approved",
+      "commercial_use": true,
+      "license": "MIT",
+      "source": "https://github.com/openai/whisper"
+    },
+    {
+      "id": "opencv-4.5-plus",
+      "kind": "computer_vision_library",
+      "status": "approved",
+      "commercial_use": true,
+      "license": "Apache-2.0",
+      "source": "https://opencv.org/license/"
+    },
+    {
+      "id": "libass",
+      "kind": "subtitle_renderer",
+      "status": "approved",
+      "commercial_use": true,
+      "license": "ISC",
+      "source": "https://github.com/libass/libass"
+    },
+    {
+      "id": "ffmpeg",
+      "kind": "media_tool",
+      "status": "runtime_build_check_required",
+      "commercial_use": true,
+      "license": "LGPL-2.1-or-later by default; GPL-2.0-or-later when built with --enable-gpl; nonfree configurations may restrict redistribution",
+      "source": "https://ffmpeg.org/legal.html",
+      "notes": "Video production may proceed locally, but record the installed build configuration before any redistribution/bundling of FFmpeg itself."
+    },
+    {
+      "id": "yt-dlp",
+      "kind": "corpus_collection_tool",
+      "status": "approved_local_tool_no_redistribution",
+      "commercial_use": true,
+      "license": "Unlicense for core source; some bundled release executables include GPLv3+ components",
+      "source": "https://github.com/yt-dlp/yt-dlp",
+      "notes": "Use locally to collect permitted public corpus material; do not bundle its executable into a distributed Hibou product without reviewing that build's third-party notices."
+    }
+  ],
+  "gates": {
+    "unknown_model_license": "block",
+    "noncommercial_model_in_commercial_pipeline": "block",
+    "model_hash_mismatch": "block",
+    "voice_reference_rights_unknown": "block",
+    "custom_comfyui_node_license_unknown": "block",
+    "ffmpeg_runtime_license_unknown": "allow_local_render_but_block_redistribution",
+    "license_revalidation_before_public_release": true
+  }
+}

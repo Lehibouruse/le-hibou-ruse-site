@@ -2,24 +2,23 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync, readFileSync } from "node:fs";
 
-test("confirmed local hardware profile exists and remains runtime-preflight gated",()=>{
-  const path="video/hardware/rog-g814ji-rtx4070-8gb.json";
+test("canonical local hardware profile requires runtime detection",()=>{
+  const path="video/hardware/detect-at-runtime.json";
   assert.equal(existsSync(path),true);
   const profile=JSON.parse(readFileSync(path,"utf8"));
-  assert.equal(profile.profile_id,"ROG_G814JI_RTX4070_8GB");
-  assert.equal(profile.device.gpu,"NVIDIA GeForce RTX 4070 Laptop GPU");
-  assert.equal(profile.device.vram_gb,8);
-  assert.equal(profile.device.ram_gb,32);
-  assert.equal(profile.verified,true);
-  assert.match(profile.status,/USER_CONFIRMED/);
-  assert.match(profile.verification_command,/gpu-check:windows/);
-  assert.equal(profile.safeguards.paid_api_fallback,false);
-  assert.equal(profile.safeguards.public_comfyui_endpoint,false);
+  assert.equal(profile.status,"DETECT_AT_RUNTIME");
+  assert.equal(profile.known.platform,"Windows");
+  assert.equal(profile.known.cpu_family,"Intel Core i9");
+  assert.equal(profile.known.gpu_vendor,"NVIDIA");
+  assert.equal(profile.known.gpu_family,"GeForce RTX");
+  assert.ok(profile.required_commands.includes("npm run video:gpu-check:windows"));
+  assert.equal(profile.policy.no_paid_cloud_fallback,true);
 });
 
-test("Windows runbook points to the real confirmed profile and still requires runtime diagnostic",()=>{
+test("Windows runbook points to runtime profile and does not claim exact hardware",()=>{
   const doc=readFileSync("docs/video-first-run-windows.md","utf8");
-  assert.match(doc,/rog-g814ji-rtx4070-8gb\.json/);
-  assert.doesNotMatch(doc,/detect-at-runtime\.json/);
-  assert.match(doc,/diagnostic runtime reste obligatoire/i);
+  assert.match(doc,/detect-at-runtime\.json/);
+  assert.match(doc,/diagnostic runtime/i);
+  assert.doesNotMatch(doc,/rog-g814ji-rtx4070-8gb\.json/);
+  assert.doesNotMatch(doc,/G814JI|RTX 4070 Laptop|13980HX/i);
 });

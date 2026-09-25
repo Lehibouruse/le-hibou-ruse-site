@@ -1,0 +1,4 @@
+# Top-level local forensic dependencies. Transitive packages remain constrained by upstream packages.
+# Revalidate versions/licences before changing.
+faster-whisper==1.2.1
+opencv-python-headless==4.14.0.94

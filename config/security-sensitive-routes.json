@@ -95,6 +95,41 @@
       ]
     },
     {
+      "path": "app/api/competitor-ecureuil-youtube/route.js",
+      "required_all": [
+        "adminOrServiceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/competitor-furet-youtube/route.js",
+      "required_all": [
+        "adminOrServiceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/competitor-renard-comments/route.js",
+      "required_all": [
+        "adminOrServiceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/competitor-renard-probe/route.js",
+      "required_all": [
+        "adminOrServiceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
+      "path": "app/api/competitor-renard-youtube/route.js",
+      "required_all": [
+        "adminOrServiceAuthorized(request)",
+        "serviceUnauthorized()"
+      ]
+    },
+    {
       "path": "app/api/orchestrator/route.js",
       "required_all": [
         "serviceAuthorized(request)",

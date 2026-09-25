@@ -42,7 +42,8 @@
     "video:style:apply": "node scripts/video-style-apply.mjs",
     "video:image:factory": "node scripts/video-image-factory.mjs",
     "video:master": "node scripts/video-master.mjs",
-    "video:quality-proximity": "node scripts/video-quality-proximity.mjs"
+    "video:voice-qc": "node scripts/video-voice-qc.mjs",
+    "video:voice-qc:run": "node scripts/video-voice-qc-run.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

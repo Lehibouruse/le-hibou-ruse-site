@@ -22,7 +22,22 @@
       "commercial_use": false,
       "license": "FLUX.1-dev Non-Commercial License",
       "source": "https://github.com/black-forest-labs/flux",
-      "blocked_name_patterns": ["flux.1-dev", "flux1-dev", "flux.1-krea-dev", "flux1-krea-dev", "flux.1-fill-dev", "flux1-fill-dev", "flux.1-canny-dev", "flux1-canny-dev", "flux.1-depth-dev", "flux1-depth-dev", "flux.1-redux-dev", "flux1-redux-dev", "flux.1-kontext-dev", "flux1-kontext-dev"],
+      "blocked_name_patterns": [
+        "flux.1-dev",
+        "flux1-dev",
+        "flux.1-krea-dev",
+        "flux1-krea-dev",
+        "flux.1-fill-dev",
+        "flux1-fill-dev",
+        "flux.1-canny-dev",
+        "flux1-canny-dev",
+        "flux.1-depth-dev",
+        "flux1-depth-dev",
+        "flux.1-redux-dev",
+        "flux1-redux-dev",
+        "flux.1-kontext-dev",
+        "flux1-kontext-dev"
+      ],
       "notes": "Do not use in the commercial Hibou production path unless a separate commercial license is documented and the policy is explicitly updated."
     },
     {
@@ -42,7 +57,9 @@
       "commercial_use": true,
       "license": "GPL-3.0",
       "source": "https://github.com/Comfy-Org/ComfyUI",
-      "notes": "Use as a separately installed local process over loopback/API. Do not vendor or redistribute a modified/bundled copy in a proprietary Hibou package without satisfying GPL obligations."
+      "notes": "Use as a separately installed local process over loopback/API. Do not vendor or redistribute a modified/bundled copy in a proprietary Hibou package without satisfying GPL obligations.",
+      "version": "0.37.0",
+      "source_ref": "v0.37.0"
     },
     {
       "id": "faster-whisper",
@@ -50,7 +67,8 @@
       "status": "approved",
       "commercial_use": true,
       "license": "MIT",
-      "source": "https://github.com/SYSTRAN/faster-whisper"
+      "source": "https://github.com/SYSTRAN/faster-whisper",
+      "version": "1.2.1"
     },
     {
       "id": "whisper-models",
@@ -61,12 +79,13 @@
       "source": "https://github.com/openai/whisper"
     },
     {
-      "id": "opencv-4.5-plus",
+      "id": "opencv-python-headless-4.14.0.94",
       "kind": "computer_vision_library",
       "status": "approved",
       "commercial_use": true,
       "license": "Apache-2.0",
-      "source": "https://opencv.org/license/"
+      "source": "https://pypi.org/project/opencv-python-headless/4.14.0.94/",
+      "version": "4.14.0.94"
     },
     {
       "id": "libass",
@@ -102,6 +121,7 @@
     "voice_reference_rights_unknown": "block",
     "custom_comfyui_node_license_unknown": "block",
     "ffmpeg_runtime_license_unknown": "allow_local_render_but_block_redistribution",
-    "license_revalidation_before_public_release": true
+    "license_revalidation_before_public_release": true,
+    "unpinned_top_level_forensic_dependency": "block"
   }
 }

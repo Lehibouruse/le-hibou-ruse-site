@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminOrServiceAuthorized, serviceUnauthorized } from "../../../lib/admin-auth.mjs";
 import { resolveSocialEnv } from "../../../lib/social-credentials-runtime.mjs";
 
 export const runtime = "nodejs";
@@ -23,6 +24,7 @@ function safeError(label, response, data) {
 }
 
 export async function GET(request) {
+  if (!adminOrServiceAuthorized(request)) return serviceUnauthorized();
   const url = new URL(request.url);
   if (url.searchParams.get("target") !== TARGET) {
     return NextResponse.json({ ok: false, error: "fixed_target_only" }, { status: 400 });

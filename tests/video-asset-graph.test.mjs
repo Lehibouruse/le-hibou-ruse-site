@@ -57,3 +57,44 @@ test("scene plan reuses known layers and generates only missing slots",()=>{
 test("normalization rejects malformed hashes",()=>{
   assert.throws(()=>normalizeAsset({kind:"object",path:"x.png",sha256:"abc"}),/64 hex/);
 });
+
+test("canonical registry preserves provenance generation and compatibility metadata",()=>{
+  const asset=normalizeAsset({
+    kind:"character_pose",
+    path:"owl.png",
+    tags:["Hibou","Explication"],
+    anchor:"bottom_center",
+    palette:["#0B1F33","#F5F0E6"],
+    version:"v3",
+    quality_status:"validated",
+    compatible_scene_types:["explainer","list"],
+    provenance:{type:"generated",source:"ComfyUI local",license:"commercial-compatible",license_reference:"model-card"},
+    generation:{prompt:"owl explaining",seed:42,model:"local-model",workflow_version:"wf-2"}
+  });
+  assert.equal(asset.anchor,"bottom_center");
+  assert.equal(asset.version,"v3");
+  assert.equal(asset.quality_status,"validated");
+  assert.equal(asset.provenance.license,"commercial-compatible");
+  assert.equal(asset.generation.seed,42);
+  assert.deepEqual(asset.compatible_scene_types,["explainer","list"]);
+});
+
+test("resolver prefers validated compatible assets and never reuses rejected ones",()=>{
+  const graph=buildAssetGraph([
+    {asset_id:"legacy",kind:"background",path:"legacy.png",tags:["bureau"],quality_status:"candidate"},
+    {asset_id:"validated",kind:"background",path:"validated.png",tags:["bureau"],quality_status:"validated",compatible_scene_types:["explainer"],license:"commercial-compatible"},
+    {asset_id:"rejected",kind:"background",path:"rejected.png",tags:["bureau","premium"],quality_status:"rejected"}
+  ]);
+  const found=resolveAsset(graph,{kind:"background",required_tags:["bureau"],scene_type:"explainer"});
+  assert.equal(found.asset.asset_id,"validated");
+  assert.equal(graph.assets.find(x=>x.asset_id==="rejected").reusable,false);
+});
+
+test("resolver excludes assets incompatible with an explicit scene type",()=>{
+  const graph=buildAssetGraph([
+    {asset_id:"list-only",kind:"background",path:"list.png",tags:["bureau"],quality_status:"validated",compatible_scene_types:["list"]},
+    {asset_id:"generic",kind:"background",path:"generic.png",tags:["bureau"],quality_status:"validated"}
+  ]);
+  const found=resolveAsset(graph,{kind:"background",required_tags:["bureau"],scene_type:"explainer"});
+  assert.equal(found.asset.asset_id,"generic");
+});

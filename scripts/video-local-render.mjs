@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { buildSceneCompositePlan, sceneAssetRefs } from "./video-scene-compositor.mjs";
 
 function fail(message) { throw new Error(message); }
 
@@ -69,8 +70,10 @@ export function validateVideoContract(contract, root) {
   let total = 0;
   contract.scenes.forEach((scene, index) => {
     if (scene.order !== index + 1) fail("scene order must be contiguous");
-    const image = resolve(root, scene.image.selected);
-    if (!existsSync(image)) fail(`image missing: ${image}`);
+    const assets = sceneAssetRefs(scene).map(ref => resolve(root, ref));
+    for (const asset of assets) {
+      if (!existsSync(asset)) fail(`scene asset missing: ${asset}`);
+    }
     const ref = scene.narration_exact;
     const referencedDuration = Number(ref.end_s) - Number(ref.start_s);
     if (ref.mode !== "audio_reference" || ref.sha256 !== audioHash) fail(`narration ref mismatch: ${scene.scene_id}`);
@@ -100,15 +103,15 @@ export function renderVideoContract(contractPathArg, outputArg) {
 
   for (let i = 0; i < contract.scenes.length; i += 1) {
     const scene = contract.scenes[i];
-    const image = resolve(root, scene.image.selected);
-    const imageHash = sha256(image);
     const duration = Number(scene.planned_duration_s);
-    const zoomPercent = Math.min(4, Math.max(2, Number(scene.zoom_percent ?? 3)));
-    const maxZoom = 1 + zoomPercent / 100;
-    const frames = Math.max(1, Math.round(duration * 30));
-    const increment = (maxZoom - 1) / frames;
-    const anchor = scene.framing?.anchor || scene.anchor || "center";
-    const pan = anchorExpressions(anchor);
+    const plan = buildSceneCompositePlan(scene, {
+      duration,
+      width: contract.engine.width,
+      height: contract.engine.height,
+      fps: contract.engine.fps,
+    });
+    const assetPaths = plan.input_refs.map(ref => resolve(root, ref));
+    const assetHashes = assetPaths.map(path => sha256(path));
 
     const fingerprint = hashObject({
       contract_version: contract.contract_version,
@@ -118,23 +121,30 @@ export function renderVideoContract(contractPathArg, outputArg) {
       height: contract.engine.height,
       fps: contract.engine.fps,
       preset,
-      image_sha256: imageHash,
+      composition: plan.normalized,
+      asset_sha256: assetHashes,
       duration,
-      zoom_percent: zoomPercent,
-      anchor,
     });
     const clip = resolve(work, `scene-${String(i + 1).padStart(2, "0")}-${fingerprint.slice(0, 16)}.mp4`);
+    const clipWasCached = validVisual(clip);
 
-    if (validVisual(clip)) {
+    if (clipWasCached) {
       sceneCacheHits += 1;
     } else {
-      const vf = `scale=1200:2134:force_original_aspect_ratio=increase,crop=1200:2134,zoompan=z='if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))':x='${pan.x}':y='${pan.y}':d=${frames}:s=1080x1920:fps=30,format=yuv420p`;
-      run("ffmpeg", [
-        "-y", "-loglevel", "error", "-loop", "1", "-i", image,
-        "-vf", vf, "-t", duration.toFixed(3), "-an",
-        "-c:v", "libx264", "-preset", preset, "-crf", "18", "-pix_fmt", "yuv420p",
+      const args = ["-y", "-loglevel", "error"];
+      for (const asset of assetPaths) args.push("-loop", "1", "-i", asset);
+      args.push(
+        "-filter_complex", plan.filter_complex,
+        "-map", plan.output_label,
+        "-t", duration.toFixed(3),
+        "-an",
+        "-c:v", "libx264",
+        "-preset", preset,
+        "-crf", "18",
+        "-pix_fmt", "yuv420p",
         clip,
-      ]);
+      );
+      run("ffmpeg", args);
       sceneCacheMisses += 1;
     }
 
@@ -142,7 +152,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
     scene.render_artifact = {
       path: clip,
       sha256: clipHash,
-      cache: validVisual(clip) && sceneCacheMisses === 0 ? "reused_or_first_scene" : "available",
+      cache: clipWasCached ? "hit" : "miss",
     };
     clips.push(clip);
     clipFingerprints.push(clipHash);

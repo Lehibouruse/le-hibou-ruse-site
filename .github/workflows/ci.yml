@@ -30,6 +30,8 @@ jobs:
         run: npm test
       - name: Security self-check
         run: npm run security:self-check
+      - name: Strict API surface audit
+        run: npm run security:api-surface:strict
       - name: Worker syntax check
         run: node --check scripts/hibou-worker.mjs
       - name: Production build

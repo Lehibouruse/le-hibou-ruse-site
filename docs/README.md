@@ -1,39 +1,42 @@
 # Documentation canonique — Le Hibou Rusé
 
-## Reprise
-- `../WORK_STATE.md` — état courant et blocages réels.
-- `../README.md` — vue d'ensemble courte.
+## À lire d’abord
+- `../README.md` — vue d’ensemble.
+- `../WORK_STATE.md` — état de reprise courant.
+- `AUTONOMY_ROADMAP.md` — architecture d’automatisation.
+- `NO_SECRETS.md` — règles de secrets.
 
 ## Vidéo
-- `video-first-run-windows.md`
-- `video-local-install-windows.md`
-- `video-local-gpu-runbook-v1.md`
-- `video-contract-v1.md`
-- `video-generation-interfaces-v1.md`
+- `video-first-run-windows.md` — premier lancement sur le PC réel.
+- `local-video-gpu-runbook.md` — préflight GPU / Chatterbox / ComfyUI.
+- `video-contract-v1.md` + `video-contract-v1.schema.json` — contrat vidéo.
+- `video-generation-interfaces-v1.md` — interfaces IMAGE_GEN / VOICE_GEN.
+- `video-local-pipeline-v1.md` — pipeline local.
+- `video-windows-gpu-check.md` — diagnostic Windows.
 
-## Sécurité
-- `SECURITY_ARCHITECTURE.md`
-- `SECURITY_BASELINE.md`
-- `API_SECURITY_AUDIT.md`
-- `CSP_REPORT_ONLY.md`
-- `SECRET_ROTATION.md`
-- `WAF_RATE_LIMIT_PLAN.md`
+Les anciens documents V1/V2 non listés ici sont conservés comme références historiques ; en cas de divergence, le code actuel et les documents ci-dessus priment.
 
-## Sauvegardes
-- `BACKUP_AND_RESTORE.md`
-- `BACKUP_RESTORE_PLAN.md`
-- `BACKUP_SCHEDULE_WINDOWS.md`
-- `BACKUP_INDEPENDENT_COPY.md`
+## Worker local
+Deux modes existent :
+1. **recommandé pour démarrer** : worker GitHub sans token ;
+2. **avancé** : worker Airtable bidirectionnel avec token.
+
+Aucun worker ne doit démarrer implicitement.
 
 ## Commerce
-- `WORK_LEMON_TEST_RUNBOOK.md`
 - `COMMERCE_LAUNCH_RUNBOOK.md`
+- `WORK_LEMON_TEST_RUNBOOK.md`
 - `launch-runbook.md`
 
-## Règle de priorité
+TEST précède toujours LIVE. Le consentement numérique reste feature-flagged.
 
-En cas de divergence :
-1. code et tests de `main` ;
-2. `WORK_STATE.md` ;
-3. documents canoniques listés ici ;
-4. anciens POC / workbenches / archives.
+## Réseaux sociaux
+- `SOCIAL_CONTROL_PLANE.md`
+- `SOCIAL_AUTHORIZATION_RUNBOOK.md`
+- `SOCIAL_API_MATRIX.md`
+- `SOCIAL_METRICS.md`
+
+Code présent ≠ accès externe approuvé ≠ runtime testé ≠ publication autorisée.
+
+## Nettoyage
+Les anciens fichiers marqueurs de CI/redéploiement non référencés ont été retirés. Les preuves, runbooks et artefacts fonctionnels sont conservés.

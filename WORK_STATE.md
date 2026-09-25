@@ -2,170 +2,60 @@
 
 Dernière mise à jour : 24/09/2026.
 
-## Règle de lecture
+## Production / main
+Le dépôt `main` contient les garde-fous paid-AI, le socle commerce Lemon TEST, le consentement numérique feature-flagged, les métriques publiques Bluesky, le worker Windows local durci et le pipeline vidéo local déterministe.
 
-Toujours distinguer :
-1. **code présent dans `main`** ;
-2. **runtime réellement configuré** ;
-3. **test réel réussi** ;
-4. **production/publi­cation autorisée**.
-
-Une CI verte ne prouve ni un accès externe, ni un secret configuré, ni une publication réelle.
-
-## Matériel local confirmé
-
-Machine de référence :
-- ASUS ROG Strix G18 G814JI ;
-- Intel Core i9-13980HX ;
-- NVIDIA GeForce RTX 4070 Laptop GPU, 8 Go VRAM ;
-- 32 Go RAM ;
-- SSD NVMe ~1 To.
-
-Le profil canonique est `video/hardware/rog-g814ji-rtx4070-8gb.json`. Le diagnostic runtime reste obligatoire avant génération lourde.
+Toujours distinguer : **code prêt**, **runtime configuré**, **test réel réussi**, **production autorisée**.
 
 ## Vidéo locale
+Le pipeline couvre storyboard, Chatterbox local, ComfyUI local, smoke test d’une scène, trois candidats image, rendu FFmpeg 1080×1920/30 fps, sous-titres, mastering audio, hashes/manifests, QC et reporting Airtable.
 
-Le socle vidéo est dans `main` :
-- contrat `HIBOU_VIDEO_CONTRACT_V1` ;
-- Airtable → scènes/storyboard ;
-- Chatterbox Multilingual local ;
-- ComfyUI local ;
-- génération séquentielle de candidats image ;
-- sous-titres, mastering audio, rendu FFmpeg 1080×1920 / 30 fps ;
-- QC, hashes, manifests ;
-- smoke test d'une seule scène ;
-- reporting Airtable qui distingue un smoke d'un pilote complet ;
-- installation Windows staged : diagnostic par défaut, installations lourdes uniquement avec switches explicites.
+Blocage réel actuel : **diagnostic matériel du PC**. L’utilisateur a indiqué Intel Core i9 + NVIDIA GeForce RTX, mais le modèle exact et la VRAM ne doivent pas être supposés.
 
-Profil image de départ pour 8 Go VRAM :
-- FLUX.1-schnell FP8 ;
-- batch 1 ;
-- génération séquentielle ;
-- smoke 768×1344 ;
-- fallback 640×1136 en cas d'OOM ;
-- aucun fallback cloud payant silencieux.
+Première commande : `npm run video:gpu-check:windows`.
 
-Preuve runtime encore attendue :
-1. diagnostic GPU/driver/CUDA/disque ;
-2. une scène voix Chatterbox ;
-3. trois images ComfyUI ;
-4. smoke complet ;
-5. trois scènes ;
-6. pilote complet + lecture iPhone.
+## Worker PC
+Mode recommandé pour la première activation : worker GitHub sans token, queue publique en lecture seule et exécution désactivée par défaut.
 
-## Worker Windows
-
-Le worker local est opt-in :
-- exécution désactivée par défaut ;
-- queue inactive par défaut ;
-- démarrage explicite ;
-- health local uniquement ;
-- aucune lecture de cookies navigateur depuis une commande distante ;
-- aucun téléchargement automatique pendant un diagnostic.
+Le worker Airtable avec token reste un mode avancé bidirectionnel.
 
 ## Commerce
-
 - Lemon Squeezy = Merchant of Record.
-- TEST et LIVE restent séparés.
-- Le bootstrap TEST existe côté code.
-- Le consentement de fourniture numérique est feature-flagged.
-- Les replays ordinaires du parcours de consentement réutilisent le checkout déjà journalisé via un `request_id` stable.
-- Les commandes/remboursements sont dédupliqués.
-- Les liens d'accès publics n'énumèrent pas les commandes.
-
-Preuve encore nécessaire avant LIVE :
-- clé Lemon TEST installée côté Vercel ;
-- checkout TEST ;
-- webhook TEST ;
-- livraison/révocation TEST ;
-- confirmation durable du consentement ;
-- validation explicite avant activation LIVE.
+- TEST séparé de LIVE.
+- Consentement numérique piloté par feature flag.
+- Aucun checkout LIVE implicite.
+- La livraison réelle n’est pas considérée comme prouvée avant test de bout en bout.
 
 ## Réseaux sociaux
-
-Les intégrations utilisent un control plane fail-closed. Un connecteur présent dans le code ne vaut jamais approbation externe.
-
-- Bluesky : métriques publiques possibles sans credentials lorsque l'URI du post existe.
-- Reddit : activation uniquement après accord externe requis et configuration correspondante.
-- Les autres réseaux conservent leurs propres OAuth/audits/contraintes.
-
-## Sécurité
-
-Déjà dans `main` :
-- trust boundaries et politique sécurité ;
-- auth explicite des routes sensibles ;
-- paid-AI fail-closed ;
-- CSP en Report-Only ;
-- inventaire statique de la surface API ;
-- Dependabot npm + GitHub Actions ;
-- scanner local de patterns sensibles ;
-- audit des GitHub Actions non épinglées ;
-- dry-run de rotation des secrets sans émission de valeurs ;
-- replay/idempotence des principales écritures publiques ;
-- politique WAF/rate-limit en mode observation, non enforced.
-
-Restent à prouver ou activer :
-- branch protection GitHub ;
-- observation navigateur CSP puis enforcement minimal ;
-- rate limiting distribué/Vercel-WAF après observation du trafic ;
-- exercice réel de rotation d'un secret TEST.
-
-## Sauvegardes / résilience
-
-Dans `main` :
-- Git bundle ;
-- exports Airtable safe/redacted ;
-- chiffrement AES-256-GCM disponible pour exports sensibles ;
-- manifest + SHA-256 ;
-- restore rehearsal local non destructif ;
-- planification Windows opt-in ;
-- copie indépendante : vérification avant copie, copie, re-vérification après copie.
-
-Restent à faire en runtime :
-- premier backup réel ;
-- rehearsal PASS sur ce backup ;
-- destination réellement indépendante choisie ;
-- première copie indépendante PASS ;
-- actifs Library prioritaires recopiés ;
-- RPO/RTO mesurés.
+- Bluesky : métriques publiques sans secret lorsque l’URI du post existe.
+- Reddit : code préparé derrière approbation externe explicite ; aucun appel ne doit partir avant le gate.
+- Les autres réseaux gardent leurs blocages propres.
 
 ## Airtable
+Airtable reste la source opérationnelle structurée pour Roadmap, Content Pipeline, Montages, Livre et états d’exécution.
 
-Airtable reste la source opérationnelle pour :
-- Roadmap ;
-- Content Pipeline ;
-- Montages ;
-- Livre ;
-- scènes vidéo ;
-- comptes sociaux ;
-- configuration non secrète ;
-- statuts et preuves.
+## Bibliothèque
+Le dossier `/Le Hibou Rusé` est organisé en :
+- `00_Pilotage`
+- `01_Livre/00_Références`
+- `01_Livre/01_Brouillons`
+- `01_Livre/02_Exports`
+- `Vidéos/<Sujet>`, avec anciens POC rangés sous `Archives`
 
-Aucun secret en clair ne doit être stocké dans les tables ordinaires.
+## Prochaines preuves humaines
+1. Diagnostic GPU/VRAM.
+2. Une scène Chatterbox.
+3. Trois images ComfyUI.
+4. Une scène rendue, puis un pilote.
+5. Checkout TEST Lemon.
+6. Accord Reddit avant activation.
 
-## Livre
-
-La liste canonique contient le socle Top 100+ des montages regroupés. Format des fiches :
-1. concept/mécanisme technique ;
-2. Exemple du Hibou, chiffré, narratif et provocateur ;
-3. risques associés uniquement lorsqu'ils existent.
-
-Rédaction prévue par lots de 10 fiches, cible globale d'environ 100 à 250 pages avant mise en forme.
-
-## Blocages humains réellement utiles
-
-1. PC : exécuter le diagnostic local puis le premier smoke vidéo.
-2. Lemon : ajouter la clé TEST directement dans Vercel, sans la transmettre dans le chat.
-3. GitHub : confirmer la branch protection de `main`.
-4. Vercel : activer/observer ultérieurement WAF/rate-limit selon le plan.
-5. Backup : choisir une vraie destination indépendante et lancer le premier backup réel.
-6. Accès sociaux : compléter uniquement les OAuth/approbations externes réellement nécessaires.
+## Sécurité / résilience
+Trois chantiers P1 sont suivis dans Airtable : audit cybersécurité, sauvegardes/restauration, puis test réel de reprise/rotation des secrets.
 
 ## Garde-fous
-
-- aucun secret dans Git/Airtable/docs ;
+- aucun secret dans GitHub/Airtable/docs ;
 - aucun fallback payant silencieux ;
 - aucun endpoint local exposé publiquement ;
-- aucun worker démarré implicitement ;
-- aucune publication automatique non validée ;
-- ne jamais inventer un runtime, un accès externe ou une preuve de test.
+- aucune publication sans validation appropriée ;
+- ne jamais inventer un état runtime ou un modèle matériel.

@@ -1,10 +1,8 @@
 # Premier lancement local — PC gaming Windows
 
-Le matériel de référence est **confirmé par l’utilisateur** : ASUS ROG Strix G18 G814JI, Intel Core i9-13980HX, NVIDIA GeForce RTX 4070 Laptop 8 Go, 32 Go RAM et SSD NVMe d’environ 1 To.
+Le modèle exact du GPU, la VRAM, la RAM et le stockage doivent être détectés localement avant tout choix de modèle lourd. Ne pas supposer un modèle ROG ou RTX précis.
 
-Profil canonique : `video/hardware/rog-g814ji-rtx4070-8gb.json`.
-
-Le diagnostic runtime reste obligatoire avant tout téléchargement/génération lourde : il sert à vérifier pilote, CUDA visible, VRAM réellement disponible, RAM et espace disque du moment. Il ne sert plus à deviner l’identité du matériel.
+Profil canonique : `video/hardware/detect-at-runtime.json`.
 
 ## 1. Diagnostic
 
@@ -13,7 +11,7 @@ npm run video:gpu-check:windows
 node scripts/video-local-preflight.mjs
 ```
 
-Aucun modèle n'est téléchargé et aucun fallback payant n'est activé.
+Aucun modèle n’est téléchargé et aucun fallback payant n’est activé.
 
 ## 2. Voix — une scène
 
@@ -31,10 +29,10 @@ Exporter un workflow ComfyUI au format API puis détecter ses vrais nœuds :
 npm run video:comfyui-binding -- C:\chemin\workflow-api.json C:\chemin\hibou-binding-candidate.json
 ```
 
-Repères :
+Repères Hibou :
 - ≥ 12 Go : smoke local confortable puis mesure ;
 - 8–12 Go : profil low-VRAM, batch 1, candidats séquentiels, FP8/quantification adaptée ;
-- < 8 Go : modèle/résolution plus légers avant d'envisager FLUX.
+- < 8 Go : modèle/résolution plus légers avant d’envisager FLUX.
 
 ```powershell
 npm run video:smoke -- video/contracts/obo.v1.json .hibou-video-artifacts/smoke-obo C:\chemin\hibou-binding.json --scene=1 --run-image
@@ -47,7 +45,7 @@ npm run video:smoke -- video/contracts/obo.v1.json .hibou-video-artifacts/smoke-
 npm run video:smoke-report -- summarize .hibou-video-artifacts/smoke-obo
 ```
 
-Le statut `LOCAL_SMOKE_PASS — FULL_PIPELINE_NOT_RUN` n'autorise aucune publication.
+Le statut `LOCAL_SMOKE_PASS — FULL_PIPELINE_NOT_RUN` n’autorise aucune publication.
 
 ## 5. Montée en charge
 

@@ -26,7 +26,7 @@ test("Dutreil arithmetic preserves exempt and residual fractions",()=>{
 
 test("apport-cession reinvestment amount uses recorded minimum ratio",()=>{
   const r=apportCessionReinvestment({sale_proceeds:500000});
-  assert.equal(r.minimum_reinvestment_amount,300000);
+  assert.equal(r.minimum_reinvestment_amount,350000);
   assert.equal(r.timing_and_asset_eligibility_checked,false);
 });
 

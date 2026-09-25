@@ -66,6 +66,29 @@ async function main(){
   const perceptualPath=resolve(root,"image-perceptual-qc.json");
   write(planPath,plan);
 
+  if(plan.requests.length===0){
+    const emptyManifest={schema:"HIBOU_IMAGE_BATCH_V1",content_id:plan.content_id,results:{},updated_at:new Date().toISOString(),scene_count_processed:0,cache_hits:0,generated_this_run:0,paid_fallback:false};
+    write(manifestPath,emptyManifest);
+    write(selectionTemplate,{});
+    write(resolve(root,"selections.provisional.json"),{});
+    const summary={
+      schema:"HIBOU_IMAGE_FACTORY_RUN_V1",
+      generated_at:new Date().toISOString(),
+      content_id:plan.content_id,
+      scenes:[],
+      reused_scenes:plan.skipped_full_reuse||[],
+      policy,
+      regeneration_runs:[],
+      all_scenes_have_candidate:true,
+      provisional_selections:{},
+      generation_skipped_reason:"all_scenes_full_reuse",
+      publication_authorized:false
+    };
+    write(resolve(root,"factory-run.json"),summary);
+    process.stdout.write(JSON.stringify({ok:true,...summary})+"\n");
+    return;
+  }
+
   await executeImagePlan(plan,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
   let manifest=load(manifestPath);
   let tech=qcImageBatch(manifest); write(techPath,tech);

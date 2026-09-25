@@ -146,6 +146,9 @@ function Write-State {
 Require-Windows
 
 Write-Host "=== Hibou vidéo local — installation staged ===" -ForegroundColor Cyan
+Write-Host "Audit licences/modeles fail-closed..." -ForegroundColor Cyan
+& node (Join-Path $RepoRoot "scripts\video-license-audit.mjs")
+if ($LASTEXITCODE -ne 0) { throw "Audit licences Hibou échoué : installation bloquée." }
 $diagnostic = Get-Preflight
 $diagnostic | ConvertTo-Json -Depth 6
 Write-State

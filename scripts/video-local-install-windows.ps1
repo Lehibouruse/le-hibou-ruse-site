@@ -23,7 +23,8 @@ $StatePath = Join-Path $VideoRoot "install-state.json"
 $ChatterboxVersion = "0.1.7"
 $TorchVersion = "2.6.0"
 $TorchIndex = "https://download.pytorch.org/whl/cu124"
-$ComfyArchiveUrl = "https://github.com/comfyanonymous/ComfyUI/releases/latest/download/ComfyUI_windows_portable_nvidia.7z"
+$ComfyVersion = "0.37.0"
+$ComfyArchiveUrl = "https://github.com/Comfy-Org/ComfyUI/releases/download/v$ComfyVersion/ComfyUI_windows_portable_nvidia.7z"
 $FluxUrl = "https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell-fp8.safetensors?download=true"
 $FluxSha256 = "ead426278b49030e9da5df862994f25ce94ab2ee4df38b556ddddb3db093bf72"
 
@@ -125,6 +126,7 @@ function Write-State {
       root = $ComfyPortable
       python = $ComfyPython
       endpoint = "http://127.0.0.1:8188"
+      expected_version = $ComfyVersion
       public_bind_allowed = $false
     }
     flux_schnell_fp8 = [ordered]@{
@@ -192,6 +194,12 @@ if ($InstallComfyUI) {
     if ($LASTEXITCODE -ne 0) { throw "Extraction ComfyUI échouée." }
     if (-not (Test-Path $ComfyMain) -or -not (Test-Path $ComfyPython)) { throw "Installation ComfyUI portable incomplète." }
     Remove-Item -Force $archive
+  }
+  $versionScript = Join-Path $ComfyDir "comfyui_version.py"
+  if (-not (Test-Path $versionScript)) { throw "Version ComfyUI introuvable : installation refusée." }
+  $actualComfyVersion = (& $ComfyPython -c "import importlib.util; s=importlib.util.spec_from_file_location('cv', r'$versionScript'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.__version__)" | Select-Object -First 1).Trim()
+  if ($actualComfyVersion -ne $ComfyVersion) {
+    throw "Version ComfyUI inattendue : $actualComfyVersion (attendue $ComfyVersion)."
   }
   Write-State
 }

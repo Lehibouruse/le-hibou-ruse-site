@@ -11,6 +11,7 @@ import {
   specialQuality,
 } from "../../../lib/book-finalizer.mjs";
 import { PAID_AI_DISABLED_BY_POLICY } from "../../../lib/hibou-agent.mjs";
+import { bearerSecretAuthorized } from "../../../lib/admin-auth.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
-  if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return;
+  if (bearerSecretAuthorized(request, process.env.CRON_SECRET)) return;
   await verifyGithubActionsToken(token);
 }
 

@@ -12,16 +12,11 @@ Toujours distinguer :
 
 Une CI verte ne prouve ni un accès externe, ni un secret configuré, ni une publication réelle.
 
-## Matériel local confirmé
+## Matériel local à confirmer par diagnostic
 
-Machine de référence :
-- ASUS ROG Strix G18 G814JI ;
-- Intel Core i9-13980HX ;
-- NVIDIA GeForce RTX 4070 Laptop GPU, 8 Go VRAM ;
-- 32 Go RAM ;
-- SSD NVMe ~1 To.
+Informations connues : PC gaming Windows, Intel Core i9 et NVIDIA GeForce RTX. Le modèle exact du PC, le modèle exact du GPU, la VRAM, la RAM et le stockage ne doivent pas être considérés comme confirmés tant que le diagnostic local n'a pas été exécuté.
 
-Le profil canonique est `video/hardware/rog-g814ji-rtx4070-8gb.json`. Le diagnostic runtime reste obligatoire avant génération lourde.
+Le profil canonique est `video/hardware/detect-at-runtime.json`. Le diagnostic runtime est obligatoire avant génération lourde.
 
 ## Vidéo locale
 
@@ -37,13 +32,7 @@ Le socle vidéo est dans `main` :
 - reporting Airtable qui distingue un smoke d'un pilote complet ;
 - installation Windows staged : diagnostic par défaut, installations lourdes uniquement avec switches explicites.
 
-Profil image de départ pour 8 Go VRAM :
-- FLUX.1-schnell FP8 ;
-- batch 1 ;
-- génération séquentielle ;
-- smoke 768×1344 ;
-- fallback 640×1136 en cas d'OOM ;
-- aucun fallback cloud payant silencieux.
+Le profil image de départ dépend de la VRAM réellement mesurée. Pour une machine contrainte, le pipeline prévoit batch 1, génération séquentielle, low-VRAM/quantification adaptée et baisse de résolution avant tout autre compromis. Aucun fallback cloud payant silencieux.
 
 Preuve runtime encore attendue :
 1. diagnostic GPU/driver/CUDA/disque ;

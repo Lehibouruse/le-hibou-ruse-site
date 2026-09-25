@@ -68,8 +68,9 @@ function ffprobe(input){
     audio:{codec:audio.codec_name||"",sample_rate:Number(audio.sample_rate||0)||null,channels:audio.channels||null},
   };
 }
-function detectScenes(input){
-  const r=spawnSync("ffmpeg",["-hide_banner","-i",input,"-vf","select='gt(scene,0.30)',showinfo","-an","-f","null","-"],{
+function detectScenes(input,{threshold=0.30}={}){
+  const safeThreshold=Math.min(0.99,Math.max(0.01,Number(threshold)||0.30));
+  const r=spawnSync("ffmpeg",["-hide_banner","-i",input,"-vf",`select='gt(scene,${safeThreshold.toFixed(2)})',showinfo`,"-an","-f","null","-"],{
     encoding:"utf8",windowsHide:true,shell:false,maxBuffer:32*1024*1024
   });
   if(![0,1].includes(r.status)) fail("ffmpeg scene detection failed: "+String(r.stderr||"").slice(-3000));
@@ -116,6 +117,44 @@ function transcribeOptional(wav,outDir){
 function writeJson(path,value){ writeFileSync(path,JSON.stringify(value,null,2)+"\n",{encoding:"utf8",mode:0o600}); }
 function artifact(path,root){ return {file:basename(path),bytes:statSync(path).size,sha256:sha256(path)}; }
 
+export function intervalStats(duration,eventTimes){
+  const boundaries=[0,...eventTimes.filter(x=>x>0&&x<duration),duration].sort((a,b)=>a-b);
+  const intervals=boundaries.slice(1).map((x,i)=>x-boundaries[i]).filter(x=>x>0.01);
+  return {
+    event_count:eventTimes.length,
+    mean_interval_s:intervals.length?Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length*1000)/1000:null,
+    median_interval_s:intervals.length?Math.round(median(intervals)*1000)/1000:null,
+    intervals_s:intervals.map(x=>Math.round(x*1000)/1000)
+  };
+}
+export function attentionMetrics(duration,eventTimes,{threshold=0.12}={}){
+  const s=intervalStats(duration,eventTimes);
+  return {
+    schema:"HIBOU_FORENSIC_ATTENTION_PROXY_V1",
+    method:"ffmpeg_scene_score_sensitive_proxy",
+    threshold:Number(threshold),
+    proxy_only:true,
+    event_count:s.event_count,
+    event_times_s:eventTimes,
+    event_interval_s:s.median_interval_s,
+    mean_event_interval_s:s.mean_interval_s,
+    intervals_s:s.intervals_s
+  };
+}
+export function transcriptPace(transcript,duration){
+  if(transcript?.status!=="ok") return {word_count:null,words_per_minute:null,words_per_minute_speaking_time:null,speaking_time_s:null};
+  const text=String(transcript.text||"").trim();
+  const wordCount=text?text.split(/\s+/).filter(Boolean).length:0;
+  const segments=Array.isArray(transcript.segments)?transcript.segments:[];
+  const speakingTime=segments.reduce((sum,s)=>sum+Math.max(0,Number(s.end||0)-Number(s.start||0)),0);
+  return {
+    word_count:wordCount,
+    words_per_minute:duration>0?Math.round((wordCount/duration*60)*10)/10:null,
+    words_per_minute_speaking_time:speakingTime>0?Math.round((wordCount/speakingTime*60)*10)/10:null,
+    speaking_time_s:Math.round(speakingTime*1000)/1000
+  };
+}
+
 export function sceneMetrics(duration,cutTimes){
   const boundaries=[0,...cutTimes.filter(x=>x>0&&x<duration),duration].sort((a,b)=>a-b);
   const intervals=boundaries.slice(1).map((x,i)=>x-boundaries[i]).filter(x=>x>0.01);
@@ -127,16 +166,17 @@ export function sceneMetrics(duration,cutTimes){
     scene_count:Math.max(1,intervals.length),
     mean_scene_duration_s:intervals.length?Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length*1000)/1000:null,
     median_scene_duration_s:intervals.length?Math.round(median(intervals)*1000)/1000:null,
+    composition_change_interval_s:intervals.length?Math.round(median(intervals)*1000)/1000:null,
     intervals_s:intervals.map(x=>Math.round(x*1000)/1000),
   };
 }
 
-export function buildManifest({input,media,scene,voice,frames,transcript,artifacts}){
+export function buildManifest({input,media,scene,voice,attention,frames,transcript,artifacts}){
   return {
     schema:"HIBOU_FORENSIC_PACKAGE_V1",
     generated_at:new Date().toISOString(),
     input:{file:basename(input),bytes:statSync(input).size,sha256:sha256(input)},
-    media,scene,voice,frames,transcript,
+    media,scene,voice,attention,frames,transcript,
     artifacts,
     network_used:false,
     paid_api_used:false,
@@ -153,28 +193,33 @@ async function main(){
   mkdirSync(out,{recursive:true});
   const media=ffprobe(input);
   if(!(media.duration_s>0)) fail("durée vidéo invalide");
-  const cuts=detectScenes(input);
+  const cuts=detectScenes(input,{threshold:0.30});
+  const attentionEvents=detectScenes(input,{threshold:0.12});
   const scene=sceneMetrics(media.duration_s,cuts);
+  const attention=attentionMetrics(media.duration_s,attentionEvents,{threshold:0.12});
   const wav=resolve(out,"audio.wav");
   extractAudio(input,wav);
   const voice=audioMetrics(wav,media.duration_s);
   const frameTimes=chooseFrameTimes(media.duration_s,cuts);
   const frames=extractFrames(input,resolve(out,"frames"),frameTimes);
   const transcript=transcribeOptional(wav,out);
+  Object.assign(voice,transcriptPace(transcript,media.duration_s));
   writeJson(resolve(out,"media.json"),media);
   writeJson(resolve(out,"scene_metrics.json"),scene);
   writeJson(resolve(out,"voice_metrics.json"),voice);
+  writeJson(resolve(out,"attention_metrics.json"),attention);
   writeJson(resolve(out,"frames.json"),frames);
   const artifacts=[
     artifact(resolve(out,"media.json"),out),
     artifact(resolve(out,"scene_metrics.json"),out),
     artifact(resolve(out,"voice_metrics.json"),out),
+    artifact(resolve(out,"attention_metrics.json"),out),
     artifact(resolve(out,"frames.json"),out),
     artifact(wav,out),
   ];
   if(existsSync(resolve(out,"transcript.json"))) artifacts.push(artifact(resolve(out,"transcript.json"),out));
-  const manifest=buildManifest({input,media,scene,voice,frames,transcript,artifacts});
+  const manifest=buildManifest({input,media,scene,voice,attention,frames,transcript,artifacts});
   writeJson(resolve(out,"manifest.json"),manifest);
-  process.stdout.write(JSON.stringify({ok:true,output_dir:out,manifest:resolve(out,"manifest.json"),cut_count:scene.cut_count,frames:frames.length,transcript_status:transcript.status||"ok"},null,2)+"\n");
+  process.stdout.write(JSON.stringify({ok:true,output_dir:out,manifest:resolve(out,"manifest.json"),cut_count:scene.cut_count,attention_events:attention.event_count,frames:frames.length,transcript_status:transcript.status||"ok"},null,2)+"\n");
 }
 if(import.meta.url===`file://${process.argv[1]}`) main().catch(e=>{console.error(String(e?.stack||e));process.exitCode=1;});

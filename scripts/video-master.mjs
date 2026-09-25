@@ -58,8 +58,12 @@ export function buildTechnicalSelections(provisional){
   if(!Object.keys(out).length) fail("no technical selections available");
   return out;
 }
+function skipStage(state,name,reason){
+  state.stages[name]={status:"SKIPPED",reason,finished_at:new Date().toISOString()};
+  writeJson(state.path,state);
+}
 function stage(state,name,fn){
-  if(state.stages[name]?.status==="PASS") return false;
+  if(["PASS","SKIPPED"].includes(state.stages[name]?.status)) return false;
   state.stages[name]={status:"RUNNING",started_at:new Date().toISOString()};
   writeJson(state.path,state);
   try{
@@ -115,7 +119,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","voice","audio_master","subtitles","style","images","technical_selection","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","voice","audio_master","voice_qc","subtitles","style","images","technical_selection","promotion","render","master_qc","forensic_quality","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -148,6 +152,24 @@ async function main(){
     run(process.execPath,[resolve("scripts/video-audio-master.mjs"),rawVoice,mastered]);
     run(process.execPath,[resolve("scripts/video-attach-mastered-audio.mjs"),voiceReady,mastered,masteredContract]);
   });
+
+  const voiceQc=resolve(voiceDir,"voice-qc.json");
+  if(String(process.env.HIBOU_FORENSIC_PYTHON||"").trim()){
+    stage(state,"voice_qc",()=>{
+      run(process.execPath,[resolve("scripts/video-voice-qc-run.mjs"),masteredContract,mastered,voiceDir],{
+        env:{HIBOU_FORENSIC_PYTHON:process.env.HIBOU_FORENSIC_PYTHON}
+      });
+      const qc=json(voiceQc);
+      state.voice_qc_status=qc.status;
+      state.voice_qc_overall_wer=qc.overall_wer;
+      writeJson(statePath,state);
+      if(qc.status!=="PASS") fail("voice QC requires REVIEW before image generation");
+    });
+  }else if(!state.stages.voice_qc){
+    skipStage(state,"voice_qc","HIBOU_FORENSIC_PYTHON not configured; human voice review remains required");
+    state.voice_qc_status="NOT_RUN";
+    writeJson(statePath,state);
+  }
 
   const ass=resolve(root,"subtitles.ass");
   const captioned=resolve(root,"contract-captioned.json");
@@ -200,10 +222,28 @@ async function main(){
     writeJson(statePath,state);
   });
 
+  const forensicDir=resolve(root,"forensic");
+  const forensicManifest=resolve(forensicDir,"manifest.json");
+  const qualityProximity=resolve(root,"quality-proximity.json");
+  if(styleArg){
+    stage(state,"forensic_quality",()=>{
+      run(process.execPath,[resolve("scripts/forensic-package-local.mjs"),master,forensicDir],{
+        env:{HIBOU_FORENSIC_PYTHON:String(process.env.HIBOU_FORENSIC_PYTHON||"")}
+      });
+      run(process.execPath,[resolve("scripts/video-quality-proximity.mjs"),resolve(styleArg),forensicManifest,qualityProximity]);
+      const report=json(qualityProximity);
+      state.quality_proximity_score=report.overall_score;
+      state.quality_proximity_coverage=report.coverage?.ratio ?? null;
+      writeJson(statePath,state);
+    });
+  }else if(!state.stages.forensic_quality){
+    skipStage(state,"forensic_quality","no --style profile supplied");
+  }
+
   const registrySpec=resolve(root,"registry-spec.json");
   const registry=resolve(root,"artifact-registry.json");
   stage(state,"registry",()=>{
-    writeJson(registrySpec,{entries:[
+    const entries=[
       {kind:"storyboard",path:storyboard},
       {kind:"audio",path:mastered},
       {kind:"subtitles",path:ass},
@@ -211,7 +251,11 @@ async function main(){
       {kind:"master",path:master},
       {kind:"qc",path:masterQc},
       {kind:"pipeline_state",path:statePath}
-    ]});
+    ];
+    if(existsSync(voiceQc)) entries.push({kind:"voice_qc",path:voiceQc});
+    if(existsSync(forensicManifest)) entries.push({kind:"forensic_manifest",path:forensicManifest});
+    if(existsSync(qualityProximity)) entries.push({kind:"quality_proximity",path:qualityProximity});
+    writeJson(registrySpec,{entries});
     run(process.execPath,[resolve("scripts/video-artifact-registry.mjs"),registrySpec,registry]);
   });
 
@@ -235,6 +279,10 @@ async function main(){
     master_qc:masterQc,
     artifact_registry:registry,
     qc_status:json(masterQc).status,
+    voice_qc_status:state.voice_qc_status||"NOT_RUN",
+    voice_qc_overall_wer:state.voice_qc_overall_wer??null,
+    quality_proximity_score:state.quality_proximity_score??null,
+    quality_proximity_coverage:state.quality_proximity_coverage??null,
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,
     publication_authorized:false

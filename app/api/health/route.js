@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES } from "../../../lib/airtable";
+import { bearerSecretAuthorized } from "../../../lib/admin-auth.mjs";
 
 export const dynamic = "force-dynamic";
 

@@ -4,7 +4,7 @@
 
 Le worker local transforme le PC Windows de Marc en exécuteur média local-first pour les tâches lourdes : collecte de vidéos publiques autorisées, forensic FFmpeg/Whisper, puis à terme génération et rendu vidéo. Il n'expose aucun port public et ne dépend d'aucun token Airtable pour lire la file de travail.
 
-Le **modèle exact**, la VRAM réellement disponible, le pilote/CUDA, la RAM et l'espace disque doivent toujours être relevés par le diagnostic runtime avant de choisir un profil de génération lourd. L'inventaire nominal de la machine sert au dimensionnement, pas de preuve de disponibilité au moment du run.
+Le modèle exact, la VRAM réellement disponible, le pilote/CUDA, la RAM et l'espace disque doivent être relevés par le diagnostic runtime avant de choisir un profil de génération lourd. L'inventaire nominal de la machine sert au dimensionnement, pas de preuve de disponibilité au moment du run.
 
 ## Architecture canonique
 

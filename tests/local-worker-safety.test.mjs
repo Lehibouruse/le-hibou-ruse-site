@@ -13,11 +13,13 @@ test("local worker refuses browser-cookie extraction from Airtable commands",()=
   assert.match(worker,/cookies_from_browser refusé en V1/);
   assert.doesNotMatch(worker,/args\.push\("--cookies-from-browser"/);
 });
-test("installer does not start or download by default",()=>{
+test("legacy installer redirects to the safe tokenless bootstrap and never asks for Airtable credentials",()=>{
   assert.match(installer,/\[switch\]\$StartWorker/);
-  assert.match(installer,/--diagnostic/);
+  assert.match(installer,/bootstrap-hibou-local-worker\.ps1/);
   assert.match(installer,/if \(\$StartWorker\)/);
-  assert.doesNotMatch(installer,/\$Worker --once/);
+  assert.doesNotMatch(installer,/AIRTABLE_TOKEN/);
+  assert.doesNotMatch(installer,/Read-Host.*Token/i);
+  assert.doesNotMatch(installer,/hibou-local-worker\.mjs/);
 });
 test("diagnostic explicitly performs no network or download proof",()=>{
   assert.match(worker,/network_tested: false/);
@@ -65,4 +67,11 @@ test("bootstrap writes local corpus approvals only behind an explicit switch",()
   assert.match(bootstrap,/if \(\$ApproveCorpus150\)/);
   assert.match(bootstrap,/approved-jobs\.json/);
   assert.match(bootstrap,/HIBOU_LOCAL_EXECUTION_ENABLED", "false"/);
+});
+
+test("legacy Airtable worker is disabled by policy unless an explicit legacy opt-in exists",()=>{
+  assert.match(worker,/HIBOU_ENABLE_LEGACY_AIRTABLE_WORKER/);
+  assert.match(worker,/if \(!LEGACY_EXECUTION_ENABLED\)/);
+  assert.match(worker,/legacy_airtable_worker_disabled/);
+  assert.match(worker,/canonical_worker: "scripts\/hibou-github-worker\.mjs"/);
 });

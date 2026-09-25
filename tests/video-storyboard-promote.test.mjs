@@ -48,3 +48,35 @@ test("promotion refuses missing scene selection",()=>{
   writeFileSync(resolve(root,"picks","selections.json"),"{}");
   assert.throws(()=>promoteStoryboard(resolve(root,"source","contract.json"),resolve(root,"picks","selections.json"),resolve(root,"out.json")),/missing selected image/);
 });
+
+test("promotion accepts FULL_REUSE layered scene without generated scene image",()=>{
+  const root=mkdtempSync(resolve(tmpdir(),"hibou-promote-reuse-"));
+  const source=resolve(root,"source"); const picks=resolve(root,"picks"); const out=resolve(root,"out");
+  mkdirSync(source,{recursive:true}); mkdirSync(picks,{recursive:true}); mkdirSync(out,{recursive:true});
+  const audio=Buffer.from("audio-reuse"); writeFileSync(resolve(source,"voice.wav"),audio);
+  const bg=Buffer.from("bg"); const owl=Buffer.from("owl");
+  writeFileSync(resolve(source,"bg.png"),bg); writeFileSync(resolve(source,"owl.png"),owl);
+  const h=hash(audio);
+  writeFileSync(resolve(source,"contract.json"),JSON.stringify({
+    contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",
+    content:{content_id:"x",script_version:1,profile_version:"p",method_version:"m"},
+    engine:{renderer:"ffmpeg",renderer_version:"1",fps:30,width:1080,height:1920},
+    scenes:[{
+      scene_id:"s1",order:1,
+      narration_exact:{mode:"audio_reference",source_audio:"voice.wav",start_s:0,end_s:1,sha256:h},
+      visual_idea:"x",screen_text:"x",planned_duration_s:1,
+      image:{candidates:[],selected:null,selection_reason:null},
+      asset_resolution:{status:"FULL_REUSE"},
+      composition:{background:"bg.png",character_pose:{path:"owl.png",anchor:"bottom-center"}},
+      breath_unit:"x",voice:{target_wpm:200,relative_speed_pct:100,pause_after_ms:0,emphasis:"x",intent:"x"}
+    }],
+    audio:{state:"ready",reference:"voice.wav",sha256:h},music:{},subtitles:{},qc:{},validation:{}
+  }));
+  writeFileSync(resolve(picks,"selections.json"),"{}");
+  promoteStoryboard(resolve(source,"contract.json"),resolve(picks,"selections.json"),resolve(out,"render-ready.json"));
+  const promoted=JSON.parse(readFileSync(resolve(out,"render-ready.json"),"utf8"));
+  assert.match(promoted.scenes[0].composition.background,/^assets\/composition\//);
+  assert.match(promoted.scenes[0].composition.character_pose.path,/^assets\/composition\//);
+  assert.match(promoted.scenes[0].image.selection_reason,/reusable asset graph/);
+  assert.equal(promoted.validation.publication_authorized,false);
+});

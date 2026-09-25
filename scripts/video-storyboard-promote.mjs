@@ -31,27 +31,64 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
 
   mkdirSync(resolve(targetRoot,"assets","audio"),{recursive:true});
   mkdirSync(resolve(targetRoot,"assets","images"),{recursive:true});
+  mkdirSync(resolve(targetRoot,"assets","composition"),{recursive:true});
   mkdirSync(resolve(targetRoot,"assets","subtitles"),{recursive:true});
   const audioTarget=resolve(targetRoot,"assets","audio",basename(audioSource));
   if(audioSource!==audioTarget) copyFileSync(audioSource,audioTarget);
   const audioRel=`assets/audio/${basename(audioTarget)}`;
 
+  const copyCompositionAsset=(sceneId,label,value)=>{
+    const raw=typeof value==="string"?value:String(value?.path||value?.reference||value?.selected||"");
+    if(!raw) return value;
+    const source=isAbsolute(raw)?raw:resolve(sourceRoot,raw);
+    if(!existsSync(source)) fail(`composition asset missing for ${sceneId}/${label}: ${source}`);
+    const ext=extname(source)||".png";
+    const filename=`${sceneId}-${safeId(label)}${ext}`;
+    const target=resolve(targetRoot,"assets","composition",filename);
+    if(source!==target) copyFileSync(source,target);
+    const rel=`assets/composition/${filename}`;
+    if(typeof value==="string") return rel;
+    return {...value,path:rel,sha256:sha256(target)};
+  };
+
   for(const scene of contract.scenes){
     const sceneId=safeId(scene.scene_id);
-    const pick=selections[sceneId];
-    if(!pick?.selected) fail(`missing selected image for ${sceneId}`);
-    const source=isAbsolute(pick.selected)?pick.selected:resolve(selectionRoot,pick.selected);
-    if(!existsSync(source)) fail(`selected image missing for ${sceneId}: ${source}`);
-    const ext=extname(source)||".png";
-    const target=resolve(targetRoot,"assets","images",`${sceneId}${ext}`);
-    if(source!==target) copyFileSync(source,target);
-    scene.image={
-      ...(scene.image||{}),
-      candidates:Array.isArray(pick.candidates)?pick.candidates:[],
-      selected:`assets/images/${basename(target)}`,
-      selection_reason:String(pick.selection_reason||"human/local QC selection"),
-      selected_sha256:sha256(target),
-    };
+    const fullReuse=scene?.asset_resolution?.status==="FULL_REUSE";
+    if(fullReuse){
+      if(!scene?.composition?.background) fail(`${sceneId}: FULL_REUSE scene missing composition background`);
+      scene.composition.background=copyCompositionAsset(sceneId,"background",scene.composition.background);
+      if(scene.composition.character_pose){
+        scene.composition.character_pose=copyCompositionAsset(sceneId,"character-pose",scene.composition.character_pose);
+      }
+      if(Array.isArray(scene.composition.object_layers)){
+        scene.composition.object_layers=scene.composition.object_layers.map((layer,index)=>copyCompositionAsset(sceneId,`object-${index+1}`,layer));
+      }
+      if(scene.composition.caption_layer && (scene.composition.caption_layer.path||scene.composition.caption_layer.reference||scene.composition.caption_layer.selected)){
+        scene.composition.caption_layer=copyCompositionAsset(sceneId,"caption-layer",scene.composition.caption_layer);
+      }
+      if(scene.composition.numeric_overlay && (scene.composition.numeric_overlay.path||scene.composition.numeric_overlay.reference||scene.composition.numeric_overlay.selected)){
+        scene.composition.numeric_overlay=copyCompositionAsset(sceneId,"numeric-overlay",scene.composition.numeric_overlay);
+      }
+      scene.image={
+        ...(scene.image||{}),
+        selection_reason:"full scene resolved from reusable asset graph; no scene image generated"
+      };
+    }else{
+      const pick=selections[sceneId];
+      if(!pick?.selected) fail(`missing selected image for ${sceneId}`);
+      const source=isAbsolute(pick.selected)?pick.selected:resolve(selectionRoot,pick.selected);
+      if(!existsSync(source)) fail(`selected image missing for ${sceneId}: ${source}`);
+      const ext=extname(source)||".png";
+      const target=resolve(targetRoot,"assets","images",`${sceneId}${ext}`);
+      if(source!==target) copyFileSync(source,target);
+      scene.image={
+        ...(scene.image||{}),
+        candidates:Array.isArray(pick.candidates)?pick.candidates:[],
+        selected:`assets/images/${basename(target)}`,
+        selection_reason:String(pick.selection_reason||"human/local QC selection"),
+        selected_sha256:sha256(target),
+      };
+    }
     if(scene.narration_exact?.mode!=="audio_reference") fail(`${sceneId}: audio_reference required before promotion`);
     if(scene.narration_exact.sha256!==contract.audio.sha256) fail(`${sceneId}: narration/audio hash mismatch`);
     scene.narration_exact.source_audio=audioRel;

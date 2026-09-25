@@ -79,6 +79,7 @@ async function main(){
   const bindingArg=arg("binding","");
   const outputArg=arg("output","");
   const styleArg=arg("style","");
+  const assetGraphArg=arg("asset-graph","");
   const maxScenes=Number(arg("max-scenes","20"));
   const regenAttempts=Number(arg("regen-attempts","1"));
   const reportAirtable=flag("report-airtable");
@@ -88,6 +89,7 @@ async function main(){
   if(Boolean(contentId)===Boolean(storyboardArg)) fail("provide exactly one of --content=<Airtable record> or --storyboard=<json>");
   if(!existsSync(resolve(bindingArg))) fail("binding file missing");
   if(styleArg&&!existsSync(resolve(styleArg))) fail("style profile missing");
+  if(assetGraphArg&&!existsSync(resolve(assetGraphArg))) fail("asset graph missing");
 
   const policy=masterPolicy({maxScenes,regenAttempts});
   const root=resolve(outputArg);
@@ -98,6 +100,7 @@ async function main(){
     source:contentId?{type:"airtable",content_id:contentId}:{type:"file",path:resolve(storyboardArg),sha256:sha256(resolve(storyboardArg))},
     binding:{path:resolve(bindingArg),sha256:sha256(resolve(bindingArg))},
     style:styleArg?{path:resolve(styleArg),sha256:sha256(resolve(styleArg))}:null,
+    asset_graph:assetGraphArg?{path:resolve(assetGraphArg),sha256:sha256(resolve(assetGraphArg))}:null,
     policy
   };
   ensureSameRun(statePath,inputs);
@@ -115,7 +118,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","voice","audio_master","subtitles","style","images","technical_selection","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","voice","audio_master","subtitles","style","asset_resolution","images","technical_selection","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -162,11 +165,28 @@ async function main(){
     else writeJson(styled,json(captioned));
   });
 
+  const assetResolved=resolve(root,"contract-assets-resolved.json");
+  stage(state,"asset_resolution",()=>{
+    if(assetGraphArg){
+      run(process.execPath,[resolve("scripts/video-asset-resolve.mjs"),styled,resolve(assetGraphArg),assetResolved]);
+    }else{
+      writeJson(assetResolved,json(styled));
+    }
+    const resolved=json(assetResolved);
+    state.asset_resolution={
+      enabled:Boolean(assetGraphArg),
+      full_reuse_scenes:resolved.asset_resolution?.full_reuse_scenes?.length||0,
+      generation_required_scenes:resolved.asset_resolution?.generation_required_scenes?.length||0,
+      generation_slots:resolved.asset_resolution?.generation_slots?.length||0
+    };
+    writeJson(statePath,state);
+  });
+
   const imageDir=resolve(root,"images");
   stage(state,"images",()=>{
     run(process.execPath,[
       resolve("scripts/video-image-factory.mjs"),
-      storyboard,resolve(bindingArg),imageDir,
+      assetResolved,resolve(bindingArg),imageDir,
       "--max-scenes="+policy.max_scenes,
       "--regen-attempts="+policy.regeneration_attempts
     ]);
@@ -177,12 +197,16 @@ async function main(){
   const selections=resolve(imageDir,"selections.json");
   stage(state,"technical_selection",()=>{
     const provisional=json(resolve(imageDir,"selections.provisional.json"));
-    writeJson(selections,buildTechnicalSelections(provisional));
+    if(Object.keys(provisional||{}).length===0){
+      writeJson(selections,{});
+    }else{
+      writeJson(selections,buildTechnicalSelections(provisional));
+    }
   });
 
   const renderReady=resolve(root,"render-ready.json");
   stage(state,"promotion",()=>{
-    run(process.execPath,[resolve("scripts/video-storyboard-promote.mjs"),styled,selections,renderReady]);
+    run(process.execPath,[resolve("scripts/video-storyboard-promote.mjs"),assetResolved,selections,renderReady]);
   });
 
   const master=resolve(root,"master.mp4");
@@ -207,6 +231,7 @@ async function main(){
       {kind:"storyboard",path:storyboard},
       {kind:"audio",path:mastered},
       {kind:"subtitles",path:ass},
+      {kind:"asset_resolved_contract",path:assetResolved},
       {kind:"contract",path:renderReady},
       {kind:"master",path:master},
       {kind:"qc",path:masterQc},
@@ -234,6 +259,7 @@ async function main(){
     master,
     master_qc:masterQc,
     artifact_registry:registry,
+    asset_resolution:state.asset_resolution||{enabled:false,full_reuse_scenes:0,generation_required_scenes:0,generation_slots:0},
     qc_status:json(masterQc).status,
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,

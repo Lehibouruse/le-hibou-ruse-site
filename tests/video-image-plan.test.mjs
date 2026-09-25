@@ -32,3 +32,13 @@ test("image plan preserves prompt/seed while preparing a lower-resolution local 
  assert.equal(item.request.overrides["25"].noise_seed,item.fallback_request.overrides["25"].noise_seed);
  assert.equal(item.request.overrides["6"].text,item.fallback_request.overrides["6"].text);
 });
+
+test("image plan skips FULL_REUSE scenes and generates only unresolved scenes",()=>{
+ const mixed=structuredClone(contract);
+ mixed.scenes[0].asset_resolution={status:"FULL_REUSE"};
+ const p=buildImagePlan(mixed,binding);
+ assert.equal(p.request_count,3);
+ assert.equal(p.generation_scene_count,1);
+ assert.deepEqual(p.skipped_full_reuse,["S01"]);
+ assert.equal(new Set(p.requests.map(x=>x.scene_id)).has("S01"),false);
+});

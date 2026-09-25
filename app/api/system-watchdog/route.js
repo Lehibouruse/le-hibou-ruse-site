@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { configMap, createRecord, queryAllRecords, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { bearerSecretAuthorized } from "../../../lib/admin-auth.mjs";
 import { healthConfigDescriptions, systemHealthConfigValues } from "../../../lib/infrastructure-observability.mjs";
 import { commercialReadiness } from "../../../lib/launch-readiness.mjs";
 import { clearOpenAiCircuit, isCreditExhausted, openOpenAiCircuit, readOpenAiCircuit } from "../../../lib/openai-circuit.mjs";
@@ -37,7 +38,7 @@ async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
-  if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return;
+  if (bearerSecretAuthorized(request, process.env.CRON_SECRET)) return;
   try {
     await verifyGithubActionsToken(token, { allowedWorkflowFiles: [OIDC_WORKFLOW] });
   } catch {

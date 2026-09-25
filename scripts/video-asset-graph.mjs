@@ -74,6 +74,7 @@ export function buildAssetGraph(entries,{nearDuplicateDistance=4}={}){
       prior.tags=uniq([...prior.tags,...asset.tags]);
       prior.aliases=uniq([...prior.aliases,asset.path,...asset.aliases]);
       prior.transparent=prior.transparent||asset.transparent;
+      prior.reusable=prior.reusable||asset.reusable;
       prior.compatible_scene_types=uniq([...(prior.compatible_scene_types||[]),...(asset.compatible_scene_types||[])]);
       prior.palette=uniq([...(prior.palette||[]),...(asset.palette||[])]);
       if(prior.quality_status!=="validated"&&asset.quality_status==="validated") prior.quality_status="validated";

@@ -20,7 +20,12 @@ export function buildImagePlan(contract,binding){
   const prefix=String(binding.style_prefix||"").trim();
   const suffix=String(binding.style_suffix||"").trim();
   const requests=[];
+  const skipped_full_reuse=[];
   for(const scene of contract.scenes||[]){
+    if(scene?.asset_resolution?.status==="FULL_REUSE"){
+      skipped_full_reuse.push(scene.scene_id);
+      continue;
+    }
     const core=String(scene.image_prompt||scene.visual_idea||"").trim();
     if(!core) fail(`${scene.scene_id}: image prompt/visual idea missing`);
     const prompt=[prefix,core,suffix].filter(Boolean).join(" ");
@@ -67,7 +72,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,candidates_per_scene:3,request_count:requests.length,requests,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,paid_fallback:false};
 }
 if(import.meta.url===`file://${process.argv[1]}`){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

@@ -8,7 +8,7 @@ function text(v){ return String(v??"").trim(); }
 function normTag(v){ return text(v).normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9_-]+/g,"-").replace(/^-+|-+$/g,""); }
 function uniq(values){ return [...new Set(values.filter(Boolean))].sort(); }
 function stableId(entry){
-  const basis=[entry.kind,entry.sha256||"",entry.path||"",...(entry.tags||[])].join("|");
+  const basis=[entry.kind,entry.sha256||"",entry.path||"",entry.version||"1",...(entry.tags||[])].join("|");
   return "asset-"+createHash("sha256").update(basis).digest("hex").slice(0,16);
 }
 function phashDistance(a,b){
@@ -26,8 +26,23 @@ export function normalizeAsset(entry){
   if(!path) fail("asset path required");
   if(sha256 && !/^[a-f0-9]{64}$/.test(sha256)) fail("asset sha256 must be 64 hex chars");
   const tags=uniq((entry.tags||[]).map(normTag));
+  const qualityStatus=normTag(entry.quality_status||"legacy_unspecified");
+  const compatibleSceneTypes=uniq((entry.compatible_scene_types||[]).map(normTag));
+  const palette=uniq((entry.palette||[]).map(text));
+  const provenance={
+    type:normTag(entry.provenance?.type||entry.source_type||"local"),
+    source:text(entry.provenance?.source||entry.source||"local"),
+    license:text(entry.provenance?.license||entry.license||"unspecified"),
+    license_reference:text(entry.provenance?.license_reference||entry.license_reference||"")
+  };
+  const generation={
+    prompt:text(entry.generation?.prompt||entry.prompt||""),
+    seed:Number.isFinite(Number(entry.generation?.seed??entry.seed))?Number(entry.generation?.seed??entry.seed):null,
+    model:text(entry.generation?.model||entry.model||""),
+    workflow_version:text(entry.generation?.workflow_version||entry.workflow_version||"")
+  };
   return {
-    asset_id:text(entry.asset_id)||stableId({kind,path,sha256,tags}),
+    asset_id:text(entry.asset_id)||stableId({kind,path,sha256,tags,version:text(entry.version)||"1"}),
     kind,
     path,
     sha256:sha256||null,
@@ -36,9 +51,16 @@ export function normalizeAsset(entry){
     width:Number.isFinite(Number(entry.width))?Number(entry.width):null,
     height:Number.isFinite(Number(entry.height))?Number(entry.height):null,
     transparent:entry.transparent===true,
-    source:text(entry.source)||"local",
+    anchor:normTag(entry.anchor||"center"),
+    palette,
+    version:text(entry.version)||"1",
+    provenance,
+    generation,
+    compatible_scene_types:compatibleSceneTypes,
+    quality_status:qualityStatus,
+    source:provenance.source,
     aliases:uniq((entry.aliases||[]).map(text)),
-    reusable:entry.reusable!==false,
+    reusable:entry.reusable!==false && qualityStatus!=="rejected",
   };
 }
 
@@ -52,6 +74,10 @@ export function buildAssetGraph(entries,{nearDuplicateDistance=4}={}){
       prior.tags=uniq([...prior.tags,...asset.tags]);
       prior.aliases=uniq([...prior.aliases,asset.path,...asset.aliases]);
       prior.transparent=prior.transparent||asset.transparent;
+      prior.compatible_scene_types=uniq([...(prior.compatible_scene_types||[]),...(asset.compatible_scene_types||[])]);
+      prior.palette=uniq([...(prior.palette||[]),...(asset.palette||[])]);
+      if(prior.quality_status!=="validated"&&asset.quality_status==="validated") prior.quality_status="validated";
+      if(prior.provenance?.license==="unspecified"&&asset.provenance?.license!=="unspecified") prior.provenance=asset.provenance;
       continue;
     }
     assets.push(asset);
@@ -77,6 +103,9 @@ export function buildAssetGraph(entries,{nearDuplicateDistance=4}={}){
       phash_near_duplicates_auto_merged:false,
       phash_review_distance_max:nearDuplicateDistance,
       generation_only_when_no_reusable_match:true,
+      prefer_validated_assets:true,
+      rejected_assets_never_reused:true,
+      preserve_provenance_and_license:true,
     },
   };
 }
@@ -87,12 +116,17 @@ export function resolveAsset(graph,query){
   if(!kind) fail("query kind required");
   const required=uniq((query.required_tags||[]).map(normTag));
   const optional=uniq((query.optional_tags||[]).map(normTag));
+  const sceneType=normTag(query?.scene_type||"");
   const candidates=(graph.assets||[])
     .filter(a=>a.reusable!==false && a.kind===kind)
     .filter(a=>required.every(tag=>(a.tags||[]).includes(tag)))
+    .filter(a=>!sceneType || !(a.compatible_scene_types||[]).length || a.compatible_scene_types.includes(sceneType))
     .map(a=>{
       const optional_hits=optional.filter(tag=>(a.tags||[]).includes(tag));
-      const score=required.length*100+optional_hits.length*10+(a.transparent?2:0);
+      const qualityBonus=a.quality_status==="validated"?20:a.quality_status==="candidate"?5:0;
+      const sceneBonus=sceneType&&(a.compatible_scene_types||[]).includes(sceneType)?8:0;
+      const licenseBonus=a.provenance?.license&&a.provenance.license!=="unspecified"?3:0;
+      const score=required.length*100+optional_hits.length*10+qualityBonus+sceneBonus+licenseBonus+(a.transparent?2:0);
       return {asset:a,score,optional_hits};
     })
     .sort((a,b)=>b.score-a.score || a.asset.asset_id.localeCompare(b.asset.asset_id));
@@ -105,12 +139,13 @@ export function planSceneAssetReuse(scene,graph){
   for(const req of requirements){
     const slot=text(req.slot);
     if(!slot) fail("asset requirement slot required");
-    const match=resolveAsset(graph,req);
+    const match=resolveAsset(graph,{...req,scene_type:req.scene_type||scene?.scene_type||""});
     slots.push({
       slot,
       kind:normTag(req.kind),
       required_tags:uniq((req.required_tags||[]).map(normTag)),
       optional_tags:uniq((req.optional_tags||[]).map(normTag)),
+      scene_type:normTag(req.scene_type||scene?.scene_type||""),
       action:match?"reuse":"generate",
       asset_id:match?.asset.asset_id||null,
       path:match?.asset.path||null,

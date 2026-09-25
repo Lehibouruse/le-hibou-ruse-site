@@ -8,10 +8,10 @@ Ce document est un garde-fou d'ingénierie, pas un avis juridique. La source mac
 
 - **FLUX.1 Schnell / checkpoint Comfy-Org FP8** — Apache-2.0. Le fichier approuvé est `flux1-schnell-fp8.safetensors`, SHA-256 `ead426278b49030e9da5df862994f25ce94ab2ee4df38b556ddddb3db093bf72`. Le dépôt Comfy-Org identifie le modèle de base Black Forest Labs et conserve Apache-2.0.
 - **Chatterbox TTS 0.1.7** — MIT pour le code et le modèle public vérifié. Cette licence ne donne aucun droit sur la voix d'une personne : une référence vocale doit être Hibou-owned ou autorisée.
-- **faster-whisper / Whisper** — MIT. Les métriques forensic/QC restent locales.
-- **OpenCV 4.5+** — Apache-2.0.
+- **faster-whisper 1.2.1 / Whisper** — MIT. Les métriques forensic/QC restent locales.
+- **opencv-python-headless 4.14.0.94** — Apache-2.0.
 - **libass** — ISC.
-- **ComfyUI** — GPL-3.0. La politique Hibou l'utilise comme processus local séparé via loopback/API. Ne pas intégrer ou redistribuer un build modifié/bundlé dans un produit propriétaire sans traiter les obligations GPL.
+- **ComfyUI 0.37.0** — GPL-3.0. La politique Hibou l'utilise comme processus local séparé via loopback/API. Ne pas intégrer ou redistribuer un build modifié/bundlé dans un produit propriétaire sans traiter les obligations GPL.
 - **FFmpeg** — licence dépendante du build. Par défaut l'amont est LGPL-2.1+, mais `--enable-gpl` fait basculer le build sous GPL et `--enable-nonfree` interdit certaines redistributions. `npm run video:license:audit:runtime` classe le build réellement installé.
 - **yt-dlp** — outil local de collecte : cœur sous Unlicense, mais certains exécutables packagés embarquent du GPLv3+. Ne pas le redistribuer avec le produit Hibou sans audit du binaire exact.
 
@@ -37,3 +37,14 @@ Le premier contrôle est déterministe et CI-friendly. Le second interroge le FF
 ## Revalidation
 
 Revalider avant une première publication commerciale et lors de tout changement de modèle, version majeure, provenance de checkpoint, custom node ou méthode de distribution.
+
+
+## Versions locales figées
+
+- ComfyUI portable : **0.37.0**. L'installateur utilise le tag `v0.37.0` et vérifie `comfyui_version.__version__` après extraction.
+- faster-whisper : **1.2.1**.
+- opencv-python-headless : **4.14.0.94**.
+- Chatterbox : **0.1.7** ; Torch/Torchaudio : **2.6.0** dans l'installateur voix.
+- Les dépendances forensic de premier niveau sont installées depuis `config/video-forensic-python-pins.txt` dans un venv dédié ; elles ne sont pas injectées dans l'environnement Chatterbox.
+
+Une mise à jour de l'une de ces versions doit être traitée comme un changement de stack : licence, compatibilité, CI et smoke local à revalider.

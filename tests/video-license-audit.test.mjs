@@ -41,3 +41,21 @@ test("voice and unknown custom-node rights are fail-closed in policy",()=>{
   assert.equal(policy.gates.custom_comfyui_node_license_unknown,"block");
   assert.equal(policy.gates.license_revalidation_before_public_release,true);
 });
+
+test("toolchain policy pins ComfyUI and top-level forensic dependencies",()=>{
+  const comfy=policy.components.find(x=>x.id==="comfyui");
+  const faster=policy.components.find(x=>x.id==="faster-whisper");
+  const opencv=policy.components.find(x=>x.id==="opencv-python-headless-4.14.0.94");
+  assert.equal(comfy.version,"0.37.0");
+  assert.equal(comfy.source_ref,"v0.37.0");
+  assert.equal(faster.version,"1.2.1");
+  assert.equal(opencv.version,"4.14.0.94");
+  assert.equal(policy.gates.unpinned_top_level_forensic_dependency,"block");
+});
+
+test("Windows installer no longer follows an unversioned ComfyUI latest release",()=>{
+  assert.match(installer,/\$ComfyVersion = "0\.37\.0"/);
+  assert.match(installer,/releases\/download\/v\$ComfyVersion/);
+  assert.doesNotMatch(installer,/releases\/latest\/download/);
+  assert.match(installer,/Version ComfyUI inattendue/);
+});

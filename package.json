@@ -45,7 +45,9 @@
     "video:image:factory": "node scripts/video-image-factory.mjs",
     "video:master": "node scripts/video-master.mjs",
     "video:voice-qc": "node scripts/video-voice-qc.mjs",
-    "video:voice-qc:run": "node scripts/video-voice-qc-run.mjs"
+    "video:voice-qc:run": "node scripts/video-voice-qc-run.mjs",
+    "video:license:audit": "node scripts/video-license-audit.mjs",
+    "video:license:audit:runtime": "node scripts/video-license-audit.mjs --runtime"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

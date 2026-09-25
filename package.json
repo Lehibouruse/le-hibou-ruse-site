@@ -40,7 +40,8 @@
     "video:doctor:windows": "node scripts/video-doctor.mjs",
     "video:style:compile": "node scripts/video-style-profile.mjs",
     "video:style:apply": "node scripts/video-style-apply.mjs",
-    "video:image:factory": "node scripts/video-image-factory.mjs"
+    "video:image:factory": "node scripts/video-image-factory.mjs",
+    "video:master": "node scripts/video-master.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

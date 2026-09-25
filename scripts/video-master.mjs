@@ -63,7 +63,7 @@ function skipStage(state,name,reason){
   writeJson(state.path,state);
 }
 function stage(state,name,fn){
-  if(["PASS","SKIPPED"].includes(state.stages[name]?.status)) return false;
+  if(state.stages[name]?.status==="PASS") return false;
   state.stages[name]={status:"RUNNING",started_at:new Date().toISOString()};
   writeJson(state.path,state);
   try{
@@ -102,6 +102,7 @@ async function main(){
     source:contentId?{type:"airtable",content_id:contentId}:{type:"file",path:resolve(storyboardArg),sha256:sha256(resolve(storyboardArg))},
     binding:{path:resolve(bindingArg),sha256:sha256(resolve(bindingArg))},
     style:styleArg?{path:resolve(styleArg),sha256:sha256(resolve(styleArg))}:null,
+    local_voice_qc_enabled:Boolean(String(process.env.HIBOU_FORENSIC_PYTHON||"").trim()),
     policy
   };
   ensureSameRun(statePath,inputs);

@@ -1,0 +1,30 @@
+{
+  "schema": "HIBOU_HARDWARE_PROFILE_V1",
+  "status": "DETECT_AT_RUNTIME",
+  "source_of_truth": "runtime_diagnostic",
+  "known": {
+    "platform": "Windows",
+    "cpu_family": "Intel Core i9",
+    "gpu_vendor": "NVIDIA",
+    "gpu_family": "GeForce RTX"
+  },
+  "unknown_until_diagnostic": [
+    "computer_model",
+    "cpu_model",
+    "gpu_model",
+    "vram_gb",
+    "ram_gb",
+    "storage_free_gb",
+    "driver_version",
+    "cuda_driver_version"
+  ],
+  "required_commands": [
+    "npm run video:gpu-check:windows",
+    "node scripts/video-local-preflight.mjs"
+  ],
+  "policy": {
+    "no_heavy_model_download_before_diagnostic": true,
+    "no_paid_cloud_fallback": true,
+    "prefer_local_loopback": true
+  }
+}

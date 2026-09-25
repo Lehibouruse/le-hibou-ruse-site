@@ -41,10 +41,14 @@ function forensicStats(root){
       const rel=path.slice(resolve(root).length+1).replaceAll("\\","/");
       const bucket=rel.split("/")[0]||"_root";
       const name=canonicalBucket(bucket);
-      const row=by[name]||(by[name]={forensic:0,transcribed:0});
+      const row=by[name]||(by[name]={forensic:0,transcribed:0,advanced:0,wpm:0});
       row.forensic+=1;
       const transcript=m.transcript||{};
       if(transcript.status==="ok") row.transcribed+=1;
+      const hasAttention=m.attention?.proxy_only===true && Number.isFinite(Number(m.attention?.event_interval_s));
+      const hasComposition=Number.isFinite(Number(m.scene?.composition_change_interval_s));
+      if(hasAttention&&hasComposition) row.advanced+=1;
+      if(Number.isFinite(Number(m.voice?.words_per_minute))) row.wpm+=1;
     }catch{}
   }
   return by;
@@ -74,7 +78,7 @@ export function buildCorpusProposal(inventory,forensic,queue){
   }
   const names=new Set([...Object.keys(by),...Object.keys(forensic),...Object.keys(queue)]);
   return [...names].sort().map(name=>{
-    const media=by[name]||{downloaded:0,bytes:0}, f=forensic[name]||{forensic:0,transcribed:0};
+    const media=by[name]||{downloaded:0,bytes:0}, f=forensic[name]||{forensic:0,transcribed:0,advanced:0,wpm:0};
     return {
       competitor:name,
       fields:{
@@ -82,6 +86,8 @@ export function buildCorpusProposal(inventory,forensic,queue){
         "Taille Go":Math.round(media.bytes/1024/1024/1024*100)/100,
         "Forensic prêts":f.forensic,
         "Transcrites":f.transcribed,
+        "Forensic avancés":f.advanced||0,
+        "WPM mesurés":f.wpm||0,
         "URLs en file":queue[name]||0,
         "Dernière MAJ":new Date().toISOString(),
       }

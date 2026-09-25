@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
+import { bearerSecretAuthorized } from "../../../lib/admin-auth.mjs";
 import { dispatchSocialPost, socialGatewayStatus } from "../../../lib/social-gateway-complete.mjs";
 import { dispatchSocialWebhookFallback, safeDirectFallbackError } from "../../../lib/social-fallback.mjs";
 import { resolveSocialEnv, socialGatewayStatusWithVault } from "../../../lib/social-credentials-runtime.mjs";
@@ -24,7 +25,7 @@ async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
-  if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return { kind: "cron" };
+  if (bearerSecretAuthorized(request, process.env.CRON_SECRET)) return { kind: "cron" };
   await verifyGithubActionsToken(token);
   return { kind: "github_oidc" };
 }

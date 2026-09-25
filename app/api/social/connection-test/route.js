@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES } from "../../../../lib/airtable.js";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
+import { bearerSecretAuthorized } from "../../../../lib/admin-auth.mjs";
 import { testVaultProviderConnections } from "../../../../lib/social-connection-health.mjs";
 import { socialCredentialStatuses } from "../../../../lib/social-credential-vault.mjs";
 import { syncSocialRoutingPlanToAirtable } from "../../../../lib/social-routing-airtable.mjs";
@@ -16,7 +17,7 @@ async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
   if (!auth.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice("Bearer ".length);
-  if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return "cron";
+  if (bearerSecretAuthorized(request, process.env.CRON_SECRET)) return "cron";
   await verifyGithubActionsToken(token);
   return "github_oidc";
 }

@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LEMON_MY_ORDERS_URL = "https://app.lemonsqueezy.com/my-orders";
 
 function response(body, status = 200) {
   return NextResponse.json(body, {
@@ -15,6 +16,13 @@ function response(body, status = 200) {
       "Referrer-Policy": "no-referrer",
     },
   });
+}
+
+function saleDeliveryProvider(fields = {}) {
+  const notes = String(fields?.Notes || "");
+  if (notes.includes("delivery_provider=lemon_native")) return "lemon_native";
+  if (notes.includes("delivery_provider=digify")) return "digify";
+  return String(fields?.["Digify File GUID"] || "").trim() ? "digify" : "";
 }
 
 function safeAccessUrl(value) {
@@ -65,6 +73,15 @@ export async function GET(request) {
   const edition = String(sale.fields?.["Version livre livrée"] || "").trim();
 
   if (deliveryStatus === "delivered") {
+    const deliveryProvider = saleDeliveryProvider(sale.fields);
+    if (deliveryProvider === "lemon_native") {
+      return response({
+        ok: true,
+        status: "delivered_native",
+        edition,
+        access_url: LEMON_MY_ORDERS_URL,
+      });
+    }
     const accessUrl = safeAccessUrl(sale.fields?.["Digify access URL"]);
     return response({
       ok: true,

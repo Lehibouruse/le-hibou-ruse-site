@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES } from "../../../../lib/airtable";
 import { canonicalSale, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
+import { createReaderToken } from "../../../../lib/secure-reader.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,24 @@ export async function GET(request) {
 
   const deliveryStatus = String(sale.fields?.["Livraison statut"] || "pending").trim().toLowerCase();
   const edition = String(sale.fields?.["Version livre livrée"] || "").trim();
+
+  if (deliveryStatus === "reader_ready") {
+    try {
+      const token = createReaderToken({
+        saleId: sale.id,
+        orderIdentifier,
+        edition,
+      }, process.env);
+      return response({
+        ok: true,
+        status: "reader_ready",
+        edition,
+        reader_url: `/lire?token=${encodeURIComponent(token)}`,
+      });
+    } catch {
+      return response({ ok: true, status: "manual_review" });
+    }
+  }
 
   if (deliveryStatus === "delivered") {
     const accessUrl = safeAccessUrl(sale.fields?.["Digify access URL"]);

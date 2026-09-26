@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { queryRecords, TABLES } from "../../../../lib/airtable";
 import { canonicalSale, escapeFormula, saleIsRefunded } from "../../../../lib/commerce.mjs";
-import { createReaderToken } from "../../../../lib/secure-reader.mjs";
+import { signReaderToken } from "../../../../lib/secure-reader.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,7 +75,7 @@ export async function GET(request) {
 
   if (deliveryStatus === "reader_ready") {
     try {
-      const token = createReaderToken({
+      const token = signReaderToken({
         saleId: sale.id,
         orderIdentifier,
         edition,

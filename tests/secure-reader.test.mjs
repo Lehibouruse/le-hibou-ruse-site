@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createReaderToken, resolveReaderSecret, verifyReaderToken } from "../lib/secure-reader.mjs";
+import { signReaderToken, resolveReaderSecret, verifyReaderToken } from "../lib/secure-reader.mjs";
 
 test("un jeton lecteur signé se vérifie et conserve uniquement l'identité minimale", () => {
   const env = { CRON_SECRET: "root-secret" };
-  const token = createReaderToken({
+  const token = signReaderToken({
     saleId: "rec123",
     orderIdentifier: "11111111-1111-4111-8111-111111111111",
     edition: "V1.0-2026-09",
@@ -20,7 +20,7 @@ test("un jeton lecteur signé se vérifie et conserve uniquement l'identité min
 
 test("la modification d'un jeton lecteur invalide sa signature", () => {
   const env = { CRON_SECRET: "root-secret" };
-  const token = createReaderToken({
+  const token = signReaderToken({
     saleId: "rec123",
     orderIdentifier: "11111111-1111-4111-8111-111111111111",
   }, env);
@@ -39,6 +39,6 @@ test("un secret lecteur dédié prend le pas sur le secret racine", () => {
 });
 
 test("aucun jeton ne peut être créé sans secret serveur", () => {
-  assert.throws(() => createReaderToken({ saleId: "rec123", orderIdentifier: "o" }, {}), /Secret lecteur absent/);
+  assert.throws(() => signReaderToken({ saleId: "rec123", orderIdentifier: "o" }, {}), /Secret lecteur absent/);
   assert.equal(verifyReaderToken("bad.token", {}), null);
 });

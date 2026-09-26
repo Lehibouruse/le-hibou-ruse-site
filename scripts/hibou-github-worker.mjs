@@ -254,30 +254,78 @@ function profileVideoUrl(entry, profileUrl) {
   return /^https?:\/\//i.test(raw) ? raw : "";
 }
 
+function profileDiscoveryUrls(profileUrl) {
+  const raw = String(profileUrl || "").trim();
+  const urls = [raw];
+
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+
+    if (host.includes("youtube.com")) {
+      const basePath = u.pathname.replace(/\/(shorts|videos)\/?$/i, "").replace(/\/$/, "");
+      const originBase = `${u.origin}${basePath}`;
+      urls.push(`${originBase}/shorts`, `${originBase}/videos`, originBase);
+    } else if (host.includes("instagram.com")) {
+      const basePath = u.pathname.replace(/\/reels?\/?$/i, "").replace(/\/$/, "");
+      const originBase = `${u.origin}${basePath}/`;
+      urls.push(originBase);
+    }
+  } catch {}
+
+  return [...new Set(urls.filter(Boolean))];
+}
+
 async function discoverProfileShorts(profileUrl, options = {}) {
   const discoveryLimit = Math.max(10, Math.min(100, Number(options.discovery_limit || 50)));
   const selectTop = Math.max(1, Math.min(25, Number(options.select_top || 15)));
-  const args = [
-    "--flat-playlist",
-    "--dump-json",
-    "--playlist-end", String(discoveryLimit),
-    "--ignore-errors",
-    "--no-warnings",
-    "--sleep-requests", "1",
-  ];
-  if (/tiktok\.com/i.test(profileUrl)) {
-    args.push("--extractor-args", "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
-  }
-  args.push(profileUrl);
+  const attemptedProfiles = [];
+  let rows = [];
+  let lastError = null;
 
-  const result = await run(YTDLP, args, ROOT);
-  const rows = String(result.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const candidateUrl of profileDiscoveryUrls(profileUrl)) {
+    const args = [
+      "--flat-playlist",
+      "--dump-json",
+      "--playlist-end", String(discoveryLimit),
+      "--ignore-errors",
+      "--no-warnings",
+      "--sleep-requests", "1",
+    ];
+    if (/tiktok\.com/i.test(candidateUrl)) {
+      args.push("--extractor-args", "tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+    }
+    args.push(candidateUrl);
+
+    try {
+      const result = await run(YTDLP, args, ROOT);
+      const candidateRows = String(result.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      attemptedProfiles.push({ url: candidateUrl, ok: true, rows: candidateRows.length });
+      if (candidateRows.length) {
+        rows = candidateRows;
+        break;
+      }
+    } catch (error) {
+      lastError = error;
+      attemptedProfiles.push({
+        url: candidateUrl,
+        ok: false,
+        error: String(error?.message || error).slice(0, 1000),
+      });
+    }
+  }
+
+  if (!rows.length && lastError) throw lastError;
+
   const candidates = [];
   const seen = new Set();
 
   for (let i = 0; i < rows.length; i += 1) {
     let entry;
     try { entry = JSON.parse(rows[i]); } catch { continue; }
+    const duration = Number(entry?.duration || 0);
+    if (duration > 180) continue;
+
     let url = "";
     try { url = profileVideoUrl(entry, profileUrl); } catch { url = ""; }
     if (!url || seen.has(url)) continue;
@@ -289,7 +337,7 @@ async function discoverProfileShorts(profileUrl, options = {}) {
       title: String(entry?.title || entry?.description || "").slice(0, 300),
       views: Number(entry?.view_count || entry?.play_count || 0),
       likes: Number(entry?.like_count || 0),
-      duration: Number(entry?.duration || 0),
+      duration,
       order: i,
     });
   }
@@ -300,7 +348,9 @@ async function discoverProfileShorts(profileUrl, options = {}) {
     return a.order - b.order;
   });
   const selected = ranked.slice(0, selectTop);
-  if (!selected.length) throw new Error(`Aucun format court decouvert depuis ${profileUrl}`);
+  if (!selected.length) {
+    throw new Error(`Aucun format court decouvert depuis ${profileUrl}; essais=${JSON.stringify(attemptedProfiles)}`);
+  }
 
   return {
     profile_url: profileUrl,
@@ -309,8 +359,7 @@ async function discoverProfileShorts(profileUrl, options = {}) {
     discovered_count: candidates.length,
     ranking_basis: candidates.some((x) => Number(x.views || 0) > 0) ? "views_then_order" : "profile_order",
     selected,
-    stdout_tail: result.stdout.slice(-3000),
-    stderr_tail: result.stderr.slice(-3000),
+    attempted_profiles: attemptedProfiles,
   };
 }
 
@@ -339,6 +388,7 @@ async function processJob(job, processed) {
       try {
         const runResult = await downloadOne(item.url, dir, job.options || {});
         runs.push({ ...runResult, selected_metadata: item, ok: true });
+        log("Profile item downloaded", { job: job.id, url: item.url, completed: runs.filter((x) => x.ok).length, selected: discovery.selected.length });
       } catch (error) {
         const message = String(error?.message || error).slice(0, 3000);
         runs.push({ url: item.url, selected_metadata: item, ok: false, error: message });

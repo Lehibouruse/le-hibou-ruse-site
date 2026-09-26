@@ -107,3 +107,26 @@ Le code conserve les providers historiques `digify` et `lemon_native` pour réve
 - `lemon_native` fournit un fichier téléchargeable et ne satisfait donc pas l'exigence actuelle de consultation-only.
 
 Le provider cible reste `hibou_reader`.
+
+
+## Fallback Digify — configuration conservée
+
+Si le provider `digify` est réactivé plus tard, conserver les variables serveur historiques :
+
+- `DIGIFY_KEY_ID`
+- `DIGIFY_SECRET`
+- `DIGIFY_WEBHOOK_USERNAME`
+- `DIGIFY_WEBHOOK_PASSWORD`
+
+Le webhook d'activité reste `/api/commerce/digify-webhook` avec Basic Auth dédiée. Les credentials API ne doivent jamais être réutilisés comme identifiants du webhook.
+
+
+## Ouverture publique ultérieure
+
+Seulement après validation de tous les garde-fous du provider actif :
+
+1. conserver `commerce_launch_authorized=false` pendant la préparation ;
+2. pour `hibou_reader`, prouver que le variant Lemon LIVE ne contient plus aucun PDF téléchargeable ;
+3. vérifier le parcours paiement → webhook → `reader_ready` → `/merci` → `/lire` ;
+4. effectuer le test live contrôlé uniquement avec autorisation humaine explicite ;
+5. ne passer `commerce_launch_authorized=true` pour l'ouverture publique qu'après réussite du test complet.

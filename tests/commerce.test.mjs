@@ -150,6 +150,15 @@ test("le kill switch commerce bloque le webhook et est revérifié avant tout ef
   assert.match(delivery, /commerce_launch_not_authorized/);
 });
 
+test("un statut Digify commercialement indisponible bloque avant tout effet externe", () => {
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  const statusGuardAt = delivery.indexOf("digifyCommerciallyAvailable()");
+  const effectAt = delivery.indexOf("addDigifyRecipient({ fileGuid, email, orderId })");
+  assert.ok(statusGuardAt >= 0);
+  assert.ok(effectAt > statusGuardAt);
+  assert.match(delivery, /digify_not_commercially_available/);
+});
+
 test("une configuration Digify incomplète n'entame aucune tentative de livraison", () => {
   const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
   const configuredAt = delivery.indexOf("if (!configured)");

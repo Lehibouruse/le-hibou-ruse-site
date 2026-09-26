@@ -25,7 +25,7 @@ export default function PurchaseAccess({ orderIdentifier = "" }) {
         if (cancelled) return;
         const next = data?.status || "processing";
         setState({ ...data, status: next });
-        if (["delivered", "delivered_by_email", "revoked", "manual_review"].includes(next)) return;
+        if (["delivered", "delivered_native", "delivered_by_email", "revoked", "manual_review"].includes(next)) return;
       } catch {
         if (!cancelled) setState({ status: "processing" });
       }
@@ -52,8 +52,17 @@ export default function PurchaseAccess({ orderIdentifier = "" }) {
     );
   }
 
+  if (state.status === "delivered_native" && state.access_url) {
+    return (
+      <div>
+        <p>Votre guide est disponible dans votre reçu Lemon Squeezy et dans « My Orders »{state.edition ? ` — ${state.edition}` : ""}.</p>
+        <a className="button" href={state.access_url} rel="noreferrer">Accéder à mon guide</a>
+      </div>
+    );
+  }
+
   if (state.status === "delivered_by_email") {
-    return <p>Votre accès est activé. Digify vous l’a envoyé à l’adresse utilisée lors de l’achat.</p>;
+    return <p>Votre accès est activé et vous a été envoyé à l’adresse utilisée lors de l’achat.</p>;
   }
 
   if (state.status === "revoked") {

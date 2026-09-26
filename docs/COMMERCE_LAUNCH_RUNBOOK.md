@@ -4,9 +4,13 @@
 
 Un achat live à 29 € doit suivre cette chaîne :
 
-Lemon Squeezy checkout → webhook signé `order_created` → vente Airtable → livraison Digify nominative → `/merci?order=[order_identifier]` → bouton **Lire mon guide** → révocation Digify si `order_refunded`.
+Lemon Squeezy checkout → webhook signé `order_created` → vente Airtable → provider de livraison sélectionné → `/merci?order=[order_identifier]`.
 
-Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé peut créer une vente éligible.
+Deux providers sont supportés :
+- `digify` : accès nominatif protégé, révocable et suivi par le worker Digify ;
+- `lemon_native` : fichier attaché au variant LIVE, accès via le reçu Lemon / **My Orders**, sans abonnement Digify. Ce mode reste fail-closed tant que `lemon_native_delivery_verified=true` n'a pas été explicitement établi.
+
+Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé peut créer une vente éligible côté Hibou.
 
 ## Lemon Squeezy — à faire après validation KYC/store
 
@@ -24,7 +28,9 @@ Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé pe
 7. Stocker le signing secret uniquement dans `LEMON_SQUEEZY_WEBHOOK_SECRET` côté Vercel.
 8. Vérifier que le webhook est live, pas test mode.
 
-## Livre / Digify
+## Livre / livraison
+
+### Option A — Digify
 
 1. Tous les chapitres : validation humaine = true, QC non fail, prêt export = true.
 2. Remplacer `book_current_edition` par une édition finale sans `draft`.
@@ -43,6 +49,16 @@ Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé pe
 7. Configurer le webhook d'activité Digify vers `https://d4d5d6.com/api/commerce/digify-webhook` avec la Basic Auth dédiée ci-dessus. Ne jamais réutiliser les credentials API Digify pour ce webhook.
 8. Activer la notification Digify au destinataire comme secours à la page post-achat.
 9. Vérifier qu'un événement `View` est rattaché au bon email et qu'un éventuel `Print`/`Download` remonte comme **Policy Alert**, puisque ces actions doivent rester désactivées.
+
+
+### Option B — Lemon natif
+
+1. Le PDF exact de l'édition vendue doit être attaché au **variant LIVE** Lemon et avoir le statut `published`, `test_mode=false`.
+2. Confirmer par API que le Store/Product/Variant correspondent aux IDs configurés et que `native_file_delivery_ready=true`.
+3. Effectuer au moins une validation contrôlée de l'accès client via le reçu et `https://app.lemonsqueezy.com/my-orders` avant de passer `lemon_native_delivery_verified=true`.
+4. Basculer `delivery_provider_mode=lemon_native` uniquement après cette validation humaine ; ne pas modifier automatiquement ce champ à l'expiration de Digify.
+5. Limite assumée : ce mode fournit un **PDF téléchargeable** ; il n'offre pas les contrôles Digify de viewer, watermark dynamique, blocage impression/téléchargement ni révocation API nominative.
+6. Après remboursement, le site Hibou marque l'accès comme révoqué mais ne prétend pas révoquer lui-même un fichier déjà disponible dans l'écosystème Lemon.
 
 ## Domaine et juridique
 

@@ -49,6 +49,7 @@ async function currentCommerceState() {
     launchAuthorized: truthy(values.commerce_launch_authorized),
     consentMode,
     consentRequired: consentMode === "live",
+    deliveryProvider: String(values.commerce_delivery_provider || "digify").trim().toLowerCase(),
   };
 }
 
@@ -226,6 +227,9 @@ export async function POST(request) {
   const edition = commerce.edition;
   const launchAuthorized = commerce.launchAuthorized;
   const fileGuid = String(product?.fields?.["Digify File GUID"] || "").trim();
+  const deliveryProvider = commerce.deliveryProvider;
+  const hibouReader = deliveryProvider === "hibou_reader";
+  const digifyDelivery = deliveryProvider === "digify";
   const attribution = attributionFields(order);
   const refundedBeforeCreate = Boolean(refundMarker);
   const consentValid = validDigitalSupplyCustomData(order.customData);
@@ -234,19 +238,20 @@ export async function POST(request) {
     launchAuthorized
     && consentSatisfied
     && product
-    && fileGuid
+    && (hibouReader || (digifyDelivery && fileGuid))
     && order.status === "paid"
     && !order.refunded
     && !order.testMode
     && !refundedBeforeCreate
     && finalEdition(edition)
   );
-  const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? "pending" : "manual_review";
+  const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? (hibouReader ? "reader_ready" : "pending") : "manual_review";
   const reasons = [];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
   if (commerce.consentRequired && !consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
-  if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
+  if (!["hibou_reader", "digify"].includes(deliveryProvider)) reasons.push(`provider de livraison non pris en charge: ${deliveryProvider || "absent"}`);
+  if (product && digifyDelivery && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);
   if (order.refunded) reasons.push("commande déjà remboursée");
   if (order.testMode) reasons.push("commande Lemon en mode test: livraison bloquée");
@@ -270,7 +275,7 @@ export async function POST(request) {
     Referrer: attribution.Referrer,
     Remboursement: refundedBeforeCreate ? (refundMarker?.createdTime || new Date().toISOString()) : "",
     "Email client": order.email,
-    Notes: orderAuditNotes(order, [attribution.attribution?.utm_term ? `utm_term=${attribution.attribution.utm_term}` : "", ...reasons]),
+    Notes: orderAuditNotes(order, [attribution.attribution?.utm_term ? `utm_term=${attribution.attribution.utm_term}` : "", `delivery_provider=${deliveryProvider || "absent"}`, ...reasons]),
     "Livraison statut": deliveryStatus,
     "Digify recipient email": order.email,
     "Digify File GUID": fileGuid,
@@ -279,6 +284,6 @@ export async function POST(request) {
     "Livraison erreur": reasons.join("; "),
   });
   const saleId = actionId(created);
-  await journal(order, ready ? "Completed" : refundedBeforeCreate ? "Completed" : "Manual Review", ready ? `Commande enregistrée; livraison Digify en attente · édition ${edition}` : reasons.join("; "), saleId);
+  await journal(order, ready ? "Completed" : refundedBeforeCreate ? "Completed" : "Manual Review", ready ? (hibouReader ? `Commande enregistrée; lecteur Hibou prêt · édition ${edition}` : `Commande enregistrée; livraison Digify en attente · édition ${edition}`) : reasons.join("; "), saleId);
   return NextResponse.json({ ok: true, sale_id: saleId, delivery_status: deliveryStatus, refunded: refundedBeforeCreate, attributed: Boolean(attribution.attribution?.utm_source || attribution.attribution?.utm_campaign || attribution.attribution?.utm_content) });
 }

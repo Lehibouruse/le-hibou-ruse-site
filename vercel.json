@@ -17,7 +17,6 @@
       "schedule": "53 5 * * *"
     }
   ],
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- app components public package.json package-lock.json proxy.js vercel.json",
   "headers": [
     {
       "source": "/(.*)",

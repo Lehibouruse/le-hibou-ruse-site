@@ -90,3 +90,10 @@ Aucune ouverture publique si l'un des points suivants n'est pas prouvé :
 - contrôles juridiques requis selon le mode de lancement.
 
 Le système doit échouer fermé plutôt que livrer le PDF brut.
+
+
+## Coût et dépendance externe
+
+Le lecteur Hibou évite de rendre un abonnement DRM tiers obligatoire au démarrage. Digify reste un fallback optionnel si une protection tierce plus poussée est décidée plus tard. Aucun abonnement ne doit être souscrit automatiquement.
+
+La protection navigateur V1 vise l'absence de téléchargement du PDF et la prévention de la copie ordinaire. Elle n'est pas une DRM inviolable. Pour une diffusion large, privilégier la V2 rasterisée sur stockage privé afin de ne pas transmettre de couche texte exploitable au navigateur.

@@ -172,7 +172,7 @@ test("le provider Lemon natif vérifié peut remplacer Digify sans rendre ses co
   const result = commercialReadiness(input);
   assert.equal(result.ready, true);
   assert.ok(result.checks.some((item) => item.key === "lemon_native_delivery" && item.ok));
-  assert.ok(result.warnings.some((item) => item.key === "digify_status"));
+  assert.ok(result.checks.some((item) => item.key === "digify_status" && item.ok && item.blocking === false));
 });
 
 test("le provider Lemon natif reste bloqué tant que sa livraison n'est pas vérifiée", () => {

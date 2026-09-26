@@ -1,1 +1,1 @@
-2026-09-26 audit Lemon native file delivery after Digify trial ended
+2026-09-26T09:40Z verify disabled Lemon file on live variant

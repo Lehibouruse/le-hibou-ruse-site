@@ -36,6 +36,14 @@ test("le lien lecteur n'est rendu qu'après livraison et reste borné à Digify 
   assert.match(route, /saleIsRefunded/);
 });
 
+test("la livraison native Lemon renvoie uniquement vers My Orders", () => {
+  assert.match(route, /LEMON_MY_ORDERS_URL = "https:\/\/app\.lemonsqueezy\.com\/my-orders"/);
+  assert.match(route, /status: "delivered_native"/);
+  assert.match(route, /saleDeliveryProvider/);
+  assert.match(client, /delivered_native/);
+  assert.match(client, /Accéder à mon guide/);
+});
+
 test("la page merci est non indexable et se met à jour automatiquement", () => {
   assert.match(page, /robots: \{ index: false, follow: false \}/);
   assert.match(page, /PurchaseAccess/);

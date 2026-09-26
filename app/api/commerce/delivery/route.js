@@ -53,6 +53,16 @@ async function commerceLaunchAuthorized() {
   return truthy(records[0]?.fields?.Valeur);
 }
 
+async function digifyCommerciallyAvailable() {
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: "AND({Actif}=1,{Clé}='digify_api_status')",
+    pageSize: 1,
+    priorityAware: false,
+  });
+  const status = String(records[0]?.fields?.Valeur || "").trim().toUpperCase();
+  return ["ACTIVE", "READY", "LIVE", "LIVE_DELIVERABLE", "DELIVERABLE"].includes(status);
+}
+
 function finalEdition(value) {
   const edition = String(value || "").trim();
   return Boolean(edition && !edition.toLowerCase().includes("draft"));
@@ -115,6 +125,9 @@ export async function POST(request) {
   const configured = Boolean(process.env.DIGIFY_KEY_ID && process.env.DIGIFY_SECRET);
   if (!(await commerceLaunchAuthorized())) {
     return NextResponse.json({ ok: true, processed: 0, reason: "commerce_launch_not_authorized", configured });
+  }
+  if (!(await digifyCommerciallyAvailable())) {
+    return NextResponse.json({ ok: true, processed: 0, reason: "digify_not_commercially_available", configured });
   }
   if (!configured) {
     return NextResponse.json({ ok: true, processed: 0, reason: "delivery_not_configured", configured: false });

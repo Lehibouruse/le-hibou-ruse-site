@@ -83,3 +83,29 @@ test("le watchdog normalise un refus OIDC en Unauthorized pour répondre 401", (
   assert.match(source, /catch \{\s*throw new Error\("Unauthorized"\);\s*\}/);
   assert.match(source, /status: message === "Unauthorized" \? 401 : 500/);
 });
+
+
+test("un workflow d'audit peut autoriser explicitement son propre branch push sans ouvrir les autres routes", () => {
+  const branchRef = "refs/heads/lemon-readiness-audit-20260926";
+  const payload = claims("lemon-readiness.yml", {
+    ref: branchRef,
+    sub: `repo:${REPOSITORY}:ref:${branchRef}`,
+    workflow_ref: `${REPOSITORY}/.github/workflows/lemon-readiness.yml@${branchRef}`,
+    event_name: "push",
+  });
+  assert.equal(
+    validateGithubActionsClaims(payload, NOW, {
+      allowedWorkflowFiles: ["lemon-readiness.yml"],
+      allowedEvents: ["push", "workflow_dispatch"],
+      allowBranchPush: true,
+    }).ref,
+    branchRef,
+  );
+  assert.throws(
+    () => validateGithubActionsClaims(payload, NOW, {
+      allowedWorkflowFiles: ["lemon-readiness.yml"],
+      allowedEvents: ["push", "workflow_dispatch"],
+    }),
+    /ref/,
+  );
+});

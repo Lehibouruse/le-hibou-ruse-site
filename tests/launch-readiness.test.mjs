@@ -29,6 +29,8 @@ function readyInput() {
       public_site_url: "https://d4d5d6.com",
       public_site_host_expected: "d4d5d6.com",
       domain_verified: "true",
+      delivery_provider_mode: "digify",
+      lemon_native_delivery_verified: "false",
       digify_api_status: "LIVE_DELIVERABLE",
       withdrawal_durable_receipt_tested: "true",
     },
@@ -158,6 +160,29 @@ test("un essai Digify terminé bloque toute ouverture commerciale", () => {
   assert.equal(result.ready, false);
   assert.equal(result.checkoutUrl, "");
   assert.ok(result.blockers.some((item) => item.key === "digify_status"));
+});
+
+test("le provider Lemon natif vérifié peut remplacer Digify sans rendre ses contrôles bloquants", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "lemon_native";
+  input.config.lemon_native_delivery_verified = "true";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  delete input.env.DIGIFY_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.ok(result.checks.some((item) => item.key === "lemon_native_delivery" && item.ok));
+  assert.ok(result.warnings.some((item) => item.key === "digify_status"));
+});
+
+test("le provider Lemon natif reste bloqué tant que sa livraison n'est pas vérifiée", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "lemon_native";
+  input.config.lemon_native_delivery_verified = "false";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "lemon_native_delivery"));
 });
 
 test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de secret", () => {

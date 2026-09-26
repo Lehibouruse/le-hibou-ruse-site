@@ -58,7 +58,7 @@ test("la page merci est non indexable et se met à jour automatiquement", () => 
 
 
 test("le parcours post-achat peut créer un lien signé vers le lecteur Hibou", () => {
-  assert.match(route, /createReaderToken/);
+  assert.match(route, /signReaderToken/);
   assert.match(route, /deliveryStatus === "reader_ready"/);
   assert.match(route, /reader_url/);
   assert.match(route, /\/lire\?token=/);

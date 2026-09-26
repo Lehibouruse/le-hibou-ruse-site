@@ -38,7 +38,7 @@ async function matchingProduct(order) {
 
 async function currentCommerceState() {
   const records = await queryRecords(TABLES.configuration, {
-    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized',{Clé}='digital_supply_consent_checkout_mode'))",
+    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized',{Clé}='digital_supply_consent_checkout_mode',{Clé}='commerce_delivery_provider'))",
     pageSize: 10,
     priorityAware: false,
   });

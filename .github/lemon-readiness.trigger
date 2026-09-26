@@ -1,1 +1,1 @@
-2026-09-26 audit Lemon native file delivery after Digify trial ended
+2026-09-26T11:00+02:00 read-only audit after secure reader deployment

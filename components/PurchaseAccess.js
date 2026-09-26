@@ -25,7 +25,7 @@ export default function PurchaseAccess({ orderIdentifier = "" }) {
         if (cancelled) return;
         const next = data?.status || "processing";
         setState({ ...data, status: next });
-        if (["delivered", "delivered_by_email", "revoked", "manual_review"].includes(next)) return;
+        if (["reader_ready", "delivered", "delivered_by_email", "revoked", "manual_review"].includes(next)) return;
       } catch {
         if (!cancelled) setState({ status: "processing" });
       }
@@ -41,6 +41,16 @@ export default function PurchaseAccess({ orderIdentifier = "" }) {
 
   if (state.status === "missing") {
     return <p>Votre accès sécurisé est envoyé séparément à l’adresse utilisée lors de l’achat.</p>;
+  }
+
+  if (state.status === "reader_ready" && state.reader_url) {
+    return (
+      <div>
+        <p>Votre accès personnel au guide est activé{state.edition ? ` — ${state.edition}` : ""}.</p>
+        <a className="button" href={state.reader_url} rel="noreferrer">Lire mon guide</a>
+        <p className="form-privacy">Lecture en ligne uniquement : téléchargement, impression et copie sont désactivés.</p>
+      </div>
+    );
   }
 
   if (state.status === "delivered" && state.access_url) {

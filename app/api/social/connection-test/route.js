@@ -61,6 +61,7 @@ export async function POST(request) {
       authenticated_via: authenticatedVia,
       tested_vault_providers: unique,
       requested_provider: requested || null,
+      deployment_probe: "bluesky-read-test-v1",
       results,
       routing,
       checked_at: new Date().toISOString(),

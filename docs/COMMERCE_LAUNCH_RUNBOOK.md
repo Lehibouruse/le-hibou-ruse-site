@@ -1,104 +1,109 @@
-# Le Hibou Rusé — lancement paiement → lecture
+# Le Hibou Rusé — lancement paiement → lecture sécurisée
 
 ## État cible
 
 Un achat live à 29 € doit suivre cette chaîne :
 
-Lemon Squeezy checkout → webhook signé `order_created` → vente Airtable → provider de livraison sélectionné → `/merci?order=[order_identifier]`.
+Lemon Squeezy checkout → webhook signé `order_created` → vente Airtable → statut `reader_ready` → `/merci?order=[order_identifier]` → lien signé vers `/lire?token=...` → lecteur Hibou protégé.
 
-Deux providers sont supportés :
-- `digify` : accès nominatif protégé, révocable et suivi par le worker Digify ;
-- `lemon_native` : fichier attaché au variant LIVE, accès via le reçu Lemon / **My Orders**, sans abonnement Digify. Ce mode reste fail-closed tant que `lemon_native_delivery_verified=true` n'a pas été explicitement établi.
+Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé peut créer une vente éligible.
 
-Le redirect Lemon n'est jamais une preuve de paiement. Seul le webhook signé peut créer une vente éligible côté Hibou.
+Le PDF maître ne doit jamais être joint au variant Lemon public, exposé par une URL publique ou renvoyé directement au navigateur. Lemon est le prestataire de paiement, pas le canal de livraison du fichier.
 
-## Lemon Squeezy — à faire après validation KYC/store
+## Provider de livraison
 
-1. Créer/activer le produit live **Ebook Le Hibou Rusé** à 29 €.
-2. Renseigner dans Airtable `Produits site` :
-   - `Lemon Squeezy Product ID`
-   - `Lemon Squeezy Variant ID`
-   - `Lemon Squeezy Checkout URL`
-3. Renseigner `Configuration.checkout_url` avec l'URL live uniquement au moment de l'ouverture publique, pas pendant le test live contrôlé.
-4. Configurer le redirect de confirmation et le bouton du reçu vers :
-   `https://d4d5d6.com/merci?order=[order_identifier]`
-5. Créer le webhook live vers :
-   `https://d4d5d6.com/api/commerce/lemon-webhook`
-6. Événements minimum : `order_created`, `order_refunded`.
-7. Stocker le signing secret uniquement dans `LEMON_SQUEEZY_WEBHOOK_SECRET` côté Vercel.
-8. Vérifier que le webhook est live, pas test mode.
+Configuration cible :
 
-## Livre / livraison
+- `delivery_provider_mode=hibou_reader`
+- `commerce_launch_authorized=false` jusqu'au test live contrôlé réussi
+- `lemon_downloadable_file_removed_verified=false` tant qu'un fichier téléchargeable est encore attaché au variant LIVE
 
-### Option A — Digify
+Digify reste un fallback historique désactivé. Ne souscrire à aucun abonnement Digify sans décision explicite.
 
-1. Tous les chapitres : validation humaine = true, QC non fail, prêt export = true.
-2. Remplacer `book_current_edition` par une édition finale sans `draft`.
-3. Exporter le PDF final puis l'importer dans Digify.
-4. Appliquer la politique : accès nominatif, téléchargement/impression désactivés par défaut, watermark email + date/heure, révocation possible.
-5. Renseigner `Digify File GUID` dans le produit Airtable.
-6. Configurer côté serveur :
-   - `DIGIFY_KEY_ID`
-   - `DIGIFY_SECRET`
-   - `DIGIFY_ADD_RECIPIENT_URL`
-   - `DIGIFY_ADD_RECIPIENT_BODY_TEMPLATE`
-   - `DIGIFY_REVOKE_RECIPIENT_URL`
-   - `DIGIFY_REVOKE_RECIPIENT_BODY_TEMPLATE`
-   - `DIGIFY_WEBHOOK_USERNAME`
-   - `DIGIFY_WEBHOOK_PASSWORD`
-7. Configurer le webhook d'activité Digify vers `https://d4d5d6.com/api/commerce/digify-webhook` avec la Basic Auth dédiée ci-dessus. Ne jamais réutiliser les credentials API Digify pour ce webhook.
-8. Activer la notification Digify au destinataire comme secours à la page post-achat.
-9. Vérifier qu'un événement `View` est rattaché au bon email et qu'un éventuel `Print`/`Download` remonte comme **Policy Alert**, puisque ces actions doivent rester désactivées.
+## Lecteur Hibou V1
 
+Le lecteur `/lire` :
 
-### Option B — Lemon natif
+1. exige un jeton signé HMAC généré uniquement après une vente reconnue ;
+2. revérifie la vente dans Airtable à chaque ouverture ;
+3. refuse immédiatement une commande remboursée/révoquée ;
+4. exige `Livraison statut=reader_ready` ;
+5. ne renvoie aucun PDF ou URL de téléchargement ;
+6. affiche le livre en ligne avec watermark nominatif ;
+7. désactive les interactions ordinaires de sélection, copier/coller, clic droit, glisser-déposer, impression et raccourcis de sauvegarde ;
+8. utilise `no-store`, `noindex`, CSP et protection contre l'embarquement dans une iframe.
 
-1. Le PDF exact de l'édition vendue doit être attaché au **variant LIVE** Lemon et avoir le statut `published`, `test_mode=false`.
-2. Confirmer par API que le Store/Product/Variant correspondent aux IDs configurés et que `native_file_delivery_ready=true`.
-3. Effectuer au moins une validation contrôlée de l'accès client via le reçu et `https://app.lemonsqueezy.com/my-orders` avant de passer `lemon_native_delivery_verified=true`.
-4. Basculer `delivery_provider_mode=lemon_native` uniquement après cette validation humaine ; ne pas modifier automatiquement ce champ à l'expiration de Digify.
-5. Limite assumée : ce mode fournit un **PDF téléchargeable** ; il n'offre pas les contrôles Digify de viewer, watermark dynamique, blocage impression/téléchargement ni révocation API nominative.
-6. Après remboursement, le site Hibou marque l'accès comme révoqué mais ne prétend pas révoquer lui-même un fichier déjà disponible dans l'écosystème Lemon.
+Cette protection réduit fortement la copie ordinaire mais ne doit jamais être décrite comme impossible à contourner : un navigateur contrôlé par le lecteur peut toujours être instrumenté et un écran peut être photographié.
 
-## Domaine et juridique
+### Renforcement cible avant diffusion large
+
+Pour supprimer également la couche texte du navigateur, la V2 doit rasteriser l'édition finale page par page et conserver les images dans un stockage privé (par exemple Vercel Blob privé). Le lecteur authentifié servira alors les pages comme images temporaires avec watermark, sans exposer le PDF maître ni une couche texte directement sélectionnable.
+
+## Lemon Squeezy
 
 Avant ouverture publique :
-- `d4d5d6.com` doit être le domaine canonique réellement vérifié ;
-- CGV, mentions légales, confidentialité/cookies et avertissement éditorial doivent être `Validé` ;
-- `commerce_readiness_mode=strict` reste actif.
 
-## Tests avant ouverture
+1. le store LIVE, le produit et le variant à 29 € doivent être valides ;
+2. le webhook LIVE doit pointer vers `https://d4d5d6.com/api/commerce/lemon-webhook` avec `order_created` et `order_refunded` ;
+3. la confirmation et le reçu doivent renvoyer vers `https://d4d5d6.com/merci?order=[order_identifier]` ;
+4. **aucun fichier PDF téléchargeable ne doit rester attaché au variant LIVE** ;
+5. un audit API doit confirmer `variant_file_count=0` avant de passer `lemon_downloadable_file_removed_verified=true` ;
+6. le payout/store doit être prêt ;
+7. le checkout ne doit pas être ouvert tant que le kill switch est à `false`.
 
-### 1. Tests sandbox / test mode
+## Livre
 
-1. Laisser `commerce_launch_authorized=false`.
-2. Tester Lemon en `test_mode=true` et Digify séparément avec un destinataire de test.
-3. Une commande Lemon de test ne doit jamais provoquer une livraison ou une révocation Digify réelle.
-4. Le checkout de test ne doit jamais être utilisé comme `checkout_url` public.
-5. Vérifier le webhook d'activité Digify avec la Basic Auth dédiée avant toute phase live ; aucun événement sans email destinataire ne doit être rattaché à une vente.
+Avant le premier achat réel :
 
-### 2. Achat live contrôlé de bout en bout
+1. finaliser l'édition et la sortir de tout état `draft` ;
+2. terminer les validations humaines et QC requises ;
+3. vérifier le rendu dans le lecteur Hibou sur desktop et mobile ;
+4. conserver le PDF maître uniquement comme source privée/archivée ;
+5. ne pas joindre le PDF maître au produit Lemon.
 
-Cette phase n'a lieu qu'après validation de toutes les autres dépendances live.
+## Remboursement / révocation
 
-1. Créer/configurer le checkout et le webhook live dans Lemon, mais **ne pas renseigner `Configuration.checkout_url` et ne pas publier le checkout sur le site**.
-2. Vérifier que le PDF final, le File GUID, les endpoints Digify officiels, le webhook d'activité Digify, le domaine, le juridique et le payout/store sont prêts.
-3. Ouvrir une fenêtre de validation courte en passant explicitement `commerce_launch_authorized=true`.
-4. Accéder manuellement au checkout live privé depuis Lemon et effectuer un seul achat contrôlé à 29 €.
-5. Vérifier : vente Airtable unique, webhook signé, livraison Digify nominative, bouton `Lire mon guide`, email Digify, attribution et absence de doublon.
-6. Refermer immédiatement la fenêtre en remettant `commerce_launch_authorized=false` après confirmation de la livraison.
-7. Effectuer ensuite le remboursement contrôlé et vérifier la révocation Digify ; la révocation doit fonctionner même avec le lancement public refermé.
-8. Si un contrôle échoue, conserver le switch à `false`, ne pas publier le checkout et corriger avant tout nouveau test.
+Un événement signé `order_refunded` met la vente en état remboursé/révoqué. Le lecteur revérifie la vente à chaque requête : un ancien lien signé ne suffit donc pas à conserver l'accès après remboursement.
 
-### 3. Ouverture publique ultérieure
+## Test live contrôlé
 
-Seulement après le test live contrôlé réussi et la revue finale :
+Cette étape nécessite une autorisation humaine explicite car elle crée une transaction réelle.
 
-1. renseigner `Configuration.checkout_url` avec le checkout LIVE validé ;
-2. vérifier à nouveau tous les contrôles stricts ;
-3. passer explicitement `commerce_launch_authorized=true` pour l'ouverture publique ;
-4. vérifier que le bouton public du site pointe bien vers le checkout LIVE attendu.
+1. Laisser `commerce_launch_authorized=false` pendant toute la préparation.
+2. Prouver par audit que le variant Lemon contient zéro fichier téléchargeable.
+3. Vérifier lecteur, webhook, domaine, payout et édition.
+4. Passer temporairement `commerce_launch_authorized=true`.
+5. Effectuer un seul achat contrôlé à 29 €.
+6. Vérifier : vente Airtable unique, statut `reader_ready`, page `/merci`, bouton **Lire mon guide**, ouverture du lecteur, absence de PDF/download, protections de copie/impression.
+7. Tester ensuite le remboursement et vérifier que le même lien lecteur est refusé.
+8. Repasser immédiatement `commerce_launch_authorized=false` si un contrôle échoue.
 
 ## Règle de sécurité
 
-Ne jamais exposer le PDF maître ni utiliser le redirect Lemon comme preuve de paiement. La page `/merci` ne révèle un lien Digify qu'après qu'une vente créée par le webhook signé soit réellement marquée `delivered`.
+Aucune ouverture publique si l'un des points suivants n'est pas prouvé :
+
+- fichier téléchargeable Lemon retiré ;
+- paiement/webhook signé fonctionnel ;
+- édition non draft ;
+- lecteur signé fonctionnel ;
+- remboursement révocatoire fonctionnel ;
+- contrôles juridiques requis selon le mode de lancement.
+
+Le système doit échouer fermé plutôt que livrer le PDF brut.
+
+
+## Coût et dépendance externe
+
+Le lecteur Hibou évite de rendre un abonnement DRM tiers obligatoire au démarrage. Digify reste un fallback optionnel si une protection tierce plus poussée est décidée plus tard. Aucun abonnement ne doit être souscrit automatiquement.
+
+La protection navigateur V1 vise l'absence de téléchargement du PDF et la prévention de la copie ordinaire. Elle n'est pas une DRM inviolable. Pour une diffusion large, privilégier la V2 rasterisée sur stockage privé afin de ne pas transmettre de couche texte exploitable au navigateur.
+
+
+## Fallbacks conservés mais inactifs
+
+Le code conserve les providers historiques `digify` et `lemon_native` pour réversibilité technique. Ils ne correspondent pas au mode cible actuel :
+
+- `digify` nécessite un abonnement actif et revalidé ;
+- `lemon_native` fournit un fichier téléchargeable et ne satisfait donc pas l'exigence actuelle de consultation-only.
+
+Le provider cible reste `hibou_reader`.

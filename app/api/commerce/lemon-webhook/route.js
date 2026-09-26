@@ -274,10 +274,12 @@ export async function POST(request) {
     && !refundedBeforeCreate
     && finalEdition(edition)
   );
+  let readyDeliveryStatus = deliveryProvider === "lemon_native" ? "delivered" : "pending";
+  if (deliveryProvider === "hibou_reader") readyDeliveryStatus = "reader_ready";
   const deliveryStatus = refundedBeforeCreate
     ? "revoked"
     : ready
-      ? (deliveryProvider === "lemon_native" ? "delivered" : deliveryProvider === "hibou_reader" ? "reader_ready" : "pending")
+      ? readyDeliveryStatus
       : "manual_review";
   const reasons = [`delivery_provider=${deliveryProvider || "absent"}`];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");

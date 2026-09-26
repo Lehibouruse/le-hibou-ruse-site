@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { configMap, queryRecords, TABLES } from "../../../../lib/airtable";
+import { configMap, createRecord, queryRecords, TABLES } from "../../../../lib/airtable";
 import { listLemonFiles, listLemonProducts, listLemonStores, listLemonVariants, lemonResourceId, lemonResourceName, summarizeLemonFiles } from "../../../../lib/lemon-api.mjs";
 import { resolveLemonWebhookSecret } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
@@ -11,6 +11,33 @@ export const maxDuration = 30;
 const OIDC_WORKFLOW = "lemon-readiness.yml";
 
 function text(value) { return String(value ?? "").trim(); }
+
+async function journalReadiness(summary) {
+  const payload = {
+    api_key_present: Boolean(summary.api_key_present),
+    api_authenticated: Boolean(summary.api_authenticated),
+    webhook_secret_ready: Boolean(summary.webhook_secret_ready),
+    store_id: text(summary.store_id),
+    product_id: text(summary.product_id),
+    variant_id: text(summary.variant_id),
+    variant_price_cents: summary.variant_price_cents ?? null,
+    variant_file_count: Number(summary.variant_file_count || 0),
+    variant_published_file_count: Number(summary.variant_published_file_count || 0),
+    native_file_delivery_ready: Boolean(summary.native_file_delivery_ready),
+    variant_files: Array.isArray(summary.variant_files) ? summary.variant_files : [],
+    blockers: Array.isArray(summary.blockers) ? summary.blockers : [],
+  };
+  await createRecord(TABLES.journal, {
+    Workflow: "HIBOU_LEMON_READINESS_V2",
+    Déclencheur: "GitHub Actions / read-only audit",
+    Action: "inspect_live_delivery",
+    Statut: payload.api_authenticated ? "Completed" : "Error",
+    "Dernière exécution": new Date().toISOString(),
+    "ID externe": payload.variant_id || payload.product_id || payload.store_id || "",
+    Erreur: payload.api_authenticated ? "" : payload.blockers.join(","),
+    Notes: JSON.stringify(payload),
+  }).catch(() => {});
+}
 
 async function authenticate(request) {
   const auth = request.headers.get("authorization") || "";
@@ -32,7 +59,7 @@ export async function POST(request) {
   const webhookSecretPresent = Boolean(text(process.env.LEMON_SQUEEZY_WEBHOOK_SECRET));
   const webhookSecretReady = Boolean(text(resolveLemonWebhookSecret(process.env)));
   if (!keyPresent) {
-    return NextResponse.json({
+    const result = {
       ok: true,
       mode: "readiness_only",
       api_key_present: false,
@@ -40,7 +67,9 @@ export async function POST(request) {
       webhook_secret_present: webhookSecretPresent,
       webhook_secret_ready: webhookSecretReady,
       blockers: ["missing_LEMON_SQUEEZY_API_KEY"],
-    }, { headers: { "Cache-Control": "no-store" } });
+    };
+    await journalReadiness(result);
+    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   }
 
   const [configuration, products] = await Promise.all([
@@ -97,7 +126,7 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({
+    const result = {
       ok: true,
       mode: "readiness_only",
       api_key_present: true,
@@ -121,9 +150,11 @@ export async function POST(request) {
       variant_files: variantFiles,
       native_file_delivery_ready: variantFiles.some((file) => file.status === "published" && file.test_mode === false),
       blockers: [],
-    }, { headers: { "Cache-Control": "no-store" } });
+    };
+    await journalReadiness(result);
+    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return NextResponse.json({
+    const result = {
       ok: true,
       mode: "readiness_only",
       api_key_present: true,
@@ -132,6 +163,8 @@ export async function POST(request) {
       webhook_secret_ready: webhookSecretReady,
       error: String(error?.message || error).slice(0, 500),
       blockers: ["lemon_api_auth_failed"],
-    }, { headers: { "Cache-Control": "no-store" } });
+    };
+    await journalReadiness(result);
+    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   }
 }

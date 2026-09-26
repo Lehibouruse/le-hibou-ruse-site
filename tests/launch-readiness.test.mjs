@@ -185,6 +185,44 @@ test("le provider Lemon natif reste bloqué tant que sa livraison n'est pas vér
   assert.ok(result.blockers.some((item) => item.key === "lemon_native_delivery"));
 });
 
+test("le lecteur Hibou remplace Digify quand le PDF Lemon a été retiré", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "true";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  delete input.env.DIGIFY_KEY_ID;
+  delete input.env.DIGIFY_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.equal(result.blockers.length, 0);
+  assert.equal(result.deliveryProvider, "hibou_reader");
+});
+
+test("le lecteur Hibou bloque le lancement tant qu'un PDF téléchargeable reste chez Lemon", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "false";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "lemon_downloadable_file_removed"));
+});
+
+test("le lecteur Hibou exige un secret serveur", () => {
+  const input = readyInput();
+  input.config.delivery_provider_mode = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "true";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  delete input.env.CRON_SECRET;
+  delete input.env.HIBOU_READER_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "secure_reader"));
+});
+
 test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de secret", () => {
   const input = readyInput();
   delete input.env.DIGIFY_SECRET;

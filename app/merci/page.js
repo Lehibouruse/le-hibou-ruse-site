@@ -14,8 +14,8 @@ export default async function ThankYouPage({ searchParams }) {
         <p className="eyebrow dark"><span /> Paiement confirmé</p>
         <h1>Merci. Votre guide arrive ici automatiquement.</h1>
         <PurchaseAccess orderIdentifier={orderIdentifier} />
-        <p>Le reçu de paiement est envoyé à l’adresse utilisée lors de l’achat. Selon le mode de livraison actif, l’accès est fourni dans le lecteur sécurisé du Hibou ou directement via Lemon Squeezy.</p>
-        <p>Vous recevez également les informations d’accès par e-mail. Si l’activation prend quelques minutes, laissez cette page ouverte : elle se met à jour automatiquement. Ne rachetez pas le guide.</p>
+        <p>Le reçu de paiement est envoyé à l’adresse utilisée lors de l’achat. Pour le mode protégé du Hibou, le PDF maître n’est jamais exposé : le bouton de lecture apparaît ici après validation du paiement.</p>
+        <p>Conservez votre reçu Lemon Squeezy pour retrouver cette page. Si l’activation prend quelques instants, laissez cette page ouverte : elle se met à jour automatiquement. Ne rachetez pas le guide.</p>
         <a className="button secondary" href="/">Retour au site</a>
       </article>
     </main>

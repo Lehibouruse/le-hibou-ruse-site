@@ -25,6 +25,7 @@ function readyInput() {
       lemon_checkout_status: "LIVE_PUBLIC",
       commerce_launch_authorized: "true",
       commerce_readiness_mode: "strict",
+      commerce_delivery_provider: "digify",
       book_current_edition: "V1.0-2026-09",
       public_site_url: "https://d4d5d6.com",
       public_site_host_expected: "d4d5d6.com",
@@ -158,6 +159,44 @@ test("un essai Digify terminé bloque toute ouverture commerciale", () => {
   assert.equal(result.ready, false);
   assert.equal(result.checkoutUrl, "");
   assert.ok(result.blockers.some((item) => item.key === "digify_status"));
+});
+
+test("le lecteur Hibou peut remplacer Digify si le PDF Lemon a été retiré", () => {
+  const input = readyInput();
+  input.config.commerce_delivery_provider = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "true";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  delete input.env.DIGIFY_KEY_ID;
+  delete input.env.DIGIFY_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.equal(result.blockers.length, 0);
+  assert.equal(result.deliveryProvider, "hibou_reader");
+});
+
+test("le lecteur Hibou bloque le lancement tant qu'un PDF téléchargeable reste chez Lemon", () => {
+  const input = readyInput();
+  input.config.commerce_delivery_provider = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "false";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "lemon_downloadable_file_removed"));
+});
+
+test("le lecteur Hibou exige un secret serveur", () => {
+  const input = readyInput();
+  input.config.commerce_delivery_provider = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "true";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  delete input.env.CRON_SECRET;
+  delete input.env.HIBOU_READER_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "secure_reader"));
 });
 
 test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de secret", () => {

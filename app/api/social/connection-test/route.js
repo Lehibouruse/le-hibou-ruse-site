@@ -60,6 +60,7 @@ export async function POST(request) {
       ok: failed.length === 0,
       authenticated_via: authenticatedVia,
       tested_vault_providers: unique,
+      requested_provider: requested || null,
       results,
       routing,
       checked_at: new Date().toISOString(),

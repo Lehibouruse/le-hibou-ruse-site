@@ -45,6 +45,7 @@ async function authenticate(request) {
   await verifyGithubActionsToken(auth.slice("Bearer ".length), {
     allowedWorkflowFiles: [OIDC_WORKFLOW],
     allowedEvents: ["push", "workflow_dispatch"],
+    allowBranchPush: true,
   });
 }
 

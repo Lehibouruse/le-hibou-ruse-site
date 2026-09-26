@@ -15,7 +15,7 @@ export default async function ThankYouPage({ searchParams }) {
         <h1>Merci. Votre guide arrive ici automatiquement.</h1>
         <PurchaseAccess orderIdentifier={orderIdentifier} />
         <p>Le reçu de paiement est envoyé à l’adresse utilisée lors de l’achat. L’accès au guide est nominatif et créé dans notre lecteur sécurisé ; le PDF maître n’est jamais exposé publiquement.</p>
-        <p>Vous recevez également l’accès par e-mail. Si l’activation prend quelques minutes, laissez cette page ouverte : elle se met à jour automatiquement. Ne rachetez pas le guide.</p>
+        <p>Le bouton « Lire mon guide » apparaît ici automatiquement après validation du paiement. Conservez votre reçu Lemon Squeezy pour retrouver cette page. Si l’activation prend quelques instants, laissez cette page ouverte : elle se met à jour automatiquement. Ne rachetez pas le guide.</p>
         <a className="button secondary" href="/">Retour au site</a>
       </article>
     </main>

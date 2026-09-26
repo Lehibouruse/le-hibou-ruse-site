@@ -150,6 +150,21 @@ test("le kill switch commerce bloque le webhook et est revérifié avant tout ef
   assert.match(delivery, /commerce_launch_not_authorized/);
 });
 
+test("le webhook supporte un fallback Lemon natif strictement activé par configuration", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /delivery_provider_mode/);
+  assert.match(lemon, /lemon_native_delivery_verified/);
+  assert.match(lemon, /lemonNativeProviderReady/);
+  assert.match(lemon, /deliveryProvider === "lemon_native" \? "delivered" : "pending"/);
+  assert.match(lemon, /delivery_provider=\$\{deliveryProvider/);
+});
+
+test("un remboursement Lemon natif révoque l'accès Hibou sans prétendre révoquer le fichier chez Lemon", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /existingProvider === "lemon_native" \? "revoked"/);
+  assert.match(lemon, /Accès natif Lemon non révoqué par notre API/);
+});
+
 test("un statut Digify commercialement indisponible bloque avant tout effet externe", () => {
   const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
   const statusGuardAt = delivery.indexOf("digifyCommerciallyAvailable()");

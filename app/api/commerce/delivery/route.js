@@ -63,6 +63,15 @@ async function digifyCommerciallyAvailable() {
   return ["ACTIVE", "READY", "LIVE", "LIVE_DELIVERABLE", "DELIVERABLE"].includes(status);
 }
 
+async function commerceDeliveryProvider() {
+  const records = await queryRecords(TABLES.configuration, {
+    filterByFormula: "AND({Actif}=1,{Clé}='commerce_delivery_provider')",
+    pageSize: 1,
+    priorityAware: false,
+  });
+  return String(records[0]?.fields?.Valeur || "digify").trim().toLowerCase();
+}
+
 function finalEdition(value) {
   const edition = String(value || "").trim();
   return Boolean(edition && !edition.toLowerCase().includes("draft"));
@@ -117,6 +126,11 @@ export async function POST(request) {
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: String(error?.message || "Unauthorized").slice(0, 300) }, { status: 401 });
+  }
+
+  const provider = await commerceDeliveryProvider();
+  if (provider !== "digify") {
+    return NextResponse.json({ ok: true, processed: 0, reason: "delivery_provider_not_digify", provider });
   }
 
   const staleId = await clearStaleDelivery();

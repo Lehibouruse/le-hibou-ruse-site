@@ -47,6 +47,8 @@ async function currentCommerceState() {
   return {
     edition: String(values.book_current_edition || "").trim(),
     launchAuthorized: truthy(values.commerce_launch_authorized),
+    deliveryProvider: String(values.delivery_provider_mode || "digify").trim().toLowerCase(),
+    lemonNativeVerified: truthy(values.lemon_native_delivery_verified),
     consentMode,
     consentRequired: consentMode === "live",
   };
@@ -92,6 +94,13 @@ function attributionFields(order) {
     Referrer: attribution.referrer || "",
     attribution,
   };
+}
+
+function saleDeliveryProvider(fields = {}) {
+  const notes = String(fields?.Notes || "");
+  if (notes.includes("delivery_provider=lemon_native")) return "lemon_native";
+  if (notes.includes("delivery_provider=digify")) return "digify";
+  return String(fields?.["Digify File GUID"] || "").trim() ? "digify" : "";
 }
 
 function orderAuditNotes(order, reasons = []) {
@@ -230,23 +239,35 @@ export async function POST(request) {
   const refundedBeforeCreate = Boolean(refundMarker);
   const consentValid = validDigitalSupplyCustomData(order.customData);
   const consentSatisfied = !commerce.consentRequired || consentValid;
+  const deliveryProvider = commerce.deliveryProvider;
+  const providerKnown = ["digify", "lemon_native"].includes(deliveryProvider);
+  const digifyProviderReady = deliveryProvider === "digify" && Boolean(fileGuid);
+  const lemonNativeProviderReady = deliveryProvider === "lemon_native" && commerce.lemonNativeVerified;
+  const providerReady = digifyProviderReady || lemonNativeProviderReady;
   const ready = Boolean(
     launchAuthorized
     && consentSatisfied
     && product
-    && fileGuid
+    && providerKnown
+    && providerReady
     && order.status === "paid"
     && !order.refunded
     && !order.testMode
     && !refundedBeforeCreate
     && finalEdition(edition)
   );
-  const deliveryStatus = refundedBeforeCreate ? "revoked" : ready ? "pending" : "manual_review";
-  const reasons = [];
+  const deliveryStatus = refundedBeforeCreate
+    ? "revoked"
+    : ready
+      ? (deliveryProvider === "lemon_native" ? "delivered" : "pending")
+      : "manual_review";
+  const reasons = [`delivery_provider=${deliveryProvider || "absent"}`];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
   if (commerce.consentRequired && !consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
-  if (product && !fileGuid) reasons.push("Digify File GUID absent du produit");
+  if (!providerKnown) reasons.push(`provider de livraison inconnu: ${deliveryProvider || "absent"}`);
+  if (deliveryProvider === "digify" && product && !fileGuid) reasons.push("Digify File GUID absent du produit");
+  if (deliveryProvider === "lemon_native" && !commerce.lemonNativeVerified) reasons.push("livraison native Lemon non vérifiée");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);
   if (order.refunded) reasons.push("commande déjà remboursée");
   if (order.testMode) reasons.push("commande Lemon en mode test: livraison bloquée");
@@ -276,9 +297,13 @@ export async function POST(request) {
     "Digify File GUID": fileGuid,
     "Version livre livrée": edition,
     "Livraison tentatives": 0,
-    "Livraison erreur": reasons.join("; "),
+    ...(ready && deliveryProvider === "lemon_native" ? { "Livré le": new Date().toISOString() } : {}),
+    "Livraison erreur": ready ? "" : reasons.join("; "),
   });
   const saleId = actionId(created);
-  await journal(order, ready ? "Completed" : refundedBeforeCreate ? "Completed" : "Manual Review", ready ? `Commande enregistrée; livraison Digify en attente · édition ${edition}` : reasons.join("; "), saleId);
+  const readyNote = deliveryProvider === "lemon_native"
+    ? `Commande enregistrée; livraison native Lemon disponible via reçu/My Orders · édition ${edition}`
+    : `Commande enregistrée; livraison Digify en attente · édition ${edition}`;
+  await journal(order, ready ? "Completed" : refundedBeforeCreate ? "Completed" : "Manual Review", ready ? readyNote : reasons.join("; "), saleId);
   return NextResponse.json({ ok: true, sale_id: saleId, delivery_status: deliveryStatus, refunded: refundedBeforeCreate, attributed: Boolean(attribution.attribution?.utm_source || attribution.attribution?.utm_campaign || attribution.attribution?.utm_content) });
 }

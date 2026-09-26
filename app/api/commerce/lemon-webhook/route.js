@@ -179,17 +179,28 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, refunded: true, sale_id: saleId, out_of_order: true });
     }
     const deliveryStatus = String(existing.fields?.["Livraison statut"] || "");
-    // A refund can arrive while Digify is adding the recipient. Keep that order
-    // in the revocation queue; the delivery worker rechecks after the API call.
-    const nextStatus = refundDeliveryStatus(deliveryStatus);
+    const existingProvider = saleDeliveryProvider(existing.fields);
+    // A refund can arrive while Digify is adding the recipient. Native Lemon delivery
+    // is revoked only in the Hibou access layer; this code does not claim to revoke
+    // a file already available from Lemon Squeezy.
+    const nextStatus = existingProvider === "lemon_native" ? "revoked" : refundDeliveryStatus(deliveryStatus);
+    const refundNote = existingProvider === "lemon_native"
+      ? "Remboursement reçu; accès Hibou marqué révoqué. Accès natif Lemon non révoqué par notre API."
+      : nextStatus === "revocation_pending"
+        ? "Remboursement reçu; retrait de l'accès Digify en attente."
+        : "";
     await updateRecord(TABLES.sales, existing.id, {
       Statut: "refunded",
       "Identifiant commande public": order.identifier,
       Remboursement: order.refundedAt || new Date().toISOString(),
       "Livraison statut": nextStatus,
-      ...(nextStatus === "revocation_pending" ? { "Livraison erreur": "Remboursement reçu; retrait de l'accès Digify en attente." } : {}),
+      ...(refundNote ? { "Livraison erreur": refundNote } : {}),
     });
-    await journal(order, "Completed", nextStatus === "revocation_pending" ? "Vente remboursée; révocation Digify mise en attente" : "Vente remboursée; accès absent, déjà révoqué ou en revue", existing.id);
+    await journal(order, "Completed", existingProvider === "lemon_native"
+      ? "Vente remboursée; accès Hibou natif marqué révoqué"
+      : nextStatus === "revocation_pending"
+        ? "Vente remboursée; révocation Digify mise en attente"
+        : "Vente remboursée; accès absent, déjà révoqué ou en revue", existing.id);
     return NextResponse.json({ ok: true, refunded: true, sale_id: existing.id, deduplicated: saleIsRefunded(existing.fields) });
   }
 

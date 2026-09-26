@@ -187,6 +187,23 @@ test("la livraison n'utilise jamais de lien Digify générique partagé", () => 
   assert.match(delivery, /Quick Access Link/);
 });
 
+test("le webhook peut livrer par lecteur Hibou sans dépendre de Digify", () => {
+  const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+  assert.match(lemon, /deliveryProvider === "hibou_reader"/);
+  assert.match(lemon, /hibouReader \|\| \(digifyDelivery && fileGuid\)/);
+  assert.match(lemon, /"reader_ready"/);
+  assert.match(lemon, /delivery_provider=/);
+});
+
+test("le worker Digify devient inactif quand le lecteur Hibou est sélectionné", () => {
+  const delivery = readFileSync(new URL("../app/api/commerce/delivery/route.js", import.meta.url), "utf8");
+  const providerGuardAt = delivery.indexOf('provider !== "digify"');
+  const effectAt = delivery.indexOf("addDigifyRecipient({ fileGuid, email, orderId })");
+  assert.ok(providerGuardAt >= 0);
+  assert.ok(effectAt > providerGuardAt);
+  assert.match(delivery, /delivery_provider_not_digify/);
+});
+
 test("le scheduler interroge livraison et révocation sans bloquer le Core", () => {
   const workflow = readFileSync(new URL("../.github/workflows/hibou-wake.yml", import.meta.url), "utf8");
   assert.match(workflow, /api\/commerce\/delivery/);

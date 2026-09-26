@@ -1,1 +1,1 @@
-2026-09-19 verify Lemon readiness after Digify correction and diagnostic fix
+2026-09-26 audit Lemon native file delivery after Digify trial ended

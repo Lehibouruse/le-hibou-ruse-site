@@ -29,6 +29,7 @@ function readyInput() {
       public_site_url: "https://d4d5d6.com",
       public_site_host_expected: "d4d5d6.com",
       domain_verified: "true",
+      digify_api_status: "LIVE_DELIVERABLE",
       withdrawal_durable_receipt_tested: "true",
     },
     product: {
@@ -148,6 +149,15 @@ test("un accusé durable de rétractation non testé bloque toute ouverture comm
   assert.equal(result.ready, false);
   assert.equal(result.checkoutUrl, "");
   assert.ok(result.blockers.some((item) => item.key === "withdrawal_durable_receipt"));
+});
+
+test("un essai Digify terminé bloque toute ouverture commerciale", () => {
+  const input = readyInput();
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.equal(result.checkoutUrl, "");
+  assert.ok(result.blockers.some((item) => item.key === "digify_status"));
 });
 
 test("une dépendance serveur Lemon ou Digify absente bloque sans exposer de secret", () => {

@@ -210,3 +210,16 @@ test("la route readiness expose la disponibilité de livraison native sans mutat
   assert.match(source, /variant_published_file_count/);
   assert.doesNotMatch(source, /create.*File|upload.*File|delete.*File/i);
 });
+
+
+test("le readiness Lemon journalise uniquement un résumé non sensible de la livraison native", () => {
+  const source = readFileSync(new URL("../app/api/commerce/lemon-readiness/route.js", import.meta.url), "utf8");
+  assert.match(source, /HIBOU_LEMON_READINESS_V2/);
+  assert.match(source, /variant_file_count/);
+  assert.match(source, /variant_published_file_count/);
+  assert.match(source, /native_file_delivery_ready/);
+  const journalStart = source.indexOf("async function journalReadiness");
+  const journalEnd = source.indexOf("async function authenticate", journalStart);
+  const journal = source.slice(journalStart, journalEnd);
+  assert.doesNotMatch(journal, /buy_now_url|download_url|signature/);
+});

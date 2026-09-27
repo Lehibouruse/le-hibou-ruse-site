@@ -966,6 +966,39 @@ export async function POST(request) {
           body.result && typeof body.result === "object"
             ? body.result
             : {};
+        const rawStageProgress =
+          heartbeatResult.stage_progress &&
+          typeof heartbeatResult.stage_progress === "object" &&
+          !Array.isArray(heartbeatResult.stage_progress)
+            ? heartbeatResult.stage_progress
+            : null;
+        const stageProgress = rawStageProgress
+          ? {
+              stage: cut(rawStageProgress.stage || "", 80) || null,
+              unit: cut(rawStageProgress.unit || "", 80) || null,
+              completed_units: Math.max(
+                0,
+                Math.min(10000, Number(rawStageProgress.completed_units || 0)),
+              ),
+              failed_units: Math.max(
+                0,
+                Math.min(10000, Number(rawStageProgress.failed_units || 0)),
+              ),
+              total_units:
+                Number.isFinite(Number(rawStageProgress.total_units)) &&
+                Number(rawStageProgress.total_units) >= 0
+                  ? Math.min(10000, Number(rawStageProgress.total_units))
+                  : null,
+              percent:
+                Number.isFinite(Number(rawStageProgress.percent))
+                  ? Math.max(
+                      0,
+                      Math.min(100, Number(rawStageProgress.percent)),
+                    )
+                  : null,
+              visual_ready: rawStageProgress.visual_ready === true,
+            }
+          : null;
         fields["R\u00e9sultat JSON"] = JSON.stringify({
           schema: "HIBOU_VIDEO_RENDER_HEARTBEAT_V1",
           heartbeat_at: now,
@@ -980,6 +1013,19 @@ export async function POST(request) {
           failed_stages: Array.isArray(heartbeatResult.failed_stages)
             ? heartbeatResult.failed_stages.slice(0, 30).map((x) => cut(x, 80))
             : [],
+          stage_started_at:
+            cut(heartbeatResult.stage_started_at || "", 80) || null,
+          stage_elapsed_seconds:
+            Number.isFinite(Number(heartbeatResult.stage_elapsed_seconds))
+              ? Math.max(
+                  0,
+                  Math.min(
+                    7 * 24 * 60 * 60,
+                    Number(heartbeatResult.stage_elapsed_seconds),
+                  ),
+                )
+              : null,
+          stage_progress: stageProgress,
           publication_authorized: false,
           paid_fallback: false,
         });

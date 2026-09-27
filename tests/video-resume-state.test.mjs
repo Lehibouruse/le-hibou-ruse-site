@@ -10,8 +10,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   pipelineStateFingerprint,
+  VIDEO_STAGE_ORDER,
 } from "../scripts/video-resume-plan.mjs";
 import {
+  buildResumeApplyReceipt,
   prepareResumeState,
   RESUME_STATE_SCHEMA,
   validateResumeApply,
@@ -35,13 +37,19 @@ function state() {
 }
 
 function planFor(s, root = "/tmp/hibou") {
+  const resumeStage = "voice";
   return {
     schema: "HIBOU_VIDEO_RESUME_PLAN_V1",
     root,
     source_state_sha256: pipelineStateFingerprint(s),
+    analysis_only: true,
     execution_performed: false,
-    resume_stage: "voice",
-    stages_to_reset: ["voice", "images", "render", "master_qc"],
+    resume_required: true,
+    resume_stage: resumeStage,
+    stages_to_reset: VIDEO_STAGE_ORDER.slice(
+      VIDEO_STAGE_ORDER.indexOf(resumeStage),
+    ),
+    publication_authorized: false,
   };
 }
 
@@ -200,4 +208,118 @@ test("resume apply refuses a plan rooted at another render directory", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+
+test("resume reset rejects unknown or non-canonical reset stages", () => {
+  const original = state();
+
+  const unknown = planFor(original);
+  unknown.stages_to_reset = [...unknown.stages_to_reset, "mystery_stage"];
+  assert.throws(
+    () =>
+      prepareResumeState({
+        state: original,
+        plan: unknown,
+        planSha256: "a".repeat(64),
+      }),
+    /unknown reset stage/,
+  );
+
+  const nonCanonical = planFor(original);
+  nonCanonical.stages_to_reset = nonCanonical.stages_to_reset.filter(
+    (stage) => stage !== "creative_qc",
+  );
+  assert.throws(
+    () =>
+      prepareResumeState({
+        state: original,
+        plan: nonCanonical,
+        planSha256: "a".repeat(64),
+      }),
+    /canonical suffix/,
+  );
+});
+
+test("resume reset rejects executable publishable or no-op plans", () => {
+  const original = state();
+
+  const executable = planFor(original);
+  executable.analysis_only = false;
+  assert.throws(
+    () =>
+      prepareResumeState({
+        state: original,
+        plan: executable,
+        planSha256: "a".repeat(64),
+      }),
+    /analysis_only/,
+  );
+
+  const publishable = planFor(original);
+  publishable.publication_authorized = true;
+  assert.throws(
+    () =>
+      prepareResumeState({
+        state: original,
+        plan: publishable,
+        planSha256: "a".repeat(64),
+      }),
+    /cannot authorize publication/,
+  );
+
+  const noResume = planFor(original);
+  noResume.resume_required = false;
+  assert.throws(
+    () =>
+      prepareResumeState({
+        state: original,
+        plan: noResume,
+        planSha256: "a".repeat(64),
+      }),
+    /must require a resume/,
+  );
+});
+
+test("resume apply receipt binds plan backup source and prepared state hashes", () => {
+  const receipt = buildResumeApplyReceipt({
+    root: "/tmp/hibou",
+    planSha256: "1".repeat(64),
+    backupPath: "/tmp/hibou/pipeline-run.before.json",
+    backupSha256: "2".repeat(64),
+    sourceStateSha256: "3".repeat(64),
+    preparedStateSha256: "4".repeat(64),
+    stateFileSha256: "5".repeat(64),
+    resetStages: ["voice", "render"],
+    appliedAt: "2026-09-28T00:00:00.000Z",
+  });
+
+  assert.equal(receipt.schema, "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1");
+  assert.equal(receipt.plan_sha256, "1".repeat(64));
+  assert.equal(receipt.backup_sha256, "2".repeat(64));
+  assert.equal(receipt.source_state_sha256, "3".repeat(64));
+  assert.equal(receipt.prepared_state_sha256, "4".repeat(64));
+  assert.equal(receipt.state_file_sha256, "5".repeat(64));
+  assert.deepEqual(receipt.reset_stages, ["voice", "render"]);
+  assert.equal(receipt.artifacts_deleted, false);
+  assert.equal(receipt.caches_deleted, false);
+  assert.equal(receipt.execution_started, false);
+  assert.equal(receipt.publication_authorized, false);
+});
+
+test("resume apply receipt rejects malformed hashes", () => {
+  assert.throws(
+    () =>
+      buildResumeApplyReceipt({
+        root: "/tmp/hibou",
+        planSha256: "bad",
+        backupPath: "/tmp/hibou/pipeline-run.before.json",
+        backupSha256: "2".repeat(64),
+        sourceStateSha256: "3".repeat(64),
+        preparedStateSha256: "4".repeat(64),
+        stateFileSha256: "5".repeat(64),
+        resetStages: [],
+      }),
+    /planSha256 must be a sha256/,
+  );
 });

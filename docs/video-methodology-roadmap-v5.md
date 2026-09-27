@@ -81,6 +81,11 @@
 - ducking / fades / normalisation ;
 - aucun contrôle Chatterbox fictif déclaré comme appliqué.
 
+### Observabilité pipeline
+
+- `pipeline-run.json` conserve `stage_history` avec START/PASS/ERROR, numéro de tentative et durée ;
+- les stages PASS restent idempotents et l'historique n'est pas écrasé lors d'une nouvelle tentative ;
+
 ### Itérations
 
 - `HIBOU_VIDEO_RESUME_PLAN_V1` analyse un run interrompu sans rien exécuter ;

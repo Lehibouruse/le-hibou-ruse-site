@@ -151,6 +151,53 @@ export function normalizeSceneTimeline(scene,{duration}={}){
   return {schema:"HIBOU_SCENE_TIMELINE_V1",events};
 }
 
+function beatFamily(event){
+  const type=String(event?.type||"").trim().toLowerCase();
+  if(type==="text"||type==="callout") return "caption";
+  if(type==="object") return "prop";
+  if(type==="pose") return "pose";
+  if(type==="camera") return "camera";
+  if(type==="accent") return "accent";
+  return type||"unknown";
+}
+
+export function analyzeBeatVariation(timeline,{maxSameFamily=2}={}){
+  const limit=Math.max(1,Math.round(num(maxSameFamily,2)));
+  const events=Array.isArray(timeline?.events)?timeline.events:[];
+  const sequence=events.map((event,index)=>({
+    id:String(event?.id||`E${String(index+1).padStart(2,"0")}`),
+    family:beatFamily(event),
+    type:String(event?.type||""),
+    start_s:num(event?.start_s,0)
+  }));
+  const warnings=[];
+  let cursor=0;
+  while(cursor<sequence.length){
+    let end=cursor+1;
+    while(end<sequence.length&&sequence[end].family===sequence[cursor].family) end+=1;
+    const run=sequence.slice(cursor,end);
+    if(run.length>limit){
+      warnings.push({
+        code:"REPEATED_BEAT_FAMILY",
+        family:run[0].family,
+        count:run.length,
+        event_ids:run.map(item=>item.id),
+        recommendation:"vary the next attention beat when a semantically correct alternative exists"
+      });
+    }
+    cursor=end;
+  }
+  return {
+    schema:"HIBOU_BEAT_VARIATION_POLICY_V1",
+    event_count:sequence.length,
+    sequence,
+    warnings,
+    review_required:warnings.length>0,
+    blocking:false,
+    max_same_family:limit
+  };
+}
+
 export function normalizeSceneComposition(scene){
   const c=scene?.composition||{};
   const background=assetRef(c.background)||assetRef(scene?.image?.selected);
@@ -369,5 +416,6 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     output_label:"[outv]",
     normalized:c,
     timeline,
+    beat_variation:analyzeBeatVariation(timeline),
   };
 }

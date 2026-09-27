@@ -111,3 +111,13 @@ test("FINAL human candidate checkpoint pauses cleanly and resumes without regene
  assert.match(queueRoute,/isHumanSelectionPause/);
  assert.match(queueRoute,/ALLOWED_STATUS = new Set\(\["Running", "Paused"/);
 });
+
+
+test("incremental review diff is commit-pinned and remains human-only",()=>{
+ assert.match(master,/video-review-diff\.mjs/);
+ assert.match(master,/stage\(state,"review_diff"/);
+ assert.match(master,/review-diff\.json/);
+ assert.match(master,/kind:"review_diff"/);
+ assert.match(humanReview,/previous_human_approval_auto_reused:false/);
+ assert.match(humanReview,/always_required_global_checks/);
+});

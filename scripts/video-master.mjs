@@ -604,11 +604,12 @@ async function main(){
   });
 
   const imageRuntime=await ensureImageRuntimeBundle(runtimeCommit);
+  const imageFactoryScript=imageRuntime.factory;
   const postRuntime=await ensurePostRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");
   stage(state,"images",()=>{
     run(process.execPath,[
-      imageRuntime.factory,
+      imageFactoryScript,
       assetResolved,resolve(bindingArg),imageDir,
       "--max-scenes="+policy.max_scenes,
       "--regen-attempts="+policy.regeneration_attempts

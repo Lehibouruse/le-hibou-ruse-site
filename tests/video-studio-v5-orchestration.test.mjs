@@ -5,6 +5,7 @@ const master=readFileSync(new URL("../scripts/video-master.mjs",import.meta.url)
 const sync=readFileSync(new URL("../scripts/video-airtable-sync.mjs",import.meta.url),"utf8");
 const promote=readFileSync(new URL("../scripts/video-storyboard-promote.mjs",import.meta.url),"utf8");
 const worker=readFileSync(new URL("../scripts/hibou-github-worker.mjs",import.meta.url),"utf8");
+const queueRoute=readFileSync(new URL("../app/api/local-worker-queue/route.js",import.meta.url),"utf8");
 
 test("V5 execution needs both GLOBAL contract feature and local runtime gate",()=>{
  assert.match(master,/contract\?\.features\?\.\[name\]===true && envFlag\(envName\)/);
@@ -57,4 +58,14 @@ test("remote queue preview policy reaches the local master without changing scen
  assert.match(master,/execution_override:executionOverride/);
  assert.match(master,/global_visual_identity_unchanged:true/);
  assert.match(master,/publication_authorized:false/);
+});
+
+
+test("remote incremental reuse accepts only a prior Airtable job id and never an arbitrary path",()=>{
+ assert.match(queueRoute,/reuse_from_job_id/);
+ assert.match(queueRoute,/invalid_reuse_from_job_id/);
+ assert.match(worker,/reuse_from_job_id/);
+ assert.match(worker,/--reuse-from=\$\{previousRoot\}/);
+ assert.match(worker,/path\.join\([\s\S]*VIDEO_OUTPUT_ROOT[\s\S]*safePart\(reuseFromJobId\)/);
+ assert.doesNotMatch(queueRoute,/reuse_from_path/);
 });

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 function fail(m){throw new Error(m);}
 export function applyStyleProfile(contract,profile,{force=false}={}){
   if(contract?.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported video contract");
@@ -22,7 +23,7 @@ export function applyStyleProfile(contract,profile,{force=false}={}){
   });
   return out;
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,profilePath,outPath,...rest]=process.argv.slice(2);
   if(!contractPath||!profilePath||!outPath) fail("usage: video-style-apply.mjs contract.json style-profile.json output.json [--force]");
   const contract=JSON.parse(readFileSync(resolve(contractPath),"utf8"));

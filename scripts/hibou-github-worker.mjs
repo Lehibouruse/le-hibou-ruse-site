@@ -78,6 +78,11 @@ const CHATTERBOX_BATCH_SCRIPT =
   String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT || "").trim() ||
   path.join(PROJECT_ROOT, "scripts", "chatterbox-storyboard-batch.py");
 
+const COMFYUI_START_SCRIPT = path.join(
+  LOG_DIR,
+  "video-start-comfyui-windows.runtime.ps1",
+);
+
 const RUNTIME_REPO =
   "Lehibouruse/le-hibou-ruse-site";
 const ALLOWED_HOSTS = new Set([
@@ -441,6 +446,7 @@ async function ensureCanonicalVideoRuntimes(job) {
       commit,
       master: VIDEO_MASTER_SCRIPT,
       voice: CHATTERBOX_BATCH_SCRIPT,
+      comfy_start: COMFYUI_START_SCRIPT,
       refreshed: false,
     };
   }
@@ -465,9 +471,20 @@ async function ensureCanonicalVideoRuntimes(job) {
     ],
   );
 
+  const comfyStart = await installPinnedRuntime(
+    commit,
+    "scripts/video-start-comfyui-windows.ps1",
+    COMFYUI_START_SCRIPT,
+    [
+      "COMFYUI_AUTOSTART_V2",
+      "Start-Process",
+    ],
+  );
+
   state.runtime_commit = commit;
   state.runtime_master_sha256 = master.sha256;
   state.runtime_voice_sha256 = voice.sha256;
+  state.runtime_comfy_start_sha256 = comfyStart.sha256;
 
   log("VIDEO_RENDER runtimes refreshed", {
     commit,
@@ -475,12 +492,15 @@ async function ensureCanonicalVideoRuntimes(job) {
     master_sha256: master.sha256,
     voice: voice.path,
     voice_sha256: voice.sha256,
+    comfy_start: comfyStart.path,
+    comfy_start_sha256: comfyStart.sha256,
   });
 
   return {
     commit,
     master: master.path,
     voice: voice.path,
+    comfy_start: comfyStart.path,
     refreshed: true,
   };
 }
@@ -596,11 +616,9 @@ async function ensureComfyUIReady() {
     throw new Error("Automatic ComfyUI start is Windows-only");
   }
 
-  const startScript = path.join(
-    PROJECT_ROOT,
-    "scripts",
-    "video-start-comfyui-windows.ps1",
-  );
+  const startScript = existsSync(COMFYUI_START_SCRIPT)
+    ? COMFYUI_START_SCRIPT
+    : path.join(PROJECT_ROOT, "scripts", "video-start-comfyui-windows.ps1");
 
   if (!existsSync(startScript)) {
     throw new Error(`ComfyUI start script missing: ${startScript}`);
@@ -636,7 +654,7 @@ async function ensureComfyUIReady() {
   );
   child.unref();
 
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     if (await comfyReady(endpoint)) {
       log("ComfyUI ready", { endpoint });
@@ -645,7 +663,19 @@ async function ensureComfyUIReady() {
     await sleep(2000);
   }
 
-  throw new Error(`ComfyUI did not become ready within 120 seconds: ${endpoint}`);
+  const logDir = path.join(LOG_DIR, "logs");
+  const stderrPath = path.join(logDir, "comfyui-autostart.stderr.log");
+  const stdoutPath = path.join(logDir, "comfyui-autostart.stdout.log");
+  const tail = (file) => {
+    try { return readFileSync(file, "utf8").slice(-5000); } catch { return ""; }
+  };
+  const stderrTail = tail(stderrPath);
+  const stdoutTail = tail(stdoutPath);
+  throw new Error(
+    `ComfyUI did not become ready within 180 seconds: ${endpoint}` +
+    (stderrTail ? `\n--- ComfyUI stderr tail ---\n${stderrTail}` : "") +
+    (stdoutTail ? `\n--- ComfyUI stdout tail ---\n${stdoutTail}` : "")
+  );
 }
 
 async function fetchQueue() {
@@ -1631,6 +1661,7 @@ function healthServer() {
       worker_source_sha256: state.worker_source_sha256 || null,
       runtime_master_sha256: state.runtime_master_sha256 || null,
       runtime_voice_sha256: state.runtime_voice_sha256 || null,
+      runtime_comfy_start_sha256: state.runtime_comfy_start_sha256 || null,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

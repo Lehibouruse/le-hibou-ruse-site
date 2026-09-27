@@ -11,6 +11,7 @@ test("scene cache fingerprint changes when timeline text/camera timing changes",
 
 test("V1 contract formally exposes optional backward-compatible V5 extensions",()=>{
   assert.equal(schema.properties.features.properties.video_timeline_v1.type,"boolean");
+  assert.equal(schema.properties.features.properties.video_human_candidate_selection_v1.type,"boolean");
   assert.equal(schema.properties.scenes.items.properties.timeline.$ref,"./video-scene-timeline-v1.schema.json");
   assert.equal(schema.properties.scenes.items.properties.pose_request.type,"string");
   assert.equal(schema.properties.scenes.items.properties.voice.properties.verbatim.type,"boolean");

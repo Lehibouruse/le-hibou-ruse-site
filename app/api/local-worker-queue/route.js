@@ -128,6 +128,13 @@ function parseJsonObject(value) {
   }
 }
 
+function reuseValidationReason(error) {
+  const message = cut(error?.message || error, 1000);
+  return /^reuse_[a-z0-9_]+$/i.test(message)
+    ? message
+    : "reuse_parent_lookup_failed: " + message;
+}
+
 async function activeVideoJobs() {
   const requests = [
     queryRecords(TABLES.localWorkerQueue, {
@@ -579,7 +586,7 @@ export async function GET(request) {
         } catch (error) {
           const sanitized = await markQueueValidationError(
             record,
-            "reuse_parent_lookup_failed: " + cut(error?.message || error, 1000),
+            reuseValidationReason(error),
           );
           queue_sanitization.push(sanitized);
           continue;

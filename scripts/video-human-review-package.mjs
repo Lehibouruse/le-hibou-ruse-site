@@ -37,6 +37,7 @@ export function buildHumanReviewPackage({
   candidateReview = null,
   artifactRegistry = null,
   incrementalPlan = null,
+  reviewDiff = null,
 } = {}) {
   const blockers = [];
   const warnings = [];
@@ -181,6 +182,20 @@ export function buildHumanReviewPackage({
             ? incrementalPlan.invalidated_stages
             : [],
           human_should_focus_changed_scenes: changedScenes.length > 0,
+          review_scope:reviewDiff?.review_scope||"FULL",
+          full_review_required:reviewDiff
+            ? Boolean(reviewDiff.full_review_required)
+            : true,
+          focused_scene_review:Array.isArray(reviewDiff?.focused_scene_review)
+            ? reviewDiff.focused_scene_review
+            : [],
+          global_focused_checks:Array.isArray(reviewDiff?.global_focused_checks)
+            ? reviewDiff.global_focused_checks
+            : [],
+          always_required_global_checks:Array.isArray(reviewDiff?.always_required_global_checks)
+            ? reviewDiff.always_required_global_checks
+            : [],
+          previous_human_approval_auto_reused:false,
         }
       : null,
     checklist,
@@ -213,6 +228,7 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     candidateReview: loadIf(resolve(root, "images", "candidate-review.json")),
     artifactRegistry: loadIf(resolve(root, "artifact-registry.json")),
     incrementalPlan: loadIf(resolve(root, "incremental-retouch-plan.json")),
+    reviewDiff: loadIf(resolve(root, "review-diff.json")),
   });
 
   writeFileSync(output, JSON.stringify(review, null, 2) + "\n");

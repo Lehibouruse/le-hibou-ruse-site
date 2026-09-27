@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -9,6 +10,21 @@ export function isCudaOom(error){
   const message=String(error?.message||error||"");
   return /(?:cuda[^\n]{0,80})?out of memory|cuda error[^\n]{0,80}memory|cublas_status_alloc_failed|torch\.outofmemoryerror/i.test(message);
 }
+function stable(value){
+  if(Array.isArray(value)) return value.map(stable);
+  if(value&&typeof value==="object"){
+    return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]));
+  }
+  return value;
+}
+export function imageRequestFingerprint(item){
+  return createHash("sha256")
+    .update(JSON.stringify(stable({
+      request:item?.request||null,
+      fallback_request:item?.fallback_request||null
+    })))
+    .digest("hex");
+}
 function loadExisting(path,contentId){
   if(!path||!existsSync(path)) return {schema:"HIBOU_IMAGE_BATCH_V1",content_id:contentId,results:{}};
   try{
@@ -18,8 +34,12 @@ function loadExisting(path,contentId){
     return parsed;
   }catch(error){fail(`cannot reuse image batch manifest: ${error.message}`);}
 }
-function outputsStillExist(result){
-  return result?.status==="completed"&&Array.isArray(result.outputs)&&result.outputs.length>0&&result.outputs.every(o=>existsSync(o.path));
+function outputsStillExist(result,requestFingerprint){
+  return result?.status==="completed"
+    && result?.request_fingerprint===requestFingerprint
+    && Array.isArray(result.outputs)
+    && result.outputs.length>0
+    && result.outputs.every(o=>existsSync(o.path));
 }
 function writeState(path,state){
   if(!path) return;
@@ -34,11 +54,16 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
   for(const item of plan.requests){
     if(!allowedScenes.includes(item.scene_id)&&allowedScenes.length<maxScenes) allowedScenes.push(item.scene_id);
   }
-  let cacheHits=0,generated=0;
+  let cacheHits=0,generated=0,invalidatedCacheEntries=0;
   for(const item of plan.requests){
     if(!allowedScenes.includes(item.scene_id)) continue;
     const key=item.candidate_id;
-    if(outputsStillExist(state.results[key])){cacheHits+=1;continue;}
+    const requestFingerprint=imageRequestFingerprint(item);
+    const prior=state.results[key];
+    if(outputsStillExist(prior,requestFingerprint)){cacheHits+=1;continue;}
+    if(prior?.status==="completed"&&Array.isArray(prior.outputs)&&prior.outputs.length){
+      invalidatedCacheEntries+=1;
+    }
     try{
       let result;
       let fallbackUsed=false;
@@ -53,6 +78,7 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
       }
       state.results[key]={
         status:"completed",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,
+        request_fingerprint:requestFingerprint,
         job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,
         fallback_used:fallbackUsed,primary_error:primaryError,error:""
       };
@@ -61,6 +87,7 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     }catch(error){
       state.results[key]={
         status:"error",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,outputs:[],
+        request_fingerprint:requestFingerprint,
         fallback_used:false,error:String(error?.message||error).slice(0,700)
       };
       writeState(manifestPath,state);
@@ -84,10 +111,17 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
   state.updated_at=new Date().toISOString();
   state.scene_count_processed=allowedScenes.length;
   state.cache_hits=cacheHits;
+  state.cache_invalidations=invalidatedCacheEntries;
   state.generated_this_run=generated;
   state.paid_fallback=false;
   writeState(manifestPath,state);
-  return {manifest:state,selections,cache_hits:cacheHits,generated_this_run:generated};
+  return {
+    manifest:state,
+    selections,
+    cache_hits:cacheHits,
+    cache_invalidations:invalidatedCacheEntries,
+    generated_this_run:generated
+  };
 }
 
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
@@ -98,5 +132,10 @@ if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const maxScenes=flag?Number(flag.split("=")[1]):Infinity;
   if(!Number.isFinite(maxScenes)&&maxScenes!==Infinity) fail("invalid --max-scenes");
   const result=await executeImagePlan(plan,{manifestPath,selectionTemplatePath:selectionPath,maxScenes});
-  process.stdout.write(JSON.stringify({ok:true,cache_hits:result.cache_hits,generated_this_run:result.generated_this_run})+"\n");
+  process.stdout.write(JSON.stringify({
+    ok:true,
+    cache_hits:result.cache_hits,
+    cache_invalidations:result.cache_invalidations,
+    generated_this_run:result.generated_this_run
+  })+"\n");
 }

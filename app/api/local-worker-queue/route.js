@@ -134,6 +134,146 @@ function isHumanSelectionPause(record) {
     || result.status === "WAITING_HUMAN_SELECTION";
 }
 
+function humanSelectionResumePayload(record) {
+  if (!isHumanSelectionPause(record)) {
+    return { eligible: false, reason: "not_human_selection_pause" };
+  }
+
+  const options = parseOptions(record?.fields?.["Options JSON"]);
+  if (options.resume_human_selection !== true) {
+    return { eligible: false, reason: "resume_flag_missing" };
+  }
+
+  const paused = parseJsonObject(record?.fields?.["Résultat JSON"]);
+  const decisions =
+    options.human_candidate_decisions &&
+    typeof options.human_candidate_decisions === "object" &&
+    !Array.isArray(options.human_candidate_decisions)
+      ? options.human_candidate_decisions
+      : null;
+
+  if (!decisions) {
+    return { eligible: false, reason: "human_candidate_decisions_missing" };
+  }
+  if (decisions.schema !== "HIBOU_HUMAN_IMAGE_SELECTION_V1") {
+    return { eligible: false, reason: "human_candidate_decisions_schema_invalid" };
+  }
+
+  const pausedFingerprint = String(
+    paused.review_fingerprint_sha256 || "",
+  ).trim().toLowerCase();
+  const decisionFingerprint = String(
+    decisions.review_fingerprint_sha256 || "",
+  ).trim().toLowerCase();
+
+  if (
+    !/^[0-9a-f]{64}$/.test(pausedFingerprint) ||
+    decisionFingerprint !== pausedFingerprint
+  ) {
+    return { eligible: false, reason: "human_selection_fingerprint_mismatch" };
+  }
+
+  const contentId = String(paused.content_id || "").trim();
+  if (
+    !/^rec[A-Za-z0-9]{14}$/.test(contentId) ||
+    String(decisions.content_id || "").trim() !== contentId
+  ) {
+    return { eligible: false, reason: "human_selection_content_mismatch" };
+  }
+
+  const decisionRows =
+    decisions.decisions &&
+    typeof decisions.decisions === "object" &&
+    !Array.isArray(decisions.decisions)
+      ? decisions.decisions
+      : null;
+  const entries = decisionRows ? Object.entries(decisionRows) : [];
+  if (!entries.length || entries.length > 25) {
+    return { eligible: false, reason: "human_selection_decisions_invalid" };
+  }
+
+  for (const [sceneId, decision] of entries) {
+    if (
+      !/^S[0-9A-Za-z_-]{1,30}$/.test(String(sceneId)) ||
+      !decision ||
+      typeof decision !== "object" ||
+      Array.isArray(decision) ||
+      !String(decision.candidate_id || "").trim() ||
+      decision.human_confirmed !== true
+    ) {
+      return { eligible: false, reason: "human_selection_decision_row_invalid" };
+    }
+  }
+
+  return {
+    eligible: true,
+    reason: "human_selection_ready",
+    content_id: contentId,
+    review_fingerprint_sha256: pausedFingerprint,
+    decisions,
+  };
+}
+
+async function autoResumeHumanSelection(request) {
+  const { session, worker } = workerSession(request);
+  if (!session || !worker) {
+    return { resumed: false, reason: "worker_session_required" };
+  }
+
+  const active = await activeVideoJobs();
+  if (active.length) {
+    return {
+      resumed: false,
+      reason: "queue_not_empty",
+      active_job_ids: active.map((record) => record.id),
+    };
+  }
+
+  const paused = await queryRecords(TABLES.localWorkerQueue, {
+    filterByFormula: "AND({Statut}='Paused',{Type}='VIDEO_RENDER')",
+    pageSize: 50,
+  });
+
+  const eligible = paused
+    .map((record) => ({ record, decision: humanSelectionResumePayload(record) }))
+    .filter((item) => item.decision.eligible);
+
+  if (eligible.length !== 1) {
+    return {
+      resumed: false,
+      reason: eligible.length
+        ? "ambiguous_human_selection_resume_jobs"
+        : "no_human_selection_resume_job",
+      eligible_job_ids: eligible.map((item) => item.record.id),
+    };
+  }
+
+  const { record, decision } = eligible[0];
+  const resumedAt = new Date().toISOString();
+  await updateRecord(TABLES.localWorkerQueue, record.id, {
+    Statut: "Pending",
+    "Résultat JSON": JSON.stringify({
+      schema: "HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1",
+      status: "HUMAN_SELECTION_RESUME_SCHEDULED",
+      resumed_at: resumedAt,
+      resumed_by_worker: worker,
+      resumed_by_session: session,
+      content_id: decision.content_id,
+      review_fingerprint_sha256: decision.review_fingerprint_sha256,
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    }),
+  });
+
+  return {
+    resumed: true,
+    job_id: record.id,
+    resumed_at: resumedAt,
+    review_fingerprint_sha256: decision.review_fingerprint_sha256,
+  };
+}
+
 function reuseValidationReason(error) {
   const message = cut(error?.message || error, 1000);
   return /^reuse_[a-z0-9_]+$/i.test(message)
@@ -471,6 +611,7 @@ export async function GET(request) {
     }));
 
     const reconciliation = await reconcileStaleRunning(request);
+    const human_selection_resume = await autoResumeHumanSelection(request);
     const auto_activation = await autoActivateWhenWorkerReady(request);
 
     const controls = await videoControls();
@@ -512,6 +653,17 @@ export async function GET(request) {
             ? 1
             : Math.max(1, Math.min(3, Number(options.candidates_per_scene || 3))),
           reuse_from_job_id: reuseFromJobId || null,
+          human_candidate_decisions:
+            parseJsonObject(record.fields?.["Résultat JSON"]).schema ===
+              "HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1"
+              ? (
+                  options.human_candidate_decisions &&
+                  typeof options.human_candidate_decisions === "object" &&
+                  !Array.isArray(options.human_candidate_decisions)
+                    ? options.human_candidate_decisions
+                    : null
+                )
+              : null,
           report_airtable: false,
           human_review_required: true,
           publication_authorized: false,
@@ -680,6 +832,7 @@ export async function GET(request) {
       remote_cancel_enabled: REMOTE_CANCEL_ENABLED,
       runtime_commit: RUNTIME_COMMIT,
       reconciliation,
+      human_selection_resume,
       auto_activation,
       queue_sanitization,
       generated_at: new Date().toISOString(),

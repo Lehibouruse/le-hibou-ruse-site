@@ -96,6 +96,9 @@
 - ce diagnostic n'active jamais `Pending` et n'exécute jamais la reprise ;
 - détecte un ancien PASS devenu invalide (ex. durée voix), un artefact PASS manquant et les erreurs de rendu connues ;
 - choisit le point de reprise conservateur le plus précoce ;
+- `HIBOU_VIDEO_RESUME_STATE_PREP_V1` prépare le reset de `pipeline-run.json` en dry-run par défaut ;
+- application possible uniquement avec `--apply`, `HIBOU_VIDEO_RESUME_APPLY_ENABLED=true`, SHA-256 exact du plan et fingerprint exact de l'état source ;
+- une sauvegarde de l'état est créée avant toute application et aucun cache/artefact n'est supprimé ;
 - conserve les caches voix/images/render et laisse les fingerprints décider de la réutilisation ;
 
 - `HIBOU_INCREMENTAL_RETOUCH_PLAN_V1` ;

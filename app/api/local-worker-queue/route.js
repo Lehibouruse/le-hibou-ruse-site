@@ -136,6 +136,7 @@ export async function GET(request) {
         }
 
         job.storyboard = buildStoryboardContract(content, scenes);
+        job.storyboard.runtime_commit = RUNTIME_COMMIT;
       } catch (error) {
         job.queue_error = cut(error?.message || error, 1000);
       }

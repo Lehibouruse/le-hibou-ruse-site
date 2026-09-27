@@ -208,15 +208,26 @@
       "label": "Captions + texte écran",
       "code": [
         {
-          "path": "scripts/video-subtitles.mjs"
+          "path": "scripts/video-subtitles.mjs",
+          "markers": [
+            "defaultSubtitleFont",
+            "Arial"
+          ]
         },
         {
           "path": "scripts/video-scene-compositor.mjs"
+        },
+        {
+          "path": "scripts/video-attach-subtitles.mjs",
+          "markers": [
+            "font_family"
+          ]
         }
       ],
       "tests": [
         "tests/video-scene-timeline-v1.test.mjs",
-        "tests/video-local-render.test.mjs"
+        "tests/video-local-render.test.mjs",
+        "tests/video-subtitles-font.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -256,11 +267,25 @@
           "markers": [
             "HIBOU_BEAT_VARIATION_POLICY_V1"
           ]
+        },
+        {
+          "path": "scripts/video-subtitles.mjs",
+          "markers": [
+            "defaultSubtitleFont",
+            "Arial"
+          ]
+        },
+        {
+          "path": "scripts/video-attach-subtitles.mjs",
+          "markers": [
+            "font_family"
+          ]
         }
       ],
       "tests": [
         "tests/video-local-render.test.mjs",
-        "tests/video-scene-timeline-v1.test.mjs"
+        "tests/video-scene-timeline-v1.test.mjs",
+        "tests/video-subtitles-font.test.mjs"
       ],
       "e2e_pending": true
     },

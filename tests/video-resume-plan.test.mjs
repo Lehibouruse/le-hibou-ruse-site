@@ -92,6 +92,7 @@ test("actual-like legacy run resumes from voice while preserving image caches", 
     });
 
     assert.equal(plan.schema, RESUME_PLAN_SCHEMA);
+    assert.match(plan.source_state_sha256, /^[0-9a-f]{64}$/);
     assert.equal(plan.analysis_only, true);
     assert.equal(plan.execution_performed, false);
     assert.equal(plan.resume_stage, "voice");

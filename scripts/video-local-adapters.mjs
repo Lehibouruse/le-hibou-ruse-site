@@ -128,7 +128,10 @@ export async function runImageGen(rawRequest) {
       const submitted = await fetchJson(new URL("/prompt", request.endpoint), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: workflow, client_id: "hibou-local-worker" }),
+        body: JSON.stringify({
+          prompt: workflow,
+          client_id: String(process.env.HIBOU_VIDEO_CLIENT_ID || "hibou-local-worker"),
+        }),
       });
       const promptId = String(submitted?.prompt_id || "").trim();
       if (!promptId) fail("ComfyUI /prompt returned no prompt_id");

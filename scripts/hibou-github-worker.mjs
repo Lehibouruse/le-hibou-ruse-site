@@ -779,6 +779,72 @@ function cancellationMatchesOwnedChild(job, child, control) {
   return child.exitCode === null;
 }
 
+function comfyQueueClient(item) {
+  if (Array.isArray(item)) {
+    const extra = item[3];
+    return String(extra?.client_id || extra?.extra_data?.client_id || "");
+  }
+  return String(item?.client_id || item?.extra_data?.client_id || "");
+}
+
+function comfyQueuePromptId(item) {
+  if (Array.isArray(item)) return String(item[1] || "");
+  return String(item?.prompt_id || item?.id || "");
+}
+
+async function cancelOwnedComfyPrompts(clientId) {
+  const id = String(clientId || "").trim();
+  if (!id) return { checked: false, reason: "client_id_missing", running: 0, pending: 0 };
+  const endpoint = comfyEndpointFromBinding();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(new URL("/queue", endpoint), {
+      headers: { "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return { checked: false, reason: `queue_http_${response.status}`, running: 0, pending: 0 };
+    }
+    const queue = await response.json();
+    const running = (Array.isArray(queue?.queue_running) ? queue.queue_running : [])
+      .filter((item) => comfyQueueClient(item) === id);
+    const pending = (Array.isArray(queue?.queue_pending) ? queue.queue_pending : [])
+      .filter((item) => comfyQueueClient(item) === id);
+    const pendingIds = pending.map(comfyQueuePromptId).filter(Boolean);
+
+    if (running.length) {
+      await fetch(new URL("/interrupt", endpoint), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        },
+        body: "{}",
+      }).catch(() => null);
+    }
+    if (pendingIds.length) {
+      await fetch(new URL("/queue", endpoint), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        },
+        body: JSON.stringify({ delete: pendingIds }),
+      }).catch(() => null);
+    }
+    return {
+      checked: true,
+      client_id: id,
+      running: running.length,
+      pending: pendingIds.length,
+      deleted_prompt_ids: pendingIds,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function terminateOwnedRender(job, child, control) {
   if (!cancellationMatchesOwnedChild(job, child, control)) {
     return { terminated: false, reason: "scope_mismatch" };
@@ -792,6 +858,13 @@ async function terminateOwnedRender(job, child, control) {
     requested_at: control.requested_at || null,
   };
   log("VIDEO_RENDER cancellation accepted", state.cancel_request);
+
+  const comfyCancellation = await cancelOwnedComfyPrompts(state.render_client_id)
+    .catch((error) => ({
+      checked: false,
+      reason: "cancel_failed",
+      error: String(error?.message || error).slice(0, 1000),
+    }));
 
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/PID", String(pid), "/T"], {
@@ -830,6 +903,7 @@ async function terminateOwnedRender(job, child, control) {
     render_pid: pid,
     request_id: String(control.request_id || ""),
     state: control.state,
+    comfy: comfyCancellation,
   };
 }
 
@@ -1246,15 +1320,21 @@ async function processVideoRender(job, processed) {
   }
 
   const renderOutcome = await new Promise((resolveRender, rejectRender) => {
+    const renderClientId = `hibou:${job.id}:${state.worker_session}`;
     const child = spawn(process.execPath, args, {
       cwd: PROJECT_ROOT,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
-      env: process.env,
+      env: {
+        ...process.env,
+        HIBOU_VIDEO_CLIENT_ID: renderClientId,
+        HIBOU_VIDEO_QUEUE_JOB_ID: job.id,
+      },
     });
 
     state.render_pid = child.pid || null;
+    state.render_client_id = renderClientId;
     state.render_started_at = new Date().toISOString();
     state.last_video_heartbeat_at = state.render_started_at;
 
@@ -1272,6 +1352,7 @@ async function processVideoRender(job, processed) {
           worker_session: state.worker_session,
           worker_pid: process.pid,
           render_pid: child.pid || null,
+          render_client_id: state.render_client_id || null,
           current_stage: state.cancel_request ? "cancelling" : progress.current_stage,
           completed_stages: progress.completed_stages,
           failed_stages: progress.failed_stages,
@@ -1312,6 +1393,7 @@ async function processVideoRender(job, processed) {
       clearInterval(controls);
       state.render_pid = null;
       state.render_started_at = null;
+      state.render_client_id = null;
       rejectRender(error);
     });
     child.once("exit", (code, signal) => {
@@ -1320,13 +1402,16 @@ async function processVideoRender(job, processed) {
       state.render_pid = null;
       state.render_started_at = null;
       if (cancellation) {
+        state.render_client_id = null;
         resolveRender({ code: Number(code ?? 1), signal: signal || null, cancellation });
         return;
       }
       if (signal) {
+        state.render_client_id = null;
         rejectRender(new Error(`video-master terminated by signal ${signal}`));
         return;
       }
+      state.render_client_id = null;
       resolveRender({ code: Number(code ?? 1), signal: null, cancellation: null });
     });
   });

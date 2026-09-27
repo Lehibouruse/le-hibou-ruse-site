@@ -38,3 +38,11 @@ test("queue API exposes explicit controls only behind the feature flag",()=>{
   assert.match(route,/remote_cancel_enabled/);
   assert.match(route,/remote_cancel_disabled/);
 });
+
+test("ComfyUI cancel is scoped by unique queue client id and never clears unrelated prompts",()=>{
+  assert.match(worker,/HIBOU_VIDEO_CLIENT_ID/);
+  assert.match(worker,/hibou:\$\{job\.id\}:\$\{state\.worker_session\}/);
+  assert.match(worker,/comfyQueueClient\(item\) === id/);
+  assert.match(worker,/JSON\.stringify\(\{ delete: pendingIds \}\)/);
+  assert.doesNotMatch(worker,/JSON\.stringify\(\{ clear: true \}\)/);
+});

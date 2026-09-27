@@ -7,7 +7,7 @@ import { buildImagePlan } from "./video-image-plan.mjs";
 import { executeImagePlan } from "./video-image-batch.mjs";
 import { qcImageBatch } from "./video-image-qc.mjs";
 import { buildTargetedRegeneration } from "./video-image-regenerate.mjs";
-import { buildCandidateReview, renderCandidateReviewHtml } from "./video-candidate-review.mjs";
+import { buildCandidateDecisionTemplate, buildCandidateReview, renderCandidateReviewHtml } from "./video-candidate-review.mjs";
 
 function fail(m){throw new Error(m);}
 const SCRIPT_DIR=dirname(fileURLToPath(import.meta.url));
@@ -206,6 +206,7 @@ async function main(){
       publication_authorized:false
     };
     write(resolve(root,"candidate-review.json"),emptyCandidateReview);
+    write(resolve(root,"candidate-decisions.template.json"),buildCandidateDecisionTemplate(emptyCandidateReview));
     writeFileSync(resolve(root,"candidate-review.html"),renderCandidateReviewHtml(emptyCandidateReview),"utf8");
     const summary={
       schema:"HIBOU_IMAGE_FACTORY_RUN_V1",
@@ -251,6 +252,7 @@ async function main(){
     provisionalSelections:selections
   });
   write(resolve(root,"candidate-review.json"),candidateReview);
+  write(resolve(root,"candidate-decisions.template.json"),buildCandidateDecisionTemplate(candidateReview));
   writeFileSync(resolve(root,"candidate-review.html"),renderCandidateReviewHtml(candidateReview),"utf8");
   const summary={
     schema:"HIBOU_IMAGE_FACTORY_RUN_V1",

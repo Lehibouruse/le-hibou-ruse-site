@@ -66,3 +66,20 @@ test("CUDA probe handles empty stdout or stderr files under PowerShell 5.1", () 
   assert.match(starter, /\$probeOutput = \$probeOutput\.Trim\(\)/);
   assert.match(starter, /\$probeError = \$probeError\.Trim\(\)/);
 });
+
+
+test("ComfyUI starter patches comfy-kitchen builtin list annotations for torch 2.6", () => {
+  assert.match(starter, /Patch-ComfyKitchenTorch26/);
+  assert.match(starter, /list\[int\].*typing\.List\[int\]/s);
+  assert.match(starter, /list\[bool\].*typing\.List\[bool\]/s);
+  assert.match(starter, /HIBOU_COMFY_KITCHEN_TORCH26_PATCH_V1/);
+  assert.match(starter, /comfy_kitchen_import_ok/);
+  assert.match(starter, /comfy_kitchen reste incompatible avec torch 2\.6 apres patch/);
+});
+
+
+test("comfy-kitchen import validation uses a Python file to avoid Windows quoting issues", () => {
+  assert.match(starter, /comfy-kitchen-import-probe\.py/);
+  assert.match(starter, /Set-Content -LiteralPath \$importProbe -Encoding UTF8/);
+  assert.match(starter, /ArgumentList @\("-s", \$importProbe\)/);
+});

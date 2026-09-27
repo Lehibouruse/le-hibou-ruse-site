@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   buildResumePlan,
   RESUME_PLAN_SCHEMA,
@@ -15,7 +15,7 @@ import {
 
 function write(root, rel, value = "x") {
   const path = join(root, rel);
-  mkdirSync(join(path, ".."), { recursive: true });
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(
     path,
     typeof value === "string" ? value : JSON.stringify(value, null, 2),

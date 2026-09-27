@@ -49,3 +49,22 @@ test("detailed heartbeat remains observational and publication locked", () => {
   assert.match(route, /publication_authorized: false/);
   assert.match(route, /paid_fallback: false/);
 });
+
+
+test("heartbeat stagnation telemetry is advisory and sanitized before Airtable persistence", () => {
+  assert.match(worker, /function progressIdentity/);
+  assert.match(worker, /function stagnationThresholdSeconds/);
+  assert.match(worker, /stagnation_warning: stagnationWarning/);
+  assert.match(worker, /no_progress_seconds: noProgressSeconds/);
+  assert.match(worker, /stagnation_threshold_seconds: stagnationThreshold/);
+  assert.match(route, /stagnation_warning: heartbeatResult\.stagnation_warning === true/);
+  assert.match(route, /no_progress_seconds:/);
+  assert.match(route, /stagnation_threshold_seconds:/);
+});
+
+test("sanitized heartbeat JSON cannot be overwritten by the raw heartbeat payload", () => {
+  assert.match(
+    route,
+    /if \(body\.result && !retry\.retry && body\.heartbeat !== true\)/,
+  );
+});

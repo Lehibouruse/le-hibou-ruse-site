@@ -325,22 +325,70 @@ export function buildTechnicalSelections(provisional){
 }
 function stage(state,name,fn){
   if(state.stages[name]?.status==="PASS") return false;
-  state.stages[name]={status:"RUNNING",started_at:new Date().toISOString()};
+  state.stage_history=Array.isArray(state.stage_history)?state.stage_history:[];
+  const attempt=
+    state.stage_history.filter(
+      entry=>entry?.stage===name&&entry?.event==="START"
+    ).length+1;
+  const startedMs=Date.now();
+  const startedAt=new Date(startedMs).toISOString();
+  state.stages[name]={
+    status:"RUNNING",
+    started_at:startedAt,
+    attempt
+  };
+  state.stage_history.push({
+    stage:name,
+    event:"START",
+    attempt,
+    at:startedAt
+  });
   writeJson(state.path,state);
   try{
     fn();
-    state.stages[name]={status:"PASS",finished_at:new Date().toISOString()};
+    const finishedMs=Date.now();
+    const finishedAt=new Date(finishedMs).toISOString();
+    const durationMs=Math.max(0,finishedMs-startedMs);
+    state.stages[name]={
+      status:"PASS",
+      started_at:startedAt,
+      finished_at:finishedAt,
+      duration_ms:durationMs,
+      attempt
+    };
+    state.stage_history.push({
+      stage:name,
+      event:"PASS",
+      attempt,
+      at:finishedAt,
+      duration_ms:durationMs
+    });
     writeJson(state.path,state);
     return true;
   }catch(error){
+    const finishedMs=Date.now();
+    const finishedAt=new Date(finishedMs).toISOString();
+    const durationMs=Math.max(0,finishedMs-startedMs);
     const fullError=String(error?.stack||error?.message||error);
     const head=fullError.slice(0,1200);
     const tail=fullError.length>1200?fullError.slice(-6800):"";
+    const stageError=tail?head+"\n--- error tail ---\n"+tail:head;
     state.stages[name]={
       status:"ERROR",
-      finished_at:new Date().toISOString(),
-      error:tail?head+"\n--- error tail ---\n"+tail:head
+      started_at:startedAt,
+      finished_at:finishedAt,
+      duration_ms:durationMs,
+      attempt,
+      error:stageError
     };
+    state.stage_history.push({
+      stage:name,
+      event:"ERROR",
+      attempt,
+      at:finishedAt,
+      duration_ms:durationMs,
+      error:stageError.slice(0,2000)
+    });
     writeJson(state.path,state);
     throw error;
   }

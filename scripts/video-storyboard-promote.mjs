@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function fail(message) { throw new Error(message); }
 function sha256(path) { return createHash("sha256").update(readFileSync(path)).digest("hex"); }
@@ -114,7 +115,7 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
   return {output:outputPath,scene_count:contract.scenes.length,audio_sha256:contract.audio.sha256,subtitles_burn_in:Boolean(contract.subtitles?.burn_in)};
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contract,selections,output]=process.argv.slice(2);
   if(!contract||!selections||!output) fail("usage: node scripts/video-storyboard-promote.mjs contract-audio-ready.json selections.json contract-render-ready.json");
   process.stdout.write(`${JSON.stringify(promoteStoryboard(contract,selections,output))}\n`);

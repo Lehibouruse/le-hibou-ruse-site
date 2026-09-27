@@ -27,8 +27,9 @@ test("Chatterbox is pinned and CUDA is mandatory",()=>{
 });
 
 test("ComfyUI only starts on loopback and low-vram mode",()=>{
-  assert.match(starter,/--listen 127\.0\.0\.1/);
-  assert.match(starter,/--lowvram/);
+  assert.match(starter,/"--listen"\s*,\s*"127\.0\.0\.1"/);
+  assert.match(starter,/"--lowvram"/);
+  assert.match(starter,/"--windows-standalone-build"/);
   assert.doesNotMatch(starter,/0\.0\.0\.0/);
 });
 

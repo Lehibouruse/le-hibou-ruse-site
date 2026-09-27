@@ -30,3 +30,14 @@ test("pip CUDA repair tolerates harmless stderr warnings under Windows PowerShel
   assert.match(starter, /\$pipExit = \$LASTEXITCODE/);
   assert.match(starter, /if \(\$pipExit -ne 0\)/);
 });
+
+
+test("CUDA repair removes stale embedded torch packages before reinstall", () => {
+  assert.match(starter, /Remove-ComfyTorchResidue/);
+  assert.match(starter, /"torch-\*\.dist-info"/);
+  assert.match(starter, /"torchvision-\*\.dist-info"/);
+  assert.match(starter, /"torchaudio-\*\.dist-info"/);
+  assert.match(starter, /"~ympy\*"/);
+  assert.match(starter, /--no-warn-script-location/);
+  assert.match(starter, /Impossible de supprimer le residu PyTorch/);
+});

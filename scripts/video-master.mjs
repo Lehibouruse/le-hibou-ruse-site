@@ -870,9 +870,11 @@ async function main(){
       selectedImageEntries.push({
         kind:"selected_image",
         path:absoluteSelected,
-        scene_id:sceneId,
-        selected_candidate_id:String(pick?.selected_candidate_id||"")||null,
-        human_selected:pick?.human_selected===true
+        metadata:{
+          scene_id:sceneId,
+          selected_candidate_id:String(pick?.selected_candidate_id||"")||null,
+          human_selected:pick?.human_selected===true
+        }
       });
     }
     writeJson(registrySpec,{

@@ -34,8 +34,14 @@ print(json.dumps({
 }))
 raise SystemExit(0 if ok else 3)
 '@
-  $probeOutput = & $Python -c $probeCode 2>&1
-  $probeExit = $LASTEXITCODE
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $probeOutput = & $Python -c $probeCode 2>$null
+    $probeExit = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
   return [ordered]@{
     ok = ($probeExit -eq 0)
     exit_code = $probeExit

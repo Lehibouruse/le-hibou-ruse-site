@@ -45,6 +45,14 @@ function reviewFingerprint(contentId, scenes) {
       scene_id: String(scene?.scene_id || ""),
       machine_recommended_candidate_id:
         String(scene?.machine_recommended_candidate_id || "") || null,
+      machine_recommendation_status:
+        String(scene?.machine_recommendation_status || "") || null,
+      technical_provisional_candidate_id:
+        String(scene?.technical_provisional_candidate_id || "") || null,
+      machine_recommendation_score_gap:
+        Number.isFinite(Number(scene?.machine_recommendation_score_gap))
+          ? Number(scene.machine_recommendation_score_gap)
+          : null,
       candidates: asArray(scene?.candidates).map((candidate) => ({
         candidate_id: String(candidate?.candidate_id || ""),
         status: String(candidate?.status || ""),
@@ -143,7 +151,11 @@ export function renderCandidateReviewHtml(review) {
     return `
       <section class="scene">
         <h2>${escapeHtml(scene.scene_id)}</h2>
-        <p>Recommandation machine : <strong>${escapeHtml(scene.machine_recommended_candidate_id || "aucune")}</strong> · Décision humaine : <strong>EN ATTENTE</strong></p>
+        <p>Recommandation machine : <strong>${escapeHtml(
+          scene.machine_recommendation_status === "AMBIGUOUS"
+            ? "ambiguë — aucun choix machine"
+            : (scene.machine_recommended_candidate_id || "aucune"),
+        )}</strong> · Sélection technique provisoire : <strong>${escapeHtml(scene.technical_provisional_candidate_id || "aucune")}</strong> · Décision humaine : <strong>EN ATTENTE</strong></p>
         <div class="grid">${cards}</div>
       </section>`;
   }).join("\n");
@@ -183,6 +195,7 @@ export function buildCandidateReview({
   plan,
   perceptualQc,
   provisionalSelections = {},
+  recommendationMinScoreGap = 2,
 } = {}) {
   if (plan?.schema !== "HIBOU_IMAGE_PLAN_V1") {
     fail("HIBOU_IMAGE_PLAN_V1 required");
@@ -239,17 +252,53 @@ export function buildCandidateReview({
 
     const passing = candidates.filter((candidate) => candidate.status === "PASS");
     const provisionalId = provisionalCandidate(provisionalSelections, sceneId);
-    const machineRecommended =
-      provisionalId && candidates.some((x) => x.candidate_id === provisionalId)
-        ? provisionalId
-        : passing[0]?.candidate_id || null;
     const reviewable = passing.length > 0;
+    const top = passing[0] || null;
+    const second = passing[1] || null;
+    const topScore = Number.isFinite(Number(top?.perceptual_score))
+      ? Number(top.perceptual_score)
+      : null;
+    const secondScore = Number.isFinite(Number(second?.perceptual_score))
+      ? Number(second.perceptual_score)
+      : null;
+    const scoreGap =
+      topScore != null && secondScore != null
+        ? topScore - secondScore
+        : null;
+    const minGap = Math.max(0, Number(recommendationMinScoreGap) || 0);
+
+    let machineRecommended = null;
+    let recommendationStatus = "NONE";
+    let recommendationReason = "no_passing_candidate";
+
+    if (passing.length === 1) {
+      machineRecommended = top.candidate_id;
+      recommendationStatus = "RECOMMENDED";
+      recommendationReason = "single_passing_candidate";
+    } else if (passing.length > 1) {
+      if (scoreGap != null && scoreGap > minGap) {
+        machineRecommended = top.candidate_id;
+        recommendationStatus = "RECOMMENDED";
+        recommendationReason = "clear_perceptual_score_gap";
+      } else {
+        recommendationStatus = "AMBIGUOUS";
+        recommendationReason =
+          scoreGap == null
+            ? "score_gap_unavailable"
+            : "top_candidates_within_score_gap";
+      }
+    }
 
     if (!reviewable) blockingSceneCount += 1;
 
     outputScenes.push({
       scene_id: sceneId,
+      technical_provisional_candidate_id: provisionalId,
       machine_recommended_candidate_id: machineRecommended,
+      machine_recommendation_status: recommendationStatus,
+      machine_recommendation_reason: recommendationReason,
+      machine_recommendation_score_gap: scoreGap,
+      machine_recommendation_min_score_gap: minGap,
       ranking_is_advisory: true,
       passing_candidate_count: passing.length,
       candidate_count: candidates.length,
@@ -275,6 +324,11 @@ export function buildCandidateReview({
     scenes: outputScenes,
     policy: {
       machine_ranking_is_advisory_only: true,
+      ambiguous_top_scores_produce_no_machine_recommendation: true,
+      recommendation_min_score_gap: Math.max(
+        0,
+        Number(recommendationMinScoreGap) || 0,
+      ),
       human_selection_required: true,
       no_candidate_is_auto_approved: true,
       local_only: true,

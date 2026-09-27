@@ -420,6 +420,48 @@ async function installPinnedRuntime(commit, repoPath, target, markers) {
     mkdirSync(path.dirname(resolved), { recursive: true });
     const temp = `${resolved}.tmp-${process.pid}`;
     writeFileSync(temp, source, "utf8");
+
+    if (repoPath.endsWith(".mjs")) {
+      const check = spawnSync(
+        process.execPath,
+        ["--check", temp],
+        {
+          encoding: "utf8",
+          windowsHide: true,
+          shell: false,
+        },
+      );
+      if (check.status !== 0) {
+        try { unlinkSync(temp); } catch {}
+        throw new Error(
+          `Runtime node --check failed for ${repoPath}@${commit}: `
+          + String(check.stderr || check.stdout || "").slice(-4000),
+        );
+      }
+    }
+
+    if (repoPath.endsWith(".py")) {
+      const python = String(process.env.HIBOU_PYTHON || "").trim();
+      if (python && existsSync(python)) {
+        const check = spawnSync(
+          python,
+          ["-m", "py_compile", temp],
+          {
+            encoding: "utf8",
+            windowsHide: true,
+            shell: false,
+          },
+        );
+        if (check.status !== 0) {
+          try { unlinkSync(temp); } catch {}
+          throw new Error(
+            `Runtime py_compile failed for ${repoPath}@${commit}: `
+            + String(check.stderr || check.stdout || "").slice(-4000),
+          );
+        }
+      }
+    }
+
     renameSync(temp, resolved);
     return { path: resolved, sha256: sha256(resolved) };
   } finally {

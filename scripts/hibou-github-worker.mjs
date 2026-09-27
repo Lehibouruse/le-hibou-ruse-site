@@ -1270,6 +1270,8 @@ async function processVideoRender(job, processed) {
     binding: VIDEO_BINDING,
     runtime_commit: runtime.commit,
     runtime_refreshed: runtime.refreshed,
+    production_mode: productionMode,
+    candidates_per_scene: candidatesPerScene,
   });
 
   await reportVideoProgress(job, "Running", {
@@ -1306,6 +1308,16 @@ async function processVideoRender(job, processed) {
     Math.min(2, Number(job.options?.regen_attempts || 1)),
   );
 
+  const productionMode = job.options?.preview_mode === true
+    ? "preview"
+    : "final";
+  const candidatesPerScene = productionMode === "preview"
+    ? 1
+    : Math.max(
+        1,
+        Math.min(3, Number(job.options?.candidates_per_scene || 3)),
+      );
+
   const args = [
     masterScript,
     `--storyboard=${storyboardPath}`,
@@ -1313,6 +1325,8 @@ async function processVideoRender(job, processed) {
     `--output=${dir}`,
     `--max-scenes=${maxScenes}`,
     `--regen-attempts=${regenAttempts}`,
+    `--production-mode=${productionMode}`,
+    `--candidates-per-scene=${candidatesPerScene}`,
   ];
 
   const stylePath = String(

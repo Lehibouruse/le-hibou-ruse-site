@@ -171,6 +171,33 @@ export function buildImagePlan(contract,binding){
   if(!contentId) fail("content_id missing");
   const prefix=String(binding.style_prefix||"").trim();
   const suffix=String(binding.style_suffix||"").trim();
+  const creative=contract?.creative||{};
+  const production=contract?.production||{};
+  const characterLock=String(creative.character_lock||"").trim();
+  const styleLock=String(creative.style_lock||"").trim();
+  const negativeLock=String(creative.negative_prompt||"").trim();
+  const contentBrief=String(creative.content_brief||"").trim();
+  const creativeLockEnabled=Boolean(
+    Object.keys(creative||{}).length
+    && (
+      styleLock
+      || characterLock
+      || negativeLock
+      || contentBrief
+      || creative.text_in_generated_images===false
+      || creative.reference_mode
+    )
+  );
+  const textFreeLock=creativeLockEnabled?[
+    "TEXT_FREE_IMAGE_LOCK:",
+    "Do not render any letters, words, captions, labels, signage, logos, pseudo-text or gibberish inside the generated image.",
+    "All useful text, numbers, captions and the Le Hibou Rusé signature are added later in post-production.",
+    "The image itself must contain zero readable text."
+  ].join(" "):"";
+  const candidatesPerScene=Math.max(
+    1,
+    Math.min(3,Number(production.candidates_per_scene||binding.candidates_per_scene||3))
+  );
   const requests=[];
   const skipped_full_reuse=[];
   for(const scene of contract.scenes||[]){
@@ -180,8 +207,40 @@ export function buildImagePlan(contract,binding){
     }
     const core=String(scene.image_prompt||scene.visual_idea||"").trim();
     if(!core) fail(`${scene.scene_id}: image prompt/visual idea missing`);
-    const prompt=[prefix,core,suffix].filter(Boolean).join(" ");
-    for(let candidate=1;candidate<=3;candidate+=1){
+    const deterministicCharacterOverlay=
+      creativeLockEnabled
+      && String(creative.reference_mode||"")==="deterministic_character_overlay"
+      && Boolean(scene?.framing?.hibou);
+    const sceneWantsHibou=Boolean(scene?.framing?.hibou);
+    const characterGenerationLock=deterministicCharacterOverlay
+      ? [
+          "BACKGROUND_ONLY_LOCK:",
+          "Do not render any owl, bird, animal, mascot or human in this image.",
+          "The canonical Le Hibou Rusé character is composited later in post-production.",
+          "Leave a visually useful foreground area for the character overlay while keeping the environment rich and complete."
+        ].join(" ")
+      : creativeLockEnabled && !sceneWantsHibou
+        ? [
+            "NO_CHARACTER_LOCK:",
+            "Do not render any owl, bird, animal, mascot or human.",
+            "Tell the idea using environment, objects, symbols and composition only."
+          ].join(" ")
+        : creativeLockEnabled
+          ? characterLock
+          : "";
+    const prompt=creativeLockEnabled
+      ? [
+          prefix,
+          characterGenerationLock,
+          styleLock,
+          contentBrief,
+          core,
+          negativeLock?("ABSOLUTELY AVOID: "+negativeLock):"",
+          textFreeLock,
+          suffix
+        ].filter(Boolean).join("\n")
+      : [prefix,core,suffix].filter(Boolean).join(" ");
+    for(let candidate=1;candidate<=candidatesPerScene;candidate+=1){
       const seed=seedFor(contentId,scene.scene_id,candidate);
       const baseOverrides={
         [String(binding.prompt.node_id)]:{[binding.prompt.input]:prompt},
@@ -224,7 +283,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:String(production.mode||"final"),request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

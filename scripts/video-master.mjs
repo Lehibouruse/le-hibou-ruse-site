@@ -9,6 +9,27 @@ function fail(message){ throw new Error(message); }
 function sha256(path){ return createHash("sha256").update(readFileSync(path)).digest("hex"); }
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
+async function ensureCanonicalReference(storyboardData, root){
+  const url=String(storyboardData?.creative?.reference_image_url||"").trim();
+  if(!url) return null;
+  const dir=resolve(root,"reference");
+  mkdirSync(dir,{recursive:true});
+  const target=resolve(dir,"hibou-canonical.webp");
+  if(!existsSync(target)){
+    const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+    if(!response.ok) fail(`canonical Hibou reference download failed HTTP ${response.status}`);
+    const bytes=Buffer.from(await response.arrayBuffer());
+    if(bytes.length<10_000) fail("canonical Hibou reference download unexpectedly small");
+    writeFileSync(target,bytes);
+  }
+  storyboardData.creative={
+    ...(storyboardData.creative||{}),
+    reference_image_local:target,
+    reference_image_sha256:sha256(target),
+    reference_mode:"deterministic_character_overlay"
+  };
+  return target;
+}
 function run(command,args,{env={}}={}){
   const r=spawnSync(command,args,{
     encoding:"utf8",
@@ -270,7 +291,11 @@ async function main(){
     if((sb.scenes||[]).length>policy.max_scenes) fail("storyboard exceeds --max-scenes policy");
   });
 
-  const runtimeCommit=String(json(storyboard).runtime_commit||"").trim();
+  const storyboardData=json(storyboard);
+  const canonicalReference=await ensureCanonicalReference(storyboardData,root);
+  if(canonicalReference) writeJson(storyboard,storyboardData);
+
+  const runtimeCommit=String(storyboardData.runtime_commit||"").trim();
   const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
 
   const voiceDir=resolve(root,"voice");

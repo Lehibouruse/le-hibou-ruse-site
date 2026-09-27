@@ -6,7 +6,7 @@ import {
   TABLES,
   updateRecord,
 } from "../../../lib/airtable";
-import { buildStoryboardContract } from "../../../scripts/video-airtable-sync.mjs";
+import { buildStoryboardContract, resolveCanonicalVideoProfile } from "../../../scripts/video-airtable-sync.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -432,6 +432,10 @@ export async function GET(request) {
             0,
             Math.min(2, Number(options.regen_attempts || 1)),
           ),
+          preview_mode: options.preview_mode === true,
+          candidates_per_scene: options.preview_mode === true
+            ? 1
+            : Math.max(1, Math.min(3, Number(options.candidates_per_scene || 3))),
           report_airtable: false,
           human_review_required: true,
           publication_authorized: false,
@@ -467,7 +471,48 @@ export async function GET(request) {
           scenes.push(await getRecord(TABLES.videoScenes, sceneId));
         }
 
-        job.storyboard = buildStoryboardContract(content, scenes);
+        const profile = await resolveCanonicalVideoProfile(content);
+
+        job.storyboard = buildStoryboardContract(content, scenes, profile);
+        const defaults = job.storyboard?.creative?.production_defaults || {};
+        const preview = options.preview_mode === true;
+        const defaultCandidates = Math.max(
+          1,
+          Math.min(3, Number(defaults.candidates_per_scene || 2)),
+        );
+        const defaultMaxScenes = Math.max(
+          1,
+          Math.min(25, Number(defaults.plans_max || 16)),
+        );
+
+        job.options.max_scenes = Math.max(
+          1,
+          Math.min(25, Number(options.max_scenes || defaultMaxScenes)),
+        );
+        job.options.candidates_per_scene = preview
+          ? 1
+          : Math.max(
+              1,
+              Math.min(3, Number(options.candidates_per_scene || defaultCandidates)),
+            );
+        job.options.regen_attempts = preview
+          ? 0
+          : Math.max(0, Math.min(2, Number(options.regen_attempts || 1)));
+
+        job.storyboard.production = {
+          mode: preview ? "preview" : "final",
+          candidates_per_scene: job.options.candidates_per_scene,
+          regeneration_attempts: job.options.regen_attempts,
+          max_scenes: job.options.max_scenes,
+          image_qc_threshold: Number(defaults.image_qc_threshold || 85),
+          zoom_range_pct: [
+            Number(defaults.zoom_min_pct || 1.5),
+            Number(defaults.zoom_max_pct || 3.5),
+          ],
+          full_master_allowed: !preview,
+          human_review_required: true,
+          publication_authorized: false
+        };
         job.storyboard.runtime_commit = RUNTIME_COMMIT;
       } catch (error) {
         const message = cut(error?.message || error, 1000);

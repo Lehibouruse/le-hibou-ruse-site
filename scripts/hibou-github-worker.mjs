@@ -1741,6 +1741,16 @@ async function processVideoRender(job, processed) {
       requires_separate_render_start: true,
     });
 
+    const preparedMarkerPath = path.join(
+      dir,
+      "_hibou_video_remote_repair_prepared.json",
+    );
+    writeFileSync(
+      preparedMarkerPath,
+      JSON.stringify(repairResumeApplied, null, 2) + "\n",
+      "utf8",
+    );
+
     state.current_job = job.id;
     await reportVideoProgress(job, "Paused", {
       local_path: dir,

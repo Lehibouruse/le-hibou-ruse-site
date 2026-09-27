@@ -8,8 +8,13 @@ import { buildSceneCompositePlan, sceneAssetRefs } from "./video-scene-composito
 
 function fail(message) { throw new Error(message); }
 
-function run(command, args) {
-  const result = spawnSync(command, args, { encoding: "utf8" });
+function run(command, args, { env = {} } = {}) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+    windowsHide: true,
+    shell: false,
+  });
   if (result.status !== 0) fail(`${command} failed: ${result.stderr?.slice(-4000) || result.stdout}`);
   return result.stdout;
 }
@@ -50,6 +55,63 @@ function probe(path) {
 
 function ffmpegFilterPath(path) {
   return resolve(path).replaceAll("\\", "/").replaceAll(":", "\\:").replaceAll("'", "\\'");
+}
+
+function xmlEscape(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+export function buildSubtitleFontRuntime({
+  platform = process.platform,
+  workDir = process.cwd(),
+  windowsDir = process.env.WINDIR || "C:\\Windows",
+} = {}) {
+  if (platform !== "win32") {
+    return {
+      enabled: false,
+      fonts_dir: null,
+      fontconfig_dir: null,
+      fontconfig_file: null,
+      fontconfig_cache: null,
+      fontconfig_xml: null,
+      env: {},
+    };
+  }
+
+  const fontconfigDir = resolve(workDir, "fontconfig");
+  const fontconfigFile = resolve(fontconfigDir, "fonts.conf");
+  const fontconfigCache = resolve(fontconfigDir, "cache");
+  const fontsDir = resolve(windowsDir, "Fonts");
+  const fontconfigXml =
+    '<?xml version="1.0"?>\n' +
+    "<fontconfig>\n" +
+    `  <dir>${xmlEscape(fontsDir.replaceAll("\\", "/"))}</dir>\n` +
+    `  <cachedir>${xmlEscape(fontconfigCache.replaceAll("\\", "/"))}</cachedir>\n` +
+    "</fontconfig>\n";
+
+  return {
+    enabled: true,
+    fonts_dir: fontsDir,
+    fontconfig_dir: fontconfigDir,
+    fontconfig_file: fontconfigFile,
+    fontconfig_cache: fontconfigCache,
+    fontconfig_xml: fontconfigXml,
+    env: {
+      FONTCONFIG_FILE: fontconfigFile,
+      FONTCONFIG_PATH: fontconfigDir,
+    },
+  };
+}
+
+function ensureSubtitleFontRuntime(plan) {
+  if (!plan?.enabled) return;
+  mkdirSync(plan.fontconfig_dir, { recursive: true });
+  mkdirSync(plan.fontconfig_cache, { recursive: true });
+  writeFileSync(plan.fontconfig_file, plan.fontconfig_xml, "utf8");
 }
 
 function anchorExpressions(anchor) {
@@ -129,6 +191,8 @@ export function renderVideoContract(contractPathArg, outputArg) {
   mkdirSync(dirname(output), { recursive: true });
   const work = resolve(root, ".video-render-cache");
   mkdirSync(work, { recursive: true });
+  const subtitleFontRuntime = buildSubtitleFontRuntime({ workDir: work });
+  ensureSubtitleFontRuntime(subtitleFontRuntime);
 
   let sceneCacheHits = 0;
   let sceneCacheMisses = 0;
@@ -210,14 +274,17 @@ export function renderVideoContract(contractPathArg, outputArg) {
     "-t", total.toFixed(3), "-map", "0:v:0", "-map", "1:a:0",
   ];
   if (subtitlePath) {
-    muxArgs.push("-vf", `ass='${ffmpegFilterPath(subtitlePath)}'`,
+    const assFilter = subtitleFontRuntime.enabled
+      ? `ass='${ffmpegFilterPath(subtitlePath)}':fontsdir='${ffmpegFilterPath(subtitleFontRuntime.fonts_dir)}'`
+      : `ass='${ffmpegFilterPath(subtitlePath)}'`;
+    muxArgs.push("-vf", assFilter,
       "-c:v", "libx264", "-preset", preset, "-crf", String(crf), "-pix_fmt", "yuv420p");
   } else {
     muxArgs.push("-c:v", "copy");
   }
   muxArgs.push("-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
     "-movflags", "+faststart", "-shortest", output);
-  run("ffmpeg", muxArgs);
+  run("ffmpeg", muxArgs, { env: subtitleFontRuntime.env });
 
   const data = probe(output);
   const video = data.streams.find(stream => stream.codec_type === "video");
@@ -243,6 +310,13 @@ export function renderVideoContract(contractPathArg, outputArg) {
     audio_sha256: audioHash,
     subtitles_burned_in: Boolean(subtitlePath),
     subtitles_sha256: subtitlePath ? sha256(subtitlePath) : null,
+    subtitle_font_runtime: subtitlePath
+      ? {
+          mode: subtitleFontRuntime.enabled ? "windows_private_fontconfig" : "system_default",
+          fonts_dir: subtitleFontRuntime.fonts_dir,
+          fontconfig_file: subtitleFontRuntime.fontconfig_file,
+        }
+      : null,
   };
 
   contract.scenes.forEach(scene => { scene.measured_duration_s = scene.planned_duration_s; });

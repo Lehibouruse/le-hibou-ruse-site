@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,6 +32,66 @@ function byCandidate(plan) {
 function provisionalCandidate(provisional, sceneId) {
   const row = asObject(provisional)[sceneId];
   return String(row?.selected_candidate_id || "") || null;
+}
+
+function sha256Text(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
+function reviewFingerprint(contentId, scenes) {
+  const normalized = {
+    content_id: String(contentId || "") || null,
+    scenes: asArray(scenes).map((scene) => ({
+      scene_id: String(scene?.scene_id || ""),
+      machine_recommended_candidate_id:
+        String(scene?.machine_recommended_candidate_id || "") || null,
+      candidates: asArray(scene?.candidates).map((candidate) => ({
+        candidate_id: String(candidate?.candidate_id || ""),
+        status: String(candidate?.status || ""),
+        path: String(candidate?.path || "") || null,
+        seed: Number.isFinite(Number(candidate?.seed))
+          ? Number(candidate.seed)
+          : null,
+        request_fingerprint:
+          String(candidate?.request_fingerprint || "") || null,
+        perceptual_score: Number.isFinite(
+          Number(candidate?.perceptual_score),
+        )
+          ? Number(candidate.perceptual_score)
+          : null,
+      })),
+    })),
+  };
+  return sha256Text(JSON.stringify(normalized));
+}
+
+export function buildCandidateDecisionTemplate(review) {
+  if (review?.schema !== CANDIDATE_REVIEW_SCHEMA) {
+    fail("HIBOU_CANDIDATE_REVIEW_V1 required for decision template");
+  }
+  const decisions = {};
+  for (const scene of asArray(review.scenes)) {
+    if (!scene?.reviewable) continue;
+    decisions[String(scene.scene_id)] = {
+      candidate_id: null,
+      human_confirmed: false,
+      note: null,
+    };
+  }
+  return {
+    schema: "HIBOU_HUMAN_IMAGE_SELECTION_V1",
+    content_id: review.content_id || null,
+    review_fingerprint_sha256:
+      String(review.review_fingerprint_sha256 || "") || null,
+    decisions,
+    policy: {
+      human_must_choose_each_reviewable_scene: true,
+      human_confirmed_must_be_true: true,
+      stale_review_fingerprint_rejected: true,
+      publication_authorized: false,
+    },
+    publication_authorized: false,
+  };
 }
 
 function escapeHtml(value) {
@@ -200,9 +261,14 @@ export function buildCandidateReview({
     });
   }
 
+  const contentId =
+    String(plan?.content_id || perceptualQc?.content_id || "") || null;
+  const reviewFingerprintSha256 = reviewFingerprint(contentId, outputScenes);
+
   return {
     schema: CANDIDATE_REVIEW_SCHEMA,
-    content_id: String(plan?.content_id || perceptualQc?.content_id || "") || null,
+    content_id: contentId,
+    review_fingerprint_sha256: reviewFingerprintSha256,
     scene_count: outputScenes.length,
     blocking_scene_count: blockingSceneCount,
     all_scenes_reviewable: blockingSceneCount === 0,
@@ -239,6 +305,13 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   });
 
   writeFileSync(resolve(outputPath), JSON.stringify(review, null, 2) + "\n");
+  const templatePath = resolve(
+    resolve(outputPath).replace(/\.json$/i, "") + ".decisions.template.json",
+  );
+  writeFileSync(
+    templatePath,
+    JSON.stringify(buildCandidateDecisionTemplate(review), null, 2) + "\n",
+  );
   if (htmlPath) {
     writeFileSync(resolve(htmlPath), renderCandidateReviewHtml(review));
   }

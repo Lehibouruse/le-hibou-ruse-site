@@ -10,20 +10,36 @@ function sha256(path){ return createHash("sha256").update(readFileSync(path)).di
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
 async function ensureCanonicalReference(storyboardData, root){
-  const url=String(storyboardData?.creative?.reference_image_url||"").trim();
-  if(!url) return null;
+  const creative=storyboardData?.creative||{};
+  const url=String(creative.reference_image_url||"").trim();
+  const repoPath=String(creative.reference_asset_repo_path||"").trim();
+  const commit=String(storyboardData?.runtime_commit||"").trim().toLowerCase();
+  if(!url&&!repoPath) return null;
   const dir=resolve(root,"reference");
   mkdirSync(dir,{recursive:true});
   const target=resolve(dir,"hibou-canonical.webp");
   if(!existsSync(target)){
-    const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
-    if(!response.ok) fail(`canonical Hibou reference download failed HTTP ${response.status}`);
-    const bytes=Buffer.from(await response.arrayBuffer());
-    if(bytes.length<10_000) fail("canonical Hibou reference download unexpectedly small");
+    let bytes=null;
+    if(repoPath){
+      if(!/^[0-9a-f]{40}$/.test(commit)) fail("canonical Hibou asset requires valid runtime_commit");
+      const assetUrl=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${commit}/${repoPath}`;
+      const response=await fetch(assetUrl,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+      if(!response.ok) fail(`canonical Hibou embedded asset download failed HTTP ${response.status}`);
+      const encoded=(await response.text()).replace(/\\s+/g,"");
+      bytes=Buffer.from(encoded,"base64");
+    }else{
+      const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+      if(!response.ok) fail(`canonical Hibou reference download failed HTTP ${response.status}`);
+      bytes=Buffer.from(await response.arrayBuffer());
+    }
+    if(!bytes||bytes.length<10_000) fail("canonical Hibou reference download unexpectedly small");
+    if(bytes.toString("ascii",0,4)!=="RIFF"||bytes.toString("ascii",8,12)!=="WEBP"){
+      fail("canonical Hibou reference is not a valid WebP payload");
+    }
     writeFileSync(target,bytes);
   }
   storyboardData.creative={
-    ...(storyboardData.creative||{}),
+    ...creative,
     reference_image_local:target,
     reference_image_sha256:sha256(target),
     reference_mode:"deterministic_character_overlay"

@@ -3,6 +3,7 @@ import copy
 import gc
 import hashlib
 import inspect
+import importlib.metadata
 import json
 import os
 import random
@@ -186,14 +187,58 @@ if needs_generation:
     if device.startswith("cuda") and not torch.cuda.is_available():
         fail("CUDA requested but unavailable; no silent CPU/cloud fallback")
     clear_cuda_cache()
+    signature = inspect.signature(ChatterboxMultilingualTTS.from_pretrained)
+    load_kwargs = {"device": device}
+    if "t3_model" in signature.parameters:
+        load_kwargs["t3_model"] = model_variant
+
     try:
-        signature = inspect.signature(ChatterboxMultilingualTTS.from_pretrained)
-        load_kwargs = {"device": device}
-        if "t3_model" in signature.parameters:
-            load_kwargs["t3_model"] = model_variant
+        chatterbox_version = importlib.metadata.version("chatterbox-tts")
+    except Exception:
+        chatterbox_version = "unknown"
+
+    try:
         model = ChatterboxMultilingualTTS.from_pretrained(**load_kwargs)
     except Exception as exc:
-        fail(f"Chatterbox model load failed on {device}: {exc}")
+        root = f"{type(exc).__name__}: {exc}"
+        print(
+            f"HIBOU_CHATTERBOX_LOAD_ROOT_CAUSE version={chatterbox_version} device={device} error={root}",
+            file=sys.stderr,
+            flush=True,
+        )
+        if re.search(r"trailing characters|Tokenizer\.from_file|grapheme_mtl", str(exc), re.I):
+            try:
+                from huggingface_hub import hf_hub_download
+                print(
+                    "HIBOU_CHATTERBOX_TOKENIZER_REPAIR forcing grapheme tokenizer redownload",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                hf_hub_download(
+                    repo_id="ResembleAI/chatterbox",
+                    filename="grapheme_mtl_merged_expanded_v1.json",
+                    force_download=True,
+                    token=os.getenv("HF_TOKEN"),
+                )
+                clear_cuda_cache()
+                model = ChatterboxMultilingualTTS.from_pretrained(**load_kwargs)
+                print(
+                    "HIBOU_CHATTERBOX_TOKENIZER_REPAIR_OK",
+                    file=sys.stderr,
+                    flush=True,
+                )
+            except Exception as retry_exc:
+                retry_root = f"{type(retry_exc).__name__}: {retry_exc}"
+                print(
+                    f"HIBOU_CHATTERBOX_TOKENIZER_REPAIR_FAILED error={retry_root}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                fail(
+                    f"Chatterbox model load failed on {device}; tokenizer repair retry failed: {retry_exc}"
+                )
+        else:
+            fail(f"Chatterbox model load failed on {device}: {exc}")
     if audio_prompt:
         model.prepare_conditionals(audio_prompt, exaggeration=default_exaggeration)
     sample_rate = int(model.sr)

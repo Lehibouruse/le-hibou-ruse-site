@@ -1578,7 +1578,7 @@ async function processVideoRender(job, processed) {
       };
     } catch {}
   }
-  const pipelineStatePath = path.join(dir, "pipeline-run.json");
+  
   if (existsSync(pipelineStatePath)) {
     try {
       const pipeline = JSON.parse(readFileSync(pipelineStatePath, "utf8"));

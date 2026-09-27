@@ -6,6 +6,8 @@ const sync=readFileSync(new URL("../scripts/video-airtable-sync.mjs",import.meta
 const promote=readFileSync(new URL("../scripts/video-storyboard-promote.mjs",import.meta.url),"utf8");
 const worker=readFileSync(new URL("../scripts/hibou-github-worker.mjs",import.meta.url),"utf8");
 const queueRoute=readFileSync(new URL("../app/api/local-worker-queue/route.js",import.meta.url),"utf8");
+const candidateReview=readFileSync(new URL("../scripts/video-candidate-review.mjs",import.meta.url),"utf8");
+const humanReview=readFileSync(new URL("../scripts/video-human-review-package.mjs",import.meta.url),"utf8");
 
 test("V5 execution needs both GLOBAL contract feature and local runtime gate",()=>{
  assert.match(master,/contract\?\.features\?\.\[name\]===true && envFlag\(envName\)/);
@@ -68,4 +70,28 @@ test("remote incremental reuse accepts only a prior Airtable job id and never an
  assert.match(worker,/--reuse-from=\$\{previousRoot\}/);
  assert.match(worker,/path\.join\([\s\S]*VIDEO_OUTPUT_ROOT[\s\S]*safePart\(reuseFromJobId\)/);
  assert.doesNotMatch(queueRoute,/reuse_from_path/);
+});
+
+
+test("image ranking produces a separate advisory human candidate review artifact",()=>{
+ assert.match(master,/video-candidate-review\.mjs/);
+ assert.match(master,/candidate-review\.json/);
+ assert.match(master,/machine_ranking_is_advisory:true/);
+ assert.match(master,/human_candidate_review_required:true/);
+ assert.match(candidateReview,/HIBOU_CANDIDATE_REVIEW_V1/);
+ assert.match(candidateReview,/human_selected_candidate_id: null/);
+ assert.match(candidateReview,/no_candidate_is_auto_approved: true/);
+ assert.match(candidateReview,/publication_authorized: false/);
+});
+
+test("V4 master produces a consolidated human-review manifest before publication",()=>{
+ assert.match(master,/video-human-review-package\.mjs/);
+ assert.match(master,/stage\(state,"human_review_manifest"/);
+ assert.match(master,/human-review\.json/);
+ assert.match(master,/kind:"human_review"/);
+ assert.match(master,/human_review_package:state\.human_review\|\|null/);
+ assert.match(humanReview,/HIBOU_HUMAN_REVIEW_PACKAGE_V1/);
+ assert.match(humanReview,/PENDING_HUMAN_REVIEW/);
+ assert.match(humanReview,/all_checklist_items_require_human_decision: true/);
+ assert.match(humanReview,/publication_authorized: false/);
 });

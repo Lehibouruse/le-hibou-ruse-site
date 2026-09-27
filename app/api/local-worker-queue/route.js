@@ -53,6 +53,53 @@ function parseOptions(value) {
   }
 }
 
+function selectName(value) {
+  return typeof value === "object" && value
+    ? String(value.name || "")
+    : String(value || "");
+}
+
+function sortPendingRecords(records) {
+  const priorityRank = new Map([
+    ["High", 0],
+    ["Normal", 1],
+    ["Low", 2],
+  ]);
+
+  return [...records].sort((a, b) => {
+    const aPriority = priorityRank.get(
+      selectName(a.fields?.["Priorit\u00e9"]),
+    ) ?? 99;
+    const bPriority = priorityRank.get(
+      selectName(b.fields?.["Priorit\u00e9"]),
+    ) ?? 99;
+
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
+
+    const aCreated = Date.parse(
+      a.fields?.["Cr\u00e9\u00e9 le"] || a.createdTime || "",
+    );
+    const bCreated = Date.parse(
+      b.fields?.["Cr\u00e9\u00e9 le"] || b.createdTime || "",
+    );
+
+    const aTime = Number.isFinite(aCreated)
+      ? aCreated
+      : Number.MAX_SAFE_INTEGER;
+    const bTime = Number.isFinite(bCreated)
+      ? bCreated
+      : Number.MAX_SAFE_INTEGER;
+
+    if (aTime !== bTime) {
+      return aTime - bTime;
+    }
+
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
+}
+
 function linkedIds(value) {
   if (!Array.isArray(value)) return [];
   return value
@@ -329,10 +376,11 @@ export async function GET(request) {
     const reconciliation = await reconcileStaleRunning(request);
     const auto_activation = await autoActivateWhenWorkerReady(request);
 
-    const records = await queryRecords(TABLES.localWorkerQueue, {
+    const pendingRecords = await queryRecords(TABLES.localWorkerQueue, {
       filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
-      pageSize: 5,
+      pageSize: 50,
     });
+    const records = sortPendingRecords(pendingRecords).slice(0, 5);
 
     const jobs = [];
 

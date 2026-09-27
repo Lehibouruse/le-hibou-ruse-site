@@ -334,6 +334,9 @@
         },
         "video_incremental_retouch_v1": {
           "type": "boolean"
+        },
+        "video_human_candidate_selection_v1": {
+          "type": "boolean"
         }
       },
       "additionalProperties": true

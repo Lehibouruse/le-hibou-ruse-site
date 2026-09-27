@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTechnicalSelections, masterPolicy, normalizeExecutionProfileOverride } from "../scripts/video-master.mjs";
+import { buildFeatureActivationManifest, buildTechnicalSelections, masterPolicy, normalizeExecutionProfileOverride } from "../scripts/video-master.mjs";
 
 test("master orchestrator is bounded and publication locked",()=>{
  const p=masterPolicy();
@@ -30,4 +30,36 @@ test("job-level preview execution override is bounded and does not imply publica
  assert.deepEqual(p,{production_mode:"preview",candidates_per_scene:1});
  assert.throws(()=>normalizeExecutionProfileOverride({mode:"turbo",candidates:"1"}),/preview or final/);
  assert.throws(()=>normalizeExecutionProfileOverride({mode:"preview",candidates:"4"}),/1\.\.3/);
+});
+
+test("V5 integration gate activates every feature requested by GLOBAL profile",()=>{
+ const contract={features:{
+   video_timeline_v1:true,
+   video_prosody_v1:true,
+   video_pose_registry_v1:true,
+   video_creative_qc_v1:true,
+   video_music_mix_v1:false,
+   video_incremental_retouch_v1:true,
+   video_human_candidate_selection_v1:true
+ }};
+ const m=buildFeatureActivationManifest(contract,{
+   integrationEnabled:true,
+   envLookup:()=>false
+ });
+ assert.equal(m.integration_enabled,true);
+ assert.deepEqual(m.blocked_requested_features,[]);
+ assert.equal(m.rows.find(x=>x.feature==="video_timeline_v1").active,true);
+ assert.equal(m.rows.find(x=>x.feature==="video_music_mix_v1").active,false);
+});
+
+test("requested V5 bricks cannot be silently skipped when runtime gates are absent",()=>{
+ const contract={features:{video_timeline_v1:true,video_prosody_v1:true}};
+ const m=buildFeatureActivationManifest(contract,{
+   integrationEnabled:false,
+   envLookup:()=>false
+ });
+ assert.deepEqual(
+   m.blocked_requested_features,
+   ["video_timeline_v1","video_prosody_v1"]
+ );
 });

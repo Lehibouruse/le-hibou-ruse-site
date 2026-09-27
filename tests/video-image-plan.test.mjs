@@ -127,3 +127,31 @@ test("FINAL keeps the premium local profile and multi-candidate policy",()=>{
 test("unknown production modes fail closed",()=>{
  assert.throws(()=>normalizeProductionMode("turbo"),/preview or final/);
 });
+
+test("deterministic Hibou overlay routes GLOBAL and SPECIFIC prompts without contaminating FLUX",()=>{
+  const routed=structuredClone(contract);
+  routed.creative={
+    style_lock:"IDENTITÉ : même Hibou canonique, monocle doré. STYLE : illustration éditoriale 2D premium. DÉCOR : environnement contemporain lisible. COHÉRENCE : personnage stable. GRAMMAIRE CONCURRENTIELLE ADAPTÉE : une idée visuelle principale par scène.",
+    character_lock:"HIBOU CANONIQUE — yeux jaunes, monocle doré, costume noir.",
+    content_brief:"SCÈNE 1 : hook. SCÈNE 2 : détail caché. SCÈNE 3 : portefeuille.",
+    negative_prompt:"no humans, no text",
+    reference_mode:"deterministic_character_overlay",
+    text_in_generated_images:false
+  };
+  routed.scenes[0].framing={hibou:true};
+  routed.scenes[0].image_prompt="Banque privée stylisée, espace vide au premier plan.";
+  const p=buildImagePlan(routed,binding);
+  const item=p.requests.find(x=>x.scene_id==="S01");
+  const prompt=item.request.overrides["6"].text;
+  assert.match(prompt,/BACKGROUND_ONLY_LOCK/);
+  assert.match(prompt,/illustration éditoriale 2D premium/);
+  assert.match(prompt,/Banque privée stylisée/);
+  assert.doesNotMatch(prompt,/même Hibou canonique/);
+  assert.doesNotMatch(prompt,/monocle doré/);
+  assert.doesNotMatch(prompt,/SCÈNE 2/);
+  assert.doesNotMatch(prompt,/SCÈNE 3/);
+  assert.equal(item.prompt_application.mode,"background_only");
+  assert.equal(item.prompt_application.scene_specific_prompt_applied,true);
+  assert.equal(item.prompt_application.raw_specific_brief_injected,false);
+  assert.equal(item.prompt_application.raw_character_lock_injected,false);
+});

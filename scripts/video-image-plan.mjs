@@ -65,6 +65,65 @@ function seedFor(contentId,sceneId,candidate){
   return h.readUInt32BE(0);
 }
 
+function sha256Text(value){
+  return createHash("sha256").update(String(value||""),"utf8").digest("hex");
+}
+
+const BACKGROUND_STYLE_SECTION_LABELS=[
+  "STYLE",
+  "DÉCOR",
+  "DECOR",
+  "GRAMMAIRE CONCURRENTIELLE ADAPTÉE",
+  "GRAMMAIRE CONCURRENTIELLE ADAPTEE"
+];
+
+function extractBackgroundStyleLock(styleLock){
+  const source=String(styleLock||"").trim();
+  if(!source) return "";
+  const labelRe=/(?:^|\n|\.\s+)([A-ZÀ-ÖØ-ÝŒÆÉÈÊËÀÂÄÙÛÜÎÏÔÖÇ][A-ZÀ-ÖØ-ÝŒÆÉÈÊËÀÂÄÙÛÜÎÏÔÖÇ0-9 /&'’-]{2,})\s*:\s*/gu;
+  const matches=[...source.matchAll(labelRe)];
+  if(matches.length){
+    const kept=[];
+    for(let i=0;i<matches.length;i+=1){
+      const label=String(matches[i][1]||"").trim();
+      const start=matches[i].index+matches[i][0].length;
+      const end=i+1<matches.length?matches[i+1].index:source.length;
+      if(BACKGROUND_STYLE_SECTION_LABELS.includes(label)){
+        kept.push(`${label}: ${source.slice(start,end).trim().replace(/[.\s]+$/u,"")}`);
+      }
+    }
+    if(kept.length) return kept.join(". ");
+  }
+  return source
+    .split(/(?<=[.!?])\s+/u)
+    .filter(part=>!/\b(?:hibou|owl|oiseau|bird|mascotte|mascot|personnage|character|monocle|plumage|plumes|yeux|tête|corps|costume|dandy)\b/iu.test(part))
+    .join(" ")
+    .trim();
+}
+
+export function compileBackgroundPromptPolicy(creative,sceneCore){
+  const styleLock=String(creative?.style_lock||"").trim();
+  const characterLock=String(creative?.character_lock||"").trim();
+  const contentBrief=String(creative?.content_brief||"").trim();
+  const negativeLock=String(creative?.negative_prompt||"").trim();
+  const scenePrompt=String(sceneCore||"").trim();
+  return {
+    background_style_lock:extractBackgroundStyleLock(
+      String(creative?.background_style_lock||"").trim()||styleLock
+    ),
+    scene_prompt:scenePrompt,
+    negative_prompt:negativeLock,
+    provenance:{
+      global_style_sha256:sha256Text(styleLock),
+      character_lock_sha256:sha256Text(characterLock),
+      specific_brief_sha256:sha256Text(contentBrief),
+      scene_prompt_sha256:sha256Text(scenePrompt),
+      character_lock_route:"deterministic_character_overlay",
+      specific_brief_route:"scene_contract_not_raw_image_conditioning"
+    }
+  };
+}
+
 function workflowNodes(workflow){
   return Object.entries(workflow||{}).filter(([,node])=>
     node&&typeof node==="object"&&node.inputs&&typeof node.inputs==="object"
@@ -245,12 +304,17 @@ export function buildImagePlan(contract,binding){
         : creativeLockEnabled
           ? characterLock
           : "";
+    const compiledPromptPolicy=compileBackgroundPromptPolicy(creative,core);
+    const backgroundOnly=deterministicCharacterOverlay||(creativeLockEnabled&&!sceneWantsHibou);
+    const imageStyleLock=backgroundOnly
+      ?compiledPromptPolicy.background_style_lock
+      :styleLock;
     const prompt=creativeLockEnabled
       ? [
           prefix,
           characterGenerationLock,
-          styleLock,
-          contentBrief,
+          imageStyleLock,
+          backgroundOnly?"":characterLock,
           core,
           negativeLock?("ABSOLUTELY AVOID: "+negativeLock):"",
           textFreeLock,
@@ -295,6 +359,14 @@ export function buildImagePlan(contract,binding){
         scene_id:scene.scene_id,
         candidate,
         seed,
+        prompt_application:{
+          mode:backgroundOnly?"background_only":"direct_scene_generation",
+          global_style_applied:Boolean(imageStyleLock),
+          scene_specific_prompt_applied:true,
+          raw_specific_brief_injected:false,
+          raw_character_lock_injected:!backgroundOnly&&Boolean(characterLock),
+          ...compiledPromptPolicy.provenance
+        },
         request,
         fallback_request:fallbackRequest
       });

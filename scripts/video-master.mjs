@@ -10,7 +10,47 @@ function sha256(path){ return createHash("sha256").update(readFileSync(path)).di
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
 function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
-function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
+
+export const V5_FEATURE_GATES=[
+  ["video_timeline_v1","HIBOU_VIDEO_TIMELINE_V1"],
+  ["video_prosody_v1","HIBOU_VIDEO_PROSODY_V1"],
+  ["video_pose_registry_v1","HIBOU_VIDEO_POSE_REGISTRY_V1"],
+  ["video_creative_qc_v1","HIBOU_VIDEO_CREATIVE_QC_V1"],
+  ["video_music_mix_v1","HIBOU_VIDEO_MUSIC_V1"],
+  ["video_incremental_retouch_v1","HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1"],
+  ["video_human_candidate_selection_v1","HIBOU_VIDEO_HUMAN_SELECTION_V1"]
+];
+
+export function buildFeatureActivationManifest(contract,{
+  integrationEnabled=envFlag("HIBOU_VIDEO_V5_INTEGRATION"),
+  envLookup=envFlag
+}={}){
+  const rows=V5_FEATURE_GATES.map(([feature,env_name])=>{
+    const requested=contract?.features?.[feature]===true;
+    const individual_runtime_gate=Boolean(envLookup(env_name));
+    const runtime_enabled=individual_runtime_gate||Boolean(integrationEnabled);
+    return {
+      feature,
+      env_name,
+      requested,
+      individual_runtime_gate,
+      integration_gate:Boolean(integrationEnabled),
+      runtime_enabled,
+      active:requested&&runtime_enabled
+    };
+  });
+  return {
+    schema:"HIBOU_VIDEO_V5_FEATURE_ACTIVATION_V1",
+    integration_enabled:Boolean(integrationEnabled),
+    rows,
+    blocked_requested_features:rows.filter(x=>x.requested&&!x.runtime_enabled).map(x=>x.feature)
+  };
+}
+
+function contractFeature(contract,name,envName){
+  const integrationEnabled=envFlag("HIBOU_VIDEO_V5_INTEGRATION");
+  return contract?.features?.[name]===true && (integrationEnabled||envFlag(envName));
+}
 async function ensureCanonicalReference(storyboardData, root){
   const creative=storyboardData?.creative||{};
   const url=String(creative.reference_image_url||"").trim();
@@ -444,6 +484,17 @@ async function main(){
     };
     writeJson(statePath,state);
   }
+  const featureActivation=buildFeatureActivationManifest(storyboardData);
+  state.feature_activation=featureActivation;
+  writeJson(statePath,state);
+  if(featureActivation.blocked_requested_features.length){
+    fail(
+      "V5 features requested by GLOBAL profile but not runtime-enabled: "
+      +featureActivation.blocked_requested_features.join(", ")
+      +". Enable HIBOU_VIDEO_V5_INTEGRATION=true or the matching individual gates before rendering."
+    );
+  }
+
   const timelineEnabled=contractFeature(storyboardData,"video_timeline_v1","HIBOU_VIDEO_TIMELINE_V1");
   if(!timelineEnabled){
     let stripped=0;

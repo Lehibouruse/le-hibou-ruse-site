@@ -11,7 +11,7 @@ const humanReview=readFileSync(new URL("../scripts/video-human-review-package.mj
 
 test("V5 execution needs both GLOBAL contract feature and local runtime gate",()=>{
  assert.match(master,/contract\?\.features\?\.\[name\]===true && envFlag\(envName\)/);
- for(const name of ["HIBOU_VIDEO_TIMELINE_V1","HIBOU_VIDEO_PROSODY_V1","HIBOU_VIDEO_MUSIC_V1","HIBOU_VIDEO_CREATIVE_QC_V1","HIBOU_VIDEO_POSE_REGISTRY_V1","HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1"]) assert.match(master,new RegExp(name));
+ for(const name of ["HIBOU_VIDEO_TIMELINE_V1","HIBOU_VIDEO_PROSODY_V1","HIBOU_VIDEO_MUSIC_V1","HIBOU_VIDEO_CREATIVE_QC_V1","HIBOU_VIDEO_POSE_REGISTRY_V1","HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1","HIBOU_VIDEO_HUMAN_SELECTION_V1"]) assert.match(master,new RegExp(name));
 });
 
 test("Airtable export separates GLOBAL feature/music configuration from scene-specific events",()=>{
@@ -94,4 +94,20 @@ test("V4 master produces a consolidated human-review manifest before publication
  assert.match(humanReview,/PENDING_HUMAN_REVIEW/);
  assert.match(humanReview,/all_checklist_items_require_human_decision: true/);
  assert.match(humanReview,/publication_authorized: false/);
+});
+
+
+test("FINAL human candidate checkpoint pauses cleanly and resumes without regenerating images",()=>{
+ assert.match(master,/video_human_candidate_selection_v1/);
+ assert.match(master,/HIBOU_VIDEO_HUMAN_SELECTION_V1/);
+ assert.match(master,/WAITING_HUMAN_SELECTION/);
+ assert.match(master,/awaiting-human-selection\.json/);
+ assert.match(master,/candidate-decisions\.json/);
+ assert.match(master,/video-candidate-selection-apply\.mjs/);
+ assert.match(master,/unlinkSync\(waitingHumanSelectionPath\)/);
+ assert.match(worker,/HIBOU_VIDEO_RENDER_WAITING_HUMAN_SELECTION_V1/);
+ assert.match(worker,/reportVideoProgress\(job, "Paused"/);
+ assert.match(worker,/images_will_be_reused: true/);
+ assert.match(queueRoute,/isHumanSelectionPause/);
+ assert.match(queueRoute,/ALLOWED_STATUS = new Set\(\["Running", "Paused"/);
 });

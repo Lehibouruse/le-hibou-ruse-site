@@ -860,6 +860,35 @@ function pipelineHeartbeatSnapshot(dir) {
   }
 }
 
+function progressIdentity(progress) {
+  const stageProgress = progress?.stage_progress || null;
+  return JSON.stringify({
+    current_stage: progress?.current_stage || null,
+    completed_stages: Array.isArray(progress?.completed_stages)
+      ? progress.completed_stages
+      : [],
+    failed_stages: Array.isArray(progress?.failed_stages)
+      ? progress.failed_stages
+      : [],
+    stage_progress: stageProgress
+      ? {
+          unit: stageProgress.unit || null,
+          completed_units: Number(stageProgress.completed_units || 0),
+          failed_units: Number(stageProgress.failed_units || 0),
+          visual_ready: stageProgress.visual_ready === true,
+        }
+      : null,
+  });
+}
+
+function stagnationThresholdSeconds(stage) {
+  const normalized = String(stage || "").trim().toLowerCase();
+  if (normalized === "images") return 12 * 60;
+  if (normalized === "voice") return 10 * 60;
+  if (normalized === "render") return 8 * 60;
+  return 10 * 60;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -2013,10 +2042,30 @@ async function processVideoRender(job, processed) {
     state.render_client_id = renderClientId;
     state.render_started_at = new Date().toISOString();
     state.last_video_heartbeat_at = state.render_started_at;
+    let lastProgressIdentity = null;
+    let lastProgressChangedAtMs = Date.now();
 
     const heartbeat = setInterval(() => {
       const progress = pipelineHeartbeatSnapshot(dir);
       const heartbeatAt = new Date().toISOString();
+      const heartbeatMs = Date.now();
+      const identity = progressIdentity(progress);
+      if (identity !== lastProgressIdentity) {
+        lastProgressIdentity = identity;
+        lastProgressChangedAtMs = heartbeatMs;
+      }
+      const noProgressSeconds = Math.max(
+        0,
+        Math.round((heartbeatMs - lastProgressChangedAtMs) / 100) / 10,
+      );
+      const stagnationThreshold = stagnationThresholdSeconds(
+        progress.current_stage,
+      );
+      const stageKnown = !["", "starting", "unknown"].includes(
+        String(progress.current_stage || "").trim().toLowerCase(),
+      );
+      const stagnationWarning =
+        stageKnown && noProgressSeconds >= stagnationThreshold;
       state.last_video_heartbeat_at = heartbeatAt;
       reportVideoProgress(job, "Running", {
         local_path: dir,
@@ -2035,6 +2084,9 @@ async function processVideoRender(job, processed) {
           stage_started_at: progress.stage_started_at,
           stage_elapsed_seconds: progress.stage_elapsed_seconds,
           stage_progress: progress.stage_progress,
+          stagnation_warning: stagnationWarning,
+          no_progress_seconds: noProgressSeconds,
+          stagnation_threshold_seconds: stagnationThreshold,
         },
       }).catch((error) => {
         log("VIDEO_RENDER heartbeat failed", {

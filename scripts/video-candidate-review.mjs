@@ -33,6 +33,91 @@ function provisionalCandidate(provisional, sceneId) {
   return String(row?.selected_candidate_id || "") || null;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function imageHref(path) {
+  if (!path) return "";
+  try {
+    return pathToFileURL(resolve(path)).href;
+  } catch {
+    return "";
+  }
+}
+
+export function renderCandidateReviewHtml(review) {
+  if (review?.schema !== CANDIDATE_REVIEW_SCHEMA) {
+    fail("HIBOU_CANDIDATE_REVIEW_V1 required for HTML");
+  }
+
+  const sceneBlocks = asArray(review.scenes).map((scene) => {
+    const cards = asArray(scene.candidates).map((candidate) => {
+      const recommended =
+        candidate.candidate_id === scene.machine_recommended_candidate_id;
+      const warnings = asArray(candidate.warnings).join(", ") || "—";
+      const reasons = asArray(candidate.reasons).join(", ") || "—";
+      const href = imageHref(candidate.path);
+      return `
+        <article class="candidate">
+          <div class="candidate-head">
+            <strong>${escapeHtml(candidate.candidate_id)}</strong>
+            <span>${escapeHtml(candidate.status)}</span>
+            ${recommended ? '<span class="recommended">recommandation machine</span>' : ""}
+          </div>
+          ${href ? `<img src="${escapeHtml(href)}" alt="${escapeHtml(candidate.candidate_id)}">` : '<div class="missing">Image indisponible</div>'}
+          <dl>
+            <dt>Score perceptuel</dt><dd>${escapeHtml(candidate.perceptual_score ?? "—")}</dd>
+            <dt>Warnings</dt><dd>${escapeHtml(warnings)}</dd>
+            <dt>Rejets</dt><dd>${escapeHtml(reasons)}</dd>
+            <dt>Seed</dt><dd>${escapeHtml(candidate.seed ?? "—")}</dd>
+          </dl>
+        </article>`;
+    }).join("\n");
+
+    return `
+      <section class="scene">
+        <h2>${escapeHtml(scene.scene_id)}</h2>
+        <p>Recommandation machine : <strong>${escapeHtml(scene.machine_recommended_candidate_id || "aucune")}</strong> · Décision humaine : <strong>EN ATTENTE</strong></p>
+        <div class="grid">${cards}</div>
+      </section>`;
+  }).join("\n");
+
+  return `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Le Hibou Rusé — revue candidats images</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;margin:24px;background:#f7f4ec;color:#172331}
+header{max-width:1100px;margin:auto auto 24px}
+.scene{max-width:1100px;margin:0 auto 36px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.candidate{background:white;border:1px solid #d8d2c3;border-radius:14px;padding:12px}
+.candidate img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px;background:#eee}
+.candidate-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.recommended{background:#e8dfb8;padding:2px 7px;border-radius:999px;font-size:12px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:5px 10px;font-size:13px}
+dt{font-weight:700} dd{margin:0}.missing{aspect-ratio:9/16;display:grid;place-items:center;background:#eee;border-radius:10px}
+.notice{padding:12px 14px;background:#fff6cf;border-radius:10px}
+</style>
+</head>
+<body>
+<header>
+<h1>Revue des candidats images</h1>
+<p class="notice">Le ranking est uniquement consultatif. Aucun candidat n’est approuvé automatiquement. La sélection finale reste humaine.</p>
+<p>Contenu : ${escapeHtml(review.content_id || "—")} · Scènes : ${escapeHtml(review.scene_count)} · Blocages : ${escapeHtml(review.blocking_scene_count)}</p>
+</header>
+${sceneBlocks}
+</body>
+</html>\n`;
+}
+
 export function buildCandidateReview({
   plan,
   perceptualQc,
@@ -136,7 +221,7 @@ export function buildCandidateReview({
 }
 
 if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const [planPath, perceptualPath, provisionalPath, outputPath] =
+  const [planPath, perceptualPath, provisionalPath, outputPath, htmlPath] =
     process.argv.slice(2);
 
   if (!planPath || !perceptualPath || !provisionalPath || !outputPath) {
@@ -154,6 +239,9 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   });
 
   writeFileSync(resolve(outputPath), JSON.stringify(review, null, 2) + "\n");
+  if (htmlPath) {
+    writeFileSync(resolve(htmlPath), renderCandidateReviewHtml(review));
+  }
   process.stdout.write(
     JSON.stringify({
       ok: true,

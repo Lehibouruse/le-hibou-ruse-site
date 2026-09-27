@@ -321,6 +321,24 @@ async function main(){
   });
 
   const storyboardData=json(storyboard);
+  const timelineEnabled=contractFeature(storyboardData,"video_timeline_v1","HIBOU_VIDEO_TIMELINE_V1");
+  if(!timelineEnabled){
+    let stripped=0;
+    for(const scene of storyboardData.scenes||[]){
+      if(scene.timeline){
+        delete scene.timeline;
+        stripped+=1;
+      }
+    }
+    if(stripped){
+      state.timeline_v1={enabled:false,stripped_scene_count:stripped,reason:"GLOBAL contract + runtime gate required"};
+      writeJson(storyboard,storyboardData);
+      writeJson(statePath,state);
+    }
+  }else{
+    state.timeline_v1={enabled:true,stripped_scene_count:0};
+    writeJson(statePath,state);
+  }
   const canonicalReference=await ensureCanonicalReference(storyboardData,root);
   if(canonicalReference) writeJson(storyboard,storyboardData);
 
@@ -566,6 +584,7 @@ async function main(){
     qc_status:json(masterQc).status,
     creative_qc_status:state.creative_qc_status||"DISABLED",
     features:{
+      video_timeline_v1:timelineEnabled,
       video_prosody_v1:prosodyEnabled,
       video_music_mix_v1:musicEnabled,
       video_creative_qc_v1:creativeQcEnabled,

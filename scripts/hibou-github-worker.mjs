@@ -21,6 +21,32 @@ const ONCE = process.argv.includes("--once");
 const DIAGNOSTIC = process.argv.includes("--diagnostic");
 const EXECUTION_ENABLED = String(process.env.HIBOU_LOCAL_EXECUTION_ENABLED || "").trim().toLowerCase() === "true";
 const APPROVED_JOB_ID = String(process.env.HIBOU_LOCAL_APPROVED_JOB_ID || "").trim();
+const VIDEO_QUEUE_URL =
+  process.env.HIBOU_VIDEO_QUEUE_URL ||
+  "https://d4d5d6.com/api/local-worker-queue";
+
+const VIDEO_RENDER_ENABLED =
+  String(process.env.HIBOU_VIDEO_RENDER_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
+
+const PROJECT_ROOT =
+  process.env.HIBOU_PROJECT_ROOT ||
+  path.join(os.homedir(), "le-hibou-ruse-site");
+
+const VIDEO_BINDING =
+  process.env.HIBOU_VIDEO_BINDING ||
+  path.join(
+    os.homedir(),
+    "Documents",
+    "Codex",
+    "HibouVideo",
+    "comfyui-binding.json",
+  );
+
+const VIDEO_OUTPUT_ROOT =
+  process.env.HIBOU_VIDEO_OUTPUT_ROOT ||
+  path.join(ROOT, "video-renders");
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -29,12 +55,15 @@ const ALLOWED_HOSTS = new Set([
 
 mkdirSync(ROOT, { recursive: true });
 mkdirSync(LOG_DIR, { recursive: true });
+if (VIDEO_RENDER_ENABLED) {
+  mkdirSync(VIDEO_OUTPUT_ROOT, { recursive: true });
+}
 
 let state = {
   started_at: new Date().toISOString(),
   worker: WORKER_ID,
   status: "starting",
-  queue_mode: "github-public-readonly",
+  queue_mode: "github-public-readonly+authenticated-video-render",
   current_job: null,
   last_error: null,
   processed: 0,
@@ -137,6 +166,89 @@ async function fetchQueue() {
   const data = await response.json();
   if (!data || !Array.isArray(data.jobs)) throw new Error("Format de queue invalide");
   return data.jobs.filter((job) => job && job.active !== false);
+}
+
+async function fetchVideoQueue() {
+  if (!VIDEO_RENDER_ENABLED) return [];
+  if (!REPORT_TOKEN) {
+    throw new Error("HIBOU_LOCAL_REPORT_TOKEN missing for VIDEO_RENDER");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const separator = VIDEO_QUEUE_URL.includes("?") ? "&" : "?";
+    const response = await fetch(
+      `${VIDEO_QUEUE_URL}${separator}t=${Date.now()}`,
+      {
+        headers: {
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+          Authorization: `Bearer ${REPORT_TOKEN}`,
+        },
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Video queue HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || !Array.isArray(data.jobs)) {
+      throw new Error("Invalid VIDEO_RENDER queue format");
+    }
+
+    return data.jobs.filter(
+      (job) =>
+        job &&
+        job.active !== false &&
+        job.type === "VIDEO_RENDER",
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function reportVideoProgress(job, status, data = {}) {
+  if (!REPORT_TOKEN) {
+    throw new Error("HIBOU_LOCAL_REPORT_TOKEN missing for VIDEO_RENDER report");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(VIDEO_QUEUE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        Authorization: `Bearer ${REPORT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        airtable_record_id: job.airtable_record_id || job.id,
+        job_id: job.id,
+        status,
+        worker: WORKER_ID,
+        local_path: data.local_path || "",
+        result_sha256: data.result_sha256 || "",
+        result: data.result || null,
+        error: data.error || "",
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `VIDEO_RENDER report HTTP ${response.status}: ${body.slice(0, 500)}`,
+      );
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function reportProgress(job, status, data = {}) {
@@ -314,6 +426,216 @@ async function discoverProfileShorts(profileUrl, options = {}) {
   };
 }
 
+async function processVideoRender(job, processed) {
+  if (!VIDEO_RENDER_ENABLED) {
+    throw new Error("VIDEO_RENDER disabled locally");
+  }
+
+  if (!job?.id || !/^rec[A-Za-z0-9]{14}$/.test(String(job.id))) {
+    throw new Error("Invalid VIDEO_RENDER job id");
+  }
+
+  if (job.type !== "VIDEO_RENDER") {
+    throw new Error(`Invalid VIDEO_RENDER type: ${job.type}`);
+  }
+
+  if (job.queue_error) {
+    throw new Error(`Queue rejected storyboard: ${job.queue_error}`);
+  }
+
+  if (!job.storyboard || typeof job.storyboard !== "object") {
+    throw new Error("VIDEO_RENDER storyboard missing");
+  }
+
+  const contentId = String(job.options?.content_id || "").trim();
+
+  if (!/^rec[A-Za-z0-9]{14}$/.test(contentId)) {
+    throw new Error("Invalid VIDEO_RENDER content_id");
+  }
+
+  if (!existsSync(PROJECT_ROOT)) {
+    throw new Error(`HIBOU project root missing: ${PROJECT_ROOT}`);
+  }
+
+  if (!existsSync(VIDEO_BINDING)) {
+    throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
+  }
+
+  const masterScript = path.join(
+    PROJECT_ROOT,
+    "scripts",
+    "video-master.mjs",
+  );
+
+  const preflightScript = path.join(
+    PROJECT_ROOT,
+    "scripts",
+    "video-local-preflight.mjs",
+  );
+
+  if (!existsSync(masterScript)) {
+    throw new Error(`video-master missing: ${masterScript}`);
+  }
+
+  if (!existsSync(preflightScript)) {
+    throw new Error(`video preflight missing: ${preflightScript}`);
+  }
+
+  const dir = path.join(
+    VIDEO_OUTPUT_ROOT,
+    safePart(job.id),
+  );
+
+  mkdirSync(dir, { recursive: true });
+
+  const storyboardPath = path.join(dir, "storyboard.json");
+  const masterPath = path.join(dir, "master.mp4");
+
+  writeFileSync(
+    storyboardPath,
+    JSON.stringify(job.storyboard, null, 2) + "\n",
+    "utf8",
+  );
+
+  state.current_job = job.id;
+
+  log("VIDEO_RENDER started", {
+    job: job.id,
+    content_id: contentId,
+    dir,
+    binding: VIDEO_BINDING,
+  });
+
+  await reportVideoProgress(job, "Running", {
+    local_path: dir,
+  });
+
+  const preflight = spawnSync(
+    process.execPath,
+    [preflightScript, "--require-ready"],
+    {
+      cwd: PROJECT_ROOT,
+      stdio: "inherit",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+    },
+  );
+
+  if (preflight.status !== 0) {
+    throw new Error(
+      `video preflight failed with status ${preflight.status}`,
+    );
+  }
+
+  const maxScenes = Math.max(
+    1,
+    Math.min(25, Number(job.options?.max_scenes || 20)),
+  );
+
+  const regenAttempts = Math.max(
+    0,
+    Math.min(2, Number(job.options?.regen_attempts || 1)),
+  );
+
+  const args = [
+    masterScript,
+    `--storyboard=${storyboardPath}`,
+    `--binding=${VIDEO_BINDING}`,
+    `--output=${dir}`,
+    `--max-scenes=${maxScenes}`,
+    `--regen-attempts=${regenAttempts}`,
+  ];
+
+  const stylePath = String(
+    process.env.HIBOU_VIDEO_STYLE || "",
+  ).trim();
+
+  if (stylePath && existsSync(stylePath)) {
+    args.push(`--style=${stylePath}`);
+  }
+
+  const assetGraphPath = String(
+    process.env.HIBOU_VIDEO_ASSET_GRAPH || "",
+  ).trim();
+
+  if (assetGraphPath && existsSync(assetGraphPath)) {
+    args.push(`--asset-graph=${assetGraphPath}`);
+  }
+
+  const render = spawnSync(
+    process.execPath,
+    args,
+    {
+      cwd: PROJECT_ROOT,
+      stdio: "inherit",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+    },
+  );
+
+  if (render.status !== 0) {
+    throw new Error(
+      `video-master failed with status ${render.status}`,
+    );
+  }
+
+  if (!existsSync(masterPath)) {
+    throw new Error(
+      `video-master completed without master.mp4: ${masterPath}`,
+    );
+  }
+
+  const masterStat = statSync(masterPath);
+
+  if (!masterStat.isFile() || masterStat.size <= 0) {
+    throw new Error("master.mp4 is empty");
+  }
+
+  const resultSha256 = sha256(masterPath);
+
+  const result = {
+    schema: "HIBOU_VIDEO_RENDER_RESULT_V1",
+    job: job.id,
+    content_id: contentId,
+    worker: WORKER_ID,
+    output_dir: dir,
+    master_path: masterPath,
+    master_sha256: resultSha256,
+    master_bytes: masterStat.size,
+    human_review_required: true,
+    publication_authorized: false,
+    completed_at: new Date().toISOString(),
+  };
+
+  writeFileSync(
+    path.join(dir, "_hibou_video_result.json"),
+    JSON.stringify(result, null, 2) + "\n",
+    "utf8",
+  );
+
+  await reportVideoProgress(job, "Completed", {
+    local_path: masterPath,
+    result_sha256: resultSha256,
+    result,
+  });
+
+  processed.add(job.id);
+  saveProcessed(processed);
+
+  state.processed += 1;
+  state.current_job = null;
+
+  log("VIDEO_RENDER completed", {
+    job: job.id,
+    content_id: contentId,
+    master: masterPath,
+    sha256: resultSha256,
+    bytes: masterStat.size,
+  });
+}
+
 async function processJob(job, processed) {
   if (!job.id) throw new Error("Job sans id");
   const allowedTypes = ["DOWNLOAD_VIDEO", "DOWNLOAD_BATCH", "DOWNLOAD_PROFILE_TOP_SHORTS"];
@@ -383,48 +705,122 @@ async function tick() {
     state.status = "paused";
     return false;
   }
+
   const approvedJobs = loadApprovedJobs();
-  if (!APPROVED_JOB_ID && approvedJobs.size === 0) {
-    state.status = "waiting_local_job_approval";
-    return false;
-  }
   const processed = loadProcessed();
   const failed = loadFailedJobs();
   const now = Date.now();
-  const jobs = await fetchQueue();
-  const job = jobs.find((x) => {
-    const approved = x.id === APPROVED_JOB_ID || approvedJobs.has(x.id);
-    if (!approved || processed.has(x.id)) return false;
-    const info = failed[x.id];
+
+  const retryEligible = (job) => {
+    if (!job?.id || processed.has(job.id)) return false;
+
+    const info = failed[job.id];
+
     if (!info) return true;
+
     const retryAfter = Number(info.retry_after || 0);
     return retryAfter > 0 && retryAfter <= now;
-  });
-  if (!job) return false;
+  };
+
+  let job = null;
+
+  if (VIDEO_RENDER_ENABLED) {
+    try {
+      const videoJobs = await fetchVideoQueue();
+      job = videoJobs.find(retryEligible) || null;
+    } catch (error) {
+      log("VIDEO_RENDER queue fetch failed", {
+        error: String(error?.message || error).slice(0, 1000),
+      });
+    }
+  }
+
+  if (!job) {
+    if (APPROVED_JOB_ID || approvedJobs.size > 0) {
+      const jobs = await fetchQueue();
+
+      job = jobs.find((candidate) => {
+        const approved =
+          candidate.id === APPROVED_JOB_ID ||
+          approvedJobs.has(candidate.id);
+
+        return approved && retryEligible(candidate);
+      }) || null;
+    }
+  }
+
+  if (!job) {
+    state.status =
+      VIDEO_RENDER_ENABLED
+        ? "waiting_for_job"
+        : "waiting_local_job_approval";
+
+    return false;
+  }
+
+  state.status = "running";
+
   try {
-    await processJob(job, processed);
+    if (job.type === "VIDEO_RENDER") {
+      await processVideoRender(job, processed);
+    } else {
+      await processJob(job, processed);
+    }
   } catch (error) {
-    const message = String(error?.stack || error).slice(0, 6000);
+    const message = String(
+      error?.stack || error,
+    ).slice(0, 6000);
+
     state.last_error = message;
     state.current_job = null;
-    log("Job failed", { job: job?.id, error: message });
-    await reportProgress(job, "Error", { error: message });
-    const failed = loadFailedJobs();
-    const prev = failed[job.id] || {};
+
+    log("Job failed", {
+      job: job?.id,
+      type: job?.type,
+      error: message,
+    });
+
+    try {
+      if (job?.type === "VIDEO_RENDER") {
+        await reportVideoProgress(job, "Error", {
+          error: message,
+        });
+      } else {
+        await reportProgress(job, "Error", {
+          error: message,
+        });
+      }
+    } catch (reportError) {
+      log("Failure report failed", {
+        job: job?.id,
+        error: String(
+          reportError?.message || reportError,
+        ).slice(0, 1000),
+      });
+    }
+
+    const latestFailed = loadFailedJobs();
+    const prev = latestFailed[job.id] || {};
     const attempts = Number(prev.attempts || 0) + 1;
-    failed[job.id] = {
+
+    latestFailed[job.id] = {
       attempts,
       last_error: message.slice(0, 1500),
       failed_at: new Date().toISOString(),
-      retry_after: Date.now() + (attempts >= 2 ? 6 * 60 * 60 * 1000 : 60 * 1000),
+      retry_after:
+        Date.now() +
+        (attempts >= 2
+          ? 6 * 60 * 60 * 1000
+          : 60 * 1000),
     };
-    saveFailedJobs(failed);
+
+    saveFailedJobs(latestFailed);
+
     if (ONCE) throw error;
-    // Le job en erreur est temporairement saute afin que le corpus continue.
   }
+
   return true;
 }
-
 function healthServer() {
   const port = Number(process.env.HIBOU_WORKER_HEALTH_PORT || 8765);
   const server = createServer((req, res) => {
@@ -436,6 +832,12 @@ function healthServer() {
       queue_url: QUEUE_URL,
       report_url: REPORT_URL,
       report_token_present: Boolean(REPORT_TOKEN),
+      video_queue_url: VIDEO_QUEUE_URL,
+      video_render_enabled: VIDEO_RENDER_ENABLED,
+      video_project_root: PROJECT_ROOT,
+      video_binding: VIDEO_BINDING,
+      video_binding_exists: existsSync(VIDEO_BINDING),
+      video_output_root: VIDEO_OUTPUT_ROOT,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

@@ -241,3 +241,60 @@ test("run audit rejects missing pipeline state", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("run audit identifies a prepared repair waiting for separate explicit start", () => {
+  const root = fixture();
+  try {
+    const statePath = join(root, "pipeline-run.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.pipeline_status = "RESUME_PREPARED";
+    state.resume_prepared = {
+      resume_stage: "render",
+      reset_stages: ["render", "master_qc"],
+      execution_started: false,
+      publication_authorized: false,
+    };
+    delete state.stages.render;
+    writeFileSync(statePath, JSON.stringify(state, null, 2));
+
+    write(root, "_hibou_video_resume_apply_receipt.json", {
+      schema: "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+      plan_sha256: "a".repeat(64),
+      reset_stages: ["render", "master_qc"],
+      execution_started: false,
+      publication_authorized: false,
+    });
+    write(root, "_hibou_video_remote_repair_prepared.json", {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+      resume_stage: "render",
+      reset_stages: ["render", "master_qc"],
+      requires_separate_render_start: true,
+      execution_started: false,
+      publication_authorized: false,
+    });
+
+    const audit = auditVideoRun(root, { platform: "win32" });
+    assert.equal(audit.resume_preparation.prepared, true);
+    assert.equal(audit.resume_preparation.resume_stage, "render");
+    assert.equal(audit.resume_preparation.receipt_available, true);
+    assert.equal(audit.resume_preparation.remote_marker_available, true);
+    assert.equal(
+      audit.resume_preparation.remote_marker_schema,
+      "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+    );
+    assert.equal(
+      audit.resume_preparation.requires_separate_render_start,
+      true,
+    );
+    assert.equal(audit.resume_preparation.execution_started, false);
+    assert.equal(
+      audit.attention.some(
+        (item) => item.code === "resume_prepared_waiting_explicit_start",
+      ),
+      true,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

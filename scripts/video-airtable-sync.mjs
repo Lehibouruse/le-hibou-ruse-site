@@ -105,7 +105,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       video_pose_registry_v1:Boolean(profile["Registry poses V1"]),
       video_prosody_v1:Boolean(profile["Prosodie V1"]),
       video_music_mix_v1:Boolean(profile["Mix musique V1"]),
-      video_incremental_retouch_v1:Boolean(profile["Retouches incrémentales V1"])
+      video_incremental_retouch_v1:Boolean(profile["Retouches incrémentales V1"]),
+      video_human_candidate_selection_v1:Boolean(profile["Sélection humaine candidats V1"])
     },
     creative:{
       profile_name:String(profile.Profil||"HIBOU_VIRAL_V1"),

@@ -377,7 +377,11 @@
             "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
             "HIBOU_VIDEO_RESUME_APPLY_ENABLED=true required",
             "pipeline state fingerprint mismatch",
-            "caches_deleted: false"
+            "caches_deleted: false",
+            "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+            "VIDEO_STAGE_ORDER",
+            "canonical suffix from resume_stage",
+            "atomicWriteJson"
           ]
         }
       ],
@@ -493,7 +497,11 @@
             "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
             "HIBOU_VIDEO_RESUME_APPLY_ENABLED=true required",
             "pipeline state fingerprint mismatch",
-            "caches_deleted: false"
+            "caches_deleted: false",
+            "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+            "VIDEO_STAGE_ORDER",
+            "canonical suffix from resume_stage",
+            "atomicWriteJson"
           ]
         }
       ],

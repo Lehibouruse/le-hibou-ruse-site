@@ -40,6 +40,20 @@ export function applyHumanCandidateSelection({
     fail("candidate selection content_id mismatch");
   }
 
+  const reviewFingerprint = String(
+    review?.review_fingerprint_sha256 || "",
+  ).trim().toLowerCase();
+  const decisionFingerprint = String(
+    decisions?.review_fingerprint_sha256 || "",
+  ).trim().toLowerCase();
+
+  if (!/^[0-9a-f]{64}$/.test(reviewFingerprint)) {
+    fail("candidate review fingerprint missing or invalid");
+  }
+  if (decisionFingerprint !== reviewFingerprint) {
+    fail("candidate selection review fingerprint mismatch");
+  }
+
   const decisionMap = asObject(decisions?.decisions);
   const selections = {};
   const audit = [];
@@ -127,6 +141,7 @@ export function applyHumanCandidateSelection({
   return {
     schema: HUMAN_IMAGE_SELECTION_SCHEMA,
     content_id: reviewContent || decisionContent || null,
+    review_fingerprint_sha256: reviewFingerprint,
     selection_count: Object.keys(selections).length,
     selections,
     audit,
@@ -134,6 +149,7 @@ export function applyHumanCandidateSelection({
       only_pass_candidates_can_be_selected: true,
       explicit_human_confirmation_required: true,
       machine_recommendation_is_not_binding: true,
+      stale_review_fingerprint_rejected: true,
       publication_authorized: false,
     },
     human_review_required: true,

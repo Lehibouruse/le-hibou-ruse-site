@@ -138,7 +138,7 @@ $currentLauncherHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA2
 $candidateLauncherHash = (Get-FileHash -LiteralPath $LauncherCandidate -Algorithm SHA256).Hash
 
 if ($candidateLauncherHash -ne $currentLauncherHash -and $SelfUpdateActive -ne "1") {
-  Write-Host "HIBOU_LAUNCHER_SELF_UPDATE — relance sur le lanceur du commit deploye..." -ForegroundColor Cyan
+  Write-Host "HIBOU_LAUNCHER_SELF_UPDATE - relance sur le lanceur du commit deploye..." -ForegroundColor Cyan
   [Environment]::SetEnvironmentVariable("HIBOU_LAUNCHER_SELF_UPDATE_ACTIVE", "1", "Process")
   & powershell.exe `
     -NoProfile `

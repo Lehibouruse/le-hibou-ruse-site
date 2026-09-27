@@ -132,3 +132,42 @@ test("publication authorization signals are blockers and still output false", ()
   assert.equal(review.publication_authorized, false);
   assert.equal(review.human_approved, false);
 });
+
+
+test("incremental review scope is exposed without auto-reusing human approval", () => {
+  const input = base();
+  input.incrementalPlan = {
+    schema: "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1",
+    changed_scene_ids: ["S02"],
+    invalidated_stages: ["subtitles", "render"],
+  };
+  input.reviewDiff = {
+    schema: "HIBOU_INCREMENTAL_REVIEW_DIFF_V1",
+    review_scope: "FOCUSED_PLUS_GLOBAL_SANITY",
+    full_review_required: false,
+    focused_scene_review: [
+      {
+        scene_id: "S02",
+        focused_human_checks: ["captions_mobile_readable"],
+      },
+    ],
+    global_focused_checks: [],
+    always_required_global_checks: ["full_video_sanity"],
+  };
+
+  const review = buildHumanReviewPackage(input);
+
+  assert.equal(
+    review.incremental_context.review_scope,
+    "FOCUSED_PLUS_GLOBAL_SANITY",
+  );
+  assert.equal(review.incremental_context.full_review_required, false);
+  assert.equal(
+    review.incremental_context.previous_human_approval_auto_reused,
+    false,
+  );
+  assert.deepEqual(
+    review.incremental_context.always_required_global_checks,
+    ["full_video_sanity"],
+  );
+});

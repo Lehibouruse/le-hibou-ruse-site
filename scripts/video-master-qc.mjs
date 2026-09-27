@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function fail(m){throw new Error(m);}
 function exec(cmd,args){const r=spawnSync(cmd,args,{encoding:"utf8"});return {status:r.status,stdout:r.stdout||"",stderr:r.stderr||""};}
@@ -40,7 +41,7 @@ export function qcMaster(path){
  };
  return {schema:"HIBOU_MASTER_QC_V2",file:path,sha256:sha256(path),duration_s:Number(p.format?.duration),size_bytes:Number(p.format?.size),streams:p.streams,black_intervals:black,silence_events:sil,loudness:loud,checks,status:Object.values(checks).every(Boolean)?"PASS":"REVIEW",paid_fallback:false};
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [path,out]=process.argv.slice(2); if(!path) fail("usage: video-master-qc.mjs master.mp4 [qc.json]");
  const q=qcMaster(path); if(out) writeFileSync(resolve(out),JSON.stringify(q,null,2)); process.stdout.write(JSON.stringify(q)+"\n");
 }

@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { buildSceneCompositePlan, sceneAssetRefs } from "./video-scene-compositor.mjs";
 
@@ -226,7 +227,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
   return technical;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   const [contractArg, outputArg] = process.argv.slice(2);
   if (!contractArg || !outputArg) fail("usage: node scripts/video-local-render.mjs contract.json output.mp4");
   process.stdout.write(`${JSON.stringify(renderVideoContract(contractArg, outputArg))}\n`);

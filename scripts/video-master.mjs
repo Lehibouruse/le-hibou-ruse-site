@@ -74,6 +74,42 @@ async function ensureImageRuntimeBundle(commit){
   return resolve(localBase,"video-image-factory.mjs");
 }
 
+const POST_RUNTIME_FILES=[
+  ["video-storyboard-promote.mjs","promoteStoryboard"],
+  ["video-local-render.mjs","renderVideoContract"],
+  ["video-scene-compositor.mjs","buildSceneCompositePlan"],
+  ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
+  ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V1"]
+];
+
+async function ensurePostRuntimeBundle(commit){
+  const normalized=String(commit||"").trim().toLowerCase();
+  if(!/^[0-9a-f]{40}$/.test(normalized)) fail("storyboard runtime_commit missing or invalid");
+  const localBase=resolve(
+    process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
+    "LeHibou","post-runtime",normalized
+  );
+  mkdirSync(localBase,{recursive:true});
+  for(const [name,marker] of POST_RUNTIME_FILES){
+    const target=resolve(localBase,name);
+    let source=existsSync(target)?readFileSync(target,"utf8"):"";
+    if(!source.includes(marker)){
+      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/scripts/${name}`;
+      const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+      if(!response.ok) fail(`post runtime download failed HTTP ${response.status}: ${name}@${normalized}`);
+      source=await response.text();
+      if(!source.includes(marker)) fail(`post runtime marker missing: ${name}@${normalized}`);
+      writeFileSync(target,source,"utf8");
+    }
+  }
+  return {
+    promote:resolve(localBase,"video-storyboard-promote.mjs"),
+    render:resolve(localBase,"video-local-render.mjs"),
+    masterQc:resolve(localBase,"video-master-qc.mjs"),
+    registry:resolve(localBase,"video-artifact-registry.mjs")
+  };
+}
+
 function ensureSameRun(statePath,inputs){
   if(!existsSync(statePath)) return;
   const old=json(statePath);
@@ -243,6 +279,7 @@ async function main(){
 
   const runtimeCommit=String(json(storyboard).runtime_commit||"").trim();
   const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
+  const postRuntime=await ensurePostRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");
   stage(state,"images",()=>{
     run(process.execPath,[
@@ -267,17 +304,17 @@ async function main(){
 
   const renderReady=resolve(root,"render-ready.json");
   stage(state,"promotion",()=>{
-    run(process.execPath,[resolve("scripts/video-storyboard-promote.mjs"),assetResolved,selections,renderReady]);
+    run(process.execPath,[postRuntime.promote,assetResolved,selections,renderReady]);
   });
 
   const master=resolve(root,"master.mp4");
   stage(state,"render",()=>{
-    run(process.execPath,[resolve("scripts/video-local-render.mjs"),renderReady,master]);
+    run(process.execPath,[postRuntime.render,renderReady,master]);
   });
 
   const masterQc=resolve(root,"master-qc.json");
   stage(state,"master_qc",()=>{
-    run(process.execPath,[resolve("scripts/video-master-qc.mjs"),master,masterQc]);
+    run(process.execPath,[postRuntime.masterQc,master,masterQc]);
     const qc=json(masterQc);
     if(!["PASS","REVIEW"].includes(qc.status)) fail("unexpected master QC status");
     state.master_qc_status=qc.status;
@@ -298,18 +335,25 @@ async function main(){
       {kind:"qc",path:masterQc},
       {kind:"pipeline_state",path:statePath}
     ]});
-    run(process.execPath,[resolve("scripts/video-artifact-registry.mjs"),registrySpec,registry]);
+    run(process.execPath,[postRuntime.registry,registrySpec,registry]);
   });
 
   stage(state,"airtable_report",()=>{
     if(!contentId){
       state.stages.airtable_report={status:"SKIPPED",reason:"file storyboard input"};
+      state.airtable_report_mode="not_applicable";
+      writeJson(statePath,state);
+      return;
+    }
+    if(!reportAirtable){
+      state.stages.airtable_report={status:"SKIPPED",reason:"report-airtable disabled; queue worker owns final status"};
+      state.airtable_report_mode="dry_run_skipped";
       writeJson(statePath,state);
       return;
     }
     const manifest=master+".manifest.json";
-    run(process.execPath,[resolve("scripts/video-airtable-sync.mjs"),"report",contentId,manifest,...(reportAirtable?[]:["--dry-run"])]);
-    state.airtable_report_mode=reportAirtable?"applied":"dry_run";
+    run(process.execPath,[resolve("scripts/video-airtable-sync.mjs"),"report",contentId,manifest]);
+    state.airtable_report_mode="applied";
     writeJson(statePath,state);
   });
 

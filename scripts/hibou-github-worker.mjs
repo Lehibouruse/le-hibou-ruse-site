@@ -1286,6 +1286,80 @@ async function processVideoRender(job, processed) {
   const productionMode = job.options?.preview_mode === true
     ? "preview"
     : "final";
+
+  const remoteHumanDecisions =
+    job.options?.human_candidate_decisions &&
+    typeof job.options.human_candidate_decisions === "object" &&
+    !Array.isArray(job.options.human_candidate_decisions)
+      ? job.options.human_candidate_decisions
+      : null;
+  let humanSelectionResume = false;
+
+  if (remoteHumanDecisions) {
+    if (productionMode !== "final") {
+      throw new Error(
+        "VIDEO_RENDER human candidate decisions require FINAL mode",
+      );
+    }
+    if (
+      remoteHumanDecisions.schema !==
+      "HIBOU_HUMAN_IMAGE_SELECTION_V1"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER human candidate decisions schema invalid",
+      );
+    }
+    if (String(remoteHumanDecisions.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER human candidate decisions content mismatch",
+      );
+    }
+
+    const reviewPath = path.join(
+      dir,
+      "images",
+      "candidate-review.json",
+    );
+    if (!existsSync(reviewPath)) {
+      throw new Error(
+        "VIDEO_RENDER local candidate review missing for resume",
+      );
+    }
+    const localReview = JSON.parse(readFileSync(reviewPath, "utf8"));
+    const localFingerprint = String(
+      localReview?.review_fingerprint_sha256 || "",
+    ).trim().toLowerCase();
+    const suppliedFingerprint = String(
+      remoteHumanDecisions.review_fingerprint_sha256 || "",
+    ).trim().toLowerCase();
+
+    if (
+      !/^[0-9a-f]{64}$/.test(localFingerprint) ||
+      suppliedFingerprint !== localFingerprint
+    ) {
+      throw new Error(
+        "VIDEO_RENDER remote human selection fingerprint mismatch",
+      );
+    }
+
+    const decisionsPath = path.join(
+      dir,
+      "images",
+      "candidate-decisions.json",
+    );
+    writeFileSync(
+      decisionsPath,
+      JSON.stringify(remoteHumanDecisions, null, 2) + "\n",
+      "utf8",
+    );
+    humanSelectionResume = true;
+    log("VIDEO_RENDER remote human candidate decisions staged", {
+      job: job.id,
+      content_id: contentId,
+      review_fingerprint_sha256: localFingerprint,
+      decisions_path: decisionsPath,
+    });
+  }
   const candidatesPerScene = productionMode === "preview"
     ? 1
     : Math.max(
@@ -1328,7 +1402,14 @@ async function processVideoRender(job, processed) {
     );
   }
 
-  await ensureComfyUIReady();
+  if (!humanSelectionResume) {
+    await ensureComfyUIReady();
+  } else {
+    log("VIDEO_RENDER human-selection resume skips ComfyUI wake-up", {
+      job: job.id,
+      content_id: contentId,
+    });
+  }
 
   const maxScenes = Math.max(
     1,
@@ -1674,6 +1755,24 @@ async function processVideoRender(job, processed) {
       );
     }
 
+    const candidateReviewPath = String(
+      waiting.candidate_review || "",
+    ).trim();
+    let reviewFingerprint = null;
+    if (candidateReviewPath && existsSync(candidateReviewPath)) {
+      try {
+        const review = JSON.parse(
+          readFileSync(candidateReviewPath, "utf8"),
+        );
+        reviewFingerprint =
+          /^[0-9a-f]{64}$/i.test(
+            String(review?.review_fingerprint_sha256 || ""),
+          )
+            ? String(review.review_fingerprint_sha256).toLowerCase()
+            : null;
+      } catch {}
+    }
+
     const pausedResult = {
       schema: "HIBOU_VIDEO_RENDER_WAITING_HUMAN_SELECTION_V1",
       status: "WAITING_HUMAN_SELECTION",
@@ -1682,8 +1781,9 @@ async function processVideoRender(job, processed) {
       worker: WORKER_ID,
       worker_session: state.worker_session,
       local_root: dir,
-      candidate_review: waiting.candidate_review || null,
+      candidate_review: candidateReviewPath || null,
       candidate_review_html: waiting.candidate_review_html || null,
+      review_fingerprint_sha256: reviewFingerprint,
       decisions_path: waiting.decisions_path || null,
       scene_count: Number(waiting.scene_count || 0),
       resume_same_job: true,

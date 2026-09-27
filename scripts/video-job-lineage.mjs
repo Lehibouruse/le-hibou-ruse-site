@@ -90,6 +90,18 @@ export function validateReuseLineage({
   }
 
   const parentReuse = String(parentOptions.reuse_from_job_id || "").trim();
+  if (parentReuse && !isRecordId(parentReuse)) {
+    return {
+      ok: false,
+      enabled: true,
+      reason: "reuse_parent_invalid_ancestor_id",
+      lineage: {
+        parent_job_id: reuseFromJobId,
+        parent_status: status,
+        parent_content_id: parentContentId,
+      },
+    };
+  }
   if (parentReuse === currentJobId) {
     return {
       ok: false,

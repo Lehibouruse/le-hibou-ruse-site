@@ -43,6 +43,9 @@ function actualLikeRoot({ badVoice = true } = {}) {
   write(root, "render-ready.json", "{}");
   mkdirSync(join(root, "voice", "voice-scenes"), { recursive: true });
   mkdirSync(join(root, ".video-render-cache"), { recursive: true });
+  write(root, ".video-render-cache/scene-01-aaaaaaaaaaaaaaaa.mp4", "clip");
+  write(root, ".video-render-cache/scene-02-bbbbbbbbbbbbbbbb.mp4", "clip");
+  write(root, ".video-render-cache/visual-cccccccccccccccc.mp4", "visual");
 
   write(root, "voice/voice-batch-manifest.json", {
     schema: "HIBOU_CHATTERBOX_BATCH_V2",
@@ -117,6 +120,13 @@ test("actual-like legacy run resumes from voice while preserving image caches", 
     );
     assert.equal(
       plan.preservable_artifacts.render_clip_cache_should_be_preserved,
+      true,
+    );
+    assert.equal(plan.preservable_artifacts.render_scene_clip_count, 2);
+    assert.equal(plan.preservable_artifacts.render_visual_count, 1);
+    assert.equal(plan.preservable_artifacts.full_visual_cache_present, true);
+    assert.equal(
+      plan.preservable_artifacts.final_mux_may_reuse_visual_if_fingerprint_matches,
       true,
     );
     assert.equal(plan.files_deleted, false);

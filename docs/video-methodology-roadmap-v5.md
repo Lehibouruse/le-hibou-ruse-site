@@ -53,6 +53,9 @@
 
 ### Image
 
+- `HIBOU_IMAGE_GENERATION_THROUGHPUT_V1` mesure le temps par candidat généré et le débit global ;
+- `factory-run.json` estime le coût observé de 1, 2 ou 3 candidats par scène, sans modifier qualité ni prompts ;
+
 - image plan local déterministe ;
 - fallback CUDA OOM local uniquement ;
 - cache invalidé si la requête effective change ;

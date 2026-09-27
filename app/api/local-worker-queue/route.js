@@ -23,6 +23,10 @@ const REMOTE_CANCEL_ENABLED =
   String(process.env.HIBOU_VIDEO_REMOTE_CANCEL_ENABLED || "")
     .trim()
     .toLowerCase() === "true";
+const REMOTE_REPAIR_RESUME_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
 const MAX_BODY_BYTES = 20_000;
 
 function safeEqual(a, b) {
@@ -232,6 +236,161 @@ function humanSelectionResumePayload(record) {
       resume_human_selection: true,
       human_candidate_decisions: normalizedDecisions,
     },
+  };
+}
+
+function repairResumePayload(record) {
+  const diagnostic = parseJsonObject(record?.fields?.["Résultat JSON"]);
+  if (diagnostic.schema !== "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1") {
+    return { eligible: false, reason: "failure_diagnostic_required" };
+  }
+  if (diagnostic.resume_execution_performed === true) {
+    return { eligible: false, reason: "resume_already_executed" };
+  }
+
+  const options = parseOptions(record?.fields?.["Options JSON"]);
+  if (options.resume_failed_job !== true) {
+    return { eligible: false, reason: "resume_failed_job_flag_missing" };
+  }
+  if (options.human_confirmed_resume !== true) {
+    return { eligible: false, reason: "human_resume_confirmation_missing" };
+  }
+
+  const reportedPlanSha = String(
+    diagnostic.resume_plan_sha256 || "",
+  ).trim().toLowerCase();
+  const requestedPlanSha = String(
+    options.resume_plan_sha256 || "",
+  ).trim().toLowerCase();
+  if (
+    !/^[0-9a-f]{64}$/.test(reportedPlanSha) ||
+    requestedPlanSha !== reportedPlanSha
+  ) {
+    return { eligible: false, reason: "repair_resume_plan_sha_mismatch" };
+  }
+
+  const reportedStateSha = String(
+    diagnostic.resume_plan?.source_state_sha256 || "",
+  ).trim().toLowerCase();
+  const requestedStateSha = String(
+    options.resume_source_state_sha256 || "",
+  ).trim().toLowerCase();
+  if (
+    !/^[0-9a-f]{64}$/.test(reportedStateSha) ||
+    requestedStateSha !== reportedStateSha
+  ) {
+    return { eligible: false, reason: "repair_resume_state_sha_mismatch" };
+  }
+
+  if (diagnostic.resume_plan?.resume_required !== true) {
+    return { eligible: false, reason: "repair_resume_not_required" };
+  }
+  const resumeStage = cut(
+    diagnostic.resume_plan?.resume_stage || "",
+    80,
+  ).trim();
+  if (!resumeStage) {
+    return { eligible: false, reason: "repair_resume_stage_missing" };
+  }
+
+  const contentId = String(diagnostic.content_id || "").trim();
+  if (
+    !/^rec[A-Za-z0-9]{14}$/.test(contentId) ||
+    String(options.content_id || "").trim() !== contentId
+  ) {
+    return { eligible: false, reason: "repair_resume_content_mismatch" };
+  }
+
+  const request = {
+    schema: "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1",
+    content_id: contentId,
+    resume_plan_sha256: reportedPlanSha,
+    source_state_sha256: reportedStateSha,
+    resume_stage: resumeStage,
+    human_confirmed: true,
+    publication_authorized: false,
+  };
+
+  return {
+    eligible: true,
+    reason: "repair_resume_ready",
+    content_id: contentId,
+    request,
+    normalized_options: {
+      ...options,
+      resume_failed_job: false,
+      human_confirmed_resume: false,
+      repair_resume_request: request,
+    },
+  };
+}
+
+async function autoResumeFailedRepair(request) {
+  if (!REMOTE_REPAIR_RESUME_ENABLED) {
+    return { resumed: false, reason: "remote_repair_resume_disabled" };
+  }
+
+  const { session, worker } = workerSession(request);
+  if (!session || !worker) {
+    return { resumed: false, reason: "worker_session_required" };
+  }
+
+  const active = await activeVideoJobs();
+  if (active.length) {
+    return {
+      resumed: false,
+      reason: "queue_not_empty",
+      active_job_ids: active.map((record) => record.id),
+    };
+  }
+
+  const errored = await queryRecords(TABLES.localWorkerQueue, {
+    filterByFormula: "AND({Statut}='Error',{Type}='VIDEO_RENDER')",
+    pageSize: 50,
+  });
+
+  const eligible = errored
+    .map((record) => ({ record, repair: repairResumePayload(record) }))
+    .filter((item) => item.repair.eligible);
+
+  if (eligible.length !== 1) {
+    return {
+      resumed: false,
+      reason: eligible.length
+        ? "ambiguous_repair_resume_jobs"
+        : "no_repair_resume_job",
+      eligible_job_ids: eligible.map((item) => item.record.id),
+    };
+  }
+
+  const { record, repair } = eligible[0];
+  const resumedAt = new Date().toISOString();
+  await updateRecord(TABLES.localWorkerQueue, record.id, {
+    Statut: "Pending",
+    "Options JSON": JSON.stringify(repair.normalized_options),
+    "Résultat JSON": JSON.stringify({
+      schema: "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1",
+      status: "REPAIR_RESUME_SCHEDULED",
+      resumed_at: resumedAt,
+      resumed_by_worker: worker,
+      resumed_by_session: session,
+      content_id: repair.content_id,
+      resume_plan_sha256: repair.request.resume_plan_sha256,
+      source_state_sha256: repair.request.source_state_sha256,
+      resume_stage: repair.request.resume_stage,
+      human_confirmed: true,
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    }),
+  });
+
+  return {
+    resumed: true,
+    job_id: record.id,
+    resumed_at: resumedAt,
+    resume_stage: repair.request.resume_stage,
+    resume_plan_sha256: repair.request.resume_plan_sha256,
   };
 }
 
@@ -633,6 +792,7 @@ export async function GET(request) {
     }));
 
     const reconciliation = await reconcileStaleRunning(request);
+    const repair_resume = await autoResumeFailedRepair(request);
     const human_selection_resume = await autoResumeHumanSelection(request);
     const auto_activation = await autoActivateWhenWorkerReady(request);
 
@@ -685,6 +845,14 @@ export async function GET(request) {
                     ? options.human_candidate_decisions
                     : null
                 )
+              : null,
+          repair_resume_request:
+            REMOTE_REPAIR_RESUME_ENABLED &&
+            parseJsonObject(record.fields?.["Résultat JSON"]).schema ===
+              "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1" &&
+            options.repair_resume_request?.schema ===
+              "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1"
+              ? options.repair_resume_request
               : null,
           report_airtable: false,
           human_review_required: true,
@@ -852,8 +1020,10 @@ export async function GET(request) {
       jobs,
       controls,
       remote_cancel_enabled: REMOTE_CANCEL_ENABLED,
+      remote_repair_resume_enabled: REMOTE_REPAIR_RESUME_ENABLED,
       runtime_commit: RUNTIME_COMMIT,
       reconciliation,
+      repair_resume,
       human_selection_resume,
       auto_activation,
       queue_sanitization,

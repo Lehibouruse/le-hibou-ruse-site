@@ -7,6 +7,7 @@ import {
   updateRecord,
 } from "../../../lib/airtable";
 import { buildStoryboardContract, resolveCanonicalVideoProfile } from "../../../scripts/video-airtable-sync.mjs";
+import { validateReuseLineage } from "../../../scripts/video-job-lineage.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -505,6 +506,7 @@ export async function GET(request) {
         runtime_commit: RUNTIME_COMMIT,
         storyboard: null,
         queue_error: null,
+        reuse_lineage: null,
       };
 
       if (!/^rec[A-Za-z0-9]{14}$/.test(contentId)) {
@@ -529,6 +531,37 @@ export async function GET(request) {
         );
         queue_sanitization.push(sanitized);
         continue;
+      }
+
+      if (reuseFromJobId) {
+        try {
+          const parentRecord = await getRecord(
+            TABLES.localWorkerQueue,
+            reuseFromJobId,
+          );
+          const lineage = validateReuseLineage({
+            current_job_id: record.id,
+            current_content_id: contentId,
+            reuse_from_job_id: reuseFromJobId,
+            parent_record: parentRecord,
+          });
+          if (!lineage.ok) {
+            const sanitized = await markQueueValidationError(
+              record,
+              lineage.reason,
+            );
+            queue_sanitization.push(sanitized);
+            continue;
+          }
+          job.reuse_lineage = lineage.lineage;
+        } catch (error) {
+          const sanitized = await markQueueValidationError(
+            record,
+            "reuse_parent_lookup_failed: " + cut(error?.message || error, 1000),
+          );
+          queue_sanitization.push(sanitized);
+          continue;
+        }
       }
 
       try {

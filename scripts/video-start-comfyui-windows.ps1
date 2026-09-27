@@ -20,6 +20,61 @@ if ($Port -lt 1024 -or $Port -gt 65535) { throw "Port invalide." }
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+$CudaRepairLog = Join-Path $LogDir "comfyui-cuda-repair.log"
+
+function Test-ComfyCuda {
+  $probeCode = @'
+import json, torch
+ok = bool(torch.cuda.is_available())
+print(json.dumps({
+    "torch": str(torch.__version__),
+    "cuda_runtime": str(torch.version.cuda),
+    "cuda_available": ok,
+    "device": torch.cuda.get_device_name(0) if ok else None,
+}))
+raise SystemExit(0 if ok else 3)
+'@
+  $probeOutput = & $Python -c $probeCode 2>&1
+  $probeExit = $LASTEXITCODE
+  return [ordered]@{
+    ok = ($probeExit -eq 0)
+    exit_code = $probeExit
+    output = (($probeOutput | Out-String).Trim())
+  }
+}
+
+$cudaProbe = Test-ComfyCuda
+if (-not $cudaProbe.ok) {
+  Write-Host "CUDA PyTorch ComfyUI indisponible; reparation automatique vers torch 2.6.0 + cu124..." -ForegroundColor Yellow
+  ("[{0}] probe before repair: {1}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output) | Add-Content -Path $CudaRepairLog -Encoding UTF8
+
+  $pipArgs = @(
+    "-m", "pip", "install",
+    "--disable-pip-version-check",
+    "--no-input",
+    "--upgrade",
+    "--force-reinstall",
+    "torch==2.6.0",
+    "torchvision==0.21.0",
+    "torchaudio==2.6.0",
+    "--index-url", "https://download.pytorch.org/whl/cu124"
+  )
+
+  & $Python @pipArgs *>&1 | Tee-Object -FilePath $CudaRepairLog -Append
+  if ($LASTEXITCODE -ne 0) {
+    throw "Reparation PyTorch CUDA 12.4 echouee. Voir $CudaRepairLog"
+  }
+
+  $cudaProbe = Test-ComfyCuda
+  ("[{0}] probe after repair: {1}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output) | Add-Content -Path $CudaRepairLog -Encoding UTF8
+  if (-not $cudaProbe.ok) {
+    throw "CUDA reste indisponible apres reparation PyTorch cu124. Probe: $($cudaProbe.output)"
+  }
+}
+
+Write-Host ("CUDA ComfyUI OK : {0}" -f $cudaProbe.output) -ForegroundColor Green
+
+
 Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
   Where-Object {
     $_.Name -match '^python(\.exe)?$' -and
@@ -38,7 +93,9 @@ $args = @(
   "--windows-standalone-build",
   "--listen", "127.0.0.1",
   "--port", [string]$Port,
-  "--lowvram"
+  "--lowvram",
+  "--disable-xformers",
+  "--use-pytorch-cross-attention"
 )
 
 Write-Host "ComfyUI Hibou : loopback uniquement, low VRAM, port $Port" -ForegroundColor Cyan

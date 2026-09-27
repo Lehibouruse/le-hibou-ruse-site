@@ -2,9 +2,59 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 function fail(message){throw new Error(message);}
+
+const PLAN_DIR=dirname(fileURLToPath(import.meta.url));
+const VERIFIED_HARDWARE_PROFILE="rog-g814ji-rtx4070-8gb.json";
+
+function isVerticalProfile(profile){
+  const width=Number(profile?.width);
+  const height=Number(profile?.height);
+  const ratio=width/height;
+  return Number.isFinite(width)
+    && Number.isFinite(height)
+    && width>0
+    && height>0
+    && Number.isFinite(ratio)
+    && Math.abs(ratio-(9/16))<=0.05;
+}
+
+function verifiedHardwareProfiles(){
+  const candidates=[
+    resolve(PLAN_DIR,VERIFIED_HARDWARE_PROFILE),
+    resolve("video/hardware",VERIFIED_HARDWARE_PROFILE)
+  ];
+  for(const candidate of candidates){
+    try{
+      if(!existsSync(candidate)) continue;
+      const profile=JSON.parse(readFileSync(candidate,"utf8"));
+      const primary=profile?.image?.smoke_profile;
+      const fallback=profile?.image?.fallback_profile;
+      if(!isVerticalProfile(primary)) continue;
+      return {
+        hardware_profile_id:String(profile?.profile_id||"").trim()||null,
+        primary:{
+          width:Number(primary.width),
+          height:Number(primary.height),
+          batch_size:Number(primary.batch_size||1)
+        },
+        fallback:isVerticalProfile(fallback)?{
+          width:Number(fallback.width),
+          height:Number(fallback.height),
+          batch_size:Number(fallback.batch_size||1)
+        }:null
+      };
+    }catch{}
+  }
+  return {
+    hardware_profile_id:"ROG_G814JI_RTX4070_8GB_V1",
+    primary:{width:768,height:1344,batch_size:1},
+    fallback:{width:640,height:1136,batch_size:1}
+  };
+}
+
 function seedFor(contentId,sceneId,candidate){
   const h=createHash("sha256").update(`${contentId}|${sceneId}|${candidate}`).digest();
   return h.readUInt32BE(0);
@@ -67,29 +117,45 @@ export function normalizeSizeBinding(binding){
     out.size_binding_repaired=false;
   }
 
-  const profile=out.profile||{width:768,height:1344,batch_size:1};
-  out.profile={
-    width:Number(profile.width||768),
-    height:Number(profile.height||1344),
-    batch_size:Number(profile.batch_size||1)
+  const verified=verifiedHardwareProfiles();
+  const requestedProfile=out.profile||verified.primary;
+  const normalizedRequested={
+    width:Number(requestedProfile?.width||0),
+    height:Number(requestedProfile?.height||0),
+    batch_size:Number(requestedProfile?.batch_size||1)
   };
-  const ratio=out.profile.width/out.profile.height;
-  if(!Number.isFinite(ratio)||Math.abs(ratio-(9/16))>0.05){
-    fail(`ComfyUI primary image profile must be vertical 9:16-ish, got ${out.profile.width}x${out.profile.height}`);
+
+  if(isVerticalProfile(normalizedRequested)){
+    out.profile=normalizedRequested;
+    out.profile_migrated=false;
+  }else{
+    out.profile=verified.primary;
+    out.profile_migrated=true;
+    out.profile_migration={
+      reason:"legacy_non_vertical_profile",
+      from:{
+        width:Number.isFinite(normalizedRequested.width)?normalizedRequested.width:null,
+        height:Number.isFinite(normalizedRequested.height)?normalizedRequested.height:null,
+        batch_size:normalizedRequested.batch_size
+      },
+      to:verified.primary,
+      hardware_profile_id:verified.hardware_profile_id
+    };
   }
 
-  if(out.fallback_profile){
-    const fp={
+  if(out.fallback_profile&&isVerticalProfile(out.fallback_profile)){
+    out.fallback_profile={
       width:Number(out.fallback_profile.width),
       height:Number(out.fallback_profile.height),
       batch_size:Number(out.fallback_profile.batch_size||1)
     };
-    const fr=fp.width/fp.height;
-    if(!Number.isFinite(fr)||Math.abs(fr-(9/16))>0.05){
-      fail(`ComfyUI fallback image profile must be vertical 9:16-ish, got ${fp.width}x${fp.height}`);
-    }
-    out.fallback_profile=fp;
+    out.fallback_profile_migrated=false;
+  }else{
+    out.fallback_profile=verified.fallback;
+    out.fallback_profile_migrated=Boolean(verified.fallback);
   }
+
+  out.hardware_profile_id=out.hardware_profile_id||verified.hardware_profile_id;
 
   return out;
 }
@@ -158,7 +224,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

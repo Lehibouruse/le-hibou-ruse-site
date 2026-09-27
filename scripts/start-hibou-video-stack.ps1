@@ -65,6 +65,7 @@ $null = Get-Command ffprobe -ErrorAction Stop
 Set-UserEnv "HIBOU_LOCAL_EXECUTION_ENABLED" "true"
 Set-UserEnv "HIBOU_VIDEO_RENDER_ENABLED" "true"
 Set-UserEnv "HIBOU_VIDEO_AUTOSTART_COMFYUI" "true"
+Set-UserEnv "HIBOU_WORKER_SELF_UPDATE_ENABLED" "true"
 Set-UserEnv "HIBOU_PROJECT_ROOT" $ProjectRoot
 Set-UserEnv "HIBOU_VIDEO_BINDING" $Binding
 Set-UserEnv "HIBOU_VIDEO_OUTPUT_ROOT" $OutputRoot

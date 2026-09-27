@@ -31,3 +31,8 @@ test("ready payload declares persistent launcher self-update", () => {
   assert.match(launcher, /launcher = \$RuntimeLauncher/);
   assert.match(launcher, /launcher_self_update = \$true/);
 });
+
+
+test("launcher persistently forces worker self-update enabled", () => {
+  assert.match(launcher, /Set-UserEnv "HIBOU_WORKER_SELF_UPDATE_ENABLED" "true"/);
+});

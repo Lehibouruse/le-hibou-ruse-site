@@ -31,7 +31,7 @@ $FluxSha256 = "ead426278b49030e9da5df862994f25ce94ab2ee4df38b556ddddb3db093bf72"
 New-Item -ItemType Directory -Force -Path $VideoRoot | Out-Null
 
 function Require-Windows {
-  if ($env:OS -ne "Windows_NT") { throw "Cet installateur est réservé à Windows." }
+  if ($env:OS -ne "Windows_NT") { throw "Cet installateur est reserve a Windows." }
 }
 
 function Command-Exists([string]$Name) {
@@ -45,7 +45,7 @@ function Refresh-Path {
 }
 
 function Ensure-Winget {
-  if (-not (Command-Exists "winget")) { throw "winget est requis pour installer automatiquement les dépendances manquantes." }
+  if (-not (Command-Exists "winget")) { throw "winget est requis pour installer automatiquement les dependances manquantes." }
 }
 
 function Ensure-WingetPackage([string]$Command, [string]$Id) {
@@ -53,20 +53,20 @@ function Ensure-WingetPackage([string]$Command, [string]$Id) {
   Ensure-Winget
   Write-Host "Installation explicite de $Id..." -ForegroundColor Cyan
   winget install --id $Id -e --accept-source-agreements --accept-package-agreements
-  if ($LASTEXITCODE -ne 0) { throw "Échec installation $Id (code $LASTEXITCODE)." }
+  if ($LASTEXITCODE -ne 0) { throw "Echec installation $Id (code $LASTEXITCODE)." }
   Refresh-Path
-  if (-not (Command-Exists $Command)) { throw "$Command reste introuvable après installation de $Id." }
+  if (-not (Command-Exists $Command)) { throw "$Command reste introuvable apres installation de $Id." }
 }
 
 function Get-Preflight {
   $raw = & node (Join-Path $RepoRoot "scripts\video-local-preflight.mjs")
-  if ($LASTEXITCODE -ne 0) { throw "Préflight vidéo impossible." }
+  if ($LASTEXITCODE -ne 0) { throw "Preflight video impossible." }
   return ($raw | ConvertFrom-Json)
 }
 
 function Require-GpuAndDisk([double]$MinDiskGiB = 25) {
   $report = Get-Preflight
-  if (-not $report.nvidia_smi_available -or $report.gpus.Count -lt 1) { throw "GPU NVIDIA non détecté : arrêt avant téléchargement." }
+  if (-not $report.nvidia_smi_available -or $report.gpus.Count -lt 1) { throw "GPU NVIDIA non detecte : arret avant telechargement." }
   if ([double]$report.disk_free_gib -lt $MinDiskGiB) { throw "Espace disque insuffisant : $($report.disk_free_gib) GiB libres, $MinDiskGiB GiB requis par le garde-fou Hibou." }
   return $report
 }
@@ -79,18 +79,18 @@ function Ensure-Python311 {
   Ensure-Winget
   Write-Host "Installation explicite de Python 3.11..." -ForegroundColor Cyan
   winget install --id Python.Python.3.11 -e --accept-source-agreements --accept-package-agreements
-  if ($LASTEXITCODE -ne 0) { throw "Échec installation Python 3.11." }
+  if ($LASTEXITCODE -ne 0) { throw "Echec installation Python 3.11." }
   Refresh-Path
   & py -3.11 --version | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Python 3.11 reste introuvable." }
 }
 
 function Invoke-Download([string]$Url, [string]$Destination) {
-  if (-not (Command-Exists "curl.exe")) { throw "curl.exe est requis pour les téléchargements reprenables." }
+  if (-not (Command-Exists "curl.exe")) { throw "curl.exe est requis pour les telechargements reprenables." }
   New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
-  Write-Host "Téléchargement reprenable : $Destination" -ForegroundColor Cyan
+  Write-Host "Telechargement reprenable : $Destination" -ForegroundColor Cyan
   & curl.exe -L --fail --retry 3 --retry-delay 5 -C - $Url -o $Destination
-  if ($LASTEXITCODE -ne 0) { throw "Téléchargement échoué : $Url" }
+  if ($LASTEXITCODE -ne 0) { throw "Telechargement echoue : $Url" }
 }
 
 function Write-State {
@@ -147,16 +147,16 @@ function Write-State {
 
 Require-Windows
 
-Write-Host "=== Hibou vidéo local — installation staged ===" -ForegroundColor Cyan
+Write-Host "=== Hibou video local - installation staged ===" -ForegroundColor Cyan
 Write-Host "Audit licences/modeles fail-closed..." -ForegroundColor Cyan
 & node (Join-Path $RepoRoot "scripts\video-license-audit.mjs")
-if ($LASTEXITCODE -ne 0) { throw "Audit licences Hibou échoué : installation bloquée." }
+if ($LASTEXITCODE -ne 0) { throw "Audit licences Hibou echoue : installation bloquee." }
 $diagnostic = Get-Preflight
 $diagnostic | ConvertTo-Json -Depth 6
 Write-State
 
 if (-not ($InstallVoice -or $InstallComfyUI -or $InstallFluxSchnell -or $StartComfyUI)) {
-  Write-Host "Diagnostic uniquement. Aucun paquet, modèle ou service n'a été installé/démarré." -ForegroundColor Yellow
+  Write-Host "Diagnostic uniquement. Aucun paquet, modele ou service n'a ete installe/demarre." -ForegroundColor Yellow
   exit 0
 }
 
@@ -167,16 +167,16 @@ if ($InstallVoice) {
   $voicePython = Join-Path $VoiceVenv "Scripts\python.exe"
   if (-not (Test-Path $voicePython)) {
     & py -3.11 -m venv $VoiceVenv
-    if ($LASTEXITCODE -ne 0) { throw "Création du venv Chatterbox échouée." }
+    if ($LASTEXITCODE -ne 0) { throw "Creation du venv Chatterbox echouee." }
   }
   & $voicePython -m pip install --upgrade pip setuptools wheel
-  if ($LASTEXITCODE -ne 0) { throw "Mise à jour pip Chatterbox échouée." }
+  if ($LASTEXITCODE -ne 0) { throw "Mise a jour pip Chatterbox echouee." }
   & $voicePython -m pip install "torch==$TorchVersion" "torchaudio==$TorchVersion" --index-url $TorchIndex
-  if ($LASTEXITCODE -ne 0) { throw "Installation PyTorch CUDA échouée." }
+  if ($LASTEXITCODE -ne 0) { throw "Installation PyTorch CUDA echouee." }
   & $voicePython -m pip install "chatterbox-tts==$ChatterboxVersion"
-  if ($LASTEXITCODE -ne 0) { throw "Installation Chatterbox échouée." }
+  if ($LASTEXITCODE -ne 0) { throw "Installation Chatterbox echouee." }
   & $voicePython -c "import torch; from chatterbox.mtl_tts import ChatterboxMultilingualTTS; assert torch.cuda.is_available(), 'CUDA indisponible'; print(torch.__version__); print(torch.version.cuda); print(torch.cuda.get_device_name(0))"
-  if ($LASTEXITCODE -ne 0) { throw "Validation Chatterbox/CUDA échouée. Aucun fallback CPU/cloud n'est autorisé." }
+  if ($LASTEXITCODE -ne 0) { throw "Validation Chatterbox/CUDA echouee. Aucun fallback CPU/cloud n'est autorise." }
   [Environment]::SetEnvironmentVariable("HIBOU_PYTHON", $voicePython, "User")
   $env:HIBOU_PYTHON = $voicePython
   Write-State
@@ -191,13 +191,24 @@ if ($InstallComfyUI) {
     Invoke-Download $ComfyArchiveUrl $archive
     New-Item -ItemType Directory -Force -Path $ComfyRoot | Out-Null
     & 7z x -y $archive "-o$ComfyRoot"
-    if ($LASTEXITCODE -ne 0) { throw "Extraction ComfyUI échouée." }
-    if (-not (Test-Path $ComfyMain) -or -not (Test-Path $ComfyPython)) { throw "Installation ComfyUI portable incomplète." }
+    if ($LASTEXITCODE -ne 0) { throw "Extraction ComfyUI echouee." }
+    if (-not (Test-Path $ComfyMain) -or -not (Test-Path $ComfyPython)) { throw "Installation ComfyUI portable incomplete." }
     Remove-Item -Force $archive
   }
   $versionScript = Join-Path $ComfyDir "comfyui_version.py"
-  if (-not (Test-Path $versionScript)) { throw "Version ComfyUI introuvable : installation refusée." }
-  $actualComfyVersion = (& $ComfyPython -c "import importlib.util; s=importlib.util.spec_from_file_location('cv', r'$versionScript'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.__version__)" | Select-Object -First 1).Trim()
+  if (-not (Test-Path $versionScript)) { throw "Version ComfyUI introuvable : installation refusee." }
+  $versionProbe = Join-Path $env:TEMP "hibou-comfy-version-probe.py"
+  @(
+    "import importlib.util",
+    "from pathlib import Path",
+    "p = Path(__import__('sys').argv[1])",
+    "s = importlib.util.spec_from_file_location('cv', str(p))",
+    "m = importlib.util.module_from_spec(s)",
+    "s.loader.exec_module(m)",
+    "print(m.__version__)"
+  ) | Set-Content -Path $versionProbe -Encoding UTF8
+  $actualComfyVersion = (& $ComfyPython $versionProbe $versionScript | Select-Object -First 1).Trim()
+  Remove-Item -Force $versionProbe -ErrorAction SilentlyContinue
   if ($actualComfyVersion -ne $ComfyVersion) {
     throw "Version ComfyUI inattendue : $actualComfyVersion (attendue $ComfyVersion)."
   }
@@ -211,11 +222,11 @@ if ($InstallFluxSchnell) {
   if (Test-Path $FluxPath) {
     $current = (Get-FileHash -Algorithm SHA256 $FluxPath).Hash.ToLowerInvariant()
     if ($current -eq $FluxSha256) {
-      Write-Host "FLUX Schnell FP8 déjà présent et hash vérifié." -ForegroundColor Green
+      Write-Host "FLUX Schnell FP8 deja present et hash verifie." -ForegroundColor Green
     } elseif ($ForceRedownload) {
       Remove-Item -Force $FluxPath
     } else {
-      throw "FLUX Schnell existe mais son SHA-256 ne correspond pas. Utiliser -ForceRedownload seulement après vérification."
+      throw "FLUX Schnell existe mais son SHA-256 ne correspond pas. Utiliser -ForceRedownload seulement apres verification."
     }
   }
   if (-not (Test-Path $FluxPath)) {
@@ -223,17 +234,17 @@ if ($InstallFluxSchnell) {
     $actual = (Get-FileHash -Algorithm SHA256 $FluxPath).Hash.ToLowerInvariant()
     if ($actual -ne $FluxSha256) {
       Remove-Item -Force $FluxPath
-      throw "SHA-256 FLUX invalide. Fichier supprimé."
+      throw "SHA-256 FLUX invalide. Fichier supprime."
     }
   }
   Write-State
 }
 
 if ($StartComfyUI) {
-  if (-not (Test-Path $ComfyMain) -or -not (Test-Path $ComfyPython)) { throw "ComfyUI n'est pas installé." }
-  Write-Host "Démarrage explicite ComfyUI sur loopback uniquement : http://127.0.0.1:8188" -ForegroundColor Cyan
+  if (-not (Test-Path $ComfyMain) -or -not (Test-Path $ComfyPython)) { throw "ComfyUI n'est pas installe." }
+  Write-Host "Demarrage explicite ComfyUI sur loopback uniquement : http://127.0.0.1:8188" -ForegroundColor Cyan
   & (Join-Path $RepoRoot "scripts\video-start-comfyui-windows.ps1")
 }
 
 Write-State
-Write-Host "État écrit dans : $StatePath" -ForegroundColor Green
+Write-Host "Etat ecrit dans : $StatePath" -ForegroundColor Green

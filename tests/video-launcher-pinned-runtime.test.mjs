@@ -25,7 +25,8 @@ test("launcher downloads worker and video runtimes from immutable deployed commi
 test("Windows startup re-runs the persistent launcher so it resolves the current deployed commit", () => {
   assert.match(launcher, /start-hibou-video-stack\.runtime\.ps1/);
   assert.match(launcher, /Copy-Item -LiteralPath \$CurrentLauncher -Destination \$RuntimeLauncher -Force/);
-  assert.match(launcher, /-File "\$RuntimeLauncher"/);
+  assert.match(launcher, /start "" \/min powershell\.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "/);
+  assert.match(launcher, /\+ \$RuntimeLauncher \+ /);
   assert.doesNotMatch(launcher, /start-hibou-worker\.ps1/);
 });
 

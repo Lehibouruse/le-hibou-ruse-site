@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -73,6 +74,24 @@ function readJson(path) {
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stable(value[key])]),
+    );
+  }
+  return value;
+}
+
+export function pipelineStateFingerprint(state) {
+  return createHash("sha256")
+    .update(JSON.stringify(stable(state)))
+    .digest("hex");
 }
 
 function stageStatus(state, name) {
@@ -319,6 +338,7 @@ export function buildResumePlan({
     schema: RESUME_PLAN_SCHEMA,
     root: resolvedRoot,
     source_state_schema: state.schema,
+    source_state_sha256: pipelineStateFingerprint(state),
     analysis_only: true,
     execution_performed: false,
     files_deleted: false,

@@ -30,8 +30,13 @@ test("worker persists production and incremental lineage in the final result", (
   assert.match(worker, /reuse_lineage: job\.reuse_lineage \|\| null/);
   assert.match(worker, /reuse_integrity: reuseIntegrity/);
   assert.match(worker, /VIDEO_RENDER reuse parent belongs to another worker/);
+  assert.match(worker, /VIDEO_RENDER reuse parent result identity mismatch/);
+  assert.match(worker, /VIDEO_RENDER reuse parent result has invalid master hash/);
   assert.match(worker, /VIDEO_RENDER reuse parent master hash mismatch/);
   assert.match(worker, /_hibou_video_result\.json/);
+  assert.match(worker, /result_job_match/);
+  assert.match(worker, /result_content_match/);
+  assert.match(worker, /airtable_hash_verified/);
   assert.match(worker, /previousRoot,\s*"master\.mp4"/s);
   assert.match(worker, /sha256\(previousMasterPath\)/);
   assert.match(worker, /result_hash_verified/);

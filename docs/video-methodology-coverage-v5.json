@@ -307,12 +307,21 @@
           "markers": [
             "HIBOU_INCREMENTAL_REVIEW_DIFF_V1"
           ]
+        },
+        {
+          "path": "scripts/video-resume-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_PLAN_V1",
+            "execution_performed: false",
+            "preserve_caches_and_revalidate_by_fingerprint"
+          ]
         }
       ],
       "tests": [
         "tests/video-iteration-plan.test.mjs",
         "tests/video-incremental-reuse.test.mjs",
-        "tests/video-review-diff.test.mjs"
+        "tests/video-review-diff.test.mjs",
+        "tests/video-resume-plan.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -370,12 +379,21 @@
             "HIBOU_DURABLE_STORAGE_PLAN_V1",
             "upload_performed:false"
           ]
+        },
+        {
+          "path": "scripts/video-resume-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_PLAN_V1",
+            "execution_performed: false",
+            "preserve_caches_and_revalidate_by_fingerprint"
+          ]
         }
       ],
       "tests": [
         "tests/video-airtable-smoke-report.test.mjs",
         "tests/video-airtable-sync.test.mjs",
-        "tests/video-durable-storage-plan.test.mjs"
+        "tests/video-durable-storage-plan.test.mjs",
+        "tests/video-resume-plan.test.mjs"
       ],
       "e2e_pending": true
     },

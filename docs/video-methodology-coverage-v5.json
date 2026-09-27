@@ -370,6 +370,15 @@
             "stage_progress: stageProgress",
             "stage_elapsed_seconds"
           ]
+        },
+        {
+          "path": "scripts/video-resume-state.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
+            "HIBOU_VIDEO_RESUME_APPLY_ENABLED=true required",
+            "pipeline state fingerprint mismatch",
+            "caches_deleted: false"
+          ]
         }
       ],
       "tests": [
@@ -381,7 +390,8 @@
         "tests/video-image-batch.test.mjs",
         "tests/video-image-factory.test.mjs",
         "tests/video-pipeline-stage-history.test.mjs",
-        "tests/video-worker-heartbeat-progress.test.mjs"
+        "tests/video-worker-heartbeat-progress.test.mjs",
+        "tests/video-resume-state.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -476,6 +486,15 @@
             "stage_progress: stageProgress",
             "stage_elapsed_seconds"
           ]
+        },
+        {
+          "path": "scripts/video-resume-state.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
+            "HIBOU_VIDEO_RESUME_APPLY_ENABLED=true required",
+            "pipeline state fingerprint mismatch",
+            "caches_deleted: false"
+          ]
         }
       ],
       "tests": [
@@ -485,7 +504,8 @@
         "tests/video-resume-plan.test.mjs",
         "tests/video-worker-failure-resume-diagnostic.test.mjs",
         "tests/video-pipeline-stage-history.test.mjs",
-        "tests/video-worker-heartbeat-progress.test.mjs"
+        "tests/video-worker-heartbeat-progress.test.mjs",
+        "tests/video-resume-state.test.mjs"
       ],
       "e2e_pending": true
     },

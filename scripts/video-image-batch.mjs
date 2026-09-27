@@ -50,6 +50,13 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
   if(plan?.schema!=="HIBOU_IMAGE_PLAN_V1") fail("unsupported image plan");
   if(!Array.isArray(plan.requests)||!plan.requests.length) fail("image plan has no requests");
   const state=loadExisting(manifestPath,plan.content_id);
+  const requestedKeys=new Set(plan.requests.map(item=>item.candidate_id));
+  let prunedCacheEntries=0;
+  for(const key of Object.keys(state.results||{})){
+    if(requestedKeys.has(key)) continue;
+    delete state.results[key];
+    prunedCacheEntries+=1;
+  }
   const allowedScenes=[];
   for(const item of plan.requests){
     if(!allowedScenes.includes(item.scene_id)&&allowedScenes.length<maxScenes) allowedScenes.push(item.scene_id);
@@ -112,6 +119,7 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
   state.scene_count_processed=allowedScenes.length;
   state.cache_hits=cacheHits;
   state.cache_invalidations=invalidatedCacheEntries;
+  state.cache_pruned_entries=prunedCacheEntries;
   state.generated_this_run=generated;
   state.paid_fallback=false;
   writeState(manifestPath,state);
@@ -120,6 +128,7 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     selections,
     cache_hits:cacheHits,
     cache_invalidations:invalidatedCacheEntries,
+    cache_pruned_entries:prunedCacheEntries,
     generated_this_run:generated
   };
 }
@@ -136,6 +145,7 @@ if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
     ok:true,
     cache_hits:result.cache_hits,
     cache_invalidations:result.cache_invalidations,
+    cache_pruned_entries:result.cache_pruned_entries,
     generated_this_run:result.generated_this_run
   })+"\n");
 }

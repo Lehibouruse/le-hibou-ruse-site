@@ -160,3 +160,48 @@ test("canonical identity and brand drift are rejected before scene prompt genera
     /HEAD_IDENTITY_LOCK requires deterministic_character_overlay/,
   );
 });
+
+
+test("roadmap density/movement profiles require explicit selection and stay metadata-only", () => {
+  const input = contract();
+  input.audio.density_profile = "EXPLAINER_DENSE";
+  input.creative.movement_profile = "HYBRID_BEATS";
+  input.creative.curve_profile = "HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST";
+
+  const graph = buildPromptGraph(input);
+  const voice = graph.nodes.find((node) => node.id === "VOICE_SPEC");
+  const edit = graph.nodes.find((node) => node.id === "EDIT_SPEC");
+
+  assert.equal(voice.payload.density_profile, "EXPLAINER_DENSE");
+  assert.equal(voice.payload.density_profile_runtime_applied, false);
+  assert.equal(edit.payload.movement_profile, "HYBRID_BEATS");
+  assert.equal(edit.payload.curve_profile, "HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST");
+  assert.equal(edit.payload.movement_profile_runtime_applied, false);
+  assert.equal(edit.payload.curve_profile_runtime_applied, false);
+  assert.equal(graph.policy.roadmap_profiles_require_e2e_before_runtime, true);
+});
+
+test("prompt graph does not silently invent a density or movement profile", () => {
+  const graph = buildPromptGraph(contract());
+  const voice = graph.nodes.find((node) => node.id === "VOICE_SPEC");
+  const edit = graph.nodes.find((node) => node.id === "EDIT_SPEC");
+  assert.equal(voice.payload.density_profile, null);
+  assert.equal(edit.payload.movement_profile, null);
+  assert.equal(edit.payload.curve_profile, null);
+});
+
+test("unsupported roadmap profiles fail closed rather than becoming hidden defaults", () => {
+  const badVoice = contract();
+  badVoice.audio.density_profile = "FASTEST_POSSIBLE";
+  assert.throws(
+    () => buildPromptGraph(badVoice),
+    /VOICE_DENSITY_PROFILE must be one of/,
+  );
+
+  const badMovement = contract();
+  badMovement.creative.movement_profile = "RANDOM_MOTION";
+  assert.throws(
+    () => buildPromptGraph(badMovement),
+    /MOVEMENT_PROFILE must be one of/,
+  );
+});

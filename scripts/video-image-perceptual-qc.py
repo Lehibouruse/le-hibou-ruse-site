@@ -50,13 +50,14 @@ def main():
     if not isinstance(rows,list) or not rows:
         raise RuntimeError("input must contain technical QC rows")
     reference=analyze(ref) if ref else None
-    seen=[]
+    seen_by_scene={}
     result=[]
     for row in rows:
         base=dict(row)
         p=Path(str(row.get("path",""))).resolve()
         metrics=analyze(p)
         reasons=[]
+        warnings=[]
         if not metrics.get("decode"):
             reasons.append("decode_failed")
         else:
@@ -64,22 +65,24 @@ def main():
             if metrics["brightness"] > 0.92: reasons.append("too_bright")
             if metrics["dark_clip_ratio"] > 0.30: reasons.append("dark_clipping")
             if metrics["bright_clip_ratio"] > 0.30: reasons.append("bright_clipping")
-            if metrics["sharpness_laplacian_var"] < 35.0: reasons.append("low_sharpness")
+            if metrics["sharpness_laplacian_var"] < 35.0: warnings.append("low_sharpness")
+            scene_seen=seen_by_scene.setdefault(row.get("scene_id"),[])
             duplicate_near=None
-            for prev in seen:
+            for prev in scene_seen:
                 dist=hamming(metrics["phash"],prev["phash"])
                 if dist is not None and dist <= 4:
-                    duplicate_near=prev["candidate_id"]; reasons.append("near_duplicate_phash"); break
-            seen.append({"candidate_id":row.get("candidate_id"),"phash":metrics["phash"]})
+                    duplicate_near=prev["candidate_id"]; warnings.append("near_duplicate_phash"); break
+            scene_seen.append({"candidate_id":row.get("candidate_id"),"phash":metrics["phash"]})
             if reference and reference.get("decode"):
                 metrics["reference_phash_distance"]=hamming(metrics["phash"],reference.get("phash"))
         technical_ok=row.get("status")=="PASS"
         if not technical_ok: reasons.append("technical_qc_reject")
         status="PASS" if technical_ok and not reasons else "REJECT"
         score=100
-        penalties={"too_dark":25,"too_bright":25,"dark_clipping":20,"bright_clipping":20,"low_sharpness":25,"near_duplicate_phash":30,"technical_qc_reject":60,"decode_failed":100}
+        penalties={"too_dark":25,"too_bright":25,"dark_clipping":20,"bright_clipping":20,"low_sharpness":12,"near_duplicate_phash":10,"technical_qc_reject":60,"decode_failed":100}
         for reason in reasons: score-=penalties.get(reason,10)
-        result.append({**base,"perceptual":metrics,"reasons":sorted(set(reasons)),"perceptual_score":max(0,score),"status":status})
+        for warning in warnings: score-=penalties.get(warning,5)
+        result.append({**base,"perceptual":metrics,"reasons":sorted(set(reasons)),"warnings":sorted(set(warnings)),"perceptual_score":max(0,score),"status":status})
     by_scene={}
     for row in result:
         by_scene.setdefault(row.get("scene_id"),[]).append(row)
@@ -87,10 +90,20 @@ def main():
     for scene,items in by_scene.items():
         ranked=sorted(items,key=lambda x:(x["status"]!="PASS",-x["perceptual_score"],x.get("candidate",999)))
         passes=[x for x in ranked if x["status"]=="PASS"]
+        reason_counts={}
+        warning_counts={}
+        for item in items:
+            for reason in item.get("reasons",[]):
+                reason_counts[reason]=reason_counts.get(reason,0)+1
+            for warning in item.get("warnings",[]):
+                warning_counts[warning]=warning_counts.get(warning,0)+1
         scene_summary[scene]={
             "pass":len(passes),"reject":len(items)-len(passes),"total":len(items),
             "selected_candidate_id":passes[0].get("candidate_id") if passes else None,
-            "needs_regeneration":len(passes)==0
+            "selected_score":passes[0].get("perceptual_score") if passes else None,
+            "needs_regeneration":len(passes)==0,
+            "reason_counts":reason_counts,
+            "warning_counts":warning_counts
         }
     payload={
         "schema":"HIBOU_IMAGE_PERCEPTUAL_QC_V1",
@@ -99,8 +112,8 @@ def main():
         "rows":result,
         "scene_summary":scene_summary,
         "all_scenes_have_candidate":all(not x["needs_regeneration"] for x in scene_summary.values()),
-        "thresholds":{"brightness_min":0.10,"brightness_max":0.92,"clip_max":0.30,"sharpness_min":35.0,"phash_duplicate_distance_max":4},
-        "policy":{"local_only":True,"paid_fallback":False,"human_review_before_full_pilot":True}
+        "thresholds":{"brightness_min":0.10,"brightness_max":0.92,"clip_max":0.30,"sharpness_warning_below":35.0,"phash_warning_distance_max":4},
+        "policy":{"local_only":True,"paid_fallback":False,"human_review_before_full_pilot":True,"low_sharpness_is_warning":True,"phash_duplicate_scope":"within_scene","phash_duplicate_is_warning":True}
     }
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding="utf-8")

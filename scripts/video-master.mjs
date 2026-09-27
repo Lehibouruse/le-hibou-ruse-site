@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -661,12 +661,14 @@ async function main(){
     writeJson(statePath,state);
   }
 
+  const waitingHumanSelectionPath=resolve(root,"awaiting-human-selection.json");
+
   if(
     humanSelectionEnabled &&
     generatedCandidateSceneCount>0 &&
     !existsSync(candidateDecisionsPath)
   ){
-    const waitingPath=resolve(root,"awaiting-human-selection.json");
+    const waitingPath=waitingHumanSelectionPath;
     const waiting={
       schema:"HIBOU_VIDEO_MASTER_WAITING_HUMAN_SELECTION_V1",
       status:"WAITING_HUMAN_SELECTION",
@@ -709,6 +711,9 @@ async function main(){
         selections,
         humanSelectionManifest
       ]);
+      if(existsSync(waitingHumanSelectionPath)){
+        unlinkSync(waitingHumanSelectionPath);
+      }
       const humanManifest=json(humanSelectionManifest);
       state.human_candidate_selection={
         enabled:true,

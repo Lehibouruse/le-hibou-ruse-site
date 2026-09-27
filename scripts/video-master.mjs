@@ -166,10 +166,7 @@ async function ensureImageRuntimeBundle(commit){
       writeFileSync(target,source,"utf8");
     }
   }
-  return {
-    factory:resolve(localBase,"video-image-factory.mjs"),
-    selectionApply:resolve(localBase,"video-candidate-selection-apply.mjs")
-  };
+  return resolve(localBase,"video-image-factory.mjs");
 }
 
 const POST_RUNTIME_FILES=[
@@ -603,8 +600,11 @@ async function main(){
     writeJson(statePath,state);
   });
 
-  const imageRuntime=await ensureImageRuntimeBundle(runtimeCommit);
-  const imageFactoryScript=imageRuntime.factory;
+  const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
+  const imageSelectionApplyScript=resolve(
+    dirname(imageFactoryScript),
+    "video-candidate-selection-apply.mjs"
+  );
   const postRuntime=await ensurePostRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");
   stage(state,"images",()=>{
@@ -708,7 +708,7 @@ async function main(){
       generatedCandidateSceneCount>0
     ){
       run(process.execPath,[
-        imageRuntime.selectionApply,
+        imageSelectionApplyScript,
         candidateReviewPath,
         candidateDecisionsPath,
         selections,

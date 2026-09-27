@@ -68,3 +68,13 @@ test("queue forwards human decisions only after a validated resume scheduling re
   assert.match(route, /options\.human_candidate_decisions/);
   assert.match(route, /publication_authorized: false/);
 });
+
+
+test("resume normalizes human decisions before forwarding them", () => {
+  assert.match(route, /const normalizedRows = \{\}/);
+  assert.match(route, /candidate_id: candidateId/);
+  assert.match(route, /note: cut\(decision\.note \|\| "", 1000\)/);
+  assert.match(route, /publication_authorized: false/);
+  assert.match(route, /normalized_options:/);
+  assert.match(route, /"Options JSON": JSON\.stringify\(decision\.normalized_options\)/);
+});

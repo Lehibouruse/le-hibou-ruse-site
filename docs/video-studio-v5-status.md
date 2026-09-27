@@ -19,6 +19,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Ranking image ambiguïté-aware | yes | yes (ties/near-ties => aucun faux winner machine) | no | no | no |
 | Télémétrie débit images | yes | yes (durée/candidat + estimations 1/2/3 candidats par scène) | no | no | no |
 | Historique stages pipeline | yes | yes (START/PASS/ERROR, durée, tentative) | no | no | no |
+| Heartbeat vidéo détaillé | yes | yes statique (voix/images/clips, %, durée stage) | no | no | no |
 | Heartbeat progression unitaire | yes | yes statique (images/voix/clips + % + temps stage) | no | no | no |
 | Plan de reprise après échec V1 | yes | yes CPU (diagnostic + invalidations + caches conservés, aucune exécution) | no | no | no |
 | Diagnostic worker de reprise | yes | yes statique (plan commit-pinné joint aux erreurs, aucune reprise automatique) | no | no | no |

@@ -1,0 +1,332 @@
+{
+  "schema": "HIBOU_VIDEO_METHODOLOGY_COVERAGE_V1",
+  "method_version": "VIDEO_METHOD_V4.3",
+  "source": "Airtable Méthodologie vidéo + Video Studio V5",
+  "policy": {
+    "coverage_is_static_evidence_only": true,
+    "e2e_status_is_separate": true,
+    "code_presence_does_not_activate_feature": true,
+    "publication_authorized": false
+  },
+  "steps": [
+    {
+      "id": "0.4-0.5",
+      "label": "Architecture GLOBAL + SPÉCIFIQUE / socle benchmark",
+      "code": [
+        {
+          "path": "scripts/video-layer-guard.mjs",
+          "markers": [
+            "HIBOU_GLOBAL_SPECIFIC_GUARD_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-airtable-sync.mjs",
+          "markers": [
+            "VIDEO_METHOD_V4.3",
+            "features:{"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-layer-guard.test.mjs",
+        "tests/video-airtable-sync.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "1",
+      "label": "Script verrouillé / verbatim",
+      "code": [
+        {
+          "path": "scripts/video-airtable-sync.mjs",
+          "markers": [
+            "script_sha256",
+            "does not reconstruct"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-airtable-sync.test.mjs"
+      ],
+      "e2e_pending": false
+    },
+    {
+      "id": "2",
+      "label": "Storyboard / BREATH_UNIT_FIRST / attention beats",
+      "code": [
+        {
+          "path": "scripts/video-scene-compositor.mjs",
+          "markers": [
+            "HIBOU_SCENE_TIMELINE_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-airtable-sync.mjs",
+          "markers": [
+            "breath_unit",
+            "timeline"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-scene-timeline-v1.test.mjs",
+        "tests/video-scene-compositor.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "3",
+      "label": "Préflight machine / modèles",
+      "code": [
+        {
+          "path": "scripts/video-local-preflight.mjs"
+        }
+      ],
+      "tests": [
+        "tests/video-local-preflight.test.mjs",
+        "tests/video-hardware-profile.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "4",
+      "label": "Carte prosodique / unités de souffle",
+      "code": [
+        {
+          "path": "scripts/video-prosody-plan.mjs",
+          "markers": [
+            "HIBOU_PROSODY_PLAN_V1"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-prosody-plan.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "5",
+      "label": "Voix / mastering / verbatim",
+      "code": [
+        {
+          "path": "scripts/video-audio-master.mjs"
+        },
+        {
+          "path": "scripts/chatterbox-storyboard-batch.py"
+        }
+      ],
+      "tests": [
+        "tests/video-voice-qc.test.mjs",
+        "tests/video-voice-low-vram.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "6",
+      "label": "Image plan / ComfyUI local",
+      "code": [
+        {
+          "path": "scripts/video-image-plan.mjs",
+          "markers": [
+            "HIBOU_IMAGE_PLAN_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-image-batch.mjs"
+        }
+      ],
+      "tests": [
+        "tests/video-image-plan.test.mjs",
+        "tests/video-image-batch.test.mjs",
+        "tests/comfy-prompt-id.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "7",
+      "label": "Ranking assisté + sélection humaine",
+      "code": [
+        {
+          "path": "scripts/video-candidate-review.mjs",
+          "markers": [
+            "HIBOU_CANDIDATE_REVIEW_V1",
+            "review_fingerprint_sha256"
+          ]
+        },
+        {
+          "path": "scripts/video-candidate-selection-apply.mjs",
+          "markers": [
+            "HIBOU_HUMAN_IMAGE_SELECTION_V1",
+            "review fingerprint mismatch"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-candidate-review.test.mjs",
+        "tests/video-candidate-selection-apply.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "8",
+      "label": "Captions + texte écran",
+      "code": [
+        {
+          "path": "scripts/video-subtitles.mjs"
+        },
+        {
+          "path": "scripts/video-scene-compositor.mjs"
+        }
+      ],
+      "tests": [
+        "tests/video-scene-timeline-v1.test.mjs",
+        "tests/video-local-render.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "9",
+      "label": "Promotion render-ready / hashes",
+      "code": [
+        {
+          "path": "scripts/video-storyboard-promote.mjs",
+          "markers": [
+            "promoteStoryboard",
+            "publication_authorized:false"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-storyboard-promote.test.mjs",
+        "tests/video-preview-publication-guard.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "10",
+      "label": "Rendu FFmpeg / BEAT_VARIATION_POLICY",
+      "code": [
+        {
+          "path": "scripts/video-local-render.mjs",
+          "markers": [
+            "renderVideoContract"
+          ]
+        },
+        {
+          "path": "scripts/video-scene-compositor.mjs",
+          "markers": [
+            "HIBOU_BEAT_VARIATION_POLICY_V1"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-local-render.test.mjs",
+        "tests/video-scene-timeline-v1.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "10.5",
+      "label": "PREVIEW + retouches incrémentales",
+      "code": [
+        {
+          "path": "scripts/video-iteration-plan.mjs",
+          "markers": [
+            "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-review-diff.mjs",
+          "markers": [
+            "HIBOU_INCREMENTAL_REVIEW_DIFF_V1"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-iteration-plan.test.mjs",
+        "tests/video-incremental-reuse.test.mjs",
+        "tests/video-review-diff.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "11",
+      "label": "QC technique avancé",
+      "code": [
+        {
+          "path": "scripts/video-master-qc.mjs",
+          "markers": [
+            "HIBOU_MASTER_QC_V2"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-master.test.mjs",
+        "tests/video-smoke-one-scene.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "12",
+      "label": "Revue éditoriale humaine V4",
+      "code": [
+        {
+          "path": "scripts/video-human-review-package.mjs",
+          "markers": [
+            "HIBOU_HUMAN_REVIEW_PACKAGE_V1",
+            "PENDING_HUMAN_REVIEW"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-human-review-package.test.mjs",
+        "tests/video-studio-v5-orchestration.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "13",
+      "label": "Registre + remontée Airtable",
+      "code": [
+        {
+          "path": "scripts/video-artifact-registry.mjs",
+          "markers": [
+            "HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"
+          ]
+        },
+        {
+          "path": "scripts/video-airtable-sync.mjs"
+        }
+      ],
+      "tests": [
+        "tests/video-airtable-smoke-report.test.mjs",
+        "tests/video-airtable-sync.test.mjs"
+      ],
+      "e2e_pending": true
+    },
+    {
+      "id": "14",
+      "label": "Publication + apprentissage",
+      "code": [
+        {
+          "path": "scripts/video-artifact-registry.mjs",
+          "markers": [
+            "publication_authorized:false"
+          ]
+        },
+        {
+          "path": "scripts/video-human-review-package.mjs",
+          "markers": [
+            "publication_authorized: false"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-preview-publication-guard.test.mjs",
+        "tests/video-human-review-package.test.mjs"
+      ],
+      "e2e_pending": true,
+      "activation_policy": "publication remains intentionally outside automatic production"
+    }
+  ]
+}

@@ -7,6 +7,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Brique | Coded | CPU/unit tested | Merged to main | Deployed prod | Active |
 | --- | --- | --- | --- | --- | --- |
 | Timeline intra-scène V1 | yes | yes | no | no | no |
+| Prompt Graph V1 | yes | yes CPU (graphe déterministe + fingerprint + verrous GLOBAL) | no | no | no |
 | QC créatif sémantique local | yes | yes (syntax/contract; model inference E2E pending) | no | no | no |
 | Registry poses Hibou | yes | yes | no | no | no |
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |

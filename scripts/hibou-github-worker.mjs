@@ -1261,6 +1261,16 @@ async function processVideoRender(job, processed) {
     }
   }
 
+  const productionMode = job.options?.preview_mode === true
+    ? "preview"
+    : "final";
+  const candidatesPerScene = productionMode === "preview"
+    ? 1
+    : Math.max(
+        1,
+        Math.min(3, Number(job.options?.candidates_per_scene || 3)),
+      );
+
   state.current_job = job.id;
 
   log("VIDEO_RENDER started", {
@@ -1307,16 +1317,6 @@ async function processVideoRender(job, processed) {
     0,
     Math.min(2, Number(job.options?.regen_attempts || 1)),
   );
-
-  const productionMode = job.options?.preview_mode === true
-    ? "preview"
-    : "final";
-  const candidatesPerScene = productionMode === "preview"
-    ? 1
-    : Math.max(
-        1,
-        Math.min(3, Number(job.options?.candidates_per_scene || 3)),
-      );
 
   const args = [
     masterScript,

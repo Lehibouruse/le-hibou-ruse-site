@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -8,7 +8,18 @@ import { spawnSync } from "node:child_process";
 function fail(message){ throw new Error(message); }
 function sha256(path){ return createHash("sha256").update(readFileSync(path)).digest("hex"); }
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
-function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
+function writeJson(path,value){
+  const target=resolve(path);
+  mkdirSync(dirname(target),{recursive:true});
+  const temp=target+`.tmp-${process.pid}-${Date.now()}`;
+  try{
+    writeFileSync(temp,JSON.stringify(value,null,2)+"\n");
+    renameSync(temp,target);
+  }catch(error){
+    try{ if(existsSync(temp)) unlinkSync(temp); }catch{}
+    throw error;
+  }
+}
 function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
 function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
 async function ensureCanonicalReference(storyboardData, root){

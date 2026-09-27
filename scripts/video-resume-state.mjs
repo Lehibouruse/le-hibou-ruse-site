@@ -4,11 +4,16 @@ import {
   copyFileSync,
   existsSync,
   readFileSync,
+  renameSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { pipelineStateFingerprint } from "./video-resume-plan.mjs";
+import {
+  pipelineStateFingerprint,
+  VIDEO_STAGE_ORDER,
+} from "./video-resume-plan.mjs";
 
 export const RESUME_STATE_SCHEMA = "HIBOU_VIDEO_RESUME_STATE_PREP_V1";
 
@@ -24,6 +29,102 @@ function safeTimestamp(date = new Date()) {
   return date.toISOString().replace(/[:.]/g, "-");
 }
 
+function validateResetStages(plan) {
+  if (plan?.analysis_only !== true) {
+    fail("resume plan must be analysis_only");
+  }
+  if (plan?.publication_authorized === true) {
+    fail("resume plan cannot authorize publication");
+  }
+  if (plan?.resume_required !== true) {
+    fail("resume plan must require a resume");
+  }
+
+  const resumeStage = String(plan?.resume_stage || "").trim();
+  const resumeIndex = VIDEO_STAGE_ORDER.indexOf(resumeStage);
+  if (resumeIndex < 0) {
+    fail("resume plan resume_stage is unknown");
+  }
+
+  if (!Array.isArray(plan?.stages_to_reset) || !plan.stages_to_reset.length) {
+    fail("resume plan has no stages_to_reset");
+  }
+
+  const resetStages = plan.stages_to_reset.map((value) =>
+    String(value || "").trim(),
+  );
+  if (resetStages.some((value) => !VIDEO_STAGE_ORDER.includes(value))) {
+    fail("resume plan contains unknown reset stage");
+  }
+  if (new Set(resetStages).size !== resetStages.length) {
+    fail("resume plan contains duplicate reset stages");
+  }
+
+  const expected = VIDEO_STAGE_ORDER.slice(resumeIndex);
+  if (
+    resetStages.length !== expected.length ||
+    resetStages.some((value, index) => value !== expected[index])
+  ) {
+    fail("resume plan reset stages must be the canonical suffix from resume_stage");
+  }
+
+  return { resumeStage, resetStages };
+}
+
+export function buildResumeApplyReceipt({
+  root,
+  planSha256,
+  backupPath,
+  backupSha256,
+  sourceStateSha256,
+  preparedStateSha256,
+  stateFileSha256,
+  resetStages,
+  appliedAt = new Date().toISOString(),
+} = {}) {
+  for (const [name, value] of Object.entries({
+    planSha256,
+    backupSha256,
+    sourceStateSha256,
+    preparedStateSha256,
+    stateFileSha256,
+  })) {
+    if (!/^[0-9a-f]{64}$/i.test(String(value || ""))) {
+      fail(name + " must be a sha256");
+    }
+  }
+
+  return {
+    schema: "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+    root: resolve(String(root || "")),
+    applied_at: appliedAt,
+    plan_sha256: String(planSha256).toLowerCase(),
+    backup_path: resolve(String(backupPath || "")),
+    backup_sha256: String(backupSha256).toLowerCase(),
+    source_state_sha256: String(sourceStateSha256).toLowerCase(),
+    prepared_state_sha256: String(preparedStateSha256).toLowerCase(),
+    state_file_sha256: String(stateFileSha256).toLowerCase(),
+    reset_stages: Array.isArray(resetStages) ? resetStages.map(String) : [],
+    artifacts_deleted: false,
+    caches_deleted: false,
+    execution_started: false,
+    publication_authorized: false,
+  };
+}
+
+function atomicWriteJson(path, value) {
+  const target = resolve(path);
+  const temp = target + ".tmp-" + process.pid + "-" + Date.now();
+  try {
+    writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", "utf8");
+    renameSync(temp, target);
+  } finally {
+    try {
+      if (existsSync(temp)) unlinkSync(temp);
+    } catch {}
+  }
+}
+
 export function prepareResumeState({
   state,
   plan,
@@ -36,6 +137,7 @@ export function prepareResumeState({
   if (plan?.schema !== "HIBOU_VIDEO_RESUME_PLAN_V1") {
     fail("HIBOU_VIDEO_RESUME_PLAN_V1 required");
   }
+  const validatedReset = validateResetStages(plan);
   const expectedStateSha = String(plan.source_state_sha256 || "")
     .trim()
     .toLowerCase();
@@ -52,9 +154,6 @@ export function prepareResumeState({
   if (plan.execution_performed === true) {
     fail("resume plan must be planning-only");
   }
-  if (!Array.isArray(plan.stages_to_reset) || !plan.stages_to_reset.length) {
-    fail("resume plan has no stages_to_reset");
-  }
 
   const running = Object.entries(state.stages || {})
     .filter(([, info]) => info?.status === "RUNNING")
@@ -70,13 +169,10 @@ export function prepareResumeState({
     : [];
 
   const priorStages = {};
-  const resetStages = [];
-  for (const stage of plan.stages_to_reset) {
-    const name = String(stage || "").trim();
-    if (!name) continue;
+  const resetStages = [...validatedReset.resetStages];
+  for (const name of resetStages) {
     priorStages[name] = next.stages[name] || null;
     delete next.stages[name];
-    resetStages.push(name);
   }
 
   next.pipeline_status = "RESUME_PREPARED";
@@ -85,7 +181,7 @@ export function prepareResumeState({
     prepared_at: preparedAt,
     plan_sha256: String(planSha256).toLowerCase(),
     source_state_sha256: actualStateSha,
-    resume_stage: plan.resume_stage || resetStages[0] || null,
+    resume_stage: validatedReset.resumeStage,
     reset_stages: resetStages,
     preserve_artifacts: true,
     preserve_caches: true,
@@ -220,12 +316,27 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
       safeTimestamp() +
       ".json",
   );
+  const sourceStateSha256 = pipelineStateFingerprint(state);
   copyFileSync(statePath, backupPath);
-  writeFileSync(
-    statePath,
-    JSON.stringify(preview.state, null, 2) + "\n",
-    "utf8",
+  const backupSha256 = sha256File(backupPath);
+  atomicWriteJson(statePath, preview.state);
+  const stateFileSha256 = sha256File(statePath);
+  const preparedStateSha256 = pipelineStateFingerprint(preview.state);
+  const receipt = buildResumeApplyReceipt({
+    root: validated.root,
+    planSha256: validated.plan_sha256,
+    backupPath,
+    backupSha256,
+    sourceStateSha256,
+    preparedStateSha256,
+    stateFileSha256,
+    resetStages: preview.reset_stages,
+  });
+  const receiptPath = resolve(
+    dirname(statePath),
+    "_hibou_video_resume_apply_receipt.json",
   );
+  atomicWriteJson(receiptPath, receipt);
 
   process.stdout.write(
     JSON.stringify({
@@ -238,6 +349,10 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
       resume_stage: preview.state.resume_prepared.resume_stage,
       reset_stages: preview.reset_stages,
       backup_path: backupPath,
+      backup_sha256: backupSha256,
+      receipt_path: receiptPath,
+      prepared_state_sha256: preparedStateSha256,
+      state_file_sha256: stateFileSha256,
       artifacts_deleted: false,
       caches_deleted: false,
       execution_started: false,

@@ -59,7 +59,8 @@ test("human-selection resume is unique, queue-safe and never confused with ordin
     route.indexOf("autoResumeHumanSelection(request)") <
       route.indexOf("autoActivateWhenWorkerReady(request)"),
   );
-  assert.match(route, /if \(isHumanSelectionPause\(record\)\) return false/);
+  assert.match(route, /isHumanSelectionPause\(record\)/);
+  assert.match(route, /isRepairResumePreparedPause\(record\)/);
 });
 
 test("queue forwards human decisions only after a validated resume scheduling record", () => {
@@ -77,4 +78,14 @@ test("resume normalizes human decisions before forwarding them", () => {
   assert.match(route, /publication_authorized: false/);
   assert.match(route, /normalized_options:/);
   assert.match(route, /"Options JSON": JSON\.stringify\(decision\.normalized_options\)/);
+});
+
+
+test("prepared repair pause is excluded from worker-ready and success-chain automation", () => {
+  assert.match(route, /function isRepairResumePreparedPause/);
+  const occurrences = (
+    route.match(/isRepairResumePreparedPause\(record\)/g) || []
+  ).length;
+  assert.ok(occurrences >= 2);
+  assert.match(route, /requires_separate_render_start === true/);
 });

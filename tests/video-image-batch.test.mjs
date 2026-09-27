@@ -116,3 +116,34 @@ test("preview-sized plans prune stale extra candidate cache entries without dele
  assert.equal(Object.keys(JSON.parse(readFileSync(manifest,"utf8")).results).length,1);
  assert.equal(readFileSync(resolve(root,"candidate-2.png"),"utf8"),"img-2");
 });
+
+
+test("image batch timing telemetry is deterministic and persisted",async()=>{
+ const root=mkdtempSync(resolve(tmpdir(),"hibou-img-timing-"));
+ const manifest=resolve(root,"manifest.json"), selections=resolve(root,"selections.json");
+ const one={schema:"HIBOU_IMAGE_PLAN_V1",content_id:"recTIME",requests:[
+  {candidate_id:"S01-C1",scene_id:"S01",candidate:1,seed:1,request:{profile:"primary"}}
+ ]};
+ let clock=1000;
+ const now=()=>clock;
+ const runner=async()=>{
+   clock+=750;
+   const p=resolve(root,"timed.png"); writeFileSync(p,"timed");
+   return {job_id:"timed-job",request_sha256:"timed-hash",attempts:1,outputs:[{path:p}]};
+ };
+ const result=await executeImagePlan(one,{
+   runner,
+   manifestPath:manifest,
+   selectionTemplatePath:selections,
+   now
+ });
+ assert.equal(result.timing.generated_candidate_count,1);
+ assert.equal(result.timing.generated_candidate_elapsed_ms,750);
+ assert.equal(result.timing.mean_generated_candidate_elapsed_ms,750);
+ assert.equal(result.timing.elapsed_ms,750);
+ const stored=JSON.parse(readFileSync(manifest,"utf8"));
+ assert.equal(stored.results["S01-C1"].elapsed_ms,750);
+ assert.equal(stored.results["S01-C1"].primary_elapsed_ms,750);
+ assert.equal(stored.results["S01-C1"].fallback_elapsed_ms,null);
+ assert.equal(stored.run_timing.elapsed_ms,750);
+});

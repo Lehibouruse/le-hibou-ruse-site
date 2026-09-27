@@ -31,6 +31,7 @@ jobs:
           node --check scripts/video-audio-mix.mjs
           node --check scripts/video-iteration-plan.mjs
           node --check scripts/video-job-lineage.mjs
+          node --check scripts/video-v5-readiness.mjs
           node --check scripts/video-artifact-registry.mjs
           node --check scripts/video-image-plan.mjs
           node --check scripts/video-image-batch.mjs
@@ -60,6 +61,7 @@ jobs:
             tests/video-job-lineage.test.mjs \
             tests/video-job-lineage-integration.test.mjs \
             tests/video-preview-publication-guard.test.mjs \
+            tests/video-v5-readiness.test.mjs \
             tests/video-local-render.test.mjs \
             tests/video-remote-cancel.test.mjs \
             tests/video-studio-v5-orchestration.test.mjs

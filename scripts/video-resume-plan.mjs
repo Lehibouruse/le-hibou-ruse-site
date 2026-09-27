@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { auditVoiceDurations } from "./video-voice-duration-qc.mjs";
@@ -295,9 +295,21 @@ export function buildResumePlan({
   const voiceCachePresent =
     existsSync(join(resolvedRoot, "voice", "voice-scenes")) ||
     existsSync(join(resolvedRoot, "voice", "voice-batch-manifest.json"));
-  const renderCachePresent = existsSync(
-    join(resolvedRoot, ".video-render-cache"),
-  );
+  const renderCacheDir = join(resolvedRoot, ".video-render-cache");
+  const renderCachePresent = existsSync(renderCacheDir);
+  let renderSceneClipCount = 0;
+  let renderVisualCount = 0;
+  if (renderCachePresent) {
+    try {
+      const names = readdirSync(renderCacheDir);
+      renderSceneClipCount = names.filter(
+        (name) => /^scene-\d{2}-[0-9a-f]+\.mp4$/i.test(name),
+      ).length;
+      renderVisualCount = names.filter(
+        (name) => /^visual-[0-9a-f]+\.mp4$/i.test(name),
+      ).length;
+    } catch {}
+  }
 
   const requiredCapabilities = unique(
     diagnostics.flatMap((item) => item.required_runtime_capabilities || []),
@@ -331,6 +343,10 @@ export function buildResumePlan({
       voice_scene_cache_must_self_validate_duration: true,
       render_clip_cache_present: renderCachePresent,
       render_clip_cache_should_be_preserved: renderCachePresent,
+      render_scene_clip_count: renderSceneClipCount,
+      render_visual_count: renderVisualCount,
+      full_visual_cache_present: renderVisualCount > 0,
+      final_mux_may_reuse_visual_if_fingerprint_matches: renderVisualCount > 0,
       stale_cache_entries_should_not_be_deleted: true,
       cache_fingerprints_decide_reuse_after_rerun: true,
     },

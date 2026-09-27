@@ -189,8 +189,10 @@ function Stop-HibouRenderChildren {
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object {
       (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*video-master.runtime.mjs*") -or
-      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\\LeHibou\\image-runtime\\*") -or
-      (`$_.Name -match "^python(\\.exe)?$" -and `$_.CommandLine -like "*chatterbox-storyboard-batch.runtime.py*")
+      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\LeHibou\image-runtime\*") -or
+      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\LeHibou\pre-runtime\*") -or
+      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\LeHibou\post-runtime\*") -or
+      (`$_.Name -match "^python(\.exe)?$" -and `$_.CommandLine -like "*chatterbox-storyboard-batch.runtime.py*")
     } |
     ForEach-Object {
       try { Stop-Process -Id `$_.ProcessId -Force -ErrorAction Stop } catch {}
@@ -223,7 +225,9 @@ while (`$true) {
             }
           }
         }
-      } catch {}
+      } catch {
+        `$healthy = `$false
+      }
 
       if (`$healthy) {
         `$unhealthy = 0

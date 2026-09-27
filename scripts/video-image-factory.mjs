@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { buildImagePlan } from "./video-image-plan.mjs";
 import { executeImagePlan } from "./video-image-batch.mjs";
@@ -9,6 +9,81 @@ import { qcImageBatch } from "./video-image-qc.mjs";
 import { buildTargetedRegeneration } from "./video-image-regenerate.mjs";
 
 function fail(m){throw new Error(m);}
+const SCRIPT_DIR=dirname(fileURLToPath(import.meta.url));
+
+function runChecked(command,args,label){
+  const r=spawnSync(command,args,{
+    encoding:"utf8",
+    windowsHide:true,
+    shell:false,
+    maxBuffer:32*1024*1024
+  });
+  if(r.status!==0){
+    const detail=String(r.stderr||r.stdout||"").slice(-5000);
+    fail(label+" failed with status "+r.status+(detail?"\n"+detail:""));
+  }
+  return r;
+}
+
+function qcPython(){
+  const explicit=String(process.env.HIBOU_QC_PYTHON||"").trim();
+  if(explicit){
+    runChecked(explicit,["-c","import cv2, numpy"],"HIBOU_QC_PYTHON dependency probe");
+    return explicit;
+  }
+
+  const base=String(process.env.HIBOU_PYTHON||"python").trim();
+  if(process.platform!=="win32"){
+    runChecked(base,["-c","import cv2, numpy"],"QC dependency probe");
+    return base;
+  }
+
+  const localAppData=String(process.env.LOCALAPPDATA||"").trim();
+  if(!localAppData) fail("LOCALAPPDATA missing; cannot create isolated Hibou QC venv");
+
+  const qcRoot=resolve(localAppData,"LeHibou","video","qc","venv");
+  const python=resolve(qcRoot,"Scripts","python.exe");
+
+  if(!existsSync(python)){
+    mkdirSync(dirname(qcRoot),{recursive:true});
+    runChecked(base,["-m","venv",qcRoot],"Create isolated Hibou QC venv");
+  }
+
+  let probe=spawnSync(python,["-c","import cv2, numpy"],{
+    encoding:"utf8",
+    windowsHide:true,
+    shell:false,
+    maxBuffer:16*1024*1024
+  });
+
+  if(probe.status!==0){
+    runChecked(
+      python,
+      [
+        "-m","pip","install",
+        "--disable-pip-version-check",
+        "--no-input",
+        "--upgrade",
+        "numpy<2",
+        "opencv-python-headless==4.10.0.84"
+      ],
+      "Install isolated Hibou QC dependencies"
+    );
+    probe=spawnSync(python,["-c","import cv2, numpy"],{
+      encoding:"utf8",
+      windowsHide:true,
+      shell:false,
+      maxBuffer:16*1024*1024
+    });
+  }
+
+  if(probe.status!==0){
+    const detail=String(probe.stderr||probe.stdout||"").slice(-5000);
+    fail("Hibou QC dependency probe failed after repair"+(detail?"\n"+detail:""));
+  }
+
+  return python;
+}
 function load(p){return JSON.parse(readFileSync(resolve(p),"utf8"));}
 function write(p,v){writeFileSync(resolve(p),JSON.stringify(v,null,2)+"\n");}
 function arg(name,fallback=""){
@@ -16,8 +91,8 @@ function arg(name,fallback=""){
   return hit?hit.slice(name.length+3):fallback;
 }
 function runPerceptual(techPath,outPath,reference=""){
-  const python=String(process.env.HIBOU_QC_PYTHON||process.env.HIBOU_PYTHON||"python").trim();
-  const args=[resolve("scripts/video-image-perceptual-qc.py"),resolve(techPath),resolve(outPath)];
+  const python=qcPython();
+  const args=[resolve(SCRIPT_DIR,"video-image-perceptual-qc.py"),resolve(techPath),resolve(outPath)];
   if(reference) args.push(resolve(reference));
   const r=spawnSync(python,args,{encoding:"utf8",windowsHide:true,shell:false,maxBuffer:16*1024*1024});
   if(r.status!==0) fail("perceptual QC failed: "+String(r.stderr||r.stdout||"").slice(-3000));

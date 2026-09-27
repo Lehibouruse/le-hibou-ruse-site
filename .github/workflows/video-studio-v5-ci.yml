@@ -40,6 +40,7 @@ jobs:
           node --check scripts/video-durable-storage-plan.mjs
           node --check scripts/video-resume-plan.mjs
           node --check scripts/video-resume-state.mjs
+          node --check scripts/video-run-audit.mjs
           node --check scripts/video-candidate-review.mjs
           node --check scripts/video-candidate-selection-apply.mjs
           node --check scripts/video-image-plan.mjs
@@ -85,6 +86,7 @@ jobs:
             tests/video-resume-state.test.mjs \
             tests/video-worker-failure-resume-diagnostic.test.mjs \
             tests/video-remote-repair-resume.test.mjs \
+            tests/video-run-audit.test.mjs \
             tests/video-pipeline-stage-history.test.mjs \
             tests/video-worker-heartbeat-progress.test.mjs \
             tests/video-local-render.test.mjs \

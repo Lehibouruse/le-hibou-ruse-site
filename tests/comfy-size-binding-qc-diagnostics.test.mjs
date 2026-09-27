@@ -42,9 +42,11 @@ test("image factory preserves aggregate QC diagnostics while adding profile meta
   assert.match(factory, /qc_options:qcOptions/);
 });
 
-test("image plan repairs missing size binding from API workflow", () => {
+test("image plan repairs missing size binding and migrates stale profiles", () => {
   assert.match(plan, /function discoverSizeNode/);
   assert.match(plan, /ComfyUI workflow has no controllable width\/height node/);
   assert.match(plan, /size_binding_repaired/);
-  assert.match(plan, /must be vertical 9:16-ish/);
+  assert.match(plan, /legacy_non_vertical_profile/);
+  assert.match(plan, /profile_migrated/);
+  assert.match(plan, /verifiedHardwareProfiles/);
 });

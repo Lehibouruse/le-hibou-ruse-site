@@ -82,13 +82,14 @@ async function ensurePreImageRuntimeBundle(commit){
 }
 
 const IMAGE_RUNTIME_FILES=[
-  ["video-image-factory.mjs","executeImagePlan"],
-  ["video-image-batch.mjs","runImageGen"],
-  ["video-local-adapters.mjs","ComfyUI /prompt returned no prompt_id"],
-  ["video-image-plan.mjs","HIBOU_IMAGE_PLAN_V1"],
-  ["video-image-qc.mjs","HIBOU_IMAGE_BATCH_V1"],
-  ["video-image-regenerate.mjs","buildTargetedRegeneration"],
-  ["video-image-perceptual-qc.py","input must contain technical QC rows"]
+  ["video-image-factory.mjs","executeImagePlan","scripts/video-image-factory.mjs"],
+  ["video-image-batch.mjs","runImageGen","scripts/video-image-batch.mjs"],
+  ["video-local-adapters.mjs","ComfyUI /prompt returned no prompt_id","scripts/video-local-adapters.mjs"],
+  ["video-image-plan.mjs","HIBOU_IMAGE_PLAN_V1","scripts/video-image-plan.mjs"],
+  ["video-image-qc.mjs","HIBOU_IMAGE_BATCH_V1","scripts/video-image-qc.mjs"],
+  ["video-image-regenerate.mjs","buildTargetedRegeneration","scripts/video-image-regenerate.mjs"],
+  ["video-image-perceptual-qc.py","input must contain technical QC rows","scripts/video-image-perceptual-qc.py"],
+  ["rog-g814ji-rtx4070-8gb.json","VALIDATED_LOCAL_BASELINE","video/hardware/rog-g814ji-rtx4070-8gb.json"]
 ];
 
 async function ensureImageRuntimeBundle(commit){
@@ -99,11 +100,11 @@ async function ensureImageRuntimeBundle(commit){
     "LeHibou","image-runtime",normalized
   );
   mkdirSync(localBase,{recursive:true});
-  for(const [name,marker] of IMAGE_RUNTIME_FILES){
+  for(const [name,marker,sourcePath] of IMAGE_RUNTIME_FILES){
     const target=resolve(localBase,name);
     let source=existsSync(target)?readFileSync(target,"utf8"):"";
     if(!source.includes(marker)){
-      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/scripts/${name}`;
+      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/${sourcePath}`;
       const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
       if(!response.ok) fail(`image runtime download failed HTTP ${response.status}: ${name}@${normalized}`);
       source=await response.text();

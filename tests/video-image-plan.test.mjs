@@ -66,8 +66,34 @@ test("image plan repairs a missing size binding from the real API workflow",()=>
  assert.equal(p.size_binding_repaired,true);
 });
 
-test("image plan rejects non-vertical primary profiles before generation",()=>{
+test("image plan auto-migrates stale non-vertical profiles to verified ROG portrait sizes",()=>{
  const broken=structuredClone(binding);
- broken.profile={width:1024,height:1024,batch_size:1};
- assert.throws(()=>buildImagePlan(contract,broken),/must be vertical 9:16-ish/);
+ broken.profile={width:512,height:768,batch_size:1};
+ broken.fallback_profile={width:512,height:768,batch_size:1};
+ const normalized=normalizeSizeBinding(broken);
+ assert.deepEqual(normalized.profile,{width:768,height:1344,batch_size:1});
+ assert.deepEqual(normalized.fallback_profile,{width:640,height:1136,batch_size:1});
+ assert.equal(normalized.profile_migrated,true);
+ assert.equal(normalized.profile_migration.reason,"legacy_non_vertical_profile");
+ assert.equal(normalized.hardware_profile_id,"ROG_G814JI_RTX4070_8GB_V1");
+ const p=buildImagePlan(contract,broken);
+ assert.equal(p.profile.width,768);
+ assert.equal(p.profile.height,1344);
+ assert.equal(p.fallback_profile.width,640);
+ assert.equal(p.fallback_profile.height,1136);
+ assert.equal(p.profile_migrated,true);
+ assert.equal(p.requests[0].request.overrides["5"].width,768);
+ assert.equal(p.requests[0].request.overrides["5"].height,1344);
+ assert.equal(p.requests[0].fallback_request.overrides["5"].width,640);
+ assert.equal(p.requests[0].fallback_request.overrides["5"].height,1136);
+});
+
+
+test("image plan preserves an already-valid vertical custom profile",()=>{
+ const custom=structuredClone(binding);
+ custom.profile={width:704,height:1216,batch_size:1};
+ custom.fallback_profile={width:640,height:1136,batch_size:1};
+ const normalized=normalizeSizeBinding(custom);
+ assert.deepEqual(normalized.profile,{width:704,height:1216,batch_size:1});
+ assert.equal(normalized.profile_migrated,false);
 });

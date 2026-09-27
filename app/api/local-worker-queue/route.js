@@ -1196,6 +1196,27 @@ export async function POST(request) {
                 )
               : null,
           stage_progress: stageProgress,
+          stagnation_warning: heartbeatResult.stagnation_warning === true,
+          no_progress_seconds:
+            Number.isFinite(Number(heartbeatResult.no_progress_seconds))
+              ? Math.max(
+                  0,
+                  Math.min(
+                    7 * 24 * 60 * 60,
+                    Number(heartbeatResult.no_progress_seconds),
+                  ),
+                )
+              : null,
+          stagnation_threshold_seconds:
+            Number.isFinite(Number(heartbeatResult.stagnation_threshold_seconds))
+              ? Math.max(
+                  30,
+                  Math.min(
+                    24 * 60 * 60,
+                    Number(heartbeatResult.stagnation_threshold_seconds),
+                  ),
+                )
+              : null,
           publication_authorized: false,
           paid_fallback: false,
         });
@@ -1226,7 +1247,7 @@ export async function POST(request) {
       );
     }
 
-    if (body.result && !retry.retry) {
+    if (body.result && !retry.retry && body.heartbeat !== true) {
       fields["R\u00e9sultat JSON"] = cut(
         typeof body.result === "string"
           ? body.result

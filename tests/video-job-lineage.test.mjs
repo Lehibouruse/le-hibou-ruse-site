@@ -99,3 +99,16 @@ test("reuse lineage leaves ordinary jobs untouched", () => {
     lineage: null,
   });
 });
+
+
+test("reuse lineage rejects an invalid ancestor record ID", () => {
+  const result = validateReuseLineage({
+    current_job_id: currentJob,
+    current_content_id: contentId,
+    reuse_from_job_id: parentJob,
+    parent_record: parent({ reuseFrom: "not-an-airtable-record" }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "reuse_parent_invalid_ancestor_id");
+});

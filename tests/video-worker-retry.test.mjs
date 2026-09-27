@@ -37,3 +37,12 @@ test("explicit video stack restart clears backoff only for currently pending que
   assert.match(launcher, /PSObject\.Properties\.Remove\(\$job\.id\)/);
   assert.match(launcher, /Backoff local leve/);
 });
+
+
+test("completed local VIDEO_RENDER artifacts are recoverable after connectivity loss", () => {
+  assert.match(worker, /function localCompletedVideoResults\(processed\)/);
+  assert.match(worker, /_hibou_video_result\.json/);
+  assert.match(worker, /recovered_after_connectivity_loss/);
+  assert.match(worker, /Recovered completed VIDEO_RENDER report after connectivity loss/);
+  assert.match(worker, /await recoverCompletedLocalVideoReports\(processed\)/);
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSceneCompositePlan, normalizeSceneTimeline, sceneAssetRefs } from "../scripts/video-scene-compositor.mjs";
+import { analyzeBeatVariation, buildSceneCompositePlan, normalizeSceneTimeline, sceneAssetRefs } from "../scripts/video-scene-compositor.mjs";
 
 test("timeline is optional and legacy scenes remain unchanged",()=>{
   const scene={scene_id:"S01",image:{selected:"bg.png"},planned_duration_s:9};
@@ -71,4 +71,50 @@ test("visual accent compiles to a timed post-production overlay",()=>{
   assert.match(plan.filter_complex,/drawbox=/);
   assert.match(plan.filter_complex,/0xC7A65A@0\.75/);
   assert.match(plan.filter_complex,/between\(t,1\.500,2\.500\)/);
+});
+
+
+test("beat variation policy flags three consecutive beats from the same family without blocking render",()=>{
+  const timeline=normalizeSceneTimeline({
+    planned_duration_s:6,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"a",type:"text",start_s:0,end_s:2,text:"A"},
+      {id:"b",type:"callout",start_s:2,end_s:4,text:"B"},
+      {id:"c",type:"text",start_s:4,end_s:6,text:"C"}
+    ]}
+  },{duration:6});
+  const report=analyzeBeatVariation(timeline);
+  assert.equal(report.review_required,true);
+  assert.equal(report.blocking,false);
+  assert.equal(report.warnings[0].family,"caption");
+  assert.deepEqual(report.warnings[0].event_ids,["a","b","c"]);
+});
+
+test("beat variation policy accepts a mixed attention-beat sequence",()=>{
+  const timeline=normalizeSceneTimeline({
+    planned_duration_s:8,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"a",type:"text",start_s:0,end_s:2,text:"A"},
+      {id:"b",type:"object",start_s:2,end_s:4,path:"coin.png"},
+      {id:"c",type:"pose",start_s:4,end_s:6,path:"pose.png"},
+      {id:"d",type:"callout",start_s:6,end_s:8,text:"+1 %"}
+    ]}
+  },{duration:8});
+  const report=analyzeBeatVariation(timeline);
+  assert.equal(report.review_required,false);
+  assert.deepEqual(report.warnings,[]);
+});
+
+test("compositor exposes the advisory beat variation report with the render plan",()=>{
+  const scene={
+    scene_id:"S06",image:{selected:"bg.png"},planned_duration_s:6,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {type:"text",start_s:0,end_s:2,text:"A"},
+      {type:"text",start_s:2,end_s:4,text:"B"},
+      {type:"text",start_s:4,end_s:6,text:"C"}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:6});
+  assert.equal(plan.beat_variation.schema,"HIBOU_BEAT_VARIATION_POLICY_V1");
+  assert.equal(plan.beat_variation.review_required,true);
 });

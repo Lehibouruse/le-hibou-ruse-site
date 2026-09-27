@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -92,7 +92,8 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-attach-subtitles.mjs","attachSubtitles"],
   ["video-style-apply.mjs","applyStyleProfile"],
   ["video-asset-resolve.mjs","applyAssetResolution"],
-  ["video-asset-graph.mjs","planSceneAssetReuse"]
+  ["video-asset-graph.mjs","planSceneAssetReuse"],
+  ["video-iteration-plan.mjs","HIBOU_INCREMENTAL_RETOUCH_PLAN_V1"]
 ];
 
 async function ensurePreImageRuntimeBundle(commit){
@@ -127,7 +128,8 @@ async function ensurePreImageRuntimeBundle(commit){
     subtitles:resolve(localBase,"video-subtitles.mjs"),
     attachSubtitles:resolve(localBase,"video-attach-subtitles.mjs"),
     style:resolve(localBase,"video-style-apply.mjs"),
-    assetResolve:resolve(localBase,"video-asset-resolve.mjs")
+    assetResolve:resolve(localBase,"video-asset-resolve.mjs"),
+    iterationPlan:resolve(localBase,"video-iteration-plan.mjs")
   };
 }
 
@@ -211,6 +213,62 @@ function ensureSameRun(statePath,inputs){
     fail("output root already belongs to different inputs; use a new output directory");
   }
 }
+export function seedIncrementalCaches(previousRootArg,currentRootArg){
+  const previousRoot=resolve(previousRootArg);
+  const currentRoot=resolve(currentRootArg);
+  if(previousRoot===currentRoot) fail("reuse-from must reference a different output root");
+  if(!existsSync(previousRoot)) fail("reuse-from output root missing: "+previousRoot);
+
+  const seeded={
+    schema:"HIBOU_INCREMENTAL_CACHE_SEED_V1",
+    previous_root:previousRoot,
+    current_root:currentRoot,
+    voice_scene_cache:false,
+    image_manifest:false,
+    copied_image_outputs:0,
+    render_cache:false
+  };
+
+  const previousVoice=resolve(previousRoot,"voice","voice-scenes");
+  const currentVoice=resolve(currentRoot,"voice","voice-scenes");
+  if(existsSync(previousVoice)&&!existsSync(currentVoice)){
+    mkdirSync(dirname(currentVoice),{recursive:true});
+    cpSync(previousVoice,currentVoice,{recursive:true,force:false,errorOnExist:false});
+    seeded.voice_scene_cache=true;
+  }
+
+  const previousImageManifest=resolve(previousRoot,"images","batch-manifest.json");
+  const currentImageManifest=resolve(currentRoot,"images","batch-manifest.json");
+  if(existsSync(previousImageManifest)&&!existsSync(currentImageManifest)){
+    const manifest=json(previousImageManifest);
+    for(const result of Object.values(manifest?.results||{})){
+      for(const output of Array.isArray(result?.outputs)?result.outputs:[]){
+        const raw=String(output?.path||"").trim();
+        if(!raw) continue;
+        const source=isAbsolute(raw)?resolve(raw):resolve(previousRoot,raw);
+        const insidePrevious=source===previousRoot||source.startsWith(previousRoot+sep);
+        if(!insidePrevious||!existsSync(source)) continue;
+        const target=resolve(currentRoot,relative(previousRoot,source));
+        mkdirSync(dirname(target),{recursive:true});
+        if(!existsSync(target)) cpSync(source,target,{force:false,errorOnExist:false});
+        output.path=target;
+        seeded.copied_image_outputs+=1;
+      }
+    }
+    writeJson(currentImageManifest,manifest);
+    seeded.image_manifest=true;
+  }
+
+  const previousRenderCache=resolve(previousRoot,".video-render-cache");
+  const currentRenderCache=resolve(currentRoot,".video-render-cache");
+  if(existsSync(previousRenderCache)&&!existsSync(currentRenderCache)){
+    cpSync(previousRenderCache,currentRenderCache,{recursive:true,force:false,errorOnExist:false});
+    seeded.render_cache=true;
+  }
+
+  return seeded;
+}
+
 export function masterPolicy({maxScenes=20,regenAttempts=1}={}){
   const scenes=Number(maxScenes), retries=Number(regenAttempts);
   if(!Number.isInteger(scenes)||scenes<1||scenes>25) fail("maxScenes must be 1..25");
@@ -266,6 +324,7 @@ async function main(){
   const outputArg=arg("output","");
   const styleArg=arg("style","");
   const assetGraphArg=arg("asset-graph","");
+  const reuseFromArg=arg("reuse-from","");
   const maxScenes=Number(arg("max-scenes","20"));
   const regenAttempts=Number(arg("regen-attempts","1"));
   const reportAirtable=flag("report-airtable");
@@ -287,6 +346,10 @@ async function main(){
     binding:{path:resolve(bindingArg),sha256:sha256(resolve(bindingArg))},
     style:styleArg?{path:resolve(styleArg),sha256:sha256(resolve(styleArg))}:null,
     asset_graph:assetGraphArg?{path:resolve(assetGraphArg),sha256:sha256(resolve(assetGraphArg))}:null,
+    reuse_from:reuseFromArg?{
+      root:resolve(reuseFromArg),
+      storyboard_sha256:existsSync(resolve(reuseFromArg,"storyboard.json"))?sha256(resolve(reuseFromArg,"storyboard.json")):null
+    }:null,
     policy
   };
   ensureSameRun(statePath,inputs);
@@ -350,6 +413,40 @@ async function main(){
     const guardModule=await import(pathToFileURL(preRuntime.layerGuard).href+"?v="+Date.now());
     const separation=guardModule.validateGlobalSpecificSeparation(storyboardData);
     state.global_specific_guard=separation;
+    writeJson(statePath,state);
+  }
+
+  const incrementalEnabled=contractFeature(
+    storyboardData,
+    "video_incremental_retouch_v1",
+    "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1"
+  );
+  const incrementalPlanPath=resolve(root,"incremental-retouch-plan.json");
+  if(reuseFromArg&&!incrementalEnabled){
+    fail("--reuse-from requires GLOBAL video_incremental_retouch_v1 and HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1=true");
+  }
+  if(incrementalEnabled&&reuseFromArg){
+    const previousRoot=resolve(reuseFromArg);
+    const previousStoryboard=resolve(previousRoot,"storyboard.json");
+    if(!existsSync(previousStoryboard)) fail("reuse-from storyboard.json missing: "+previousStoryboard);
+    const planner=await import(pathToFileURL(preRuntime.iterationPlan).href+"?v="+Date.now());
+    const iterationPlan=planner.buildIterationPlan(json(previousStoryboard),storyboardData);
+    writeJson(incrementalPlanPath,iterationPlan);
+    const cacheSeed=seedIncrementalCaches(previousRoot,root);
+    state.incremental_retouch={
+      enabled:true,
+      reuse_from:previousRoot,
+      plan:incrementalPlanPath,
+      changed_scene_ids:iterationPlan.changed_scene_ids||[],
+      invalidated_stages:iterationPlan.invalidated_stages||[],
+      cache_seed:cacheSeed
+    };
+    writeJson(statePath,state);
+  }else{
+    state.incremental_retouch={
+      enabled:false,
+      reason:reuseFromArg?"feature gate disabled":"no reuse-from requested"
+    };
     writeJson(statePath,state);
   }
 
@@ -557,6 +654,7 @@ async function main(){
       {kind:"qc",path:masterQc},
       ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
+      ...(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)?[{kind:"incremental_retouch_plan",path:incrementalPlanPath}]:[]),
       {kind:"pipeline_state",path:statePath}
     ]});
     run(process.execPath,[postRuntime.registry,registrySpec,registry]);
@@ -596,8 +694,10 @@ async function main(){
       video_prosody_v1:prosodyEnabled,
       video_music_mix_v1:musicEnabled,
       video_creative_qc_v1:creativeQcEnabled,
-      video_pose_registry_v1:poseRegistryEnabled
+      video_pose_registry_v1:poseRegistryEnabled,
+      video_incremental_retouch_v1:incrementalEnabled
     },
+    incremental_retouch:state.incremental_retouch||{enabled:false},
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,
     publication_authorized:false

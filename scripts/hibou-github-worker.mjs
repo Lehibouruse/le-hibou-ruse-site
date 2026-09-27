@@ -1575,6 +1575,11 @@ async function processVideoRender(job, processed) {
     "scripts",
     "video-local-preflight.mjs",
   );
+  const readinessScript = path.join(
+    PROJECT_ROOT,
+    "scripts",
+    "video-v5-readiness.mjs",
+  );
 
   if (!existsSync(masterScript)) {
     throw new Error(`video-master missing: ${masterScript}`);
@@ -1582,6 +1587,9 @@ async function processVideoRender(job, processed) {
 
   if (!existsSync(preflightScript)) {
     throw new Error(`video preflight missing: ${preflightScript}`);
+  }
+  if (!existsSync(readinessScript)) {
+    throw new Error(`video V5 readiness gate missing: ${readinessScript}`);
   }
 
   const dir = path.join(
@@ -1774,6 +1782,33 @@ async function processVideoRender(job, processed) {
       `video preflight failed with status ${preflight.status}`,
     );
   }
+
+  const readinessPath = path.join(dir, "v5-readiness.json");
+  const readiness = spawnSync(
+    process.execPath,
+    [readinessScript, storyboardPath, readinessPath],
+    {
+      cwd: PROJECT_ROOT,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
+  if (readiness.status !== 0) {
+    const detail = String(readiness.stderr || readiness.stdout || "")
+      .slice(-6000);
+    throw new Error(
+      `video V5 readiness gate failed with status ${readiness.status}`
+      + (detail ? `\n${detail}` : ""),
+    );
+  }
+  log("VIDEO_RENDER V5 readiness gate passed", {
+    job: job.id,
+    content_id: contentId,
+    report: readinessPath,
+  });
 
   if (!humanSelectionResume) {
     await ensureComfyUIReady();

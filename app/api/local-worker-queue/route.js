@@ -76,6 +76,133 @@ function parseJsonObject(value) {
   }
 }
 
+async function activeVideoJobs() {
+  const [pending, running] = await Promise.all([
+    queryRecords(TABLES.localWorkerQueue, {
+      filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
+      pageSize: 10,
+    }),
+    queryRecords(TABLES.localWorkerQueue, {
+      filterByFormula: "AND({Statut}='Running',{Type}='VIDEO_RENDER')",
+      pageSize: 10,
+    }),
+  ]);
+  return [...pending, ...running];
+}
+
+function workerSession(request) {
+  return {
+    session: cut(request.headers.get("x-hibou-worker-session"), 240),
+    worker: cut(request.headers.get("x-hibou-worker"), 180),
+  };
+}
+
+async function autoActivateWhenWorkerReady(request) {
+  const { session, worker } = workerSession(request);
+  if (!session || !worker) {
+    return { activated: false, reason: "worker_session_required" };
+  }
+
+  const active = await activeVideoJobs();
+  if (active.length) {
+    return {
+      activated: false,
+      reason: "queue_not_empty",
+      active_job_ids: active.map((record) => record.id),
+    };
+  }
+
+  const paused = await queryRecords(TABLES.localWorkerQueue, {
+    filterByFormula: "AND({Statut}='Paused',{Type}='VIDEO_RENDER')",
+    pageSize: 50,
+  });
+
+  const eligible = paused.filter((record) => {
+    const options = parseOptions(record.fields?.["Options JSON"]);
+    return options.auto_start_when_worker_ready === true;
+  });
+
+  if (eligible.length !== 1) {
+    return {
+      activated: false,
+      reason: eligible.length ? "ambiguous_auto_start_jobs" : "no_auto_start_job",
+      eligible_job_ids: eligible.map((record) => record.id),
+    };
+  }
+
+  const record = eligible[0];
+  const activatedAt = new Date().toISOString();
+  await updateRecord(TABLES.localWorkerQueue, record.id, {
+    Statut: "Pending",
+    "R\u00e9sultat JSON": JSON.stringify({
+      schema: "HIBOU_VIDEO_RENDER_AUTO_ACTIVATION_V1",
+      activated_at: activatedAt,
+      activated_by_worker: worker,
+      activated_by_session: session,
+      reason: "worker_ready_and_queue_empty",
+      publication_authorized: false,
+      paid_fallback: false,
+    }),
+  });
+
+  return {
+    activated: true,
+    job_id: record.id,
+    activated_at: activatedAt,
+  };
+}
+
+async function autoChainAfterSuccess(completedRecordId) {
+  const active = await activeVideoJobs();
+  if (active.length) {
+    return {
+      activated: false,
+      reason: "queue_not_empty",
+      active_job_ids: active.map((record) => record.id),
+    };
+  }
+
+  const paused = await queryRecords(TABLES.localWorkerQueue, {
+    filterByFormula: "AND({Statut}='Paused',{Type}='VIDEO_RENDER')",
+    pageSize: 50,
+  });
+
+  const eligible = paused.filter((record) => {
+    const options = parseOptions(record.fields?.["Options JSON"]);
+    return options.auto_start_after_success === true
+      && String(options.auto_start_after_job_id || "") === completedRecordId;
+  });
+
+  if (eligible.length !== 1) {
+    return {
+      activated: false,
+      reason: eligible.length ? "ambiguous_success_chain_jobs" : "no_success_chain_job",
+      eligible_job_ids: eligible.map((record) => record.id),
+    };
+  }
+
+  const record = eligible[0];
+  const activatedAt = new Date().toISOString();
+  await updateRecord(TABLES.localWorkerQueue, record.id, {
+    Statut: "Pending",
+    "R\u00e9sultat JSON": JSON.stringify({
+      schema: "HIBOU_VIDEO_RENDER_SUCCESS_CHAIN_V1",
+      activated_at: activatedAt,
+      predecessor_job_id: completedRecordId,
+      reason: "predecessor_completed",
+      publication_authorized: false,
+      paid_fallback: false,
+    }),
+  });
+
+  return {
+    activated: true,
+    job_id: record.id,
+    activated_at: activatedAt,
+    predecessor_job_id: completedRecordId,
+  };
+}
+
 async function reconcileStaleRunning(request) {
   const session = cut(request.headers.get("x-hibou-worker-session"), 240);
   const worker = cut(request.headers.get("x-hibou-worker"), 180);
@@ -141,6 +268,7 @@ export async function GET(request) {
     }
 
     const reconciliation = await reconcileStaleRunning(request);
+    const auto_activation = await autoActivateWhenWorkerReady(request);
 
     const records = await queryRecords(TABLES.localWorkerQueue, {
       filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
@@ -217,6 +345,7 @@ export async function GET(request) {
       jobs,
       runtime_commit: RUNTIME_COMMIT,
       reconciliation,
+      auto_activation,
       generated_at: new Date().toISOString(),
     });
   } catch (error) {
@@ -354,10 +483,15 @@ export async function POST(request) {
       fields,
     );
 
+    const success_chain = status === "Completed"
+      ? await autoChainAfterSuccess(recordId)
+      : { activated: false, reason: "predecessor_not_completed" };
+
     return NextResponse.json({
       ok: true,
       airtable_record_id: recordId,
       status,
+      success_chain,
     });
   } catch (error) {
     return NextResponse.json(

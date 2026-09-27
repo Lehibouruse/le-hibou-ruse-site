@@ -41,18 +41,38 @@ export function parseNvidiaCsv(text) {
     .filter(gpu => Number.isInteger(gpu.index) && Number.isFinite(gpu.memory_total_mib));
 }
 
-export function classify(report, minFreeGiB = 25) {
+export function classify(
+  report,
+  minFreeGiB = 25,
+  minFreeRamGiB = 4,
+  minFreeGpuMiB = 3072,
+) {
   const reasons = [];
   if (!report.gpus.length) reasons.push("no_nvidia_gpu");
   if (!report.python_3_11.available) reasons.push("python_3_11_missing");
   if (!report.ffmpeg.available || !report.ffprobe.available) reasons.push("ffmpeg_missing");
   if (report.disk_free_gib < minFreeGiB) reasons.push("low_disk_space");
+
+  const ramFreeGiB = Number(report.ram_free_gib);
+  if (Number.isFinite(ramFreeGiB) && ramFreeGiB < minFreeRamGiB) {
+    reasons.push("low_free_ram");
+  }
+
+  const knownGpuFree = (Array.isArray(report.gpus) ? report.gpus : [])
+    .map((gpu) => Number(gpu?.memory_free_mib))
+    .filter((value) => Number.isFinite(value) && value >= 0);
+  if (knownGpuFree.length && Math.max(...knownGpuFree) < minFreeGpuMiB) {
+    reasons.push("low_free_vram");
+  }
+
   return {
     ready_for_model_smoke_test: reasons.length === 0,
     blocking_reasons: reasons,
     policy: reasons.length ? "STOP_BEFORE_MODEL_DOWNLOAD" : "ONE_COMPONENT_AT_A_TIME",
     project_disk_safety_floor_gib: minFreeGiB,
-    note: "The disk floor is a Hibou project safety gate, not a vendor-stated model minimum.",
+    project_ram_safety_floor_gib: minFreeRamGiB,
+    project_gpu_free_safety_floor_mib: minFreeGpuMiB,
+    note: "Disk/RAM/VRAM floors are Hibou project safety gates, not vendor-stated model minimums.",
   };
 }
 
@@ -76,6 +96,8 @@ export function collectPreflight(root = process.cwd()) {
   const disk = statfsSync(resolve(root));
   const diskFree = Number(disk.bavail) * Number(disk.bsize);
   const minFreeGiB = Number(process.env.HIBOU_MIN_FREE_GIB || 25);
+  const minFreeRamGiB = Number(process.env.HIBOU_MIN_FREE_RAM_GIB || 4);
+  const minFreeGpuMiB = Number(process.env.HIBOU_MIN_FREE_GPU_MIB || 3072);
 
   const report = {
     schema: "HIBOU_LOCAL_PREFLIGHT_V1",
@@ -97,7 +119,15 @@ export function collectPreflight(root = process.cwd()) {
     model_downloads_performed: false,
     paid_fallback: false,
   };
-  return { ...report, decision: classify(report, minFreeGiB) };
+  return {
+    ...report,
+    decision: classify(
+      report,
+      minFreeGiB,
+      minFreeRamGiB,
+      minFreeGpuMiB,
+    ),
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

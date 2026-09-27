@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -9,7 +9,92 @@ function seedFor(contentId,sceneId,candidate){
   const h=createHash("sha256").update(`${contentId}|${sceneId}|${candidate}`).digest();
   return h.readUInt32BE(0);
 }
+
+function workflowNodes(workflow){
+  return Object.entries(workflow||{}).filter(([,node])=>
+    node&&typeof node==="object"&&node.inputs&&typeof node.inputs==="object"
+  );
+}
+
+function validSizeNode(workflow,size){
+  if(!size?.node_id) return false;
+  const node=workflow?.[String(size.node_id)];
+  if(!node?.inputs) return false;
+  const widthKey=size.width_input||"width";
+  const heightKey=size.height_input||"height";
+  return Object.prototype.hasOwnProperty.call(node.inputs,widthKey)
+    && Object.prototype.hasOwnProperty.call(node.inputs,heightKey);
+}
+
+function discoverSizeNode(workflow){
+  const candidates=workflowNodes(workflow)
+    .map(([id,node])=>{
+      const inputs=node.inputs||{};
+      if(!Object.prototype.hasOwnProperty.call(inputs,"width")
+        || !Object.prototype.hasOwnProperty.call(inputs,"height")) return null;
+      const classType=String(node.class_type||"").toLowerCase();
+      let score=12;
+      if(classType.includes("latent")) score+=4;
+      if(classType.includes("image")) score+=2;
+      if(Object.prototype.hasOwnProperty.call(inputs,"batch_size")) score+=2;
+      return {
+        node_id:String(id),
+        width_input:"width",
+        height_input:"height",
+        batch_input:Object.prototype.hasOwnProperty.call(inputs,"batch_size")?"batch_size":null,
+        class_type:node.class_type||null,
+        score
+      };
+    })
+    .filter(Boolean)
+    .sort((a,b)=>b.score-a.score||a.node_id.localeCompare(b.node_id));
+  return candidates[0]||null;
+}
+
+export function normalizeSizeBinding(binding){
+  const out=structuredClone(binding||{});
+  const workflowPath=String(out.workflow_path||"").trim();
+  if(!workflowPath) fail("binding.workflow_path required");
+  if(!existsSync(resolve(workflowPath))) fail("binding workflow_path missing: "+resolve(workflowPath));
+  const workflow=JSON.parse(readFileSync(resolve(workflowPath),"utf8"));
+
+  if(!validSizeNode(workflow,out.size)){
+    const repaired=discoverSizeNode(workflow);
+    if(!repaired) fail("ComfyUI workflow has no controllable width/height node");
+    out.size=repaired;
+    out.size_binding_repaired=true;
+  }else{
+    out.size_binding_repaired=false;
+  }
+
+  const profile=out.profile||{width:768,height:1344,batch_size:1};
+  out.profile={
+    width:Number(profile.width||768),
+    height:Number(profile.height||1344),
+    batch_size:Number(profile.batch_size||1)
+  };
+  const ratio=out.profile.width/out.profile.height;
+  if(!Number.isFinite(ratio)||Math.abs(ratio-(9/16))>0.05){
+    fail(`ComfyUI primary image profile must be vertical 9:16-ish, got ${out.profile.width}x${out.profile.height}`);
+  }
+
+  if(out.fallback_profile){
+    const fp={
+      width:Number(out.fallback_profile.width),
+      height:Number(out.fallback_profile.height),
+      batch_size:Number(out.fallback_profile.batch_size||1)
+    };
+    const fr=fp.width/fp.height;
+    if(!Number.isFinite(fr)||Math.abs(fr-(9/16))>0.05){
+      fail(`ComfyUI fallback image profile must be vertical 9:16-ish, got ${fp.width}x${fp.height}`);
+    }
+    out.fallback_profile=fp;
+  }
+
+  return out;
+}
 export function buildImagePlan(contract,binding){
+  binding=normalizeSizeBinding(binding);
   if(contract.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract version");
   if(contract.contract_state!=="storyboard") fail("image planning expects storyboard contract");
   if(!binding?.workflow_path) fail("binding.workflow_path required");
@@ -73,7 +158,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

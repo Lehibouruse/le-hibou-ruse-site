@@ -140,6 +140,17 @@ function aggregateDimensions(tech){
   }
   return counts;
 }
+
+function qcOptionsFromPlan(plan){
+  const profiles=[plan?.profile,plan?.fallback_profile].filter(Boolean);
+  const widths=profiles.map(p=>Number(p.width)).filter(Number.isFinite);
+  const heights=profiles.map(p=>Number(p.height)).filter(Number.isFinite);
+  return {
+    minWidth:Math.max(512,Math.min(...widths)),
+    minHeight:Math.max(896,Math.min(...heights)),
+    aspectTolerance:0.05
+  };
+}
 export function factoryPolicy({maxScenes=1,maxRegenerationAttempts=1}={}){
   const scenes=Number(maxScenes), attempts=Number(maxRegenerationAttempts);
   if(!Number.isInteger(scenes)||scenes<1||scenes>20) fail("maxScenes must be 1..20");
@@ -194,7 +205,8 @@ async function main(){
 
   await executeImagePlan(plan,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
   let manifest=load(manifestPath);
-  let tech=qcImageBatch(manifest); write(techPath,tech);
+  const qcOptions=qcOptionsFromPlan(plan);
+  let tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
   let perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
 
   const regenRuns=[];
@@ -204,7 +216,7 @@ async function main(){
     const regenPath=resolve(root,"regen-plan-"+attempt+".json"); write(regenPath,regen);
     await executeImagePlan(regen,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
     manifest=load(manifestPath);
-    tech=qcImageBatch(manifest); write(techPath,tech);
+    tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
     perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
     regenRuns.push({attempt,failed_scenes:regen.regeneration.failed_scenes,requests:regen.requests.length});
   }
@@ -217,6 +229,13 @@ async function main(){
     content_id:plan.content_id,
     scenes:limitedScenes,
     policy,
+    image_profile:{
+      primary:plan.profile||null,
+      fallback:plan.fallback_profile||null,
+      size_binding:plan.size_binding||null,
+      size_binding_repaired:Boolean(plan.size_binding_repaired),
+      qc_options:qcOptions
+    },
     regeneration_runs:regenRuns,
     all_scenes_have_candidate:perceptual.all_scenes_have_candidate,
     technical_qc:{
@@ -225,7 +244,8 @@ async function main(){
       dimensions:aggregateDimensions(tech),
       min_width:tech?.min_width??null,
       min_height:tech?.min_height??null,
-      aspect_tolerance:tech?.aspect_tolerance??null
+      aspect_tolerance:tech?.aspect_tolerance??null,
+      qc_options:qcOptions
     },
     perceptual_qc:aggregatePerceptual(perceptual),
     provisional_selections:selections,

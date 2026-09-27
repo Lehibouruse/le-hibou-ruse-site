@@ -1,0 +1,47 @@
+{
+  "schema": "HIBOU_HARDWARE_PROFILE_V1",
+  "profile_id": "ROG_G814JI_RTX4070_8GB_V1",
+  "status": "VALIDATED_LOCAL_BASELINE",
+  "computer_model": "ASUS ROG Strix G18 G814JI",
+  "platform": "Windows",
+  "cpu": {
+    "model": "Intel Core i9-13980HX",
+    "logical_threads": 32
+  },
+  "gpu": {
+    "vendor": "NVIDIA",
+    "model": "GeForce RTX 4070 Laptop GPU",
+    "vram_mib": 8188
+  },
+  "ram_gib": 32,
+  "image": {
+    "engine": "comfyui-local",
+    "smoke_profile": {
+      "width": 768,
+      "height": 1344,
+      "batch_size": 1
+    },
+    "fallback_profile": {
+      "width": 640,
+      "height": 1136,
+      "batch_size": 1
+    },
+    "candidates_per_scene": 3,
+    "sequential_generation": true
+  },
+  "policy": {
+    "prefer_local_loopback": true,
+    "paid_cloud_fallback": false,
+    "human_review_required": true,
+    "publication_authorized": false
+  },
+  "source_of_truth": "local_preflight_verified",
+  "verified_at": "2026-09-27",
+  "validation": {
+    "method": "HIBOU_LOCAL_PREFLIGHT_V1",
+    "nvidia_smi_available": true,
+    "python_3_11": true,
+    "ffmpeg": true,
+    "ffprobe": true
+  }
+}

@@ -18,7 +18,7 @@ const RUNTIME_COMMIT = /^[0-9a-f]{40}$/i.test(
   ? String(process.env.VERCEL_GIT_COMMIT_SHA).toLowerCase()
   : null;
 
-const ALLOWED_STATUS = new Set(["Running", "Completed", "Error", "Cancelled", "Superseded"]);
+const ALLOWED_STATUS = new Set(["Running", "Paused", "Completed", "Error", "Cancelled", "Superseded"]);
 const REMOTE_CANCEL_ENABLED =
   String(process.env.HIBOU_VIDEO_REMOTE_CANCEL_ENABLED || "")
     .trim()
@@ -126,6 +126,12 @@ function parseJsonObject(value) {
   } catch {
     return {};
   }
+}
+
+function isHumanSelectionPause(record) {
+  const result = parseJsonObject(record?.fields?.["Résultat JSON"]);
+  return result.schema === "HIBOU_VIDEO_RENDER_WAITING_HUMAN_SELECTION_V1"
+    || result.status === "WAITING_HUMAN_SELECTION";
 }
 
 function reuseValidationReason(error) {
@@ -278,6 +284,7 @@ async function autoActivateWhenWorkerReady(request) {
   });
 
   const eligible = paused.filter((record) => {
+    if (isHumanSelectionPause(record)) return false;
     const options = parseOptions(record.fields?.["Options JSON"]);
     return options.auto_start_when_worker_ready === true;
   });
@@ -328,6 +335,7 @@ async function autoChainAfterSuccess(completedRecordId) {
   });
 
   const eligible = paused.filter((record) => {
+    if (isHumanSelectionPause(record)) return false;
     const options = parseOptions(record.fields?.["Options JSON"]);
     return options.auto_start_after_success === true
       && String(options.auto_start_after_job_id || "") === completedRecordId;

@@ -58,3 +58,11 @@ test("CUDA probe captures Python stdout and stderr without PowerShell native-err
   assert.match(starter, /device_count/);
   assert.match(starter, /STDERR=\$\(\$cudaProbe\.stderr\)/);
 });
+
+
+test("CUDA probe handles empty stdout or stderr files under PowerShell 5.1", () => {
+  assert.match(starter, /\$null -eq \$probeOutputRaw/);
+  assert.match(starter, /\$null -eq \$probeErrorRaw/);
+  assert.match(starter, /\$probeOutput = \$probeOutput\.Trim\(\)/);
+  assert.match(starter, /\$probeError = \$probeError\.Trim\(\)/);
+});

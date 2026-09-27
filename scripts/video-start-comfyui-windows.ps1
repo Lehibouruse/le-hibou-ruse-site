@@ -2,7 +2,7 @@ param(
   [int]$Port = 8188
 )
 
-# COMFYUI_AUTOSTART_V3
+# COMFYUI_AUTOSTART_V2
 $ErrorActionPreference = "Stop"
 $VideoRoot = Join-Path $env:LOCALAPPDATA "LeHibou\video"
 $Portable = Join-Path $VideoRoot "comfyui\ComfyUI_windows_portable"
@@ -151,7 +151,7 @@ Write-Host "ComfyUI Hibou : loopback uniquement, low VRAM, port $Port" -Foregrou
 $child = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $Portable -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -WindowStyle Hidden -PassThru
 
 [ordered]@{
-  schema = "HIBOU_COMFYUI_AUTOSTART_V3"
+  schema = "HIBOU_COMFYUI_AUTOSTART_V2"
   started_at = [DateTimeOffset]::UtcNow.ToString("o")
   pid = $child.Id
   port = $Port
@@ -163,4 +163,4 @@ $child = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $
   cuda_probe = $cudaProbe.output
 } | ConvertTo-Json -Depth 4 | Set-Content -Path $State -Encoding UTF8
 
-Write-Host ("COMFYUI_AUTOSTART_V3 pid={0} state={1}" -f $child.Id, $State) -ForegroundColor Green
+Write-Host ("COMFYUI_AUTOSTART_V2 pid={0} state={1}" -f $child.Id, $State) -ForegroundColor Green

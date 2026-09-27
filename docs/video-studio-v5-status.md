@@ -16,6 +16,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Verrou PREVIEW / publication | yes | yes (contract + registry tests; publish E2E intentionally disabled) | no | no | no |
 | Sélection humaine candidats V1 | yes | yes (review package, contact sheet, stale-decision fingerprint, pause/resume orchestration statique) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
+| Plan stockage durable V1 | yes | yes (plan content-addressed, aucun transfert) | no | no | no |
 
 ## Feature gates
 

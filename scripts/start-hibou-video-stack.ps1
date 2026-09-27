@@ -181,6 +181,19 @@ if ($CurrentLauncher -ne $InstalledLauncher) {
   Copy-Item -LiteralPath $CurrentLauncher -Destination $RuntimeLauncher -Force
 }
 
+$WatchdogScript = Join-Path $InstallDir "run-hibou-worker-watchdog.ps1"
+$WatchdogContent = @"
+`$ErrorActionPreference = "Continue"
+while (`$true) {
+  try {
+    `$child = Start-Process -FilePath "$Node" -ArgumentList '"$Worker"' -WorkingDirectory "$InstallDir" -WindowStyle Hidden -PassThru
+    `$child.WaitForExit()
+  } catch {}
+  Start-Sleep -Seconds 5
+}
+"@
+Set-Content -Path $WatchdogScript -Value $WatchdogContent -Encoding UTF8
+
 $StartupDir = [Environment]::GetFolderPath("Startup")
 $StartupCmd = Join-Path $StartupDir "LeHibouWorker.cmd"
 $CmdContent = @"
@@ -189,14 +202,20 @@ start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hid
 "@
 Set-Content -Path $StartupCmd -Value $CmdContent -Encoding ASCII
 
-Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-  Where-Object { $_.CommandLine -like "*hibou-github-worker.mjs*" } |
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.ProcessId -ne $PID -and
+    (
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*hibou-github-worker.mjs*") -or
+      ($_.Name -match "^powershell(\.exe)?$|^pwsh(\.exe)?$" -and $_.CommandLine -like "*run-hibou-worker-watchdog.ps1*")
+    )
+  } |
   ForEach-Object {
     try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
   }
 
 Start-Sleep -Milliseconds 500
-Start-Process -FilePath $Node -ArgumentList ('"' + $Worker + '"') -WorkingDirectory $InstallDir -WindowStyle Hidden
+Start-Process -FilePath "powershell.exe" -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $WatchdogScript + '"') -WorkingDirectory $InstallDir -WindowStyle Hidden
 
 $health = $null
 for ($i = 0; $i -lt 20; $i++) {
@@ -244,6 +263,7 @@ if (-not $health.video_master_script_exists) {
   chatterbox_batch_script = $RuntimeVoice
   runtime_commit = $RuntimeCommit
   startup = $StartupCmd
+  watchdog = $WatchdogScript
   queue_jobs_visible = @($queue.jobs).Count
 } | ConvertTo-Json -Depth 4
 

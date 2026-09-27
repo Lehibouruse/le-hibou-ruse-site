@@ -315,13 +315,22 @@
             "execution_performed: false",
             "preserve_caches_and_revalidate_by_fingerprint"
           ]
+        },
+        {
+          "path": "scripts/hibou-github-worker.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+            "_hibou_video_resume_plan.json",
+            "resume_execution_performed: false"
+          ]
         }
       ],
       "tests": [
         "tests/video-iteration-plan.test.mjs",
         "tests/video-incremental-reuse.test.mjs",
         "tests/video-review-diff.test.mjs",
-        "tests/video-resume-plan.test.mjs"
+        "tests/video-resume-plan.test.mjs",
+        "tests/video-worker-failure-resume-diagnostic.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -387,13 +396,22 @@
             "execution_performed: false",
             "preserve_caches_and_revalidate_by_fingerprint"
           ]
+        },
+        {
+          "path": "scripts/hibou-github-worker.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+            "_hibou_video_resume_plan.json",
+            "resume_execution_performed: false"
+          ]
         }
       ],
       "tests": [
         "tests/video-airtable-smoke-report.test.mjs",
         "tests/video-airtable-sync.test.mjs",
         "tests/video-durable-storage-plan.test.mjs",
-        "tests/video-resume-plan.test.mjs"
+        "tests/video-resume-plan.test.mjs",
+        "tests/video-worker-failure-resume-diagnostic.test.mjs"
       ],
       "e2e_pending": true
     },

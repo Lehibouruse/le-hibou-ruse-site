@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function fail(message){ throw new Error(message); }
 function text(v){ return String(v??"").trim(); }
@@ -174,7 +175,7 @@ function loadEntries(paths){
   return entries;
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const args=process.argv.slice(2);
   const outArg=args.find(x=>x.startsWith("--out="))?.slice(6);
   const inputArgs=args.filter(x=>!x.startsWith("--"));

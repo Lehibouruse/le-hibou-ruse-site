@@ -10,7 +10,8 @@ function assTime(seconds){
   return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(c).padStart(2,"0")}`;
 }
 function esc(text){return String(text||"").replaceAll("\\","\\\\").replaceAll("{","\\{").replaceAll("}","\\}").replace(/\r?\n/g,"\\N");}
-export function buildAss(contract,{font="DejaVu Sans",fontSize=54,marginV=150}={}){
+export function defaultSubtitleFont(platform=process.platform){ return platform==="win32"?"Arial":"DejaVu Sans"; }
+export function buildAss(contract,{font=defaultSubtitleFont(),fontSize=54,marginV=150}={}){
   if(contract?.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract");
   const events=[];
   for(const scene of contract.scenes||[]){
@@ -41,5 +42,5 @@ if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const contract=JSON.parse(readFileSync(resolve(contractPath),"utf8"));
   const ass=buildAss(contract);
   mkdirSync(dirname(resolve(outPath)),{recursive:true}); writeFileSync(resolve(outPath),ass);
-  process.stdout.write(JSON.stringify({ok:true,output:resolve(outPath),scene_count:contract.scenes.length})+"\n");
+  process.stdout.write(JSON.stringify({ok:true,output:resolve(outPath),scene_count:contract.scenes.length,font_family:defaultSubtitleFont()})+"\n");
 }

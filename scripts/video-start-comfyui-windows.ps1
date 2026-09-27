@@ -66,8 +66,15 @@ if (-not $cudaProbe.ok) {
     "--index-url", "https://download.pytorch.org/whl/cu124"
   )
 
-  & $Python @pipArgs *>&1 | Tee-Object -FilePath $CudaRepairLog -Append
-  if ($LASTEXITCODE -ne 0) {
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    & $Python @pipArgs *>&1 | Tee-Object -FilePath $CudaRepairLog -Append
+    $pipExit = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+  if ($pipExit -ne 0) {
     throw "Reparation PyTorch CUDA 12.4 echouee. Voir $CudaRepairLog"
   }
 

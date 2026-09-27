@@ -9,8 +9,19 @@ function sha256(path){ return createHash("sha256").update(readFileSync(path)).di
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
 function run(command,args,{env={}}={}){
-  const r=spawnSync(command,args,{stdio:"inherit",windowsHide:true,shell:false,env:{...process.env,...env}});
-  if(r.status!==0) fail(command+" failed with status "+r.status);
+  const r=spawnSync(command,args,{
+    encoding:"utf8",
+    windowsHide:true,
+    shell:false,
+    env:{...process.env,...env},
+    maxBuffer:32*1024*1024
+  });
+  if(r.stdout) process.stdout.write(r.stdout);
+  if(r.stderr) process.stderr.write(r.stderr);
+  if(r.status!==0){
+    const tail=String(r.stderr||r.stdout||"").slice(-12000);
+    fail(command+" failed with status "+r.status+(tail?"\n"+tail:""));
+  }
 }
 function flag(name){ return process.argv.includes("--"+name); }
 function arg(name,fallback=""){

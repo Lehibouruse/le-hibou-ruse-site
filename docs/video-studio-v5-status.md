@@ -22,6 +22,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Heartbeat vidéo détaillé | yes | yes statique (voix/images/clips, %, durée stage) | no | no | no |
 | Heartbeat progression unitaire | yes | yes statique (images/voix/clips + % + temps stage) | no | no | no |
 | Plan de reprise après échec V1 | yes | yes CPU (diagnostic + invalidations + caches conservés, aucune exécution) | no | no | no |
+| Reset état de reprise | yes | yes CPU (dry-run, plan SHA + state SHA + env gate, caches préservés) | no | no | no |
 | Diagnostic worker de reprise | yes | yes statique (plan commit-pinné joint aux erreurs, aucune reprise automatique) | no | no | no |
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |

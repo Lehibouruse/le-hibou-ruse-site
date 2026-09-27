@@ -142,3 +142,14 @@ test("remote human resume remains a human gate and never authorizes publication"
  assert.match(queueRoute,/human_review_required: true/);
  assert.match(queueRoute,/publication_authorized: false/);
 });
+
+
+test("V5 readiness invariants run before ComfyUI GPU wake-up",()=> {
+  assert.match(worker,/video-v5-readiness\.mjs/);
+  assert.match(worker,/v5-readiness\.json/);
+  assert.match(worker,/VIDEO_RENDER V5 readiness gate passed/);
+  assert.ok(
+    worker.indexOf("video V5 readiness gate failed") <
+      worker.indexOf("await ensureComfyUIReady()"),
+  );
+});

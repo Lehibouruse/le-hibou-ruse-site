@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { pipelineStateFingerprint } from "./video-resume-plan.mjs";
 
 export const RESUME_STATE_SCHEMA = "HIBOU_VIDEO_RESUME_STATE_PREP_V1";
 
@@ -34,6 +35,16 @@ export function prepareResumeState({
   }
   if (plan?.schema !== "HIBOU_VIDEO_RESUME_PLAN_V1") {
     fail("HIBOU_VIDEO_RESUME_PLAN_V1 required");
+  }
+  const expectedStateSha = String(plan.source_state_sha256 || "")
+    .trim()
+    .toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(expectedStateSha)) {
+    fail("resume plan source_state_sha256 missing or invalid");
+  }
+  const actualStateSha = pipelineStateFingerprint(state);
+  if (actualStateSha !== expectedStateSha) {
+    fail("resume plan is stale: pipeline state fingerprint mismatch");
   }
   if (!/^[0-9a-f]{64}$/i.test(String(planSha256 || ""))) {
     fail("valid resume plan sha256 required");
@@ -73,6 +84,7 @@ export function prepareResumeState({
     schema: RESUME_STATE_SCHEMA,
     prepared_at: preparedAt,
     plan_sha256: String(planSha256).toLowerCase(),
+    source_state_sha256: actualStateSha,
     resume_stage: plan.resume_stage || resetStages[0] || null,
     reset_stages: resetStages,
     preserve_artifacts: true,
@@ -83,6 +95,7 @@ export function prepareResumeState({
   next.resume_history.push({
     prepared_at: preparedAt,
     plan_sha256: String(planSha256).toLowerCase(),
+    source_state_sha256: actualStateSha,
     resume_stage: next.resume_prepared.resume_stage,
     reset_stages: resetStages,
     prior_stages: priorStages,

@@ -223,8 +223,8 @@ export function buildResumePlan({
   platform = process.platform,
   invalidateStages = [],
 } = {}) {
-  const resolvedRoot = resolve(String(root || ""));
-  if (!resolvedRoot) fail("render root required");
+  if (!String(root || "").trim()) fail("render root required");
+  const resolvedRoot = resolve(String(root));
   if (state?.schema !== "HIBOU_VIDEO_MASTER_RUN_V1") {
     fail("HIBOU_VIDEO_MASTER_RUN_V1 required");
   }

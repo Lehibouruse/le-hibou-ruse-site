@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { mkdirSync } from "node:fs";
 
 function fail(m){throw new Error(m);}
@@ -33,7 +34,7 @@ export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
     requests
   };
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [planPath,qcPath,outPath,...rest]=process.argv.slice(2);
   if(!planPath||!qcPath||!outPath) fail("usage: video-image-regenerate.mjs image-plan.json perceptual-qc.json regen-plan.json [--attempt=N]");
   const flag=rest.find(x=>x.startsWith("--attempt="));

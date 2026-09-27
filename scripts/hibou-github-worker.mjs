@@ -30,6 +30,11 @@ const VIDEO_RENDER_ENABLED =
     .trim()
     .toLowerCase() === "true";
 
+const VIDEO_AUTOSTART_COMFYUI =
+  String(process.env.HIBOU_VIDEO_AUTOSTART_COMFYUI || "")
+    .trim()
+    .toLowerCase() === "true";
+
 const PROJECT_ROOT =
   process.env.HIBOU_PROJECT_ROOT ||
   path.join(os.homedir(), "le-hibou-ruse-site");
@@ -158,6 +163,105 @@ function walk(dir) {
 
 function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function comfyEndpointFromBinding() {
+  const binding = JSON.parse(readFileSync(VIDEO_BINDING, "utf8"));
+  const endpoint = String(binding?.endpoint || "http://127.0.0.1:8188").trim();
+  const url = new URL(endpoint);
+  const host = url.hostname.toLowerCase();
+  if (!["127.0.0.1", "localhost", "[::1]", "::1"].includes(host)) {
+    throw new Error("ComfyUI endpoint must remain loopback-only");
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
+async function comfyReady(endpoint) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const response = await fetch(new URL("/system_stats", endpoint), {
+      signal: controller.signal,
+      headers: { "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function ensureComfyUIReady() {
+  const endpoint = comfyEndpointFromBinding();
+  if (await comfyReady(endpoint)) {
+    return { endpoint, started: false };
+  }
+
+  if (!VIDEO_AUTOSTART_COMFYUI) {
+    throw new Error(
+      `ComfyUI unavailable at ${endpoint}; HIBOU_VIDEO_AUTOSTART_COMFYUI is disabled`,
+    );
+  }
+
+  if (process.platform !== "win32") {
+    throw new Error("Automatic ComfyUI start is Windows-only");
+  }
+
+  const startScript = path.join(
+    PROJECT_ROOT,
+    "scripts",
+    "video-start-comfyui-windows.ps1",
+  );
+
+  if (!existsSync(startScript)) {
+    throw new Error(`ComfyUI start script missing: ${startScript}`);
+  }
+
+  const url = new URL(endpoint);
+  const port = Number(url.port || 8188);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error(`Invalid ComfyUI port: ${url.port}`);
+  }
+
+  log("Starting ComfyUI automatically", { endpoint, port });
+
+  const child = spawn(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      startScript,
+      "-Port",
+      String(port),
+    ],
+    {
+      cwd: PROJECT_ROOT,
+      windowsHide: true,
+      shell: false,
+      detached: true,
+      stdio: "ignore",
+      env: process.env,
+    },
+  );
+  child.unref();
+
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    if (await comfyReady(endpoint)) {
+      log("ComfyUI ready", { endpoint });
+      return { endpoint, started: true };
+    }
+    await sleep(2000);
+  }
+
+  throw new Error(`ComfyUI did not become ready within 120 seconds: ${endpoint}`);
 }
 
 async function fetchQueue() {
@@ -528,6 +632,8 @@ async function processVideoRender(job, processed) {
     );
   }
 
+  await ensureComfyUIReady();
+
   const maxScenes = Math.max(
     1,
     Math.min(25, Number(job.options?.max_scenes || 20)),
@@ -839,6 +945,7 @@ function healthServer() {
       report_token_present: Boolean(REPORT_TOKEN),
       video_queue_url: VIDEO_QUEUE_URL,
       video_render_enabled: VIDEO_RENDER_ENABLED,
+      video_autostart_comfyui: VIDEO_AUTOSTART_COMFYUI,
       video_project_root: PROJECT_ROOT,
       video_binding: VIDEO_BINDING,
       video_binding_exists: existsSync(VIDEO_BINDING),
@@ -896,6 +1003,7 @@ function localDiagnostic() {
     nvidia_smi_available: nvidia.status === 0,
     gpus,
     video_profile: videoProfile,
+    video_autostart_comfyui: VIDEO_AUTOSTART_COMFYUI,
     recommended_first_step: videoProfile === "low_vram_sequential"
       ? "Chatterbox one scene, then ComfyUI local with FP8/low-VRAM profile and sequential candidates"
       : "Run the dedicated video preflight before model installation",

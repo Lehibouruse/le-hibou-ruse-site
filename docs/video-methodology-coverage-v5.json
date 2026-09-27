@@ -349,6 +349,14 @@
             "HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
             "estimated_generation_seconds"
           ]
+        },
+        {
+          "path": "scripts/video-master.mjs",
+          "markers": [
+            "stage_history",
+            "duration_ms",
+            "event:\"ERROR\""
+          ]
         }
       ],
       "tests": [
@@ -358,7 +366,8 @@
         "tests/video-resume-plan.test.mjs",
         "tests/video-worker-failure-resume-diagnostic.test.mjs",
         "tests/video-image-batch.test.mjs",
-        "tests/video-image-factory.test.mjs"
+        "tests/video-image-factory.test.mjs",
+        "tests/video-pipeline-stage-history.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -432,6 +441,14 @@
             "_hibou_video_resume_plan.json",
             "resume_execution_performed: false"
           ]
+        },
+        {
+          "path": "scripts/video-master.mjs",
+          "markers": [
+            "stage_history",
+            "duration_ms",
+            "event:\"ERROR\""
+          ]
         }
       ],
       "tests": [
@@ -439,7 +456,8 @@
         "tests/video-airtable-sync.test.mjs",
         "tests/video-durable-storage-plan.test.mjs",
         "tests/video-resume-plan.test.mjs",
-        "tests/video-worker-failure-resume-diagnostic.test.mjs"
+        "tests/video-worker-failure-resume-diagnostic.test.mjs",
+        "tests/video-pipeline-stage-history.test.mjs"
       ],
       "e2e_pending": true
     },

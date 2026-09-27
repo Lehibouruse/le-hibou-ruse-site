@@ -1378,8 +1378,11 @@ async function processVideoRender(job, processed) {
     expected_master_sha256: job.reuse_lineage?.parent_result_sha256 || null,
     result_declared_master_sha256: null,
     actual_master_sha256: null,
+    result_job_match: false,
+    result_content_match: false,
     result_hash_verified: false,
     file_hash_verified: false,
+    airtable_hash_verified: null,
     hash_verified: false,
   };
   if (reuseFromJobId) {
@@ -1415,58 +1418,82 @@ async function processVideoRender(job, processed) {
     const expectedParentHash = String(
       job.reuse_lineage?.parent_result_sha256 || "",
     ).trim().toLowerCase();
+
+    const previousResultPath = path.join(
+      previousRoot,
+      "_hibou_video_result.json",
+    );
+    if (!existsSync(previousResultPath)) {
+      throw new Error(
+        `VIDEO_RENDER reuse parent result missing for integrity verification: ${previousResultPath}`,
+      );
+    }
+
+    let previousResult;
+    try {
+      previousResult = JSON.parse(
+        readFileSync(previousResultPath, "utf8"),
+      );
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER reuse parent result unreadable: ${error?.message || error}`,
+      );
+    }
+
+    reuseIntegrity.result_job_match =
+      String(previousResult?.job || "") === reuseFromJobId;
+    reuseIntegrity.result_content_match =
+      String(previousResult?.content_id || "") === contentId;
+    if (
+      !reuseIntegrity.result_job_match ||
+      !reuseIntegrity.result_content_match
+    ) {
+      throw new Error(
+        "VIDEO_RENDER reuse parent result identity mismatch",
+      );
+    }
+
+    const declaredParentHash = String(
+      previousResult?.master_sha256 || "",
+    ).trim().toLowerCase();
+    reuseIntegrity.result_declared_master_sha256 =
+      declaredParentHash || null;
+    if (!/^[0-9a-f]{64}$/.test(declaredParentHash)) {
+      throw new Error(
+        "VIDEO_RENDER reuse parent result has invalid master hash",
+      );
+    }
+
+    const previousMasterPath = path.join(
+      previousRoot,
+      "master.mp4",
+    );
+    if (!existsSync(previousMasterPath)) {
+      throw new Error(
+        `VIDEO_RENDER reuse parent master missing for integrity verification: ${previousMasterPath}`,
+      );
+    }
+    const actualParentHash = sha256(previousMasterPath).toLowerCase();
+    reuseIntegrity.actual_master_sha256 = actualParentHash;
+    reuseIntegrity.result_hash_verified =
+      declaredParentHash === actualParentHash;
+    reuseIntegrity.file_hash_verified =
+      reuseIntegrity.result_hash_verified;
+
     if (expectedParentHash) {
-      const previousResultPath = path.join(
-        previousRoot,
-        "_hibou_video_result.json",
+      reuseIntegrity.airtable_hash_verified =
+        expectedParentHash === actualParentHash &&
+        expectedParentHash === declaredParentHash;
+    }
+
+    reuseIntegrity.hash_verified =
+      reuseIntegrity.result_hash_verified &&
+      reuseIntegrity.airtable_hash_verified !== false;
+
+    if (!reuseIntegrity.hash_verified) {
+      throw new Error(
+        "VIDEO_RENDER reuse parent master hash mismatch",
       );
-      if (!existsSync(previousResultPath)) {
-        throw new Error(
-          `VIDEO_RENDER reuse parent result missing for hash verification: ${previousResultPath}`,
-        );
-      }
-      let previousResult;
-      try {
-        previousResult = JSON.parse(
-          readFileSync(previousResultPath, "utf8"),
-        );
-      } catch (error) {
-        throw new Error(
-          `VIDEO_RENDER reuse parent result unreadable: ${error?.message || error}`,
-        );
-      }
-
-      const declaredParentHash = String(
-        previousResult?.master_sha256 || "",
-      ).trim().toLowerCase();
-      reuseIntegrity.result_declared_master_sha256 =
-        declaredParentHash || null;
-      reuseIntegrity.result_hash_verified =
-        /^[0-9a-f]{64}$/.test(declaredParentHash) &&
-        declaredParentHash === expectedParentHash;
-
-      const previousMasterPath = path.join(
-        previousRoot,
-        "master.mp4",
-      );
-      if (!existsSync(previousMasterPath)) {
-        throw new Error(
-          `VIDEO_RENDER reuse parent master missing for hash verification: ${previousMasterPath}`,
-        );
-      }
-      const actualParentHash = sha256(previousMasterPath).toLowerCase();
-      reuseIntegrity.actual_master_sha256 = actualParentHash;
-      reuseIntegrity.file_hash_verified =
-        actualParentHash === expectedParentHash;
-      reuseIntegrity.hash_verified =
-        reuseIntegrity.result_hash_verified &&
-        reuseIntegrity.file_hash_verified;
-
-      if (!reuseIntegrity.hash_verified) {
-        throw new Error(
-          "VIDEO_RENDER reuse parent master hash mismatch",
-        );
-      }
     }
 
     args.push(`--reuse-from=${previousRoot}`);

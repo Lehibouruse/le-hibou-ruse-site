@@ -84,7 +84,14 @@ function stage(state,name,fn){
     writeJson(state.path,state);
     return true;
   }catch(error){
-    state.stages[name]={status:"ERROR",finished_at:new Date().toISOString(),error:String(error?.message||error).slice(0,2000)};
+    const fullError=String(error?.stack||error?.message||error);
+    const head=fullError.slice(0,1200);
+    const tail=fullError.length>1200?fullError.slice(-6800):"";
+    state.stages[name]={
+      status:"ERROR",
+      finished_at:new Date().toISOString(),
+      error:tail?head+"\n--- error tail ---\n"+tail:head
+    };
     writeJson(state.path,state);
     throw error;
   }

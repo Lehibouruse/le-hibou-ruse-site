@@ -67,28 +67,50 @@ export function normalizeSizeBinding(binding){
     out.size_binding_repaired=false;
   }
 
-  const profile=out.profile||{width:768,height:1344,batch_size:1};
-  out.profile={
-    width:Number(profile.width||768),
-    height:Number(profile.height||1344),
-    batch_size:Number(profile.batch_size||1)
+  const canonicalPrimary={width:768,height:1344,batch_size:1};
+  const canonicalFallback={width:640,height:1136,batch_size:1};
+  const normalizeProfile=(value,fallback)=>{
+    const p={
+      width:Number(value?.width||fallback.width),
+      height:Number(value?.height||fallback.height),
+      batch_size:Number(value?.batch_size||fallback.batch_size||1)
+    };
+    const ratio=p.width/p.height;
+    const valid=Number.isFinite(p.width)
+      && Number.isFinite(p.height)
+      && p.width>0
+      && p.height>0
+      && Number.isFinite(ratio)
+      && Math.abs(ratio-(9/16))<=0.05;
+    return {profile:p,valid};
   };
-  const ratio=out.profile.width/out.profile.height;
-  if(!Number.isFinite(ratio)||Math.abs(ratio-(9/16))>0.05){
-    fail(`ComfyUI primary image profile must be vertical 9:16-ish, got ${out.profile.width}x${out.profile.height}`);
+
+  const originalPrimary=out.profile?structuredClone(out.profile):null;
+  const primary=normalizeProfile(out.profile,canonicalPrimary);
+  if(primary.valid){
+    out.profile=primary.profile;
+    out.profile_repaired=false;
+  }else{
+    out.profile=canonicalPrimary;
+    out.profile_repaired=true;
+    out.original_profile=originalPrimary;
   }
 
+  const originalFallback=out.fallback_profile?structuredClone(out.fallback_profile):null;
   if(out.fallback_profile){
-    const fp={
-      width:Number(out.fallback_profile.width),
-      height:Number(out.fallback_profile.height),
-      batch_size:Number(out.fallback_profile.batch_size||1)
-    };
-    const fr=fp.width/fp.height;
-    if(!Number.isFinite(fr)||Math.abs(fr-(9/16))>0.05){
-      fail(`ComfyUI fallback image profile must be vertical 9:16-ish, got ${fp.width}x${fp.height}`);
+    const fallback=normalizeProfile(out.fallback_profile,canonicalFallback);
+    if(fallback.valid){
+      out.fallback_profile=fallback.profile;
+      out.fallback_profile_repaired=false;
+    }else{
+      out.fallback_profile=canonicalFallback;
+      out.fallback_profile_repaired=true;
+      out.original_fallback_profile=originalFallback;
     }
-    out.fallback_profile=fp;
+  }else{
+    out.fallback_profile=canonicalFallback;
+    out.fallback_profile_repaired=true;
+    out.original_fallback_profile=null;
   }
 
   return out;
@@ -158,7 +180,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_repaired:Boolean(binding.profile_repaired),fallback_profile_repaired:Boolean(binding.fallback_profile_repaired),original_profile:binding.original_profile||null,original_fallback_profile:binding.original_fallback_profile||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

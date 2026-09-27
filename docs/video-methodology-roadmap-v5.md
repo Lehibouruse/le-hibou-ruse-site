@@ -94,6 +94,8 @@
 - `HIBOU_VIDEO_RESUME_PLAN_V1` analyse un run interrompu sans rien exécuter ;
 - le worker futur écrit `_hibou_video_resume_plan.json` et `_hibou_video_failure_diagnostic.json` sur échec, et remonte le résumé à Airtable ;
 - ce diagnostic n'active jamais `Pending` et n'exécute jamais la reprise ;
+- l'application contrôlée de la reprise exige le suffixe canonique de stages depuis `resume_stage`, un SHA256 exact du plan et `HIBOU_VIDEO_RESUME_APPLY_ENABLED=true` ;
+- elle sauvegarde `pipeline-run.json`, remplace l'état de façon atomique et écrit `HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1` avec hashes source/backup/état préparé/fichier final ;
 - détecte un ancien PASS devenu invalide (ex. durée voix), un artefact PASS manquant et les erreurs de rendu connues ;
 - choisit le point de reprise conservateur le plus précoce ;
 - `HIBOU_VIDEO_RESUME_STATE_PREP_V1` prépare le reset de `pipeline-run.json` en dry-run par défaut ;

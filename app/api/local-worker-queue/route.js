@@ -296,12 +296,24 @@ export async function POST(request) {
 
     if (status === "Running") {
       if (body.heartbeat === true) {
+        const heartbeatResult =
+          body.result && typeof body.result === "object"
+            ? body.result
+            : {};
         fields["R\u00e9sultat JSON"] = JSON.stringify({
           schema: "HIBOU_VIDEO_RENDER_HEARTBEAT_V1",
           heartbeat_at: now,
           worker: cut(body.worker, 180),
           worker_session: cut(body.worker_session, 240),
           worker_pid: Number(body.worker_pid || 0) || null,
+          render_pid: Number(heartbeatResult.render_pid || 0) || null,
+          current_stage: cut(heartbeatResult.current_stage || "unknown", 80),
+          completed_stages: Array.isArray(heartbeatResult.completed_stages)
+            ? heartbeatResult.completed_stages.slice(0, 30).map((x) => cut(x, 80))
+            : [],
+          failed_stages: Array.isArray(heartbeatResult.failed_stages)
+            ? heartbeatResult.failed_stages.slice(0, 30).map((x) => cut(x, 80))
+            : [],
           publication_authorized: false,
           paid_fallback: false,
         });

@@ -33,6 +33,15 @@ function nonEmpty(value) {
   return String(value ?? "").trim();
 }
 
+function enumOrNull(value, allowed, label) {
+  const normalized = nonEmpty(value);
+  if (!normalized) return null;
+  if (!allowed.includes(normalized)) {
+    fail(`${label} must be one of: ${allowed.join(", ")}`);
+  }
+  return normalized;
+}
+
 function sceneNarration(scene) {
   return nonEmpty(scene?.narration_exact?.text);
 }
@@ -154,6 +163,22 @@ export function buildPromptGraph(contract) {
   }
 
   const global = canonicalGlobalLayer(contract);
+  const voiceDensityProfile = enumOrNull(
+    contract?.audio?.density_profile ??
+      contract?.creative?.voice_density_profile,
+    ["RELENTLESS", "EXPLAINER_DENSE"],
+    "VOICE_DENSITY_PROFILE",
+  );
+  const movementProfile = enumOrNull(
+    contract?.creative?.movement_profile,
+    ["CUT_DOMINANT", "HYBRID_BEATS", "INTRA_SCENE_MOTION"],
+    "MOVEMENT_PROFILE",
+  );
+  const curveProfile = enumOrNull(
+    contract?.creative?.curve_profile,
+    ["HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST"],
+    "CURVE_PROFILE",
+  );
   const scriptText = scenes.map(sceneNarration).join(" ").replace(/\s+/g, " ").trim();
   const scriptSha = sha256Text(scriptText);
   const sceneNodes = scenes.map(sceneNode);
@@ -205,6 +230,8 @@ export function buildPromptGraph(contract) {
       depends_on: sceneNodes.map((node) => node.id),
       payload: {
         engine: nonEmpty(contract?.audio?.engine),
+        density_profile: voiceDensityProfile,
+        density_profile_runtime_applied: false,
         scenes: scenes.map((scene) => ({
           scene_id: scene.scene_id,
           target_wpm: Number(scene?.voice?.target_wpm || 0) || null,
@@ -242,6 +269,10 @@ export function buildPromptGraph(contract) {
         engine: contract?.engine || null,
         production: contract?.production || null,
         pacing: contract?.creative?.pacing || null,
+        movement_profile: movementProfile,
+        curve_profile: curveProfile,
+        movement_profile_runtime_applied: false,
+        curve_profile_runtime_applied: false,
         attention_beat_count: beatCount,
       },
     },
@@ -268,6 +299,7 @@ export function buildPromptGraph(contract) {
       gpu_execution_performed: false,
       airtable_mutation_performed: false,
       publication_authorized: false,
+      roadmap_profiles_require_e2e_before_runtime: true,
     },
   };
 

@@ -239,10 +239,14 @@ export function buildResumePlan({
   if (resumeIndex < 0 && firstFailedIndex >= 0) resumeIndex = firstFailedIndex;
 
   if (resumeIndex < 0) {
-    const firstIncomplete = STAGE_ORDER.findIndex((stage) =>
-      ["NOT_STARTED", "RUNNING"].includes(stageStatus(state, stage)),
+    const runningStages = STAGE_ORDER.filter(
+      (stage) => stageStatus(state, stage) === "RUNNING",
     );
-    if (firstIncomplete >= 0) resumeIndex = firstIncomplete;
+    if (runningStages.length) {
+      resumeIndex = Math.min(
+        ...runningStages.map((stage) => STAGE_ORDER.indexOf(stage)),
+      );
+    }
   }
 
   const resumeStage = resumeIndex >= 0 ? STAGE_ORDER[resumeIndex] : null;

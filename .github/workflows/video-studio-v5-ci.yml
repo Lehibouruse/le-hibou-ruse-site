@@ -35,6 +35,7 @@ jobs:
           node --check scripts/video-artifact-registry.mjs
           node --check scripts/video-human-review-package.mjs
           node --check scripts/video-candidate-review.mjs
+          node --check scripts/video-candidate-selection-apply.mjs
           node --check scripts/video-image-plan.mjs
           node --check scripts/video-image-batch.mjs
           node --check scripts/video-local-render.mjs
@@ -65,6 +66,7 @@ jobs:
             tests/video-preview-publication-guard.test.mjs \
             tests/video-v5-readiness.test.mjs \
             tests/video-candidate-review.test.mjs \
+            tests/video-candidate-selection-apply.test.mjs \
             tests/video-human-review-package.test.mjs \
             tests/video-local-render.test.mjs \
             tests/video-remote-cancel.test.mjs \

@@ -48,3 +48,32 @@ test("storyboard still rejects pathological scene duration above 12 seconds",()=
  const scenes=parts.map((p,i)=>fakeScene(i+1,p,i===2?12.1:4));
  assert.throws(()=>buildStoryboardContract(content,scenes),/duration must be 1\.5\.\.12 s/);
 });
+
+
+test("Airtable export remains FINAL and incremental-off before the prepared migration is applied",()=>{
+ const parts=Array.from({length:8},(_,i)=>`safe${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ const c=buildStoryboardContract(content,scenes,{fields:{}});
+ assert.equal(c.production.mode,"final");
+ assert.equal(c.production.preview_candidates_per_scene,1);
+ assert.equal(c.features.video_incremental_retouch_v1,false);
+ assert.equal(c.validation.publication_authorized,false);
+});
+
+test("Airtable profile can prepare preview mode without authorizing publication",()=>{
+ const parts=Array.from({length:8},(_,i)=>`preview${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ const profile={fields:{
+   "Mode production par défaut":"preview",
+   "Retouches incrémentales V1":true,
+   "Candidats par scène":3
+ }};
+ const c=buildStoryboardContract(content,scenes,profile);
+ assert.equal(c.production.mode,"preview");
+ assert.equal(c.production.final_candidates_per_scene,3);
+ assert.equal(c.production.preview_candidates_per_scene,1);
+ assert.equal(c.features.video_incremental_retouch_v1,true);
+ assert.equal(c.validation.publication_authorized,false);
+});

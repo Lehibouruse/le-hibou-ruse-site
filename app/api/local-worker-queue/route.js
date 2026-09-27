@@ -535,25 +535,47 @@ export async function GET(request) {
 
       if (reuseFromJobId) {
         try {
-          const parentRecord = await getRecord(
-            TABLES.localWorkerQueue,
-            reuseFromJobId,
-          );
-          const lineage = validateReuseLineage({
-            current_job_id: record.id,
-            current_content_id: contentId,
-            reuse_from_job_id: reuseFromJobId,
-            parent_record: parentRecord,
-          });
-          if (!lineage.ok) {
-            const sanitized = await markQueueValidationError(
-              record,
-              lineage.reason,
+          const ancestorJobIds = [];
+          const seen = new Set([record.id]);
+          let nextReuseJobId = reuseFromJobId;
+          let firstLineage = null;
+
+          while (nextReuseJobId) {
+            if (ancestorJobIds.length >= 8) {
+              throw new Error("reuse_lineage_too_deep");
+            }
+            if (seen.has(nextReuseJobId)) {
+              throw new Error("reuse_lineage_cycle_detected");
+            }
+
+            const parentRecord = await getRecord(
+              TABLES.localWorkerQueue,
+              nextReuseJobId,
             );
-            queue_sanitization.push(sanitized);
-            continue;
+            const lineage = validateReuseLineage({
+              current_job_id: record.id,
+              current_content_id: contentId,
+              reuse_from_job_id: nextReuseJobId,
+              parent_record: parentRecord,
+            });
+            if (!lineage.ok) {
+              throw new Error(lineage.reason);
+            }
+
+            if (!firstLineage) firstLineage = lineage.lineage;
+            ancestorJobIds.push(nextReuseJobId);
+            seen.add(nextReuseJobId);
+            nextReuseJobId = String(
+              lineage.lineage?.grandparent_job_id || "",
+            ).trim();
           }
-          job.reuse_lineage = lineage.lineage;
+
+          job.reuse_lineage = {
+            ...(firstLineage || {}),
+            ancestor_job_ids: ancestorJobIds,
+            lineage_depth: ancestorJobIds.length,
+            lineage_complete: true,
+          };
         } catch (error) {
           const sanitized = await markQueueValidationError(
             record,

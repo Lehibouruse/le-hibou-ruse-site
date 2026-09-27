@@ -6,6 +6,20 @@ import { mkdirSync } from "node:fs";
 
 function fail(m){throw new Error(m);}
 function load(path){return JSON.parse(readFileSync(resolve(path),"utf8"));}
+
+function mutateOverrides(request,{oldSeed,newSeed,promptSuffix}){
+  if(!request?.overrides||typeof request.overrides!=="object") return;
+  for(const node of Object.values(request.overrides)){
+    if(!node||typeof node!=="object") continue;
+    for(const [key,value] of Object.entries(node)){
+      if(typeof value==="number"&&Number(value)===Number(oldSeed)){
+        node[key]=newSeed;
+      } else if(typeof value==="string"&&value.trim().length>8){
+        node[key]=value+" "+promptSuffix;
+      }
+    }
+  }
+}
 export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
   if(plan?.schema!=="HIBOU_IMAGE_PLAN_V1") fail("unsupported image plan");
   if(qc?.schema!=="HIBOU_IMAGE_PERCEPTUAL_QC_V1") fail("unsupported perceptual QC");
@@ -18,11 +32,9 @@ export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
     const clone=structuredClone(item);
     clone.seed=Number(item.seed)+bump;
     clone.candidate_id=`${item.scene_id}-R${attempt}-C${item.candidate}`;
-    if(clone.request?.prompt){
-      clone.request.prompt=`${clone.request.prompt}\nVariation de régénération locale n°${attempt}; conserver le sujet, la palette et la composition utiles, corriger uniquement les défauts QC.`;
-    }
-    if(clone.request?.seed!==undefined) clone.request.seed=clone.seed;
-    if(clone.fallback_request?.seed!==undefined) clone.fallback_request.seed=clone.seed;
+    const promptSuffix="Variation locale "+attempt+": conserver le sujet, la palette et la composition; corriger les défauts QC; produire une alternative visuellement distincte mais cohérente.";
+    mutateOverrides(clone.request,{oldSeed:item.seed,newSeed:clone.seed,promptSuffix});
+    mutateOverrides(clone.fallback_request,{oldSeed:item.seed,newSeed:clone.seed,promptSuffix});
     clone.regeneration={attempt,source_candidate_id:item.candidate_id,reason:"scene_has_no_qc_pass"};
     requests.push(clone);
   }

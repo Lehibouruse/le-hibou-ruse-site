@@ -114,31 +114,49 @@ function provisionalSelections(qc,manifest){
   return out;
 }
 
-function aggregatePerceptual(perceptual){
-  const reasons={};
-  const warnings={};
-  for(const summary of Object.values(perceptual?.scene_summary||{})){
-    for(const [name,count] of Object.entries(summary?.reason_counts||{})){
-      reasons[name]=(reasons[name]||0)+Number(count||0);
-    }
-    for(const [name,count] of Object.entries(summary?.warning_counts||{})){
-      warnings[name]=(warnings[name]||0)+Number(count||0);
-    }
-  }
+function qcOptionsFromPlan(plan){
+  const profiles=[plan?.profile,plan?.fallback_profile].filter(Boolean);
+  const widths=profiles.map(p=>Number(p.width)).filter(Number.isFinite);
+  const heights=profiles.map(p=>Number(p.height)).filter(Number.isFinite);
   return {
-    all_scenes_have_candidate:Boolean(perceptual?.all_scenes_have_candidate),
-    reason_counts:reasons,
-    warning_counts:warnings
+    minWidth:Math.max(512,Math.min(...widths)),
+    minHeight:Math.max(896,Math.min(...heights)),
+    aspectTolerance:0.05
   };
 }
 
-function aggregateDimensions(tech){
-  const counts={};
+function summarizeTechnicalQc(tech){
+  const failure_counts={};
+  const dimensions={};
   for(const row of tech?.rows||[]){
     const key=`${row.width||"?"}x${row.height||"?"}`;
-    counts[key]=(counts[key]||0)+1;
+    dimensions[key]=(dimensions[key]||0)+1;
+    for(const [check,ok] of Object.entries(row.checks||{})){
+      if(!ok) failure_counts[check]=(failure_counts[check]||0)+1;
+    }
+    if(row.error) failure_counts.decode_error=(failure_counts.decode_error||0)+1;
   }
-  return counts;
+  return {
+    all_scenes_have_candidate:Boolean(tech?.all_scenes_have_candidate),
+    failure_counts,
+    dimensions,
+    scene_summary:tech?.scene_summary||{}
+  };
+}
+
+function summarizePerceptualQc(perceptual){
+  const reason_counts={};
+  const warning_counts={};
+  for(const row of perceptual?.rows||[]){
+    for(const reason of row.reasons||[]) reason_counts[reason]=(reason_counts[reason]||0)+1;
+    for(const warning of row.warnings||[]) warning_counts[warning]=(warning_counts[warning]||0)+1;
+  }
+  return {
+    all_scenes_have_candidate:Boolean(perceptual?.all_scenes_have_candidate),
+    reason_counts,
+    warning_counts,
+    scene_summary:perceptual?.scene_summary||{}
+  };
 }
 export function factoryPolicy({maxScenes=1,maxRegenerationAttempts=1}={}){
   const scenes=Number(maxScenes), attempts=Number(maxRegenerationAttempts);
@@ -194,7 +212,8 @@ async function main(){
 
   await executeImagePlan(plan,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
   let manifest=load(manifestPath);
-  let tech=qcImageBatch(manifest); write(techPath,tech);
+  const qcOptions=qcOptionsFromPlan(plan);
+  let tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
   let perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
 
   const regenRuns=[];
@@ -204,7 +223,7 @@ async function main(){
     const regenPath=resolve(root,"regen-plan-"+attempt+".json"); write(regenPath,regen);
     await executeImagePlan(regen,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
     manifest=load(manifestPath);
-    tech=qcImageBatch(manifest); write(techPath,tech);
+    tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
     perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
     regenRuns.push({attempt,failed_scenes:regen.regeneration.failed_scenes,requests:regen.requests.length});
   }
@@ -217,17 +236,17 @@ async function main(){
     content_id:plan.content_id,
     scenes:limitedScenes,
     policy,
-    regeneration_runs:regenRuns,
-    all_scenes_have_candidate:perceptual.all_scenes_have_candidate,
-    technical_qc:{
-      all_scenes_have_candidate:Boolean(tech?.all_scenes_have_candidate),
-      failed_check_counts:tech?.failed_check_counts||{},
-      dimensions:aggregateDimensions(tech),
-      min_width:tech?.min_width??null,
-      min_height:tech?.min_height??null,
-      aspect_tolerance:tech?.aspect_tolerance??null
+    image_profile:{
+      primary:plan.profile||null,
+      fallback:plan.fallback_profile||null,
+      size_binding:plan.size_binding||null,
+      size_binding_repaired:Boolean(plan.size_binding_repaired),
+      qc_options:qcOptions
     },
-    perceptual_qc:aggregatePerceptual(perceptual),
+    regeneration_runs:regenRuns,
+    technical_qc:summarizeTechnicalQc(tech),
+    perceptual_qc:summarizePerceptualQc(perceptual),
+    all_scenes_have_candidate:perceptual.all_scenes_have_candidate,
     provisional_selections:selections,
     publication_authorized:false
   };

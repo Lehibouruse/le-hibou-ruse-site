@@ -384,6 +384,38 @@ function pipelineFailureDetail(dir) {
   }
 }
 
+function pipelineHeartbeatSnapshot(dir) {
+  const statePath = path.join(dir, "pipeline-run.json");
+  if (!existsSync(statePath)) {
+    return {
+      current_stage: "starting",
+      completed_stages: [],
+      failed_stages: [],
+    };
+  }
+  try {
+    const pipeline = JSON.parse(readFileSync(statePath, "utf8"));
+    const entries = Object.entries(pipeline?.stages || {});
+    const running = entries.find(([, info]) => info?.status === "RUNNING");
+    const failed = entries.filter(([, info]) => info?.status === "ERROR");
+    const passed = entries.filter(([, info]) => info?.status === "PASS");
+    const lastKnown = [...entries].reverse().find(([, info]) =>
+      ["PASS", "ERROR", "RUNNING"].includes(info?.status)
+    );
+    return {
+      current_stage: running?.[0] || lastKnown?.[0] || "starting",
+      completed_stages: passed.map(([name]) => name),
+      failed_stages: failed.map(([name]) => name),
+    };
+  } catch {
+    return {
+      current_stage: "unknown",
+      completed_stages: [],
+      failed_stages: [],
+    };
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -960,6 +992,7 @@ async function processVideoRender(job, processed) {
     state.render_pid = child.pid || null;
 
     const heartbeat = setInterval(() => {
+      const progress = pipelineHeartbeatSnapshot(dir);
       reportVideoProgress(job, "Running", {
         local_path: dir,
         heartbeat: true,
@@ -970,6 +1003,9 @@ async function processVideoRender(job, processed) {
           worker_session: state.worker_session,
           worker_pid: process.pid,
           render_pid: child.pid || null,
+          current_stage: progress.current_stage,
+          completed_stages: progress.completed_stages,
+          failed_stages: progress.failed_stages,
         },
       }).catch((error) => {
         log("VIDEO_RENDER heartbeat failed", {

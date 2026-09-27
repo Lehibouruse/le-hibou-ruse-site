@@ -674,8 +674,12 @@ async function ensureComfyUIReady() {
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     if (await comfyReady(endpoint)) {
-      log("ComfyUI ready", { endpoint });
+      log("ComfyUI ready", { endpoint, pid: startedPid });
       return { endpoint, started: true };
+    }
+    if (startedPid && !pidAlive(startedPid)) {
+      log("ComfyUI child exited before readiness", { endpoint, pid: startedPid });
+      break;
     }
     await sleep(2000);
   }

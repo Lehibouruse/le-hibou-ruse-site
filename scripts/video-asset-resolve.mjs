@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { planSceneAssetReuse } from "./video-asset-graph.mjs";
 
 function fail(message){ throw new Error(message); }
@@ -88,7 +89,7 @@ export function applyAssetResolution(contract,graph,{graphPath=""}={}){
   return out;
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,graphPath,outPath]=process.argv.slice(2);
   if(!contractPath||!graphPath||!outPath) fail("usage: video-asset-resolve.mjs contract.json asset-graph.json output.json");
   if(!existsSync(resolve(contractPath))) fail("contract missing");

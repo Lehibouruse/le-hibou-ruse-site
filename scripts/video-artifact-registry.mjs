@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 function sha256(path){return createHash("sha256").update(readFileSync(path)).digest("hex");}
-export function buildRegistry(entries,{production_mode="final",publication_authorized=false,human_review_required=true}={}){
+export function buildRegistry(entries,{production_mode="final",human_review_required=true}={}){
  const mode=String(production_mode||"final").toLowerCase()==="preview"?"preview":"final";
  const previewOnly=mode==="preview";
  return {
@@ -14,7 +14,7 @@ export function buildRegistry(entries,{production_mode="final",publication_autho
   production_mode:mode,
   preview_only:previewOnly,
   human_review_required:Boolean(human_review_required),
-  publication_authorized:publication_authorized===true&&!previewOnly,
+  publication_authorized:false,
   entries:entries.filter(e=>existsSync(resolve(e.path))).map(e=>{
    const p=resolve(e.path),s=statSync(p);
    return {
@@ -36,7 +36,6 @@ if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const spec=JSON.parse(readFileSync(resolve(specPath),"utf8"));
  const r=buildRegistry(spec.entries||[],{
   production_mode:spec.production_mode||"final",
-  publication_authorized:false,
   human_review_required:spec.human_review_required!==false
  });
  writeFileSync(resolve(outPath),JSON.stringify(r,null,2));

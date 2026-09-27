@@ -7,6 +7,7 @@ import { buildImagePlan } from "./video-image-plan.mjs";
 import { executeImagePlan } from "./video-image-batch.mjs";
 import { qcImageBatch } from "./video-image-qc.mjs";
 import { buildTargetedRegeneration } from "./video-image-regenerate.mjs";
+import { buildCandidateReview } from "./video-candidate-review.mjs";
 
 function fail(m){throw new Error(m);}
 const SCRIPT_DIR=dirname(fileURLToPath(import.meta.url));
@@ -185,6 +186,25 @@ async function main(){
     write(manifestPath,emptyManifest);
     write(selectionTemplate,{});
     write(resolve(root,"selections.provisional.json"),{});
+    write(resolve(root,"candidate-review.json"),{
+      schema:"HIBOU_CANDIDATE_REVIEW_V1",
+      content_id:plan.content_id||null,
+      scene_count:0,
+      blocking_scene_count:0,
+      all_scenes_reviewable:true,
+      scenes:[],
+      generation_skipped_reason:"all_scenes_full_reuse",
+      policy:{
+        machine_ranking_is_advisory_only:true,
+        human_selection_required:false,
+        no_candidate_is_auto_approved:true,
+        local_only:true,
+        paid_fallback:false,
+        publication_authorized:false
+      },
+      human_review_required:true,
+      publication_authorized:false
+    });
     const summary={
       schema:"HIBOU_IMAGE_FACTORY_RUN_V1",
       generated_at:new Date().toISOString(),
@@ -223,6 +243,12 @@ async function main(){
 
   const selections=provisionalSelections(perceptual,manifest);
   write(resolve(root,"selections.provisional.json"),selections);
+  const candidateReview=buildCandidateReview({
+    plan,
+    perceptualQc:perceptual,
+    provisionalSelections:selections
+  });
+  write(resolve(root,"candidate-review.json"),candidateReview);
   const summary={
     schema:"HIBOU_IMAGE_FACTORY_RUN_V1",
     generated_at:new Date().toISOString(),
@@ -249,6 +275,14 @@ async function main(){
     },
     perceptual_qc:aggregatePerceptual(perceptual),
     provisional_selections:selections,
+    candidate_review:{
+      schema:candidateReview.schema,
+      scene_count:candidateReview.scene_count,
+      blocking_scene_count:candidateReview.blocking_scene_count,
+      all_scenes_reviewable:candidateReview.all_scenes_reviewable,
+      human_review_required:true,
+      publication_authorized:false
+    },
     publication_authorized:false
   };
   write(resolve(root,"factory-run.json"),summary);

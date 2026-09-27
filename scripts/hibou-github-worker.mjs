@@ -191,7 +191,10 @@ function pipelineFailureDetail(dir) {
       .at(-1);
     if (!failed) return "";
     const [stageName, info] = failed;
-    const message = String(info?.error || "unknown stage error").slice(0, 1800);
+    const full = String(info?.error || "unknown stage error");
+    const message = full.length > 3600
+      ? full.slice(0, 700) + "\n--- stage error tail ---\n" + full.slice(-2800)
+      : full;
     return ` stage=${stageName}; error=${message}`;
   } catch {
     return "";
@@ -964,9 +967,10 @@ async function tick() {
       await processJob(job, processed);
     }
   } catch (error) {
-    const message = String(
-      error?.stack || error,
-    ).slice(0, 6000);
+    const fullMessage = String(error?.stack || error);
+    const message = fullMessage.length > 6000
+      ? fullMessage.slice(0, 1200) + "\n--- worker error tail ---\n" + fullMessage.slice(-4600)
+      : fullMessage;
 
     state.last_error = message;
     state.current_job = null;

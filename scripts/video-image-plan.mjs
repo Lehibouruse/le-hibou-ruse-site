@@ -211,6 +211,7 @@ export function buildImagePlan(contract,binding){
       creativeLockEnabled
       && String(creative.reference_mode||"")==="deterministic_character_overlay"
       && Boolean(scene?.framing?.hibou);
+    const sceneWantsHibou=Boolean(scene?.framing?.hibou);
     const characterGenerationLock=deterministicCharacterOverlay
       ? [
           "BACKGROUND_ONLY_LOCK:",
@@ -218,9 +219,15 @@ export function buildImagePlan(contract,binding){
           "The canonical Le Hibou Rusé character is composited later in post-production.",
           "Leave a visually useful foreground area for the character overlay while keeping the environment rich and complete."
         ].join(" ")
-      : creativeLockEnabled
-        ? characterLock
-        : "";
+      : creativeLockEnabled && !sceneWantsHibou
+        ? [
+            "NO_CHARACTER_LOCK:",
+            "Do not render any owl, bird, animal, mascot or human.",
+            "Tell the idea using environment, objects, symbols and composition only."
+          ].join(" ")
+        : creativeLockEnabled
+          ? characterLock
+          : "";
     const prompt=[
       prefix,
       characterGenerationLock,

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function fail(m){throw new Error(m);}
 function sha256(path){return createHash("sha256").update(readFileSync(path)).digest("hex");}
@@ -32,7 +33,7 @@ export function qcImageBatch(batch,{minWidth=768,minHeight=1280,aspectTolerance=
  const sceneSummary=Object.fromEntries(Object.entries(byScene).map(([scene,items])=>[scene,{pass:items.filter(x=>x.status==="PASS").length,reject:items.filter(x=>x.status!=="PASS").length,total:items.length}]));
  return {schema:"HIBOU_IMAGE_TECH_QC_V1",content_id:batch.content_id,target_aspect_ratio:target,min_width:minWidth,min_height:minHeight,aspect_tolerance:aspectTolerance,rows,scene_summary:sceneSummary,all_scenes_have_candidate:Object.values(sceneSummary).every(x=>x.pass>=1),paid_fallback:false};
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [manifestPath,outPath]=process.argv.slice(2); if(!manifestPath||!outPath) fail("usage: video-image-qc.mjs batch-manifest.json image-qc.json");
  const q=qcImageBatch(JSON.parse(readFileSync(resolve(manifestPath),"utf8"))); writeFileSync(resolve(outPath),JSON.stringify(q,null,2)); process.stdout.write(JSON.stringify({ok:true,all_scenes_have_candidate:q.all_scenes_have_candidate,rows:q.rows.length})+"\n");
 }

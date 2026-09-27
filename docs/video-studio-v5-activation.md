@@ -21,3 +21,14 @@ La réutilisation d'un rendu précédent exige simultanément :
 - un nouveau dossier de sortie distinct.
 
 Le rendu précédent n'est jamais modifié. Les caches copiés sont revalidés par leurs fingerprints propres avant réemploi. Les champs Airtable correspondants restent non appliqués et désactivés pendant le rendu actif.
+
+
+## Audit de readiness V5
+
+Avant toute activation ou E2E local, le contrat peut être audité sans lancer de moteur média :
+
+`node scripts/video-v5-readiness.mjs <storyboard.json> [readiness.json]`
+
+L'audit ne lance ni ComfyUI, ni Chatterbox, ni FFmpeg, ne modifie pas Airtable et n'autorise jamais la publication. Il affiche pour chaque brique V5 l'état du flag GLOBAL, du gate runtime et l'état réellement actif. Il bloque notamment un mode de production invalide, tout signal `publication_authorized=true`, un PREVIEW autorisant un full master, ou un mix musique actif sans référence musicale.
+
+Cet audit est un contrôle préparatoire CPU uniquement. Un résultat vert ne remplace pas les E2E média réels ni la revue humaine.

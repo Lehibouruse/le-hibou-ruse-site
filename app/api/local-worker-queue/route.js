@@ -65,6 +65,71 @@ function cut(value, max = 5000) {
   return String(value ?? "").slice(0, max);
 }
 
+function parseJsonObject(value) {
+  try {
+    const parsed = JSON.parse(String(value || "{}"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+async function reconcileStaleRunning(request) {
+  const session = cut(request.headers.get("x-hibou-worker-session"), 240);
+  const worker = cut(request.headers.get("x-hibou-worker"), 180);
+  if (!session || !worker) return { checked: 0, reconciled: 0 };
+
+  const running = await queryRecords(TABLES.localWorkerQueue, {
+    filterByFormula: "AND({Statut}='Running',{Type}='VIDEO_RENDER')",
+    pageSize: 50,
+  });
+
+  const nowMs = Date.now();
+  const staleAfterMs = 8 * 60 * 1000;
+  let reconciled = 0;
+
+  for (const record of running) {
+    const fields = record.fields || {};
+    const result = parseJsonObject(fields["Résultat JSON"]);
+    const heartbeatMs = Date.parse(result.heartbeat_at || "");
+    const startedMs = Date.parse(fields["Démarré le"] || "");
+    const lastSeenMs = Number.isFinite(heartbeatMs)
+      ? heartbeatMs
+      : startedMs;
+
+    if (!Number.isFinite(lastSeenMs) || nowMs - lastSeenMs < staleAfterMs) {
+      continue;
+    }
+
+    const reconciledAt = new Date().toISOString();
+    await updateRecord(TABLES.localWorkerQueue, record.id, {
+      Statut: "Error",
+      "Terminé le": reconciledAt,
+      Erreur: cut(
+        `orphaned_worker_timeout: no VIDEO_RENDER heartbeat for more than 8 minutes; reconciled by ${worker}`,
+        10000,
+      ),
+      "Résultat JSON": JSON.stringify({
+        schema: "HIBOU_VIDEO_RENDER_ORPHAN_RECONCILIATION_V1",
+        reconciled_at: reconciledAt,
+        reconciled_by_worker: worker,
+        reconciled_by_session: session,
+        previous_worker: fields.Worker || null,
+        last_seen_at: Number.isFinite(lastSeenMs)
+          ? new Date(lastSeenMs).toISOString()
+          : null,
+        publication_authorized: false,
+        paid_fallback: false,
+      }),
+    });
+    reconciled += 1;
+  }
+
+  return { checked: running.length, reconciled };
+}
+
 export async function GET(request) {
   try {
     const auth = authorized(request);
@@ -74,6 +139,8 @@ export async function GET(request) {
         { status: auth.status },
       );
     }
+
+    const reconciliation = await reconcileStaleRunning(request);
 
     const records = await queryRecords(TABLES.localWorkerQueue, {
       filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
@@ -149,6 +216,7 @@ export async function GET(request) {
       schema: "HIBOU_VIDEO_RENDER_QUEUE_V2",
       jobs,
       runtime_commit: RUNTIME_COMMIT,
+      reconciliation,
       generated_at: new Date().toISOString(),
     });
   } catch (error) {
@@ -227,9 +295,21 @@ export async function POST(request) {
     };
 
     if (status === "Running") {
-      fields["D\u00e9marr\u00e9 le"] = now;
-      fields.Tentatives =
-        Number(current.fields?.Tentatives || 0) + 1;
+      if (body.heartbeat === true) {
+        fields["R\u00e9sultat JSON"] = JSON.stringify({
+          schema: "HIBOU_VIDEO_RENDER_HEARTBEAT_V1",
+          heartbeat_at: now,
+          worker: cut(body.worker, 180),
+          worker_session: cut(body.worker_session, 240),
+          worker_pid: Number(body.worker_pid || 0) || null,
+          publication_authorized: false,
+          paid_fallback: false,
+        });
+      } else {
+        fields["D\u00e9marr\u00e9 le"] = now;
+        fields.Tentatives =
+          Number(current.fields?.Tentatives || 0) + 1;
+      }
     }
 
     if (status === "Completed" || status === "Error") {

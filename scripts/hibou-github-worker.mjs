@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -14,6 +14,7 @@ const LOG_FILE = path.join(LOG_DIR, "worker.log");
 const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const APPROVAL_FILE = path.join(LOG_DIR, "approved-jobs.json");
 const FAILED_FILE = path.join(LOG_DIR, "failed-jobs.json");
+const WORKER_LOCK_FILE = path.join(LOG_DIR, "hibou-github-worker.lock");
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
 const REPORT_TOKEN = String(process.env.HIBOU_LOCAL_REPORT_TOKEN || "").trim();
@@ -77,6 +78,8 @@ if (VIDEO_RENDER_ENABLED) {
 
 let state = {
   started_at: new Date().toISOString(),
+  worker_session: `${WORKER_ID}-${process.pid}-${Date.now()}`,
+  worker_pid: process.pid,
   worker: WORKER_ID,
   status: "starting",
   queue_mode: "github-public-readonly+authenticated-video-render",
@@ -89,6 +92,62 @@ function log(message, data = null) {
   const line = `[${new Date().toISOString()}] ${message}${data ? " " + JSON.stringify(data) : ""}`;
   console.log(line);
   appendFileSync(LOG_FILE, line + "\n", "utf8");
+}
+
+function pidAlive(pid) {
+  const n = Number(pid);
+  if (!Number.isInteger(n) || n <= 0) return false;
+  try {
+    process.kill(n, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseWorkerLock() {
+  try {
+    const current = JSON.parse(readFileSync(WORKER_LOCK_FILE, "utf8"));
+    if (Number(current?.pid) === process.pid) unlinkSync(WORKER_LOCK_FILE);
+  } catch {}
+}
+
+function acquireWorkerLock() {
+  mkdirSync(LOG_DIR, { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const fd = openSync(WORKER_LOCK_FILE, "wx");
+      writeFileSync(fd, JSON.stringify({
+        pid: process.pid,
+        worker: WORKER_ID,
+        session: state.worker_session,
+        started_at: state.started_at,
+      }, null, 2), "utf8");
+      closeSync(fd);
+      process.once("exit", releaseWorkerLock);
+      for (const signal of ["SIGINT", "SIGTERM"]) {
+        process.once(signal, () => {
+          releaseWorkerLock();
+          process.exit(0);
+        });
+      }
+      return true;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      try {
+        const previous = JSON.parse(readFileSync(WORKER_LOCK_FILE, "utf8"));
+        if (pidAlive(previous?.pid)) {
+          log("Another Hibou worker instance is already alive", {
+            pid: previous.pid,
+            session: previous.session || null,
+          });
+          return false;
+        }
+      } catch {}
+      try { unlinkSync(WORKER_LOCK_FILE); } catch {}
+    }
+  }
+  throw new Error("Unable to acquire Hibou worker single-instance lock");
 }
 
 function loadProcessed() {
@@ -449,6 +508,8 @@ async function fetchVideoQueue() {
         headers: {
           "User-Agent": "Le-Hibou-ROG-Worker/1.0",
           Authorization: `Bearer ${REPORT_TOKEN}`,
+          "X-Hibou-Worker": WORKER_ID,
+          "X-Hibou-Worker-Session": state.worker_session,
         },
         signal: controller.signal,
       },
@@ -500,6 +561,9 @@ async function reportVideoProgress(job, status, data = {}) {
         result_sha256: data.result_sha256 || "",
         result: data.result || null,
         error: data.error || "",
+        heartbeat: data.heartbeat === true,
+        worker_session: state.worker_session,
+        worker_pid: process.pid,
       }),
       signal: controller.signal,
     });
@@ -884,22 +948,57 @@ async function processVideoRender(job, processed) {
     args.push(`--asset-graph=${assetGraphPath}`);
   }
 
-  const render = spawnSync(
-    process.execPath,
-    args,
-    {
+  const renderStatus = await new Promise((resolveRender, rejectRender) => {
+    const child = spawn(process.execPath, args, {
       cwd: PROJECT_ROOT,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
       env: process.env,
-    },
-  );
+    });
 
-  if (render.status !== 0) {
+    state.render_pid = child.pid || null;
+
+    const heartbeat = setInterval(() => {
+      reportVideoProgress(job, "Running", {
+        local_path: dir,
+        heartbeat: true,
+        result: {
+          schema: "HIBOU_VIDEO_RENDER_HEARTBEAT_V1",
+          heartbeat_at: new Date().toISOString(),
+          worker: WORKER_ID,
+          worker_session: state.worker_session,
+          worker_pid: process.pid,
+          render_pid: child.pid || null,
+        },
+      }).catch((error) => {
+        log("VIDEO_RENDER heartbeat failed", {
+          job: job.id,
+          error: String(error?.message || error).slice(0, 1000),
+        });
+      });
+    }, 30000);
+
+    child.once("error", (error) => {
+      clearInterval(heartbeat);
+      state.render_pid = null;
+      rejectRender(error);
+    });
+    child.once("exit", (code, signal) => {
+      clearInterval(heartbeat);
+      state.render_pid = null;
+      if (signal) {
+        rejectRender(new Error(`video-master terminated by signal ${signal}`));
+        return;
+      }
+      resolveRender(Number(code ?? 1));
+    });
+  });
+
+  if (renderStatus !== 0) {
     const detail = pipelineFailureDetail(dir);
     throw new Error(
-      `video-master failed with status ${render.status};${detail || " stage=unknown"}`,
+      `video-master failed with status ${renderStatus};${detail || " stage=unknown"}`,
     );
   }
 
@@ -1243,6 +1342,10 @@ function localDiagnostic() {
 async function main() {
   if (DIAGNOSTIC) {
     process.stdout.write(JSON.stringify(localDiagnostic(), null, 2) + "\n");
+    return;
+  }
+  if (!acquireWorkerLock()) {
+    state.status = "duplicate_instance";
     return;
   }
   state.status = EXECUTION_ENABLED ? "running" : "paused";

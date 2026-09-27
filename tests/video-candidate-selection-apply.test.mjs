@@ -9,6 +9,7 @@ function review() {
   return {
     schema: "HIBOU_CANDIDATE_REVIEW_V1",
     content_id: "recCONTENT1234567",
+    review_fingerprint_sha256: "a".repeat(64),
     scenes: [
       {
         scene_id: "S01",
@@ -49,6 +50,7 @@ test("explicit human choice may differ from machine recommendation", () => {
     decisions: {
       schema: HUMAN_IMAGE_SELECTION_SCHEMA,
       content_id: "recCONTENT1234567",
+      review_fingerprint_sha256: "a".repeat(64),
       decisions: {
         S01: {
           candidate_id: "S01-C2",
@@ -132,6 +134,7 @@ test("selection rejects unknown scenes and content mismatch", () => {
         decisions: {
           schema: HUMAN_IMAGE_SELECTION_SCHEMA,
           content_id: "recOTHER12345678",
+          review_fingerprint_sha256: "a".repeat(64),
           decisions: {
             S01: {
               candidate_id: "S01-C1",
@@ -163,5 +166,27 @@ test("selection rejects unknown scenes and content mismatch", () => {
         },
       }),
     /unknown scenes: S99/,
+  );
+});
+
+
+test("selection rejects stale review fingerprint", () => {
+  assert.throws(
+    () =>
+      applyHumanCandidateSelection({
+        review: review(),
+        decisions: {
+          schema: HUMAN_IMAGE_SELECTION_SCHEMA,
+          content_id: "recCONTENT1234567",
+          review_fingerprint_sha256: "b".repeat(64),
+          decisions: {
+            S01: {
+              candidate_id: "S01-C1",
+              human_confirmed: true,
+            },
+          },
+        },
+      }),
+    /review fingerprint mismatch/,
   );
 });

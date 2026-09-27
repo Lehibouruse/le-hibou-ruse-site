@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTechnicalSelections, masterPolicy } from "../scripts/video-master.mjs";
+import { buildTechnicalSelections, masterPolicy, normalizeExecutionProfileOverride } from "../scripts/video-master.mjs";
 
 test("master orchestrator is bounded and publication locked",()=>{
  const p=masterPolicy();
@@ -22,4 +22,12 @@ test("technical selections promote only QC PASS provisional candidates",()=>{
  assert.equal(s.S01.selected,"a.png");
  assert.match(s.S01.selection_reason,/final master human review required/);
  assert.throws(()=>buildTechnicalSelections({S01:{status:"NO_PASS",selected_path:null}}),/no QC PASS image/);
+});
+
+
+test("job-level preview execution override is bounded and does not imply publication",()=>{
+ const p=normalizeExecutionProfileOverride({mode:"preview",candidates:"1"});
+ assert.deepEqual(p,{production_mode:"preview",candidates_per_scene:1});
+ assert.throws(()=>normalizeExecutionProfileOverride({mode:"turbo",candidates:"1"}),/preview or final/);
+ assert.throws(()=>normalizeExecutionProfileOverride({mode:"preview",candidates:"4"}),/1\.\.3/);
 });

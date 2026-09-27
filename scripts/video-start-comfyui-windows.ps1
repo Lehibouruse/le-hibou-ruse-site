@@ -8,19 +8,29 @@ $VideoRoot = Join-Path $env:LOCALAPPDATA "LeHibou\video"
 $Portable = Join-Path $VideoRoot "comfyui\ComfyUI_windows_portable"
 $Python = Join-Path $Portable "python_embeded\python.exe"
 $Main = Join-Path $Portable "ComfyUI\main.py"
+$SitePackages = Join-Path $Portable "python_embeded\Lib\site-packages"
 $LogDir = Join-Path $env:LOCALAPPDATA "LeHibou\logs"
 $Stdout = Join-Path $LogDir "comfyui-autostart.stdout.log"
 $Stderr = Join-Path $LogDir "comfyui-autostart.stderr.log"
 $State = Join-Path $LogDir "comfyui-autostart-state.json"
+$CudaRepairLog = Join-Path $LogDir "comfyui-cuda-repair.log"
 
 if (-not (Test-Path $Python) -or -not (Test-Path $Main)) {
   throw "ComfyUI portable Hibou introuvable. Lancer d'abord video-local-install-windows.ps1 -InstallComfyUI."
 }
 if ($Port -lt 1024 -or $Port -gt 65535) { throw "Port invalide." }
-
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-$CudaRepairLog = Join-Path $LogDir "comfyui-cuda-repair.log"
+# Stop only stale ComfyUI processes from this Hibou portable install before touching torch DLLs.
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.Name -match '^python(\.exe)?$' -and
+    $_.CommandLine -like "*ComfyUI\main.py*" -and
+    $_.CommandLine -like "*$Portable*"
+  } |
+  ForEach-Object {
+    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+  }
 
 function Test-ComfyCuda {
   $probeCode = @'
@@ -49,15 +59,53 @@ raise SystemExit(0 if ok else 3)
   }
 }
 
+function Remove-ComfyTorchResidue {
+  $patterns = @(
+    "torch",
+    "torch-*.dist-info",
+    "torchvision",
+    "torchvision-*.dist-info",
+    "torchaudio",
+    "torchaudio-*.dist-info",
+    "functorch",
+    "torchgen",
+    "~orch*",
+    "~unctorch*",
+    "~ympy*"
+  )
+  foreach ($pattern in $patterns) {
+    Get-ChildItem -LiteralPath $SitePackages -Force -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -like $pattern } |
+      ForEach-Object {
+        $target = $_.FullName
+        $removed = $false
+        for ($attempt = 1; $attempt -le 3 -and -not $removed; $attempt++) {
+          try {
+            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop
+            $removed = $true
+          } catch {
+            Start-Sleep -Milliseconds (500 * $attempt)
+          }
+        }
+        if (-not $removed -and (Test-Path -LiteralPath $target)) {
+          throw "Impossible de supprimer le residu PyTorch: $target"
+        }
+      }
+  }
+}
+
 $cudaProbe = Test-ComfyCuda
 if (-not $cudaProbe.ok) {
   Write-Host "CUDA PyTorch ComfyUI indisponible; reparation automatique vers torch 2.6.0 + cu124..." -ForegroundColor Yellow
   ("[{0}] probe before repair: {1}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output) | Add-Content -Path $CudaRepairLog -Encoding UTF8
 
+  Remove-ComfyTorchResidue
+
   $pipArgs = @(
     "-m", "pip", "install",
     "--disable-pip-version-check",
     "--no-input",
+    "--no-warn-script-location",
     "--upgrade",
     "--force-reinstall",
     "torch==2.6.0",
@@ -86,18 +134,6 @@ if (-not $cudaProbe.ok) {
 }
 
 Write-Host ("CUDA ComfyUI OK : {0}" -f $cudaProbe.output) -ForegroundColor Green
-
-
-Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-  Where-Object {
-    $_.Name -match '^python(\.exe)?$' -and
-    $_.CommandLine -like "*ComfyUI\main.py*" -and
-    $_.CommandLine -like "*$Portable*"
-  } |
-  ForEach-Object {
-    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
-  }
-
 Start-Sleep -Milliseconds 750
 
 $args = @(
@@ -111,7 +147,7 @@ $args = @(
   "--use-pytorch-cross-attention"
 )
 
-Write-Host ("ComfyUI Hibou : loopback uniquement, low VRAM, port $Port") -ForegroundColor Cyan
+Write-Host "ComfyUI Hibou : loopback uniquement, low VRAM, port $Port" -ForegroundColor Cyan
 $child = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $Portable -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -WindowStyle Hidden -PassThru
 
 [ordered]@{
@@ -124,6 +160,7 @@ $child = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $
   working_directory = $Portable
   stdout = $Stdout
   stderr = $Stderr
+  cuda_probe = $cudaProbe.output
 } | ConvertTo-Json -Depth 4 | Set-Content -Path $State -Encoding UTF8
 
 Write-Host ("COMFYUI_AUTOSTART_V2 pid={0} state={1}" -f $child.Id, $State) -ForegroundColor Green

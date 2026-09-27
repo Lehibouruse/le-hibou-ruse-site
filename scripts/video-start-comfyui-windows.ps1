@@ -34,8 +34,14 @@ print(json.dumps({
 }))
 raise SystemExit(0 if ok else 3)
 '@
-  $probeOutput = & $Python -c $probeCode 2>&1
-  $probeExit = $LASTEXITCODE
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $probeOutput = & $Python -c $probeCode 2>$null
+    $probeExit = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
   return [ordered]@{
     ok = ($probeExit -eq 0)
     exit_code = $probeExit
@@ -98,7 +104,7 @@ $args = @(
   "--use-pytorch-cross-attention"
 )
 
-Write-Host "ComfyUI Hibou : loopback uniquement, low VRAM, port $Port" -ForegroundColor Cyan
+Write-Host ("ComfyUI Hibou : loopback uniquement, low VRAM, port $Port") -ForegroundColor Cyan
 $child = Start-Process -FilePath $Python -ArgumentList $args -WorkingDirectory $Portable -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr -WindowStyle Hidden -PassThru
 
 [ordered]@{

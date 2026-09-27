@@ -69,3 +69,15 @@ test("canonical owl asset is composited with background removal", () => {
   assert.match(source, /colorkey=/);
   assert.match(source, /0xFBF6EE/);
 });
+
+
+test("canonical active profile is the fallback for every video", () => {
+  assert.match(airtableSync, /resolveCanonicalVideoProfile/);
+  assert.match(airtableSync, /AND\(\{Actif\}=1,\{Profil\}='HIBOU_VIRAL_V1'\)/);
+  assert.match(airtableSync, /production_defaults/);
+  assert.match(airtableSync, /Candidats par scène/);
+  assert.match(airtableSync, /Seuil QC image/);
+  assert.match(queueRoute, /resolveCanonicalVideoProfile/);
+  assert.match(queueRoute, /defaultCandidates/);
+  assert.match(queueRoute, /defaultMaxScenes/);
+});

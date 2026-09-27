@@ -34,5 +34,14 @@
     "paid_cloud_fallback": false,
     "human_review_required": true,
     "publication_authorized": false
+  },
+  "source_of_truth": "local_preflight_verified",
+  "verified_at": "2026-09-27",
+  "validation": {
+    "method": "HIBOU_LOCAL_PREFLIGHT_V1",
+    "nvidia_smi_available": true,
+    "python_3_11": true,
+    "ffmpeg": true,
+    "ffprobe": true
   }
 }

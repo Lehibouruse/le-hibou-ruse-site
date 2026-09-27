@@ -22,6 +22,23 @@ function hashObject(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function buildSceneRenderFingerprint({contract, plan, assetHashes, duration, preset, crf}) {
+  return hashObject({
+    contract_version: contract.contract_version,
+    renderer: contract.engine.renderer,
+    renderer_version: contract.engine.renderer_version,
+    width: contract.engine.width,
+    height: contract.engine.height,
+    fps: contract.engine.fps,
+    preset,
+    crf,
+    composition: plan.normalized,
+    timeline: plan.timeline,
+    asset_sha256: assetHashes,
+    duration,
+  });
+}
+
 function probe(path) {
   return JSON.parse(run("ffprobe", [
     "-v", "error",
@@ -130,18 +147,13 @@ export function renderVideoContract(contractPathArg, outputArg) {
     const assetPaths = plan.input_refs.map(ref => resolve(root, ref));
     const assetHashes = assetPaths.map(path => sha256(path));
 
-    const fingerprint = hashObject({
-      contract_version: contract.contract_version,
-      renderer: contract.engine.renderer,
-      renderer_version: contract.engine.renderer_version,
-      width: contract.engine.width,
-      height: contract.engine.height,
-      fps: contract.engine.fps,
-      preset,
-      composition: plan.normalized,
-      timeline: plan.timeline,
-      asset_sha256: assetHashes,
+    const fingerprint = buildSceneRenderFingerprint({
+      contract,
+      plan,
+      assetHashes,
       duration,
+      preset,
+      crf,
     });
     const clip = resolve(work, `scene-${String(i + 1).padStart(2, "0")}-${fingerprint.slice(0, 16)}.mp4`);
     const clipWasCached = validVisual(clip);

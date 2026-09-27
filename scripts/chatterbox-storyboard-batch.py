@@ -9,6 +9,7 @@ import os
 import random
 import re
 import sys
+import subprocess
 from pathlib import Path
 
 ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V2"
@@ -179,7 +180,65 @@ def generate_scene(model, text, native, scene_id):
 needs_generation = any(item["cache"] is None for item in descriptors)
 model = None
 sample_rate = None
+
+def ensure_perth_watermarker():
+    try:
+        import perth
+    except Exception as exc:
+        fail(f"Perth dependency unavailable: {exc}")
+
+    watermarker = getattr(perth, "PerthImplicitWatermarker", None)
+    if callable(watermarker):
+        return
+
+    if os.getenv("HIBOU_PERTH_REPAIR_ATTEMPTED") == "1":
+        fail(
+            "PerthImplicitWatermarker is still unavailable after automatic setuptools repair"
+        )
+
+    print(
+        "HIBOU_PERTH_REPAIR_START reason=PerthImplicitWatermarker_not_callable target=setuptools<81",
+        file=sys.stderr,
+        flush=True,
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-input",
+            "--upgrade",
+            "setuptools<81",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    if result.stdout:
+        print(result.stdout[-5000:], file=sys.stderr, flush=True)
+    if result.stderr:
+        print(result.stderr[-5000:], file=sys.stderr, flush=True)
+
+    if result.returncode != 0:
+        fail(
+            f"Automatic Perth repair failed while installing setuptools<81 (exit={result.returncode})"
+        )
+
+    env = os.environ.copy()
+    env["HIBOU_PERTH_REPAIR_ATTEMPTED"] = "1"
+    print(
+        "HIBOU_PERTH_REPAIR_RESTART",
+        file=sys.stderr,
+        flush=True,
+    )
+    os.execve(sys.executable, [sys.executable, *sys.argv], env)
+
 if needs_generation:
+    ensure_perth_watermarker()
     try:
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
     except Exception as exc:

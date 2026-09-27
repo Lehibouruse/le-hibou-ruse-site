@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { buildImagePlan } from "./video-image-plan.mjs";
 import { executeImagePlan } from "./video-image-batch.mjs";
@@ -123,4 +124,4 @@ async function main(){
   process.stdout.write(JSON.stringify({ok:true,...summary})+"\n");
   if(!summary.all_scenes_have_candidate) process.exitCode=2;
 }
-if(import.meta.url===`file://${process.argv[1]}`) main().catch(e=>{console.error(String(e?.stack||e));process.exitCode=1;});
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href) main().catch(e=>{console.error(String(e?.stack||e));process.exitCode=1;});

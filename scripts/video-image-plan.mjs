@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function fail(message){throw new Error(message);}
 function seedFor(contentId,sceneId,candidate){
@@ -74,7 +75,7 @@ export function buildImagePlan(contract,binding){
   }
   return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:3,request_count:requests.length,requests,paid_fallback:false};
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);
   if(!contractPath||!bindingPath||!outPath) fail("usage: video-image-plan.mjs storyboard.json comfyui-binding.json image-plan.json");
   const contract=JSON.parse(readFileSync(resolve(contractPath),"utf8"));

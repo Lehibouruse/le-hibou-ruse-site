@@ -164,3 +164,12 @@ test("repair preparation clears local failure backoff but does not mark job proc
   assert.match(branch, /delete failedJobs\[job\.id\]/);
   assert.doesNotMatch(branch, /processed\.add\(job\.id\)/);
 });
+
+
+test("worker persists a local prepared-repair marker before Paused report", () => {
+  const marker = worker.indexOf("_hibou_video_remote_repair_prepared.json");
+  const paused = worker.indexOf('reportVideoProgress(job, "Paused"');
+  assert.ok(marker >= 0);
+  assert.ok(paused > marker);
+  assert.match(worker, /JSON\.stringify\(repairResumeApplied, null, 2\)/);
+});

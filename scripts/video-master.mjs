@@ -122,7 +122,7 @@ const POST_RUNTIME_FILES=[
   ["video-local-render.mjs","renderVideoContract"],
   ["video-scene-compositor.mjs","buildSceneCompositePlan"],
   ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
-  ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V1"]
+  ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"]
 ];
 
 async function ensurePostRuntimeBundle(commit){

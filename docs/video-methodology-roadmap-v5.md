@@ -40,6 +40,8 @@
 
 ### Production / montage
 
+- rendu ASS Windows auto-contenu via Fontconfig privé + `C:\\Windows\\Fonts`, sans dépendre d'une config Fontconfig système ;
+
 - timeline intra-scène indépendante du remplacement complet d'image ;
 - ATTENTION_BEATS : caption, prop, pose, camera, accent ;
 - BEAT_VARIATION_POLICY consultative ;

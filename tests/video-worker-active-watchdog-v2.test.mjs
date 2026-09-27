@@ -33,6 +33,8 @@ test("watchdog cleans Hibou render children but not ComfyUI", () => {
   const block = launcher.slice(start, end);
   assert.match(block, /video-master\.runtime\.mjs/);
   assert.match(block, /\\LeHibou\\image-runtime\\/);
+  assert.match(block, /\\LeHibou\\pre-runtime\\/);
+  assert.match(block, /\\LeHibou\\post-runtime\\/);
   assert.match(block, /chatterbox-storyboard-batch\.runtime\.py/);
   assert.doesNotMatch(block, /ComfyUI/i);
 });

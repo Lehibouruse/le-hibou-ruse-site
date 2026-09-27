@@ -34,28 +34,43 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
 
 function Test-ComfyCuda {
   $probeCode = @'
-import json, torch
+import json, sys
+import torch
 ok = bool(torch.cuda.is_available())
 print(json.dumps({
+    "python": sys.version,
     "torch": str(torch.__version__),
+    "torch_file": str(torch.__file__),
     "cuda_runtime": str(torch.version.cuda),
     "cuda_available": ok,
+    "device_count": int(torch.cuda.device_count()),
     "device": torch.cuda.get_device_name(0) if ok else None,
 }))
 raise SystemExit(0 if ok else 3)
 '@
-  $previousErrorActionPreference = $ErrorActionPreference
-  $ErrorActionPreference = "Continue"
-  try {
-    $probeOutput = & $Python -c $probeCode 2>$null
-    $probeExit = $LASTEXITCODE
-  } finally {
-    $ErrorActionPreference = $previousErrorActionPreference
-  }
+
+  $probeScript = Join-Path $LogDir "comfyui-cuda-probe.py"
+  $probeStdout = Join-Path $LogDir "comfyui-cuda-probe.stdout.log"
+  $probeStderr = Join-Path $LogDir "comfyui-cuda-probe.stderr.log"
+
+  $probeCode | Set-Content -LiteralPath $probeScript -Encoding UTF8
+  Remove-Item -LiteralPath $probeStdout -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $probeStderr -Force -ErrorAction SilentlyContinue
+
+  $probeProcess = Start-Process -FilePath $Python -ArgumentList @("-s", $probeScript) -WorkingDirectory $Portable -RedirectStandardOutput $probeStdout -RedirectStandardError $probeStderr -WindowStyle Hidden -Wait -PassThru
+
+  $probeOutputRaw = if (Test-Path -LiteralPath $probeStdout) { Get-Content -LiteralPath $probeStdout -Raw } else { "" }
+  $probeErrorRaw = if (Test-Path -LiteralPath $probeStderr) { Get-Content -LiteralPath $probeStderr -Raw } else { "" }
+  $probeOutput = if ($null -eq $probeOutputRaw) { "" } else { [string]$probeOutputRaw }
+  $probeError = if ($null -eq $probeErrorRaw) { "" } else { [string]$probeErrorRaw }
+  $probeOutput = $probeOutput.Trim()
+  $probeError = $probeError.Trim()
+
   return [ordered]@{
-    ok = ($probeExit -eq 0)
-    exit_code = $probeExit
-    output = (($probeOutput | Out-String).Trim())
+    ok = ($probeProcess.ExitCode -eq 0)
+    exit_code = $probeProcess.ExitCode
+    output = $probeOutput
+    stderr = $probeError
   }
 }
 
@@ -121,7 +136,7 @@ function Remove-ComfyTorchResidue {
 $cudaProbe = Test-ComfyCuda
 if (-not $cudaProbe.ok) {
   Write-Host "CUDA PyTorch ComfyUI indisponible; reparation automatique vers torch 2.6.0 + cu124..." -ForegroundColor Yellow
-  ("[{0}] probe before repair: {1}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output) | Add-Content -Path $CudaRepairLog -Encoding UTF8
+  ("[{0}] probe before repair: stdout={1}; stderr={2}; exit={3}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output, $cudaProbe.stderr, $cudaProbe.exit_code) | Add-Content -Path $CudaRepairLog -Encoding UTF8
 
   Remove-ComfyTorchResidue
 
@@ -151,9 +166,9 @@ if (-not $cudaProbe.ok) {
   }
 
   $cudaProbe = Test-ComfyCuda
-  ("[{0}] probe after repair: {1}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output) | Add-Content -Path $CudaRepairLog -Encoding UTF8
+  ("[{0}] probe after repair: stdout={1}; stderr={2}; exit={3}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $cudaProbe.output, $cudaProbe.stderr, $cudaProbe.exit_code) | Add-Content -Path $CudaRepairLog -Encoding UTF8
   if (-not $cudaProbe.ok) {
-    throw "CUDA reste indisponible apres reparation PyTorch cu124. Probe: $($cudaProbe.output)"
+    throw "CUDA reste indisponible apres reparation PyTorch cu124. Exit=$($cudaProbe.exit_code) STDOUT=$($cudaProbe.output) STDERR=$($cudaProbe.stderr)"
   }
 }
 

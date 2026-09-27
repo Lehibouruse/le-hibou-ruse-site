@@ -173,3 +173,77 @@ test("worker persists a local prepared-repair marker before Paused report", () =
   assert.ok(paused > marker);
   assert.match(worker, /JSON\.stringify\(repairResumeApplied, null, 2\)/);
 });
+
+
+test("prepared repair start has its own independent API and worker gates", () => {
+  assert.match(route, /HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED/);
+  assert.match(route, /const REMOTE_REPAIR_START_ENABLED/);
+  assert.match(route, /remote_repair_start_disabled/);
+  assert.match(worker, /HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED/);
+  assert.match(worker, /const VIDEO_REMOTE_REPAIR_START_ENABLED/);
+  assert.match(worker, /remote repair start is disabled locally/);
+});
+
+test("preparation clears any preloaded second consent", () => {
+  assert.match(route, /start_prepared_repair: false/);
+  assert.match(route, /human_confirmed_start: false/);
+  assert.match(route, /repair_start_plan_sha256: null/);
+  assert.match(route, /repair_start_receipt_sha256: null/);
+  assert.match(route, /repair_start_state_file_sha256: null/);
+  assert.match(route, /repair_start_request: null/);
+});
+
+test("API requires a fresh second human consent and exact prepared hashes", () => {
+  assert.match(route, /function repairStartPayload/);
+  assert.match(route, /start_prepared_repair !== true/);
+  assert.match(route, /human_confirmed_start !== true/);
+  assert.match(route, /repair_start_plan_sha_mismatch/);
+  assert.match(route, /repair_start_source_state_sha_mismatch/);
+  assert.match(route, /repair_start_receipt_sha_mismatch/);
+  assert.match(route, /repair_start_state_file_sha_mismatch/);
+  assert.match(route, /HIBOU_VIDEO_REPAIR_START_REQUEST_V1/);
+});
+
+test("API starts at most one prepared repair and ordinary auto-start still excludes prepared pauses", () => {
+  assert.match(route, /async function autoStartPreparedRepair/);
+  assert.match(route, /ambiguous_repair_start_jobs/);
+  assert.match(route, /HIBOU_VIDEO_RENDER_REPAIR_START_SCHEDULED_V1/);
+  assert.match(route, /const repair_start = await autoStartPreparedRepair\(request\)/);
+  assert.match(route, /isRepairResumePreparedPause\(record\)/);
+  assert.match(route, /remote_repair_start_enabled: REMOTE_REPAIR_START_ENABLED/);
+});
+
+test("scheduled start request reaches worker only behind start gate", () => {
+  assert.match(route, /repair_start_request:/);
+  assert.match(route, /REMOTE_REPAIR_START_ENABLED &&/);
+  assert.match(route, /HIBOU_VIDEO_RENDER_REPAIR_START_SCHEDULED_V1/);
+  assert.match(route, /HIBOU_VIDEO_REPAIR_START_REQUEST_V1/);
+});
+
+test("worker rejects any prepared state or receipt byte change before explicit start", () => {
+  assert.match(worker, /_hibou_video_remote_repair_prepared\.json/);
+  assert.match(worker, /prepared-repair marker is not startable/);
+  assert.match(worker, /prepared repair receipt bytes changed before start/);
+  assert.match(worker, /prepared pipeline state changed before explicit start/);
+  assert.match(worker, /prepared pipeline state is not eligible for explicit start/);
+});
+
+test("worker marks prepared state execution only after second local verification", () => {
+  assert.match(worker, /pipeline_status = "REPAIR_EXECUTION_STARTED"/);
+  assert.match(worker, /resume_prepared\.execution_started = true/);
+  assert.match(worker, /HIBOU_VIDEO_REMOTE_REPAIR_EXECUTION_V1/);
+  assert.match(worker, /HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1/);
+  assert.match(worker, /_hibou_video_remote_repair_started\.json/);
+  assert.match(worker, /repair_start: repairStartApplied/);
+});
+
+test("explicit repair start is auditable and still preserves caches/publication lock", () => {
+  assert.match(worker, /prepared_state_sha256:/);
+  assert.match(worker, /execution_state_sha256:/);
+  assert.match(worker, /prepared_marker_before_sha256:/);
+  assert.match(worker, /prepared_marker_after_sha256:/);
+  assert.match(worker, /artifacts_deleted: false/);
+  assert.match(worker, /caches_deleted: false/);
+  assert.match(worker, /human_review_required: true/);
+  assert.match(worker, /publication_authorized: false/);
+});

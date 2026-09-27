@@ -90,3 +90,26 @@ Un job FINAL en `WAITING_HUMAN_SELECTION` peut être repris à distance sans acc
 Le serveur ne remet alors qu'un unique job éligible en `Pending`. Le worker compare encore une fois le fingerprint avec `images/candidate-review.json`, écrit localement `candidate-decisions.json`, puis reprend le même run. Cette reprise ne réveille pas ComfyUI : les images déjà générées sont réutilisées.
 
 La publication reste interdite et la revue humaine du master reste obligatoire.
+
+
+## Reprise distante après erreur
+
+Cette brique est codée mais **désactivée** tant que l'E2E Windows n'a pas été validé.
+
+Deux gates indépendants sont obligatoires :
+
+- API / Vercel : `HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED=true` ;
+- worker Windows : `HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED=true`.
+
+La programmation d'une reprise exige en plus :
+- un job `VIDEO_RENDER` en `Error` avec `HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1` ;
+- `resume_failed_job=true` ;
+- `human_confirmed_resume=true` ;
+- le SHA-256 exact de `_hibou_video_resume_plan.json` ;
+- le SHA-256 exact de l'état source `pipeline-run.json` contenu dans ce plan ;
+- même `content_id` ;
+- un unique job éligible et aucune autre vidéo active.
+
+Le serveur ne fait que remettre le job en `Pending` avec une requête normalisée. Le worker vérifie **une seconde fois** le contenu, le plan local, ses hashes et le stage de reprise. Il n'applique le reset qu'avec le runtime `video-resume-state.mjs` du même commit, `--apply`, confirmation SHA et `HIBOU_VIDEO_RESUME_APPLY_ENABLED=true` dans ce sous-processus uniquement. Avant de relancer le master, il exige le receipt `HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1`.
+
+Une nouvelle erreur ne provoque jamais une nouvelle reprise automatique : une nouvelle confirmation humaine est requise. Les caches et artefacts sont conservés et la publication reste interdite.

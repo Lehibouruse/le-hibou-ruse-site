@@ -201,6 +201,22 @@ function explicitInvalidations(values) {
   return out;
 }
 
+function inferMissingPassArtifacts(root, state) {
+  const out = [];
+  for (const stage of STAGE_ORDER) {
+    if (stageStatus(state, stage) !== "PASS") continue;
+    const artifacts = artifactStatus(root, stage);
+    if (artifacts.complete === false) {
+      out.push({
+        stage,
+        code: "pass_stage_artifact_missing",
+        missing_artifacts: artifacts.missing,
+      });
+    }
+  }
+  return out;
+}
+
 export function buildResumePlan({
   root,
   state,
@@ -214,6 +230,7 @@ export function buildResumePlan({
   }
 
   const diagnostics = [];
+  diagnostics.push(...inferMissingPassArtifacts(resolvedRoot, state));
   const voice = inferVoiceInvalidation(resolvedRoot, state);
   if (voice) diagnostics.push(voice);
   const render = inferRenderInvalidation(resolvedRoot, state, platform);

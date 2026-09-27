@@ -97,6 +97,65 @@ function workerSession(request) {
   };
 }
 
+function isTransientVideoError(error) {
+  const message = String(error || "");
+  const transientPatterns = [
+    /\btimeout\b/i,
+    /timed out/i,
+    /ETIMEDOUT/i,
+    /ECONNRESET/i,
+    /ECONNREFUSED/i,
+    /EAI_AGAIN/i,
+    /fetch failed/i,
+    /socket hang up/i,
+    /HTTP 5\d\d/i,
+    /terminated by signal/i,
+    /CUDA out of memory/i,
+    /cublas[^\n]*alloc/i,
+    /orphaned_worker_timeout/i,
+    /worker[^\n]*(?:crash|stopp|offline|unavailable)/i,
+    /ComfyUI[^\n]*(?:timeout|unavailable|connection|refused)/i,
+  ];
+  return transientPatterns.some((pattern) => pattern.test(message));
+}
+
+function retryDecision(current, reportedStatus, error) {
+  if (reportedStatus !== "Error") {
+    return { retry: false, reason: "status_not_error" };
+  }
+
+  const options = parseOptions(current.fields?.["Options JSON"]);
+  if (options.auto_retry_transient_errors !== true) {
+    return { retry: false, reason: "auto_retry_disabled" };
+  }
+
+  if (!isTransientVideoError(error)) {
+    return { retry: false, reason: "error_not_transient" };
+  }
+
+  const limit = Math.max(
+    0,
+    Math.min(2, Number(options.auto_retry_limit || 0)),
+  );
+  const attempts = Number(current.fields?.Tentatives || 0);
+
+  if (attempts <= 0) {
+    return { retry: false, reason: "attempt_count_missing", attempts, limit };
+  }
+
+  if (attempts > limit) {
+    return { retry: false, reason: "retry_limit_reached", attempts, limit };
+  }
+
+  return {
+    retry: true,
+    reason: "transient_error_retry_scheduled",
+    attempts,
+    limit,
+    local_backoff_seconds: 60,
+  };
+}
+
 async function autoActivateWhenWorkerReady(request) {
   const { session, worker } = workerSession(request);
   if (!session || !worker) {
@@ -416,12 +475,28 @@ export async function POST(request) {
     }
 
     const now = new Date().toISOString();
+    const retry = retryDecision(current, status, body.error);
 
     const fields = {
-      Statut: status,
+      Statut: retry.retry ? "Pending" : status,
       Worker: cut(body.worker, 180),
       Erreur: cut(body.error, 10000),
     };
+
+    if (retry.retry) {
+      fields["R\u00e9sultat JSON"] = JSON.stringify({
+        schema: "HIBOU_VIDEO_RENDER_TRANSIENT_RETRY_V1",
+        scheduled_at: now,
+        reported_status: status,
+        retry_reason: retry.reason,
+        attempts: retry.attempts,
+        retry_limit: retry.limit,
+        local_backoff_seconds: retry.local_backoff_seconds,
+        last_error: cut(body.error, 12000),
+        publication_authorized: false,
+        paid_fallback: false,
+      });
+    }
 
     if (status === "Running") {
       if (body.heartbeat === true) {
@@ -453,7 +528,10 @@ export async function POST(request) {
       }
     }
 
-    if (status === "Completed" || status === "Error") {
+    if (
+      status === "Completed"
+      || (status === "Error" && !retry.retry)
+    ) {
       fields["Termin\u00e9 le"] = now;
     }
 
@@ -468,7 +546,7 @@ export async function POST(request) {
       );
     }
 
-    if (body.result) {
+    if (body.result && !retry.retry) {
       fields["R\u00e9sultat JSON"] = cut(
         typeof body.result === "string"
           ? body.result
@@ -490,7 +568,9 @@ export async function POST(request) {
     return NextResponse.json({
       ok: true,
       airtable_record_id: recordId,
-      status,
+      reported_status: status,
+      status: retry.retry ? "Pending" : status,
+      retry,
       success_chain,
     });
   } catch (error) {

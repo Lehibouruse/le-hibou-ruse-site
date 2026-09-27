@@ -177,12 +177,23 @@ export function buildImagePlan(contract,binding){
   const styleLock=String(creative.style_lock||"").trim();
   const negativeLock=String(creative.negative_prompt||"").trim();
   const contentBrief=String(creative.content_brief||"").trim();
-  const textFreeLock=[
+  const creativeLockEnabled=Boolean(
+    Object.keys(creative||{}).length
+    && (
+      styleLock
+      || characterLock
+      || negativeLock
+      || contentBrief
+      || creative.text_in_generated_images===false
+      || creative.reference_mode
+    )
+  );
+  const textFreeLock=creativeLockEnabled?[
     "TEXT_FREE_IMAGE_LOCK:",
     "Do not render any letters, words, captions, labels, signage, logos, pseudo-text or gibberish inside the generated image.",
     "All useful text, numbers, captions and the Le Hibou Rusé signature are added later in post-production.",
     "The image itself must contain zero readable text."
-  ].join(" ");
+  ].join(" "):"";
   const candidatesPerScene=Math.max(
     1,
     Math.min(3,Number(production.candidates_per_scene||binding.candidates_per_scene||3))
@@ -197,7 +208,8 @@ export function buildImagePlan(contract,binding){
     const core=String(scene.image_prompt||scene.visual_idea||"").trim();
     if(!core) fail(`${scene.scene_id}: image prompt/visual idea missing`);
     const deterministicCharacterOverlay=
-      String(creative.reference_mode||"")==="deterministic_character_overlay"
+      creativeLockEnabled
+      && String(creative.reference_mode||"")==="deterministic_character_overlay"
       && Boolean(scene?.framing?.hibou);
     const characterGenerationLock=deterministicCharacterOverlay
       ? [
@@ -206,7 +218,9 @@ export function buildImagePlan(contract,binding){
           "The canonical Le Hibou Rusé character is composited later in post-production.",
           "Leave a visually useful foreground area for the character overlay while keeping the environment rich and complete."
         ].join(" ")
-      : characterLock;
+      : creativeLockEnabled
+        ? characterLock
+        : "";
     const prompt=[
       prefix,
       characterGenerationLock,

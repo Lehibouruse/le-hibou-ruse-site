@@ -110,6 +110,43 @@ foreach ($ch in $RuntimeCommit.ToCharArray()) {
 $RuntimeCommit = $RuntimeCommit.ToLowerInvariant()
 Write-Host ("Runtime deploye : {0}" -f $RuntimeCommit) -ForegroundColor Green
 
+$InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+$RawBase = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/$RuntimeCommit"
+
+$LauncherUrl = "$RawBase/scripts/start-hibou-video-stack.ps1"
+$LauncherCandidate = Join-Path $InstallDir "start-hibou-video-stack.candidate.ps1"
+$SelfUpdateActive = [Environment]::GetEnvironmentVariable("HIBOU_LAUNCHER_SELF_UPDATE_ACTIVE", "Process")
+$selfUpdateHeaders = @{ "Cache-Control" = "no-cache"; "Pragma" = "no-cache" }
+$selfUpdateBust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+Invoke-WebRequest `
+  -UseBasicParsing `
+  -Headers $selfUpdateHeaders `
+  -Uri ($LauncherUrl + "?hibou_cb=" + $selfUpdateBust) `
+  -OutFile $LauncherCandidate
+
+$launcherCandidateSource = Get-Content -Raw $LauncherCandidate
+if (
+  $launcherCandidateSource -notmatch 'HIBOU_VIDEO_STACK_READY' -or
+  $launcherCandidateSource -notmatch 'HIBOU_LAUNCHER_SELF_UPDATE'
+) {
+  throw "Lanceur distant invalide ou incompatible."
+}
+
+$currentLauncherHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
+$candidateLauncherHash = (Get-FileHash -LiteralPath $LauncherCandidate -Algorithm SHA256).Hash
+
+if ($candidateLauncherHash -ne $currentLauncherHash -and $SelfUpdateActive -ne "1") {
+  Write-Host "HIBOU_LAUNCHER_SELF_UPDATE — relance sur le lanceur du commit deploye..." -ForegroundColor Cyan
+  [Environment]::SetEnvironmentVariable("HIBOU_LAUNCHER_SELF_UPDATE_ACTIVE", "1", "Process")
+  & powershell.exe `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File $LauncherCandidate
+  exit $LASTEXITCODE
+}
+
 $FailedJobsPath = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
 if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
   try {
@@ -130,17 +167,12 @@ if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
   }
 }
 
-$InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
 $Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
 $RuntimeMaster = Join-Path $InstallDir "video-master.runtime.mjs"
 $RuntimeVoice = Join-Path $InstallDir "chatterbox-storyboard-batch.runtime.py"
-
-$RawBase = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/$RuntimeCommit"
 $WorkerUrl = "$RawBase/scripts/hibou-github-worker.mjs"
 $MasterUrl = "$RawBase/scripts/video-master.mjs"
 $VoiceUrl = "$RawBase/scripts/chatterbox-storyboard-batch.py"
-
-New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 Set-UserEnv "HIBOU_VIDEO_MASTER_SCRIPT" $RuntimeMaster
 Set-UserEnv "HIBOU_CHATTERBOX_BATCH_SCRIPT" $RuntimeVoice
@@ -326,6 +358,8 @@ if (-not $health.video_master_script_exists) {
   video_master_script_exists = $health.video_master_script_exists
   chatterbox_batch_script = $RuntimeVoice
   runtime_commit = $RuntimeCommit
+  launcher = $RuntimeLauncher
+  launcher_self_update = $true
   startup = $StartupCmd
   watchdog = $WatchdogScript
   queue_jobs_visible = @($queue.jobs).Count

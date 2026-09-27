@@ -25,6 +25,7 @@ export function buildRegistry(entries,{production_mode="final",human_review_requ
     size_bytes:s.size,
     durable_url:e.durable_url||null,
     approved:Boolean(e.approved),
+    metadata:e.metadata&&typeof e.metadata==="object"?e.metadata:null,
     preview_only:previewOnly,
     publication_authorized:false
    };

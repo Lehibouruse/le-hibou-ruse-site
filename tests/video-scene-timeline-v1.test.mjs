@@ -45,3 +45,30 @@ test("timeline pose/object assets are independent inputs and camera event change
   assert.match(plan.filter_complex,/between\(on,91,180\)/);
   assert.match(plan.filter_complex,/1\.05000/);
 });
+
+test("timed object can move slightly without replacing the scene image",()=>{
+  const scene={
+    scene_id:"S04",image:{selected:"bg.png"},planned_duration_s:5,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {type:"object",start_s:1,end_s:4,path:"arrow.png",offset_x:0,offset_y:0,move_to_offset_x:36,move_to_offset_y:-20}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:5});
+  assert.deepEqual(plan.input_refs,["bg.png","arrow.png"]);
+  assert.match(plan.filter_complex,/\(t-1\.000\)\/3\.000/);
+  assert.match(plan.filter_complex,/\*36\.000/);
+  assert.match(plan.filter_complex,/\*-20\.000/);
+});
+
+test("visual accent compiles to a timed post-production overlay",()=>{
+  const scene={
+    scene_id:"S05",image:{selected:"bg.png"},planned_duration_s:4,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {type:"accent",start_s:1.5,end_s:2.5,accent:"gold_border"}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:4});
+  assert.match(plan.filter_complex,/drawbox=/);
+  assert.match(plan.filter_complex,/0xC7A65A@0\.75/);
+  assert.match(plan.filter_complex,/between\(t,1\.500,2\.500\)/);
+});

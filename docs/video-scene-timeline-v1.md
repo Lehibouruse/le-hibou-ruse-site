@@ -19,3 +19,9 @@ Extension optionnelle du contrat vidéo existant. Elle ne modifie pas `HIBOU_VID
 Types pris en charge : `text`, `callout`, `object`, `pose`, `camera`, `accent`. Les événements de texte et d'asset utilisent les expressions FFmpeg `enable=between(t,...)`. Les événements caméra sont compilés dans l'expression `zoompan` par fenêtres d'images. Aucun changement complet de background n'est requis.
 
 Le flag d'activation recommandé au niveau orchestration est `video_timeline_v1`. Le compositor lui-même reste backward-compatible : absence de timeline = comportement V1 historique.
+
+### Mouvement léger et accent
+
+Un événement `object` ou `pose` peut définir `move_to_offset_x` / `move_to_offset_y`. FFmpeg interpole alors la position pendant la fenêtre temporelle sans remplacer le background.
+
+Un événement `accent` produit par défaut une bordure or temporaire en post-production (`drawbox`), configurable via `color`, `thickness` et `margin`.

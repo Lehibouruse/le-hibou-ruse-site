@@ -79,6 +79,25 @@
           },
           "accent": {
             "type": "string"
+          },
+          "move_to_offset_x": {
+            "type": "number"
+          },
+          "move_to_offset_y": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "thickness": {
+            "type": "number",
+            "minimum": 2,
+            "maximum": 24
+          },
+          "margin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
           }
         },
         "allOf": [

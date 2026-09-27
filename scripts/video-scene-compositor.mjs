@@ -125,10 +125,26 @@ export function normalizeSceneTimeline(scene,{duration}={}){
         z:base.z,width:type==="pose"?430:300,anchor:type==="pose"?"bottom-center":"center"
       });
       if(!layer) fail(`timeline event ${base.id}: asset path/reference required`);
-      return {...base,layer};
+      return {
+        ...base,
+        layer,
+        motion:{
+          to_offset_x:num(event?.move_to_offset_x,layer.offset_x),
+          to_offset_y:num(event?.move_to_offset_y,layer.offset_y)
+        }
+      };
     }
     if(type==="camera"){
       return {...base,zoom_percent:Math.min(8,Math.max(0,num(event?.zoom_percent,0))),anchor:String(event?.anchor||"center")};
+    }
+    if(type==="accent"){
+      return {
+        ...base,
+        accent:String(event?.accent||"gold_border"),
+        color:String(event?.color||"0xC7A65A@0.75"),
+        thickness:Math.max(2,Math.min(24,Math.round(num(event?.thickness,8)))),
+        margin:Math.max(0,Math.min(120,Math.round(num(event?.margin,28))))
+      };
     }
     return {...base};
   }).sort((a,b)=>a.start_s-b.start_s||a.z-b.z);
@@ -267,7 +283,13 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
       :"";
     filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity}[${overlay}]`);
     const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
-    filters.push(`[${base}][${overlay}]overlay=x='${p.x}':y='${p.y}':enable='${timelineEnable(event)}':format=auto[${next}]`);
+    const span=Math.max(0.001,event.end_s-event.start_s);
+    const dx=num(event.motion?.to_offset_x,layer.offset_x)-layer.offset_x;
+    const dy=num(event.motion?.to_offset_y,layer.offset_y)-layer.offset_y;
+    const motion=(baseExpr,delta)=>Math.abs(delta)<0.001
+      ?baseExpr
+      :`(${baseExpr})+((t-${event.start_s.toFixed(3)})/${span.toFixed(3)})*${delta.toFixed(3)}`;
+    filters.push(`[${base}][${overlay}]overlay=x='${motion(p.x,dx)}':y='${motion(p.y,dy)}':enable='${timelineEnable(event)}':format=auto[${next}]`);
     base=next;
   });
 
@@ -307,6 +329,16 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     ];
     if(layer.box) opts.push("box=1",`boxcolor=${layer.box_color}`,`boxborderw=${layer.box_border_width}`);
     filters.push(`[${base}]drawtext=${opts.join(":")}[${next}]`);
+    base=next;
+  });
+
+  const accentEvents=timeline.events.filter(event=>event.type==="accent");
+  accentEvents.forEach((event,index)=>{
+    const next=`accent${index}`;
+    const m=event.margin;
+    filters.push(
+      `[${base}]drawbox=x=${m}:y=${m}:w=w-${m*2}:h=h-${m*2}:color=${event.color}:t=${event.thickness}:enable='${timelineEnable(event)}'[${next}]`
+    );
     base=next;
   });
 

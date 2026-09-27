@@ -79,6 +79,10 @@
           "checkbox"
         ],
         [
+          "Sélection humaine candidats V1",
+          "checkbox"
+        ],
+        [
           "Mode production par défaut",
           "singleSelect"
         ]
@@ -103,5 +107,5 @@
       ]
     }
   ],
-  "rollout": "Prepared only. Apply after the active render finishes and before enabling V5 flags. Keep Retouches incrémentales V1 false and Mode production par défaut=final until dedicated preview/reuse E2E passes."
+  "rollout": "Prepared only. Apply after the active render finishes and before enabling V5 flags. Keep Retouches incrémentales V1 and Sélection humaine candidats V1 false, and Mode production par défaut=final, until dedicated preview/reuse/human-selection E2E passes."
 }

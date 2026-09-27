@@ -85,6 +85,7 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-audio-mix.mjs","HIBOU_AUDIO_MIX_V1"],
   ["video-prosody-plan.mjs","HIBOU_PROSODY_PLAN_V1"],
   ["video-hibou-pose-registry.mjs","HIBOU_POSE_REGISTRY_V1"],
+  ["video-layer-guard.mjs","HIBOU_GLOBAL_SPECIFIC_GUARD_V1"],
   ["hibou-poses.registry.v1.json","HIBOU_POSE_REGISTRY_V1","video/assets/hibou-poses.registry.v1.json"],
   ["video-attach-mastered-audio.mjs","attachMasteredAudio"],
   ["video-subtitles.mjs","buildAss"],
@@ -120,6 +121,7 @@ async function ensurePreImageRuntimeBundle(commit){
     audioMix:resolve(localBase,"video-audio-mix.mjs"),
     prosody:resolve(localBase,"video-prosody-plan.mjs"),
     poseRegistryScript:resolve(localBase,"video-hibou-pose-registry.mjs"),
+    layerGuard:resolve(localBase,"video-layer-guard.mjs"),
     poseRegistry:resolve(localBase,"hibou-poses.registry.v1.json"),
     attachAudio:resolve(localBase,"video-attach-mastered-audio.mjs"),
     subtitles:resolve(localBase,"video-subtitles.mjs"),
@@ -344,6 +346,12 @@ async function main(){
 
   const runtimeCommit=String(storyboardData.runtime_commit||"").trim();
   const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
+  {
+    const guardModule=await import(pathToFileURL(preRuntime.layerGuard).href+"?v="+Date.now());
+    const separation=guardModule.validateGlobalSpecificSeparation(storyboardData);
+    state.global_specific_guard=separation;
+    writeJson(statePath,state);
+  }
 
   const prosodyEnabled=contractFeature(storyboardData,"video_prosody_v1","HIBOU_VIDEO_PROSODY_V1");
   const prosodyStoryboard=resolve(root,"storyboard-prosody.json");

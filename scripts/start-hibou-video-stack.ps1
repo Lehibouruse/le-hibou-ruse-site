@@ -152,7 +152,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $StartupScript = Join-Path $InstallDir "start-hibou-worker.ps1"
 $StartupScriptContent = @"
-\$ErrorActionPreference = "SilentlyContinue"
+`$ErrorActionPreference = "SilentlyContinue"
 Invoke-WebRequest -UseBasicParsing -Uri "$WorkerUrl" -OutFile "$Worker"
 Invoke-WebRequest -UseBasicParsing -Uri "$MasterUrl" -OutFile "$RuntimeMaster"
 Invoke-WebRequest -UseBasicParsing -Uri "$VoiceUrl" -OutFile "$RuntimeVoice"

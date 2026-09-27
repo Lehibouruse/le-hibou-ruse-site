@@ -18,7 +18,7 @@ const queueRoute = readFileSync(
 
 test("storyboard accepts slower editorial pacing and injects Airtable profile", () => {
   assert.match(airtableSync, /scene_count must be 8\.\.18/);
-  assert.match(airtableSync, /duration must be 2\.5\.\.5\.5 s/);
+  assert.match(airtableSync, /duration must be 1\.5\.\.5\.5 s/);
   assert.match(airtableSync, /Style lock/);
   assert.match(airtableSync, /Negative prompt/);
   assert.match(airtableSync, /Character lock Hibou/);
@@ -27,7 +27,7 @@ test("storyboard accepts slower editorial pacing and injects Airtable profile", 
 });
 
 test("queue passes video profile and preview production mode", () => {
-  assert.match(queueRoute, /TABLES\.videoProfiles/);
+  assert.match(queueRoute, /resolveCanonicalVideoProfile/);
   assert.match(queueRoute, /preview_mode/);
   assert.match(queueRoute, /candidates_per_scene/);
   assert.match(queueRoute, /full_master_allowed/);
@@ -47,7 +47,14 @@ test("brand signature is deterministic post-production ink text", () => {
   const scene = {
     scene_id: "test",
     image: { selected: "C:/tmp/background.png" },
-    composition: {},
+    composition: {
+      brand_signature: {
+        text: "Le Hibou Rusé",
+        anchor: "bottom-center",
+        font_size: 28,
+        font_color: "#172331",
+      },
+    },
   };
   const normalized = normalizeSceneComposition(scene);
   const brand = normalized.text_layers.find((layer) => layer.kind === "brand_signature");

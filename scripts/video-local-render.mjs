@@ -42,6 +42,21 @@ function anchorExpressions(anchor) {
   return { x: "iw/2-(iw/zoom/2)", y: "ih/2-(ih/zoom/2)" };
 }
 
+export function renderEncodingPolicy(contract) {
+  const mode = String(contract?.production?.mode || "final").trim().toLowerCase();
+  if (!["preview", "final"].includes(mode)) fail("production.mode must be preview or final");
+  const preset = mode === "preview"
+    ? String(contract?.engine?.preview_preset || "veryfast")
+    : String(contract?.engine?.preset || "medium");
+  const requestedCrf = Number(mode === "preview"
+    ? (contract?.engine?.preview_crf ?? 23)
+    : (contract?.engine?.crf ?? 18));
+  const min = mode === "preview" ? 18 : 14;
+  const max = mode === "preview" ? 30 : 24;
+  const crf = Math.round(Math.min(max, Math.max(min, Number.isFinite(requestedCrf) ? requestedCrf : (mode === "preview" ? 23 : 18))));
+  return { production_mode: mode, preset, crf, preview_only: mode === "preview" };
+}
+
 function validVisual(path) {
   if (!existsSync(path)) return false;
   try {
@@ -91,7 +106,8 @@ export function renderVideoContract(contractPathArg, outputArg) {
   const output = resolve(outputArg);
   const contract = JSON.parse(readFileSync(contractPath, "utf8"));
   const { audio, audioHash, total } = validateVideoContract(contract, root);
-  const preset = String(contract.engine?.preset || "medium");
+  const encoding = renderEncodingPolicy(contract);
+  const { production_mode: productionMode, preset, crf } = encoding;
 
   mkdirSync(dirname(output), { recursive: true });
   const work = resolve(root, ".video-render-cache");
@@ -142,7 +158,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
         "-an",
         "-c:v", "libx264",
         "-preset", preset,
-        "-crf", "18",
+        "-crf", String(crf),
         "-pix_fmt", "yuv420p",
         clip,
       );
@@ -183,7 +199,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
   ];
   if (subtitlePath) {
     muxArgs.push("-vf", `ass='${ffmpegFilterPath(subtitlePath)}'`,
-      "-c:v", "libx264", "-preset", preset, "-crf", "18", "-pix_fmt", "yuv420p");
+      "-c:v", "libx264", "-preset", preset, "-crf", String(crf), "-pix_fmt", "yuv420p");
   } else {
     muxArgs.push("-c:v", "copy");
   }
@@ -205,7 +221,10 @@ export function renderVideoContract(contractPathArg, outputArg) {
     audio_codec: sound?.codec_name,
     sample_rate: sound?.sample_rate,
     channels: sound?.channels,
+    production_mode: productionMode,
+    preview_only: encoding.preview_only,
     renderer_preset: preset,
+    renderer_crf: crf,
     scene_cache_hits: sceneCacheHits,
     scene_cache_misses: sceneCacheMisses,
     visual_cache_hit: visualCacheHit,
@@ -224,6 +243,13 @@ export function renderVideoContract(contractPathArg, outputArg) {
     technical.fps === "30/1"
       ? "PASS"
       : "FAIL";
+  contract.validation = {
+    ...(contract.validation || {}),
+    human_required: true,
+    publication_authorized: false,
+    production_mode: productionMode,
+    preview_only: encoding.preview_only,
+  };
   writeFileSync(`${output}.manifest.json`, JSON.stringify(contract, null, 2));
   return technical;
 }

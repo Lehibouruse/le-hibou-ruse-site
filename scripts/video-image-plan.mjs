@@ -5,6 +5,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 function fail(message){throw new Error(message);}
+export function normalizeProductionMode(value){
+  const mode=String(value||"final").trim().toLowerCase();
+  if(!["preview","final"].includes(mode)) fail("production.mode must be preview or final");
+  return mode;
+}
 
 const PLAN_DIR=dirname(fileURLToPath(import.meta.url));
 const VERIFIED_HARDWARE_PROFILE="rog-g814ji-rtx4070-8gb.json";
@@ -173,6 +178,7 @@ export function buildImagePlan(contract,binding){
   const suffix=String(binding.style_suffix||"").trim();
   const creative=contract?.creative||{};
   const production=contract?.production||{};
+  const productionMode=normalizeProductionMode(production.mode);
   const characterLock=String(creative.character_lock||"").trim();
   const styleLock=String(creative.style_lock||"").trim();
   const negativeLock=String(creative.negative_prompt||"").trim();
@@ -194,10 +200,20 @@ export function buildImagePlan(contract,binding){
     "All useful text, numbers, captions and the Le Hibou Rusé signature are added later in post-production.",
     "The image itself must contain zero readable text."
   ].join(" "):"";
+  const defaultCandidates=productionMode==="preview"
+    ?1
+    :Number(binding.candidates_per_scene||3);
+  const requestedCandidates=production.candidates_per_scene==null||production.candidates_per_scene===""
+    ?defaultCandidates
+    :Number(production.candidates_per_scene);
   const candidatesPerScene=Math.max(
     1,
-    Math.min(3,Number(production.candidates_per_scene||binding.candidates_per_scene||3))
+    Math.min(3,Number.isFinite(requestedCandidates)?requestedCandidates:defaultCandidates)
   );
+  const primaryProfile=productionMode==="preview"&&binding.fallback_profile
+    ?binding.fallback_profile
+    :binding.profile;
+  const fallbackProfile=productionMode==="preview"?null:binding.fallback_profile;
   const requests=[];
   const skipped_full_reuse=[];
   for(const scene of contract.scenes||[]){
@@ -269,9 +285,9 @@ export function buildImagePlan(contract,binding){
           max_retries:Number(binding.max_retries??1)
         };
       };
-      const request=requestForProfile(binding.profile);
-      const fallbackRequest=binding?.fallback_profile?.width&&binding?.fallback_profile?.height&&binding?.size?.node_id
-        ?requestForProfile(binding.fallback_profile)
+      const request=requestForProfile(primaryProfile);
+      const fallbackRequest=fallbackProfile?.width&&fallbackProfile?.height&&binding?.size?.node_id
+        ?requestForProfile(fallbackProfile)
         :null;
       requests.push({
         candidate_id:`${scene.scene_id}-C${candidate}`,
@@ -283,7 +299,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:String(production.mode||"final"),request_count:requests.length,requests,size_binding:binding.size,profile:binding.profile,fallback_profile:binding.fallback_profile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

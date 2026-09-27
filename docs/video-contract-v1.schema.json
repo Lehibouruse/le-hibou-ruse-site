@@ -74,6 +74,19 @@
         },
         "preset": {
           "type": "string"
+        },
+        "crf": {
+          "type": "number",
+          "minimum": 14,
+          "maximum": 24
+        },
+        "preview_preset": {
+          "type": "string"
+        },
+        "preview_crf": {
+          "type": "number",
+          "minimum": 18,
+          "maximum": 30
         }
       }
     },
@@ -318,6 +331,24 @@
         },
         "video_music_mix_v1": {
           "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "production": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "final"
+          ]
+        },
+        "candidates_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
         }
       },
       "additionalProperties": true

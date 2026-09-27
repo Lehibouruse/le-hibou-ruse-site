@@ -29,6 +29,10 @@ jobs:
           node --check scripts/video-hibou-pose-registry.mjs
           node --check scripts/video-prosody-plan.mjs
           node --check scripts/video-audio-mix.mjs
+          node --check scripts/video-iteration-plan.mjs
+          node --check scripts/video-image-plan.mjs
+          node --check scripts/video-image-batch.mjs
+          node --check scripts/video-local-render.mjs
           node --check scripts/hibou-github-worker.mjs
           node --check scripts/video-master.mjs
           node --check scripts/video-storyboard-promote.mjs
@@ -47,6 +51,10 @@ jobs:
             tests/video-layer-guard.test.mjs \
             tests/video-prosody-plan.test.mjs \
             tests/video-audio-mix.test.mjs \
+            tests/video-iteration-plan.test.mjs \
+            tests/video-image-plan.test.mjs \
+            tests/video-image-batch.test.mjs \
+            tests/video-local-render.test.mjs \
             tests/video-remote-cancel.test.mjs \
             tests/video-studio-v5-orchestration.test.mjs
       - name: Existing unit suite

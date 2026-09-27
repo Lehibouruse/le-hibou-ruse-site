@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildImagePlan, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
+import { buildImagePlan, normalizeProductionMode, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
 
 const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",content:{content_id:"recX"},scenes:[
  {scene_id:"S01",image_prompt:"prompt one",visual_idea:"v1"},
@@ -96,4 +96,34 @@ test("image plan preserves an already-valid vertical custom profile",()=>{
  const normalized=normalizeSizeBinding(custom);
  assert.deepEqual(normalized.profile,{width:704,height:1216,batch_size:1});
  assert.equal(normalized.profile_migrated,false);
+});
+
+
+test("PREVIEW defaults to one candidate per scene and the lower local profile",()=>{
+ const preview=structuredClone(contract);
+ preview.production={mode:"preview"};
+ const p=buildImagePlan(preview,binding);
+ assert.equal(p.production_mode,"preview");
+ assert.equal(p.candidates_per_scene,1);
+ assert.equal(p.request_count,2);
+ assert.equal(p.profile.width,640);
+ assert.equal(p.profile.height,1136);
+ assert.equal(p.fallback_profile,null);
+ assert.equal(p.preview_profile_applied,true);
+});
+
+test("FINAL keeps the premium local profile and multi-candidate policy",()=>{
+ const final=structuredClone(contract);
+ final.production={mode:"final"};
+ const p=buildImagePlan(final,binding);
+ assert.equal(p.production_mode,"final");
+ assert.equal(p.candidates_per_scene,3);
+ assert.equal(p.request_count,6);
+ assert.equal(p.profile.width,768);
+ assert.equal(p.fallback_profile.width,640);
+ assert.equal(p.preview_profile_applied,false);
+});
+
+test("unknown production modes fail closed",()=>{
+ assert.throws(()=>normalizeProductionMode("turbo"),/preview or final/);
 });

@@ -1650,6 +1650,73 @@ async function processVideoRender(job, processed) {
     );
   }
 
+  const waitingSelectionPath = path.join(
+    dir,
+    "awaiting-human-selection.json",
+  );
+  if (existsSync(waitingSelectionPath)) {
+    let waiting;
+    try {
+      waiting = JSON.parse(
+        readFileSync(waitingSelectionPath, "utf8"),
+      );
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER human-selection checkpoint unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      waiting?.schema !== "HIBOU_VIDEO_MASTER_WAITING_HUMAN_SELECTION_V1" ||
+      waiting?.status !== "WAITING_HUMAN_SELECTION"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER invalid human-selection checkpoint schema",
+      );
+    }
+
+    const pausedResult = {
+      schema: "HIBOU_VIDEO_RENDER_WAITING_HUMAN_SELECTION_V1",
+      status: "WAITING_HUMAN_SELECTION",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      local_root: dir,
+      candidate_review: waiting.candidate_review || null,
+      candidate_review_html: waiting.candidate_review_html || null,
+      decisions_path: waiting.decisions_path || null,
+      scene_count: Number(waiting.scene_count || 0),
+      resume_same_job: true,
+      images_will_be_reused: true,
+      human_review_required: true,
+      publication_authorized: false,
+      paused_at: new Date().toISOString(),
+    };
+
+    await reportVideoProgress(job, "Paused", {
+      local_path: dir,
+      result: pausedResult,
+    });
+
+    const failedJobs = loadFailedJobs();
+    delete failedJobs[job.id];
+    saveFailedJobs(failedJobs);
+
+    state.current_job = null;
+    state.render_pid = null;
+    state.render_client_id = null;
+    state.cancel_request = null;
+
+    log("VIDEO_RENDER waiting for human candidate selection", {
+      job: job.id,
+      content_id: contentId,
+      scene_count: pausedResult.scene_count,
+      candidate_review: pausedResult.candidate_review,
+      decisions_path: pausedResult.decisions_path,
+    });
+    return;
+  }
+
   if (!existsSync(masterPath)) {
     throw new Error(
       `video-master completed without master.mp4: ${masterPath}`,

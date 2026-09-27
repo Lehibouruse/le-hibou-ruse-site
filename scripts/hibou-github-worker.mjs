@@ -688,6 +688,92 @@ function buildVideoFailureDiagnostic(job, errorMessage) {
   return diagnostic;
 }
 
+function heartbeatUnitProgress(dir, stage, sceneCount) {
+  const totalScenes = Math.max(0, Number(sceneCount || 0));
+
+  if (stage === "images") {
+    const planPath = path.join(dir, "images", "image-plan.json");
+    const manifestPath = path.join(dir, "images", "batch-manifest.json");
+    let total = 0;
+    let completed = 0;
+    let failed = 0;
+    try {
+      if (existsSync(planPath)) {
+        const plan = JSON.parse(readFileSync(planPath, "utf8"));
+        total = Number(plan.request_count || plan.requests?.length || 0);
+      }
+      if (existsSync(manifestPath)) {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+        const rows = Object.values(manifest.results || {});
+        completed = rows.filter((row) => row?.status === "completed").length;
+        failed = rows.filter((row) => row?.status === "error").length;
+      }
+    } catch {}
+    return {
+      stage,
+      unit: "image_candidate",
+      completed_units: completed,
+      failed_units: failed,
+      total_units: total || null,
+      percent: total > 0
+        ? Math.min(100, Math.round((completed / total) * 1000) / 10)
+        : null,
+    };
+  }
+
+  if (stage === "voice") {
+    const sceneDir = path.join(dir, "voice", "voice-scenes");
+    let completed = 0;
+    try {
+      if (existsSync(sceneDir)) {
+        completed = readdirSync(sceneDir)
+          .filter((name) => /\.wav$/i.test(name))
+          .length;
+      }
+    } catch {}
+    return {
+      stage,
+      unit: "voice_scene",
+      completed_units: completed,
+      failed_units: 0,
+      total_units: totalScenes || null,
+      percent: totalScenes > 0
+        ? Math.min(100, Math.round((completed / totalScenes) * 1000) / 10)
+        : null,
+    };
+  }
+
+  if (stage === "render") {
+    const cacheDir = path.join(dir, ".video-render-cache");
+    let clips = 0;
+    let visualReady = false;
+    try {
+      if (existsSync(cacheDir)) {
+        const names = readdirSync(cacheDir);
+        clips = names.filter(
+          (name) => /^scene-\d{2}-[0-9a-f]+\.mp4$/i.test(name),
+        ).length;
+        visualReady = names.some(
+          (name) => /^visual-[0-9a-f]+\.mp4$/i.test(name),
+        );
+      }
+    } catch {}
+    return {
+      stage,
+      unit: "scene_clip",
+      completed_units: clips,
+      failed_units: 0,
+      total_units: totalScenes || null,
+      percent: totalScenes > 0
+        ? Math.min(100, Math.round((clips / totalScenes) * 1000) / 10)
+        : null,
+      visual_ready: visualReady,
+    };
+  }
+
+  return null;
+}
+
 function pipelineHeartbeatSnapshot(dir) {
   const statePath = path.join(dir, "pipeline-run.json");
   if (!existsSync(statePath)) {
@@ -695,6 +781,9 @@ function pipelineHeartbeatSnapshot(dir) {
       current_stage: "starting",
       completed_stages: [],
       failed_stages: [],
+      stage_started_at: null,
+      stage_elapsed_seconds: null,
+      stage_progress: null,
     };
   }
   try {
@@ -706,16 +795,39 @@ function pipelineHeartbeatSnapshot(dir) {
     const lastKnown = [...entries].reverse().find(([, info]) =>
       ["PASS", "ERROR", "RUNNING"].includes(info?.status)
     );
+    const current = running || lastKnown || ["starting", {}];
+    const currentStage = current[0];
+    const currentInfo = current[1] || {};
+    const startedAt = String(currentInfo.started_at || "") || null;
+    const startedMs = startedAt ? Date.parse(startedAt) : NaN;
+    let sceneCount = 0;
+    try {
+      const storyboardPath = path.join(dir, "storyboard.json");
+      if (existsSync(storyboardPath)) {
+        const storyboard = JSON.parse(readFileSync(storyboardPath, "utf8"));
+        sceneCount = Array.isArray(storyboard.scenes)
+          ? storyboard.scenes.length
+          : 0;
+      }
+    } catch {}
     return {
-      current_stage: running?.[0] || lastKnown?.[0] || "starting",
+      current_stage: currentStage,
       completed_stages: passed.map(([name]) => name),
       failed_stages: failed.map(([name]) => name),
+      stage_started_at: startedAt,
+      stage_elapsed_seconds: Number.isFinite(startedMs)
+        ? Math.max(0, Math.round((Date.now() - startedMs) / 100) / 10)
+        : null,
+      stage_progress: heartbeatUnitProgress(dir, currentStage, sceneCount),
     };
   } catch {
     return {
       current_stage: "unknown",
       completed_stages: [],
       failed_stages: [],
+      stage_started_at: null,
+      stage_elapsed_seconds: null,
+      stage_progress: null,
     };
   }
 }
@@ -1764,6 +1876,9 @@ async function processVideoRender(job, processed) {
           current_stage: state.cancel_request ? "cancelling" : progress.current_stage,
           completed_stages: progress.completed_stages,
           failed_stages: progress.failed_stages,
+          stage_started_at: progress.stage_started_at,
+          stage_elapsed_seconds: progress.stage_elapsed_seconds,
+          stage_progress: progress.stage_progress,
         },
       }).catch((error) => {
         log("VIDEO_RENDER heartbeat failed", {

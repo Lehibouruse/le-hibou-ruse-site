@@ -1553,8 +1553,42 @@ async function processVideoRender(job, processed) {
 
   const resultSha256 = sha256(masterPath);
 
+  let incrementalRetouch = {
+    requested: Boolean(reuseFromJobId),
+    reuse_from_job_id: reuseFromJobId || null,
+    plan_available: false,
+    changed_scene_ids: [],
+    invalidated_stages: [],
+    cache_seed: null,
+  };
+  const incrementalPlanPath = path.join(dir, "incremental-retouch-plan.json");
+  if (existsSync(incrementalPlanPath)) {
+    try {
+      const plan = JSON.parse(readFileSync(incrementalPlanPath, "utf8"));
+      incrementalRetouch = {
+        ...incrementalRetouch,
+        plan_available: true,
+        plan_sha256: sha256(incrementalPlanPath),
+        changed_scene_ids: Array.isArray(plan.changed_scene_ids)
+          ? plan.changed_scene_ids.slice(0, 50)
+          : [],
+        invalidated_stages: Array.isArray(plan.invalidated_stages)
+          ? plan.invalidated_stages.slice(0, 50)
+          : [],
+      };
+    } catch {}
+  }
+  const pipelineStatePath = path.join(dir, "pipeline-run.json");
+  if (existsSync(pipelineStatePath)) {
+    try {
+      const pipeline = JSON.parse(readFileSync(pipelineStatePath, "utf8"));
+      incrementalRetouch.cache_seed =
+        pipeline?.incremental_retouch?.cache_seed || null;
+    } catch {}
+  }
+
   const result = {
-    schema: "HIBOU_VIDEO_RENDER_RESULT_V1",
+    schema: "HIBOU_VIDEO_RENDER_RESULT_V2",
     job: job.id,
     content_id: contentId,
     worker: WORKER_ID,
@@ -1562,6 +1596,11 @@ async function processVideoRender(job, processed) {
     master_path: masterPath,
     master_sha256: resultSha256,
     master_bytes: masterStat.size,
+    production_mode: productionMode,
+    candidates_per_scene: candidatesPerScene,
+    reuse_from_job_id: reuseFromJobId || null,
+    reuse_lineage: job.reuse_lineage || null,
+    incremental_retouch: incrementalRetouch,
     human_review_required: true,
     publication_authorized: false,
     runtime_commit: runtime.commit,

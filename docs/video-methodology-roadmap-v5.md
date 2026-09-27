@@ -83,6 +83,9 @@
 
 ### Observabilité pipeline
 
+- `HIBOU_VIDEO_RUN_AUDIT_V1` consolide un dossier de run en lecture seule : stages, voix, images, caches, erreur et point de reprise ;
+- l'audit peut être lancé via Desktop Commander et ne modifie aucun fichier du run ;
+
 - heartbeat Airtable détaillé toutes les 30 s : `image_candidate`, `voice_scene` ou `scene_clip`, avec completed/failed/total, pourcentage et temps écoulé ;
 - le heartbeat est purement observatif et ses champs sont sanitisés côté API ;
 

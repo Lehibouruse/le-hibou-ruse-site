@@ -26,7 +26,7 @@
 | 4 | Carte prosodique / unités de souffle | codé | oui | écoute Chatterbox réelle |
 | 5 | Voix + mastering + contrôle verbatim | codé | oui partiel | écoute, continuité de timbre, Whisper optionnel |
 | 6 | Image plan ComfyUI / FLUX | codé | oui | GPU E2E |
-| 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, validateur de choix humain | oui | checkpoint/reprise avec décision humaine + GPU réel |
+| 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, template, fingerprint anti-stale, validateur, pause/reprise feature-gatée | oui statique | E2E réel pause → décision → reprise + GPU réel |
 | 8 | Captions + texte écran + timeline | codé | oui | lisibilité vidéo réelle |
 | 9 | Promotion render-ready / hashes | codé | oui | E2E média |
 | 10 | FFmpeg + BEAT_VARIATION_POLICY | codé | oui | inspection visuelle réelle |
@@ -94,8 +94,8 @@
 
 ## Prochaines briques faisables sans toucher au ROG
 
-1. **Checkpoint de sélection humaine** : préparer un état `WAITING_HUMAN_SELECTION` feature-gaté pour FINAL, puis reprendre à partir du choix humain sans refaire FLUX.
-2. **Resume après revue** : valider qu'une décision humaine signée correspond aux fingerprints/candidats du run concerné avant promotion.
+1. **Checkpoint de sélection humaine** : codé statiquement ; reste l'E2E réel `WAITING_HUMAN_SELECTION` → décision fingerprintée → reprise sans refaire FLUX.
+2. **Resume après revue** : fingerprint anti-stale codé ; reste à valider sur médias réels.
 3. **Diff de revue incrémentale** : montrer automatiquement ce qui a changé depuis le dernier PREVIEW pour concentrer la revue sur les scènes modifiées tout en gardant un contrôle global minimal.
 4. **Coverage audit méthodologie** : contrôle statique que chaque étape Airtable importante dispose d'un artefact/code/test attendu.
 5. **Durabilité des artefacts** : préparer la stratégie de stockage durable sans uploader ni déplacer le master actif.

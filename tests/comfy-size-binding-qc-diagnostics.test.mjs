@@ -31,13 +31,15 @@ test("image factory derives technical QC floor from authorized profiles", () => 
   assert.match(factory, /aspectTolerance:0\.05/);
 });
 
-test("image factory exposes technical and perceptual rejection diagnostics", () => {
-  assert.match(factory, /technical_qc:summarizeTechnicalQc\(tech\)/);
-  assert.match(factory, /perceptual_qc:summarizePerceptualQc\(perceptual\)/);
-  assert.match(factory, /failure_counts/);
-  assert.match(factory, /dimensions/);
+test("image factory preserves aggregate QC diagnostics while adding profile metadata", () => {
+  assert.match(factory, /image_profile:\{/);
+  assert.match(factory, /size_binding_repaired/);
+  assert.match(factory, /failed_check_counts:tech\?\.failed_check_counts\|\|\{\}/);
+  assert.match(factory, /dimensions:aggregateDimensions\(tech\)/);
+  assert.match(factory, /perceptual_qc:aggregatePerceptual\(perceptual\)/);
   assert.match(factory, /reason_counts/);
   assert.match(factory, /warning_counts/);
+  assert.match(factory, /qc_options:qcOptions/);
 });
 
 test("image plan repairs missing size binding from API workflow", () => {

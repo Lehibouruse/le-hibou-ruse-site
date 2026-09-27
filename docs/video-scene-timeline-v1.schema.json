@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d4d5d6.com/schemas/hibou-scene-timeline-v1.json",
+  "title": "Le Hibou Rusé intra-scene timeline extension",
+  "type": "object",
+  "required": [
+    "schema",
+    "events"
+  ],
+  "properties": {
+    "schema": {
+      "const": "HIBOU_SCENE_TIMELINE_V1"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "start_s",
+          "end_s"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "callout",
+              "object",
+              "pose",
+              "camera",
+              "accent"
+            ]
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "text": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "z": {
+            "type": "number"
+          },
+          "anchor": {
+            "type": "string"
+          },
+          "offset_x": {
+            "type": "number"
+          },
+          "offset_y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number",
+            "minimum": 32
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "zoom_percent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "accent": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "text",
+                    "callout"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "text"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "object",
+                    "pose"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "path"
+                  ]
+                },
+                {
+                  "required": [
+                    "reference"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

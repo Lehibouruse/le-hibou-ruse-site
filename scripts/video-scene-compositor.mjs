@@ -85,6 +85,56 @@ function normalizeTextLayer(layer,kind,defaults={}){
   };
 }
 
+function timelineWindow(event,duration){
+  const start=Math.max(0,num(event?.start_s,0));
+  const rawEnd=event?.end_s==null?duration:num(event.end_s,duration);
+  const end=Math.min(duration,Math.max(start,rawEnd));
+  if(!(end>start)) fail(`timeline event ${event?.id||event?.type||"?"}: end_s must be > start_s`);
+  return {start_s:start,end_s:end};
+}
+
+function timelineEnable({start_s,end_s}){
+  return `between(t,${start_s.toFixed(3)},${end_s.toFixed(3)})`;
+}
+
+export function normalizeSceneTimeline(scene,{duration}={}){
+  const d=Number(duration??scene?.planned_duration_s??scene?.measured_duration_s);
+  if(!Number.isFinite(d)||d<=0) return {schema:"HIBOU_SCENE_TIMELINE_V1",events:[]};
+  const raw=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
+  const allowed=new Set(["text","callout","object","pose","camera","accent"]);
+  const events=raw.map((event,index)=>{
+    const type=String(event?.type||"").trim().toLowerCase();
+    if(!allowed.has(type)) fail(`timeline event ${event?.id||index+1}: unsupported type ${type}`);
+    const window=timelineWindow(event,d);
+    const base={
+      id:String(event?.id||`E${String(index+1).padStart(2,"0")}`),
+      type,
+      start_s:window.start_s,
+      end_s:window.end_s,
+      z:num(event?.z,type==="text"||type==="callout"?75:35),
+      accent:String(event?.accent||""),
+    };
+    if(type==="text"||type==="callout"){
+      if(!String(event?.text||"").trim()) fail(`timeline event ${base.id}: text required`);
+      return {...base,text:String(event.text),style:normalizeTextLayer({...event,text:event.text},type==="callout"?"timeline_callout":"timeline_text",{
+        z:base.z,font_size:type==="callout"?92:58,anchor:type==="callout"?"top-center":"bottom-center",box:type!=="callout"
+      })};
+    }
+    if(type==="object"||type==="pose"){
+      const layer=normalizeImageLayer(event,type==="pose"?"timeline_pose":"timeline_object",{
+        z:base.z,width:type==="pose"?430:300,anchor:type==="pose"?"bottom-center":"center"
+      });
+      if(!layer) fail(`timeline event ${base.id}: asset path/reference required`);
+      return {...base,layer};
+    }
+    if(type==="camera"){
+      return {...base,zoom_percent:Math.min(8,Math.max(0,num(event?.zoom_percent,0))),anchor:String(event?.anchor||"center")};
+    }
+    return {...base};
+  }).sort((a,b)=>a.start_s-b.start_s||a.z-b.z);
+  return {schema:"HIBOU_SCENE_TIMELINE_V1",events};
+}
+
 export function normalizeSceneComposition(scene){
   const c=scene?.composition||{};
   const background=assetRef(c.background)||assetRef(scene?.image?.selected);
@@ -150,7 +200,10 @@ export function normalizeSceneComposition(scene){
 
 export function sceneAssetRefs(scene){
   const c=normalizeSceneComposition(scene);
-  return [c.background,...c.layers.map(x=>x.ref)];
+  const duration=num(scene?.measured_duration_s,scene?.planned_duration_s);
+  const timeline=normalizeSceneTimeline(scene,{duration});
+  const timedAssets=timeline.events.filter(x=>x.layer?.ref).map(x=>x.layer.ref);
+  return [c.background,...c.layers.map(x=>x.ref),...timedAssets];
 }
 
 function zoomAnchorExpressions(anchor){
@@ -201,6 +254,23 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     base=next;
   });
 
+  const timeline=normalizeSceneTimeline(scene,{duration:d});
+  const timedImageEvents=timeline.events.filter(event=>event.layer?.ref);
+  timedImageEvents.forEach((event,index)=>{
+    const input=1+c.layers.length+index;
+    const overlay=`tov${index}`;
+    const next=`tbase${index}`;
+    const layer=event.layer;
+    const opacity=layer.opacity<1?`,colorchannelmixer=aa=${layer.opacity.toFixed(3)}`:"";
+    const keyFilter=layer.remove_background
+      ? `,colorkey=${layer.chroma_key_color}:${layer.chroma_key_similarity.toFixed(3)}:${layer.chroma_key_blend.toFixed(3)}`
+      :"";
+    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity}[${overlay}]`);
+    const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
+    filters.push(`[${base}][${overlay}]overlay=x='${p.x}':y='${p.y}':enable='${timelineEnable(event)}':format=auto[${next}]`);
+    base=next;
+  });
+
   c.text_layers.forEach((layer,index)=>{
     const next=`text${index}`;
     const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
@@ -220,20 +290,52 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     base=next;
   });
 
+  const timedTextEvents=timeline.events.filter(event=>event.style);
+  timedTextEvents.forEach((event,index)=>{
+    const layer=event.style;
+    const next=`ttext${index}`;
+    const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
+    const opts=[
+      `text='${safeText(layer.text)}'`,
+      `fontsize=${layer.font_size}`,
+      `fontcolor=${layer.font_color}`,
+      `borderw=${layer.border_width}`,
+      `bordercolor=${layer.border_color}`,
+      `x='${p.x}'`,
+      `y='${p.y}'`,
+      `enable='${timelineEnable(event)}'`,
+    ];
+    if(layer.box) opts.push("box=1",`boxcolor=${layer.box_color}`,`boxborderw=${layer.box_border_width}`);
+    filters.push(`[${base}]drawtext=${opts.join(":")}[${next}]`);
+    base=next;
+  });
+
   const frames=Math.max(1,Math.round(d*fps));
   const zoomPercent=c.camera_transform.zoom_percent;
   const maxZoom=1+zoomPercent/100;
   const increment=(maxZoom-1)/frames;
   const pan=zoomAnchorExpressions(c.camera_transform.anchor);
+  let zoomExpr=`if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))`;
+  let panX=pan.x, panY=pan.y;
+  for(const event of timeline.events.filter(x=>x.type==="camera")){
+    const startFrame=Math.max(1,Math.round(event.start_s*fps)+1);
+    const endFrame=Math.max(startFrame,Math.round(event.end_s*fps));
+    const eventZoom=(1+event.zoom_percent/100).toFixed(5);
+    const eventPan=zoomAnchorExpressions(event.anchor);
+    zoomExpr=`if(between(on,${startFrame},${endFrame}),${eventZoom},${zoomExpr})`;
+    panX=`if(between(on,${startFrame},${endFrame}),${eventPan.x},${panX})`;
+    panY=`if(between(on,${startFrame},${endFrame}),${eventPan.y},${panY})`;
+  }
   filters.push(
-    `[${base}]zoompan=z='if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))':x='${pan.x}':y='${pan.y}':d=${frames}:s=${width}x${height}:fps=${fps},format=yuv420p[outv]`
+    `[${base}]zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${frames}:s=${width}x${height}:fps=${fps},format=yuv420p[outv]`
   );
 
   return {
     schema:"HIBOU_SCENE_COMPOSITOR_PLAN_V1",
-    input_refs:[c.background,...c.layers.map(x=>x.ref)],
+    input_refs:[c.background,...c.layers.map(x=>x.ref),...timedImageEvents.map(x=>x.layer.ref)],
     filter_complex:filters.join(";"),
     output_label:"[outv]",
     normalized:c,
+    timeline,
   };
 }

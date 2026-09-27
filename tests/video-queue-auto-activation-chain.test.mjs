@@ -39,3 +39,32 @@ test("automation preserves human review, no publication and no paid fallback", (
   assert.ok(occurrences >= 3);
   assert.ok(paid >= 3);
 });
+
+
+test("human-selection resume requires explicit fingerprint-bound decisions", () => {
+  assert.match(route, /function humanSelectionResumePayload/);
+  assert.match(route, /resume_human_selection !== true/);
+  assert.match(route, /HIBOU_HUMAN_IMAGE_SELECTION_V1/);
+  assert.match(route, /human_selection_fingerprint_mismatch/);
+  assert.match(route, /human_selection_content_mismatch/);
+  assert.match(route, /human_selection_decision_row_invalid/);
+});
+
+test("human-selection resume is unique, queue-safe and never confused with ordinary auto-start", () => {
+  assert.match(route, /async function autoResumeHumanSelection/);
+  assert.match(route, /ambiguous_human_selection_resume_jobs/);
+  assert.match(route, /HUMAN_SELECTION_RESUME_SCHEDULED/);
+  assert.match(route, /const human_selection_resume = await autoResumeHumanSelection/);
+  assert.ok(
+    route.indexOf("autoResumeHumanSelection(request)") <
+      route.indexOf("autoActivateWhenWorkerReady(request)"),
+  );
+  assert.match(route, /if \(isHumanSelectionPause\(record\)\) return false/);
+});
+
+test("queue forwards human decisions only after a validated resume scheduling record", () => {
+  assert.match(route, /human_candidate_decisions:/);
+  assert.match(route, /HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1/);
+  assert.match(route, /options\.human_candidate_decisions/);
+  assert.match(route, /publication_authorized: false/);
+});

@@ -38,6 +38,7 @@ jobs:
           node --check scripts/video-review-diff.mjs
           node --check scripts/video-methodology-coverage.mjs
           node --check scripts/video-durable-storage-plan.mjs
+          node --check scripts/video-resume-plan.mjs
           node --check scripts/video-candidate-review.mjs
           node --check scripts/video-candidate-selection-apply.mjs
           node --check scripts/video-image-plan.mjs
@@ -79,6 +80,7 @@ jobs:
             tests/video-review-diff.test.mjs \
             tests/video-methodology-coverage.test.mjs \
             tests/video-durable-storage-plan.test.mjs \
+            tests/video-resume-plan.test.mjs \
             tests/video-local-render.test.mjs \
             tests/video-subtitles-font.test.mjs \
             tests/video-remote-cancel.test.mjs \

@@ -94,3 +94,22 @@ test("production profile changes rerun cache-validation stages without semantic 
   assert.deepEqual(plan.reusable_scene_ids.images,["S01","S02"]);
   assert.equal(plan.policy.production_profile_changes_use_engine_fingerprints,true);
 });
+
+
+test("incremental retouch requires content_id on both contracts",()=>{
+  const before=base(), after=structuredClone(before);
+  delete before.content.content_id;
+  assert.throws(
+    ()=>buildIterationPlan(before,after),
+    /requires content_id on both contracts/
+  );
+});
+
+test("incremental retouch rejects a different content_id",()=>{
+  const before=base(), after=structuredClone(before);
+  after.content.content_id="recDifferent";
+  assert.throws(
+    ()=>buildIterationPlan(before,after),
+    /requires the same content_id/
+  );
+});

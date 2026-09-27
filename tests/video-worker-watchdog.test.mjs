@@ -9,7 +9,7 @@ const launcher = readFileSync(
 
 test("launcher installs a persistent worker watchdog", () => {
   assert.match(launcher, /run-hibou-worker-watchdog\.ps1/);
-  assert.match(launcher, /while \(\$true\)/);
+  assert.match(launcher, /while \(`\$true\)/);
   assert.match(launcher, /WaitForExit\(\)/);
   assert.match(launcher, /Start-Sleep -Seconds 5/);
 });

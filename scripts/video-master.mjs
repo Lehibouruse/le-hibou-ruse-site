@@ -174,6 +174,7 @@ const POST_RUNTIME_FILES=[
   ["video-scene-compositor.mjs","buildSceneCompositePlan"],
   ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
+  ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
   ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1"]
 ];
 
@@ -202,6 +203,7 @@ async function ensurePostRuntimeBundle(commit){
     render:resolve(localBase,"video-local-render.mjs"),
     masterQc:resolve(localBase,"video-master-qc.mjs"),
     registry:resolve(localBase,"video-artifact-registry.mjs"),
+    humanReview:resolve(localBase,"video-human-review-package.mjs"),
     creativeQc:resolve(localBase,"video-creative-qc.py")
   };
 }
@@ -706,6 +708,38 @@ async function main(){
     writeJson(statePath,state);
   });
 
+  const masterResultPath=resolve(root,"master-result.json");
+  const humanReview=resolve(root,"human-review.json");
+  writeJson(masterResultPath,{
+    schema:"HIBOU_VIDEO_MASTER_RESULT_DRAFT_V1",
+    production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
+    preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
+    publication_authorized:false,
+    features:{
+      video_timeline_v1:timelineEnabled,
+      video_prosody_v1:prosodyEnabled,
+      video_music_mix_v1:musicEnabled,
+      video_creative_qc_v1:creativeQcEnabled,
+      video_pose_registry_v1:poseRegistryEnabled,
+      video_incremental_retouch_v1:incrementalEnabled
+    }
+  });
+  stage(state,"human_review_manifest",()=>{
+    run(process.execPath,[postRuntime.humanReview,root,humanReview]);
+    const review=json(humanReview);
+    state.human_review={
+      path:humanReview,
+      schema:String(review.schema||""),
+      decision:String(review.decision||""),
+      machine_blocker_count:Array.isArray(review.machine_blockers)?review.machine_blockers.length:0,
+      machine_warning_count:Array.isArray(review.machine_warnings)?review.machine_warnings.length:0,
+      eligible_for_final_approval:Boolean(review.eligible_for_final_approval),
+      human_approved:false,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+  });
+
   const registrySpec=resolve(root,"registry-spec.json");
   const registry=resolve(root,"artifact-registry.json");
   stage(state,"registry",()=>{
@@ -724,6 +758,7 @@ async function main(){
       {kind:"qc",path:masterQc},
       ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.json"))?[{kind:"candidate_review",path:resolve(imageDir,"candidate-review.json")}]:[]),
+      ...(existsSync(humanReview)?[{kind:"human_review",path:humanReview}]:[]),
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
       ...(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)?[{kind:"incremental_retouch_plan",path:incrementalPlanPath}]:[]),
       {kind:"pipeline_state",path:statePath}
@@ -762,6 +797,7 @@ async function main(){
     qc_status:json(masterQc).status,
     creative_qc_status:state.creative_qc_status||"DISABLED",
     candidate_review:state.candidate_review||null,
+    human_review_package:state.human_review||null,
     image_selection_policy:{
       technical_provisional_selection_allowed:true,
       machine_ranking_is_advisory:true,
@@ -784,7 +820,7 @@ async function main(){
     human_master_review_required:true,
     publication_authorized:false
   };
-  writeJson(resolve(root,"master-result.json"),final);
+  writeJson(masterResultPath,final);
   process.stdout.write(JSON.stringify(final,null,2)+"\n");
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href) main().catch(error=>{console.error(String(error?.stack||error));process.exitCode=1;});

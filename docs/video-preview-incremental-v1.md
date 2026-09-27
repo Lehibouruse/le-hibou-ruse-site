@@ -22,6 +22,10 @@ The planner never deletes artifacts, never kills a worker, never mutates Airtabl
 
 ## Preview intent
 
-The next execution layer may consume this plan to reuse matching hashes and recompute only invalidated artifacts. Preview and final remain separate production modes; switching profile is itself tracked as a production-profile change.
+The master orchestrator now consumes this plan only when both gates are enabled: `features.video_incremental_retouch_v1=true` in the GLOBAL contract and `HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1=true` in the local runtime. The caller must also provide `--reuse-from=<previous-output-root>`, and the new run must use a different output root.
 
-No active Airtable profile or running job is modified by this code.
+The reuse seed copies only cache material: per-scene Chatterbox cache, a fingerprinted image manifest plus local image outputs that live under the previous run, and the FFmpeg scene cache. Every downstream engine still revalidates its own fingerprint before declaring a cache hit. The previous output root is read-only from the new run's point of view.
+
+Preview and final are separate production modes. PREVIEW defaults to one image candidate per scene, uses the verified lower local image profile when available, and uses a faster FFmpeg encode policy. FINAL retains the premium profile and multi-candidate policy.
+
+No active Airtable profile or running job is modified by this code. The Airtable migration is prepared only; the feature remains off until dedicated E2E validation after the active render.

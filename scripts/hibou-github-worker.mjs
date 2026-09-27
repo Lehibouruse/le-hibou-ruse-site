@@ -1470,26 +1470,7 @@ async function processVideoRender(job, processed) {
     throw new Error(`HIBOU project root missing: ${PROJECT_ROOT}`);
   }
 
-  if (!existsSync(VIDEO_BINDING)) {
-    throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
-  }
-
   const runtime = await ensureCanonicalVideoRuntimes(job);
-  const masterScript = VIDEO_MASTER_SCRIPT;
-
-  const preflightScript = path.join(
-    PROJECT_ROOT,
-    "scripts",
-    "video-local-preflight.mjs",
-  );
-
-  if (!existsSync(masterScript)) {
-    throw new Error(`video-master missing: ${masterScript}`);
-  }
-
-  if (!existsSync(preflightScript)) {
-    throw new Error(`video preflight missing: ${preflightScript}`);
-  }
 
   const dir = path.join(
     VIDEO_OUTPUT_ROOT,
@@ -1718,7 +1699,12 @@ async function processVideoRender(job, processed) {
     }
 
     repairResumeApplied = {
-      schema: "HIBOU_VIDEO_RENDER_REPAIR_RESUME_APPLIED_V1",
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      prepared_at: new Date().toISOString(),
       resume_stage: requestedResumeStage,
       plan_path: planPath,
       plan_sha256: actualPlanSha,
@@ -1728,25 +1714,67 @@ async function processVideoRender(job, processed) {
       reset_stages: receipt.reset_stages.slice(0, 50),
       backup_path: receipt.backup_path || null,
       backup_sha256: receipt.backup_sha256 || null,
+      prepared_state_sha256: receipt.prepared_state_sha256 || null,
+      state_file_sha256: receipt.state_file_sha256 || null,
       artifacts_deleted: false,
       caches_deleted: false,
       execution_started_by_reset: false,
+      execution_started: false,
+      requires_separate_render_start: true,
       human_confirmed: true,
+      human_review_required: true,
       publication_authorized: false,
+      paid_fallback: false,
     };
 
     const failedJobs = loadFailedJobs();
     delete failedJobs[job.id];
     saveFailedJobs(failedJobs);
 
-    log("VIDEO_RENDER guarded repair resume state applied", {
+    log("VIDEO_RENDER guarded repair resume state prepared", {
       job: job.id,
       content_id: contentId,
       resume_stage: requestedResumeStage,
       plan_sha256: actualPlanSha,
       receipt_sha256: repairResumeApplied.receipt_sha256,
       reset_stages: repairResumeApplied.reset_stages,
+      requires_separate_render_start: true,
     });
+
+    state.current_job = job.id;
+    await reportVideoProgress(job, "Paused", {
+      local_path: dir,
+      result: repairResumeApplied,
+    });
+    state.current_job = null;
+    state.status = "paused";
+
+    log("VIDEO_RENDER remote repair preparation paused before execution", {
+      job: job.id,
+      content_id: contentId,
+      receipt_sha256: repairResumeApplied.receipt_sha256,
+    });
+    return {
+      prepared_only: true,
+      result: repairResumeApplied,
+    };
+  }
+
+  if (!existsSync(VIDEO_BINDING)) {
+    throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
+  }
+
+  const masterScript = VIDEO_MASTER_SCRIPT;
+  const preflightScript = path.join(
+    PROJECT_ROOT,
+    "scripts",
+    "video-local-preflight.mjs",
+  );
+  if (!existsSync(masterScript)) {
+    throw new Error(`video-master missing: ${masterScript}`);
+  }
+  if (!existsSync(preflightScript)) {
+    throw new Error(`video preflight missing: ${preflightScript}`);
   }
 
   if (existsSync(pipelineStatePath) && existingStoryboard) {

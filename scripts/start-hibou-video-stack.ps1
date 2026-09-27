@@ -120,22 +120,51 @@ if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
 $Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
+$RuntimeMaster = Join-Path $InstallDir "video-master.runtime.mjs"
+$RuntimeVoice = Join-Path $InstallDir "chatterbox-storyboard-batch.runtime.py"
+
 $WorkerUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/hibou-github-worker.mjs"
+$MasterUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/video-master.mjs"
+$VoiceUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/chatterbox-storyboard-batch.py"
+
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
-Write-Host "Actualisation du worker depuis main..." -ForegroundColor Cyan
+Set-UserEnv "HIBOU_VIDEO_MASTER_SCRIPT" $RuntimeMaster
+Set-UserEnv "HIBOU_CHATTERBOX_BATCH_SCRIPT" $RuntimeVoice
+
+Write-Host "Actualisation des runtimes video canoniques depuis main..." -ForegroundColor Cyan
 Invoke-WebRequest -UseBasicParsing -Uri $WorkerUrl -OutFile $Worker
+Invoke-WebRequest -UseBasicParsing -Uri $MasterUrl -OutFile $RuntimeMaster
+Invoke-WebRequest -UseBasicParsing -Uri $VoiceUrl -OutFile $RuntimeVoice
+
 & $Node --check $Worker
 if ($LASTEXITCODE -ne 0) {
   throw "Le worker telecharge ne passe pas node --check."
 }
+& $Node --check $RuntimeMaster
+if ($LASTEXITCODE -ne 0) {
+  throw "Le video-master runtime ne passe pas node --check."
+}
+& $VoicePython -m py_compile $RuntimeVoice
+if ($LASTEXITCODE -ne 0) {
+  throw "Le batch Chatterbox runtime ne passe pas py_compile."
+}
+
+$StartupScript = Join-Path $InstallDir "start-hibou-worker.ps1"
+$StartupScriptContent = @"
+`$ErrorActionPreference = "SilentlyContinue"
+Invoke-WebRequest -UseBasicParsing -Uri "$WorkerUrl" -OutFile "$Worker"
+Invoke-WebRequest -UseBasicParsing -Uri "$MasterUrl" -OutFile "$RuntimeMaster"
+Invoke-WebRequest -UseBasicParsing -Uri "$VoiceUrl" -OutFile "$RuntimeVoice"
+Start-Process -FilePath "$Node" -ArgumentList '"$Worker"' -WorkingDirectory "$InstallDir" -WindowStyle Hidden
+"@
+Set-Content -Path $StartupScript -Value $StartupScriptContent -Encoding UTF8
 
 $StartupDir = [Environment]::GetFolderPath("Startup")
 $StartupCmd = Join-Path $StartupDir "LeHibouWorker.cmd"
 $CmdContent = @"
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing -Uri '$WorkerUrl' -OutFile '$Worker' } catch {}"
-start "" /min "$Node" "$Worker"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$StartupScript"
 "@
 Set-Content -Path $StartupCmd -Value $CmdContent -Encoding ASCII
 
@@ -175,6 +204,9 @@ if (-not $health.report_token_present) {
 if (-not $health.video_binding_exists) {
   throw "Worker actif mais binding ComfyUI introuvable."
 }
+if (-not $health.video_master_script_exists) {
+  throw "Worker actif mais video-master runtime introuvable."
+}
 
 [ordered]@{
   schema = "HIBOU_VIDEO_STACK_READY_V1"
@@ -186,6 +218,9 @@ if (-not $health.video_binding_exists) {
   report_token_present = $health.report_token_present
   video_binding_exists = $health.video_binding_exists
   video_output_root = $health.video_output_root
+  video_master_script = $health.video_master_script
+  video_master_script_exists = $health.video_master_script_exists
+  chatterbox_batch_script = $RuntimeVoice
   startup = $StartupCmd
   queue_jobs_visible = @($queue.jobs).Count
 } | ConvertTo-Json -Depth 4

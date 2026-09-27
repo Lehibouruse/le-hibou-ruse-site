@@ -52,6 +52,10 @@ const VIDEO_BINDING =
 const VIDEO_OUTPUT_ROOT =
   process.env.HIBOU_VIDEO_OUTPUT_ROOT ||
   path.join(ROOT, "video-renders");
+
+const VIDEO_MASTER_SCRIPT =
+  String(process.env.HIBOU_VIDEO_MASTER_SCRIPT || "").trim() ||
+  path.join(PROJECT_ROOT, "scripts", "video-master.mjs");
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -594,11 +598,7 @@ async function processVideoRender(job, processed) {
     throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
   }
 
-  const masterScript = path.join(
-    PROJECT_ROOT,
-    "scripts",
-    "video-master.mjs",
-  );
+  const masterScript = VIDEO_MASTER_SCRIPT;
 
   const preflightScript = path.join(
     PROJECT_ROOT,
@@ -1036,6 +1036,8 @@ function healthServer() {
       video_binding: VIDEO_BINDING,
       video_binding_exists: existsSync(VIDEO_BINDING),
       video_output_root: VIDEO_OUTPUT_ROOT,
+      video_master_script: VIDEO_MASTER_SCRIPT,
+      video_master_script_exists: existsSync(VIDEO_MASTER_SCRIPT),
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

@@ -21,3 +21,11 @@ test("CUDA probe tolerates expected torch stderr warnings under Windows PowerShe
   assert.match(starter, /2>\$null/);
   assert.match(starter, /\$ErrorActionPreference = \$previousErrorActionPreference/);
 });
+
+
+test("pip CUDA repair tolerates harmless stderr warnings under Windows PowerShell 5.1", () => {
+  assert.match(starter, /\$ErrorActionPreference = "Continue"/);
+  assert.match(starter, /Tee-Object -FilePath \$CudaRepairLog -Append/);
+  assert.match(starter, /\$pipExit = \$LASTEXITCODE/);
+  assert.match(starter, /if \(\$pipExit -ne 0\)/);
+});

@@ -14,3 +14,10 @@ test("ComfyUI starter auto-repairs CUDA runtime to a driver-compatible cu124 sta
   assert.match(starter, /--disable-xformers/);
   assert.match(starter, /--use-pytorch-cross-attention/);
 });
+
+test("CUDA probe tolerates expected torch stderr warnings under Windows PowerShell 5.1", () => {
+  assert.match(starter, /\$previousErrorActionPreference = \$ErrorActionPreference/);
+  assert.match(starter, /\$ErrorActionPreference = "Continue"/);
+  assert.match(starter, /2>\$null/);
+  assert.match(starter, /\$ErrorActionPreference = \$previousErrorActionPreference/);
+});

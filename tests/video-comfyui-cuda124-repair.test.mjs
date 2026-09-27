@@ -39,5 +39,13 @@ test("CUDA repair removes stale embedded torch packages before reinstall", () =>
   assert.match(starter, /"torchaudio-\*\.dist-info"/);
   assert.match(starter, /"~ympy\*"/);
   assert.match(starter, /--no-warn-script-location/);
-  assert.match(starter, /Impossible de supprimer le residu PyTorch/);
+  assert.match(starter, /Impossible de supprimer le paquet PyTorch critique/);
+});
+
+
+test("long-path torch metadata cleanup cannot block critical package repair", () => {
+  assert.match(starter, /criticalNames = @\("torch", "torchvision", "torchaudio", "functorch", "torchgen"\)/);
+  assert.match(starter, /shutil\.rmtree\(sys\.argv\[1\], ignore_errors=True\)/);
+  assert.match(starter, /metadata residue kept/);
+  assert.match(starter, /Impossible de supprimer le paquet PyTorch critique/);
 });

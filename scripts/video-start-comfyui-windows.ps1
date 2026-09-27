@@ -73,13 +73,18 @@ function Remove-ComfyTorchResidue {
     "~unctorch*",
     "~ympy*"
   )
+  $criticalNames = @("torch", "torchvision", "torchaudio", "functorch", "torchgen")
+
   foreach ($pattern in $patterns) {
     Get-ChildItem -LiteralPath $SitePackages -Force -ErrorAction SilentlyContinue |
       Where-Object { $_.Name -like $pattern } |
       ForEach-Object {
         $target = $_.FullName
+        $name = $_.Name
+        $critical = $criticalNames -contains $name
         $removed = $false
-        for ($attempt = 1; $attempt -le 3 -and -not $removed; $attempt++) {
+
+        for ($attempt = 1; $attempt -le 2 -and -not $removed; $attempt++) {
           try {
             Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop
             $removed = $true
@@ -87,8 +92,27 @@ function Remove-ComfyTorchResidue {
             Start-Sleep -Milliseconds (500 * $attempt)
           }
         }
+
         if (-not $removed -and (Test-Path -LiteralPath $target)) {
-          throw "Impossible de supprimer le residu PyTorch: $target"
+          # Fallback for deep Windows package metadata paths left by the portable build.
+          $extendedTarget = if ($target.StartsWith("\\?\")) { $target } else { "\\?\$target" }
+          $cleanupCode = "import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)"
+          $previousErrorActionPreference = $ErrorActionPreference
+          $ErrorActionPreference = "Continue"
+          try {
+            & $Python -c $cleanupCode $extendedTarget 2>$null
+          } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+          }
+          $removed = -not (Test-Path -LiteralPath $target)
+        }
+
+        if (-not $removed -and $critical) {
+          throw "Impossible de supprimer le paquet PyTorch critique: $target"
+        }
+        if (-not $removed) {
+          ("[{0}] warning: metadata residue kept: {1}" -f ([DateTimeOffset]::UtcNow.ToString("o")), $target) |
+            Add-Content -Path $CudaRepairLog -Encoding UTF8
         }
       }
   }

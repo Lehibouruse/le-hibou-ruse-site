@@ -7,20 +7,19 @@ const launcher = readFileSync(
   "utf8",
 );
 
-test("watchdog is emitted from a literal PowerShell here-string", () => {
-  assert.match(launcher, /\$WatchdogContent = @'/);
-  assert.match(launcher, /\n'@\n\$WatchdogContent = \$WatchdogContent\.Replace/);
+test("watchdog is emitted without PowerShell here-strings", () => {
+  assert.match(launcher, /\$WatchdogContent = @\(/);
+  assert.match(launcher, /\) -join \[Environment\]::NewLine/);
+  assert.doesNotMatch(launcher, /\$WatchdogContent = @'/);
   assert.doesNotMatch(launcher, /\$WatchdogContent = @"/);
+  assert.doesNotMatch(launcher, /\$CmdContent = @"/);
 });
 
 test("watchdog template contains no escaped-dollar parser hazards", () => {
-  const start = launcher.indexOf("$WatchdogContent = @'");
-  const end = launcher.indexOf("\n'@", start);
-  assert.ok(start >= 0 && end > start);
-  const block = launcher.slice(start, end);
-  assert.equal(block.includes(String.fromCharCode(96) + "$"), false);
-  assert.match(block, /while \(-not \$child\.HasExited\)/);
-  assert.match(block, /\$health\.last_video_heartbeat_at/);
+  assert.equal(launcher.includes(String.fromCharCode(96) + "$child"), false);
+  assert.equal(launcher.includes(String.fromCharCode(96) + "$health"), false);
+  assert.match(launcher, /while \(-not \$child\.HasExited\)/);
+  assert.match(launcher, /\$health\.last_video_heartbeat_at/);
 });
 
 test("watchdog runtime paths are inserted through placeholders", () => {

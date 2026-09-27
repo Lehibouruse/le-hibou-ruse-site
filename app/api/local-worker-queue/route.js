@@ -1292,6 +1292,85 @@ export async function POST(request) {
       Erreur: cut(body.error, 10000),
     };
 
+    const repairStartAccepted =
+      status === "Running" &&
+      body.heartbeat !== true &&
+      body.result &&
+      typeof body.result === "object" &&
+      !Array.isArray(body.result) &&
+      body.result.schema === "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1" &&
+      body.result.publication_authorized === false;
+
+    if (repairStartAccepted) {
+      if (!REMOTE_REPAIR_START_ENABLED) {
+        return NextResponse.json(
+          { ok: false, error: "remote_repair_start_disabled" },
+          { status: 409 },
+        );
+      }
+
+      const options = parseOptions(current.fields?.["Options JSON"]);
+      const request =
+        options.repair_start_request &&
+        typeof options.repair_start_request === "object" &&
+        !Array.isArray(options.repair_start_request)
+          ? options.repair_start_request
+          : null;
+
+      if (
+        request?.schema !== "HIBOU_VIDEO_REPAIR_START_REQUEST_V1" ||
+        request.human_confirmed !== true
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "repair_start_request_missing_at_acceptance" },
+          { status: 409 },
+        );
+      }
+
+      const pairs = [
+        ["plan_sha256", "plan_sha256"],
+        ["source_state_sha256", "source_state_sha256"],
+        ["receipt_sha256", "receipt_sha256"],
+        ["state_file_sha256", "prepared_state_sha256"],
+      ];
+      for (const [requestField, resultField] of pairs) {
+        const expected = String(request?.[requestField] || "")
+          .trim().toLowerCase();
+        const actual = String(body.result?.[resultField] || "")
+          .trim().toLowerCase();
+        if (
+          !/^[0-9a-f]{64}$/.test(expected) ||
+          expected !== actual
+        ) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error:
+                "repair_start_acceptance_hash_mismatch:" +
+                requestField,
+            },
+            { status: 409 },
+          );
+        }
+      }
+
+      fields["Options JSON"] = JSON.stringify({
+        ...options,
+        repair_start_request: null,
+        repair_start_consumed_at: now,
+        repair_start_consumed_plan_sha256:
+          String(body.result.plan_sha256 || "").toLowerCase(),
+        repair_start_consumed_source_state_sha256:
+          String(body.result.source_state_sha256 || "").toLowerCase(),
+        repair_start_consumed_receipt_sha256:
+          String(body.result.receipt_sha256 || "").toLowerCase(),
+        repair_start_consumed_prepared_state_sha256:
+          String(body.result.prepared_state_sha256 || "").toLowerCase(),
+        start_prepared_repair: false,
+        human_confirmed_start: false,
+      });
+    }
+
     const repairPrepared =
       status === "Paused" &&
       body.result &&
@@ -1462,7 +1541,7 @@ export async function POST(request) {
       );
     }
 
-    if (body.result && !retry.retry && body.heartbeat !== true) {
+    if (body.result && !retry.retry) {
       fields["R\u00e9sultat JSON"] = cut(
         typeof body.result === "string"
           ? body.result
@@ -1490,6 +1569,7 @@ export async function POST(request) {
       success_chain,
       repair_resume_prepared: repairPrepared,
       requires_separate_render_start: repairPrepared,
+      repair_start_accepted: repairStartAccepted,
     });
   } catch (error) {
     return NextResponse.json(

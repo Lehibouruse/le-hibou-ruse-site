@@ -207,6 +207,9 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     $_.ProcessId -ne $PID -and
     (
       ($_.Name -eq "node.exe" -and $_.CommandLine -like "*hibou-github-worker.mjs*") -or
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*video-master.runtime.mjs*") -or
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*\LeHibou\image-runtime\*") -or
+      ($_.Name -match "^python(\.exe)?$" -and $_.CommandLine -like "*chatterbox-storyboard-batch.runtime.py*") -or
       ($_.Name -match "^powershell(\.exe)?$|^pwsh(\.exe)?$" -and $_.CommandLine -like "*run-hibou-worker-watchdog.ps1*")
     )
   } |

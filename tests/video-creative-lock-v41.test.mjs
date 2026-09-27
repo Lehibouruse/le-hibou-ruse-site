@@ -39,6 +39,8 @@ test("image generation receives creative lock and never generates useful text", 
   assert.match(imagePlan, /styleLock/);
   assert.match(imagePlan, /ABSOLUTELY AVOID/);
   assert.match(imagePlan, /The image itself must contain zero readable text/);
+  assert.match(imagePlan, /BACKGROUND_ONLY_LOCK/);
+  assert.match(imagePlan, /canonical Le Hibou Rusé character is composited later/);
 });
 
 test("brand signature is deterministic post-production ink text", () => {
@@ -55,4 +57,15 @@ test("brand signature is deterministic post-production ink text", () => {
   assert.equal(brand.font_size, 28);
   assert.equal(brand.font_color, "#172331");
   assert.equal(brand.box, false);
+});
+
+
+test("canonical owl asset is composited with background removal", () => {
+  const source = readFileSync(
+    new URL("../scripts/video-scene-compositor.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /remove_background/);
+  assert.match(source, /colorkey=/);
+  assert.match(source, /0xFBF6EE/);
 });

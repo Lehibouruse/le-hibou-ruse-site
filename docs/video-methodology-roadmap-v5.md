@@ -41,6 +41,7 @@
 ### Production / montage
 
 - rendu ASS Windows auto-contenu via Fontconfig privé + `C:\\Windows\\Fonts`, sans dépendre d'une config Fontconfig système ;
+- sous-titres ASS en Arial sur Windows (présent nativement sur le ROG), DejaVu Sans ailleurs, police persistée dans le contrat ;
 
 - timeline intra-scène indépendante du remplacement complet d'image ;
 - ATTENTION_BEATS : caption, prop, pose, camera, accent ;

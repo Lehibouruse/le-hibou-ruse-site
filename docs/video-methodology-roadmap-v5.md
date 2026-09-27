@@ -96,7 +96,10 @@
 
 - `HIBOU_VIDEO_RESUME_PLAN_V1` analyse un run interrompu sans rien exécuter ;
 - le worker futur écrit `_hibou_video_resume_plan.json` et `_hibou_video_failure_diagnostic.json` sur échec, et remonte le résumé à Airtable ;
-- `HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1` permet une reprise distante uniquement après double gate, confirmation humaine, plan/state SHA identiques et receipt local validé ;
+- `HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1` permet une préparation distante uniquement après double gate, confirmation humaine, plan/state SHA identiques et receipt local validé ;
+- le worker écrit `HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1`, repasse le job en `Paused` et retourne avant préflight/ComfyUI/master ;
+- la requête de préparation est consommée en one-shot et les auto-start/auto-chain ignorent ce `Paused` : un second ordre explicite est obligatoire pour relancer le rendu ;
+- `_hibou_video_remote_repair_prepared.json` permet à `HIBOU_VIDEO_RUN_AUDIT_V1` de distinguer un état réparé en attente d'un échec non traité ;
 - ce diagnostic n'active jamais `Pending` et n'exécute jamais la reprise ;
 - l'application contrôlée de la reprise exige le suffixe canonique de stages depuis `resume_stage`, un SHA256 exact du plan et `HIBOU_VIDEO_RESUME_APPLY_ENABLED=true` ;
 - elle sauvegarde `pipeline-run.json`, remplace l'état de façon atomique et écrit `HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1` avec hashes source/backup/état préparé/fichier final ;

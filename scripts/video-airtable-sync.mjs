@@ -48,7 +48,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
     const order=Number(f.Ordre);
     if(order!==index+1) fail("scene order must be contiguous");
     const duration=Number(f["Durée secondes"]);
-    if(!Number.isFinite(duration)||duration<1.5||duration>5.5) fail(`${f.Scène||record.id}: duration must be 1.5..5.5 s`);
+    if(!Number.isFinite(duration)||duration<1.5||duration>12) fail(`${f.Scène||record.id}: duration must be 1.5..12 s`);
     total+=duration;
     const candidates=parseJsonArray(f["Candidats JSON"]);
     return {
@@ -84,7 +84,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       title:String(content.Sujet||""),
       script_version:Number(content["Version script"]||1),
       profile_version:String(profile.Version||"HIBOU_VIRAL_V1@2.4-V4.2"),
-      method_version:"VIDEO_METHOD_V4.2",
+      method_version:"VIDEO_METHOD_V4.3",
       source:"airtable",
       exported_at:new Date().toISOString()
     },
@@ -109,7 +109,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       },
       pacing:{
         scene_duration_target_s:[Number(profile["Durée min scène"]||2.8),Number(profile["Durée max scène"]||5)],
-        scene_duration_allowed_s:[2.5,5.5],
+        scene_duration_allowed_s:[1.5,12],
         cadence:"intonation-adaptive",
         perceptible_beat_s:[2,3],
         full_composition_change_s:[3,5]

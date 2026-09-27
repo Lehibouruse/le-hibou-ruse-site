@@ -59,8 +59,12 @@ raise SystemExit(0 if ok else 3)
 
   $probeProcess = Start-Process -FilePath $Python -ArgumentList @("-s", $probeScript) -WorkingDirectory $Portable -RedirectStandardOutput $probeStdout -RedirectStandardError $probeStderr -WindowStyle Hidden -Wait -PassThru
 
-  $probeOutput = if (Test-Path -LiteralPath $probeStdout) { (Get-Content -LiteralPath $probeStdout -Raw).Trim() } else { "" }
-  $probeError = if (Test-Path -LiteralPath $probeStderr) { (Get-Content -LiteralPath $probeStderr -Raw).Trim() } else { "" }
+  $probeOutputRaw = if (Test-Path -LiteralPath $probeStdout) { Get-Content -LiteralPath $probeStdout -Raw } else { "" }
+  $probeErrorRaw = if (Test-Path -LiteralPath $probeStderr) { Get-Content -LiteralPath $probeStderr -Raw } else { "" }
+  $probeOutput = if ($null -eq $probeOutputRaw) { "" } else { [string]$probeOutputRaw }
+  $probeError = if ($null -eq $probeErrorRaw) { "" } else { [string]$probeErrorRaw }
+  $probeOutput = $probeOutput.Trim()
+  $probeError = $probeError.Trim()
 
   return [ordered]@{
     ok = ($probeProcess.ExitCode -eq 0)

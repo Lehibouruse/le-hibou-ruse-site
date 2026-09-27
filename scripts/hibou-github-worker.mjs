@@ -1530,6 +1530,225 @@ async function processVideoRender(job, processed) {
     "utf8",
   );
 
+  const remoteRepairResume =
+    job.options?.repair_resume_request &&
+    typeof job.options.repair_resume_request === "object" &&
+    !Array.isArray(job.options.repair_resume_request)
+      ? job.options.repair_resume_request
+      : null;
+  let repairResumeApplied = null;
+
+  if (remoteRepairResume) {
+    if (!VIDEO_REMOTE_REPAIR_RESUME_ENABLED) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume is disabled locally",
+      );
+    }
+    if (
+      remoteRepairResume.schema !==
+      "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume schema invalid",
+      );
+    }
+    if (remoteRepairResume.human_confirmed !== true) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume requires human confirmation",
+      );
+    }
+    if (String(remoteRepairResume.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume content mismatch",
+      );
+    }
+    if (!existsSync(pipelineStatePath)) {
+      throw new Error(
+        "VIDEO_RENDER local pipeline state missing for repair resume",
+      );
+    }
+
+    const planPath = path.join(
+      dir,
+      "_hibou_video_resume_plan.json",
+    );
+    if (!existsSync(planPath)) {
+      throw new Error(
+        "VIDEO_RENDER local resume plan missing for repair resume",
+      );
+    }
+
+    const requestedPlanSha = String(
+      remoteRepairResume.resume_plan_sha256 || "",
+    ).trim().toLowerCase();
+    const actualPlanSha = sha256(planPath).toLowerCase();
+    if (
+      !/^[0-9a-f]{64}$/.test(requestedPlanSha) ||
+      requestedPlanSha !== actualPlanSha
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume plan hash mismatch",
+      );
+    }
+
+    let localPlan;
+    try {
+      localPlan = JSON.parse(readFileSync(planPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER local resume plan unreadable: ${error?.message || error}`,
+      );
+    }
+    if (localPlan?.schema !== "HIBOU_VIDEO_RESUME_PLAN_V1") {
+      throw new Error(
+        "VIDEO_RENDER local resume plan schema invalid",
+      );
+    }
+
+    const requestedStateSha = String(
+      remoteRepairResume.source_state_sha256 || "",
+    ).trim().toLowerCase();
+    const localStateSha = String(
+      localPlan.source_state_sha256 || "",
+    ).trim().toLowerCase();
+    if (
+      !/^[0-9a-f]{64}$/.test(requestedStateSha) ||
+      requestedStateSha !== localStateSha
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume source-state hash mismatch",
+      );
+    }
+
+    const requestedResumeStage = String(
+      remoteRepairResume.resume_stage || "",
+    ).trim();
+    if (
+      !requestedResumeStage ||
+      requestedResumeStage !== String(localPlan.resume_stage || "").trim()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume stage mismatch",
+      );
+    }
+    if (
+      localPlan.analysis_only !== true ||
+      localPlan.execution_performed === true ||
+      localPlan.resume_required !== true ||
+      localPlan.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER local resume plan is not eligible for guarded apply",
+      );
+    }
+
+    const resumeStateScript = String(runtime.resume_state || "").trim();
+    if (!resumeStateScript || !existsSync(resumeStateScript)) {
+      throw new Error(
+        "VIDEO_RENDER commit-pinned resume-state runtime missing",
+      );
+    }
+
+    const applied = spawnSync(
+      process.execPath,
+      [
+        resumeStateScript,
+        dir,
+        planPath,
+        "--apply",
+        `--confirm-plan-sha256=${actualPlanSha}`,
+      ],
+      {
+        cwd: PROJECT_ROOT,
+        encoding: "utf8",
+        windowsHide: true,
+        shell: false,
+        env: {
+          ...process.env,
+          HIBOU_VIDEO_RESUME_APPLY_ENABLED: "true",
+        },
+        maxBuffer: 8 * 1024 * 1024,
+      },
+    );
+    if (applied.status !== 0) {
+      throw new Error(
+        "VIDEO_RENDER guarded repair resume apply failed: " +
+        String(applied.stderr || applied.stdout || "unknown error").slice(-4000),
+      );
+    }
+
+    const receiptPath = path.join(
+      dir,
+      "_hibou_video_resume_apply_receipt.json",
+    );
+    if (!existsSync(receiptPath)) {
+      throw new Error(
+        "VIDEO_RENDER repair resume apply receipt missing",
+      );
+    }
+
+    let receipt;
+    try {
+      receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER repair resume receipt unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      receipt?.schema !== "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1" ||
+      String(receipt.plan_sha256 || "").toLowerCase() !== actualPlanSha ||
+      String(receipt.source_state_sha256 || "").toLowerCase() !== localStateSha ||
+      receipt.execution_started === true ||
+      receipt.artifacts_deleted === true ||
+      receipt.caches_deleted === true ||
+      receipt.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume receipt validation failed",
+      );
+    }
+    if (
+      !Array.isArray(receipt.reset_stages) ||
+      receipt.reset_stages[0] !== requestedResumeStage
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume receipt reset-stage mismatch",
+      );
+    }
+
+    repairResumeApplied = {
+      schema: "HIBOU_VIDEO_RENDER_REPAIR_RESUME_APPLIED_V1",
+      resume_stage: requestedResumeStage,
+      plan_path: planPath,
+      plan_sha256: actualPlanSha,
+      source_state_sha256: localStateSha,
+      receipt_path: receiptPath,
+      receipt_sha256: sha256(receiptPath),
+      reset_stages: receipt.reset_stages.slice(0, 50),
+      backup_path: receipt.backup_path || null,
+      backup_sha256: receipt.backup_sha256 || null,
+      artifacts_deleted: false,
+      caches_deleted: false,
+      execution_started_by_reset: false,
+      human_confirmed: true,
+      publication_authorized: false,
+    };
+
+    const failedJobs = loadFailedJobs();
+    delete failedJobs[job.id];
+    saveFailedJobs(failedJobs);
+
+    log("VIDEO_RENDER guarded repair resume state applied", {
+      job: job.id,
+      content_id: contentId,
+      resume_stage: requestedResumeStage,
+      plan_sha256: actualPlanSha,
+      receipt_sha256: repairResumeApplied.receipt_sha256,
+      reset_stages: repairResumeApplied.reset_stages,
+    });
+  }
+
   if (existsSync(pipelineStatePath) && existingStoryboard) {
     try {
       const pipeline = JSON.parse(
@@ -1658,6 +1877,8 @@ async function processVideoRender(job, processed) {
     runtime_refreshed: runtime.refreshed,
     production_mode: productionMode,
     candidates_per_scene: candidatesPerScene,
+    repair_resume_applied: Boolean(repairResumeApplied),
+    repair_resume_stage: repairResumeApplied?.resume_stage || null,
   });
 
   await reportVideoProgress(job, "Running", {
@@ -2163,6 +2384,7 @@ async function processVideoRender(job, processed) {
     reuse_lineage: job.reuse_lineage || null,
     reuse_integrity: reuseIntegrity,
     incremental_retouch: incrementalRetouch,
+    repair_resume: repairResumeApplied,
     human_review_required: true,
     publication_authorized: false,
     runtime_commit: runtime.commit,
@@ -2283,6 +2505,12 @@ async function tick() {
 
   const retryEligible = (job) => {
     if (!job?.id || processed.has(job.id)) return false;
+
+    const repairResume =
+      VIDEO_REMOTE_REPAIR_RESUME_ENABLED &&
+      job?.options?.repair_resume_request?.schema ===
+        "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1";
+    if (repairResume) return true;
 
     const info = failed[job.id];
 

@@ -1370,6 +1370,15 @@ async function processVideoRender(job, processed) {
   const reuseFromJobId = String(
     job.options?.reuse_from_job_id || "",
   ).trim();
+  const reuseIntegrity = {
+    requested: Boolean(reuseFromJobId),
+    parent_worker: job.reuse_lineage?.parent_worker || null,
+    current_worker: WORKER_ID,
+    worker_match: null,
+    expected_master_sha256: job.reuse_lineage?.parent_result_sha256 || null,
+    actual_master_sha256: null,
+    hash_verified: false,
+  };
   if (reuseFromJobId) {
     if (
       !/^rec[A-Za-z0-9]{14}$/.test(reuseFromJobId) ||
@@ -1377,6 +1386,19 @@ async function processVideoRender(job, processed) {
     ) {
       throw new Error("Invalid VIDEO_RENDER reuse_from_job_id");
     }
+
+    const expectedParentWorker = String(
+      job.reuse_lineage?.parent_worker || "",
+    ).trim();
+    if (expectedParentWorker) {
+      reuseIntegrity.worker_match = expectedParentWorker === WORKER_ID;
+      if (!reuseIntegrity.worker_match) {
+        throw new Error(
+          `VIDEO_RENDER reuse parent belongs to another worker: ${expectedParentWorker}`,
+        );
+      }
+    }
+
     const previousRoot = path.join(
       VIDEO_OUTPUT_ROOT,
       safePart(reuseFromJobId),
@@ -1386,12 +1408,51 @@ async function processVideoRender(job, processed) {
         `VIDEO_RENDER reuse-from output missing: ${previousRoot}`,
       );
     }
+
+    const expectedParentHash = String(
+      job.reuse_lineage?.parent_result_sha256 || "",
+    ).trim().toLowerCase();
+    if (expectedParentHash) {
+      const previousResultPath = path.join(
+        previousRoot,
+        "_hibou_video_result.json",
+      );
+      if (!existsSync(previousResultPath)) {
+        throw new Error(
+          `VIDEO_RENDER reuse parent result missing for hash verification: ${previousResultPath}`,
+        );
+      }
+      let previousResult;
+      try {
+        previousResult = JSON.parse(
+          readFileSync(previousResultPath, "utf8"),
+        );
+      } catch (error) {
+        throw new Error(
+          `VIDEO_RENDER reuse parent result unreadable: ${error?.message || error}`,
+        );
+      }
+      const actualParentHash = String(
+        previousResult?.master_sha256 || "",
+      ).trim().toLowerCase();
+      reuseIntegrity.actual_master_sha256 = actualParentHash || null;
+      reuseIntegrity.hash_verified =
+        /^[0-9a-f]{64}$/.test(actualParentHash) &&
+        actualParentHash === expectedParentHash;
+      if (!reuseIntegrity.hash_verified) {
+        throw new Error(
+          "VIDEO_RENDER reuse parent master hash mismatch",
+        );
+      }
+    }
+
     args.push(`--reuse-from=${previousRoot}`);
     log("VIDEO_RENDER incremental reuse requested", {
       job: job.id,
       reuse_from_job_id: reuseFromJobId,
       previous_root: previousRoot,
       production_mode: productionMode,
+      reuse_integrity: reuseIntegrity,
     });
   }
 
@@ -1600,6 +1661,7 @@ async function processVideoRender(job, processed) {
     candidates_per_scene: candidatesPerScene,
     reuse_from_job_id: reuseFromJobId || null,
     reuse_lineage: job.reuse_lineage || null,
+    reuse_integrity: reuseIntegrity,
     incremental_retouch: incrementalRetouch,
     human_review_required: true,
     publication_authorized: false,

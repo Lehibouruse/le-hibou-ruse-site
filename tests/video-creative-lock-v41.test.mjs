@@ -41,6 +41,7 @@ test("image generation receives creative lock and never generates useful text", 
   assert.match(imagePlan, /The image itself must contain zero readable text/);
   assert.match(imagePlan, /BACKGROUND_ONLY_LOCK/);
   assert.match(imagePlan, /canonical Le Hibou Rusé character is composited later/);
+  assert.match(imagePlan, /NO_CHARACTER_LOCK/);
 });
 
 test("brand signature is deterministic post-production ink text", () => {

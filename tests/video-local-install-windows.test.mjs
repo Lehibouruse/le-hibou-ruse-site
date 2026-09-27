@@ -6,7 +6,7 @@ const installer=readFileSync(new URL("../scripts/video-local-install-windows.ps1
 const starter=readFileSync(new URL("../scripts/video-start-comfyui-windows.ps1",import.meta.url),"utf8");
 
 test("video local installer defaults to diagnostic-only",()=>{
-  assert.match(installer,/Diagnostic uniquement\\. Aucun paquet, modele ou service n'a ete installe\\/demarre/);
+  assert.match(installer,/Diagnostic uniquement\. Aucun paquet, modele ou service n'a ete installe\/demarre/);
   assert.match(installer,/if \(-not \(\$InstallVoice -or \$InstallComfyUI -or \$InstallFluxSchnell -or \$StartComfyUI\)\)/);
 });
 
@@ -23,7 +23,7 @@ test("Chatterbox is pinned and CUDA is mandatory",()=>{
   assert.match(installer,/TorchVersion = "2\.6\.0"/);
   assert.match(installer,/download\.pytorch\.org\/whl\/cu124/);
   assert.match(installer,/torch\.cuda\.is_available/);
-  assert.match(installer,/Aucun fallback CPU\\/cloud n'est autorise/);
+  assert.match(installer,/Aucun fallback CPU\/cloud n'est autorise/);
 });
 
 test("ComfyUI only starts on loopback and low-vram mode",()=>{
@@ -36,7 +36,7 @@ test("FLUX download is explicit and SHA-256 verified",()=>{
   assert.match(installer,/flux1-schnell-fp8\.safetensors/);
   assert.match(installer,/ead426278b49030e9da5df862994f25ce94ab2ee4df38b556ddddb3db093bf72/);
   assert.match(installer,/Get-FileHash -Algorithm SHA256/);
-  assert.match(installer,/SHA-256 FLUX invalide\\. Fichier supprime/);
+  assert.match(installer,/SHA-256 FLUX invalide\. Fichier supprime/);
 });
 
 test("installer records no paid fallback or automatic start",()=>{

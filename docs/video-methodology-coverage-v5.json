@@ -404,7 +404,10 @@
             "process_started: false",
             "auditVideoRun",
             "resumePreparationSummary",
-            "resume_prepared_waiting_explicit_start"
+            "resume_prepared_waiting_explicit_start",
+            "execution_started",
+            "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+            "repair_start_receipt_invalid"
           ]
         }
       ],
@@ -549,7 +552,10 @@
             "process_started: false",
             "auditVideoRun",
             "resumePreparationSummary",
-            "resume_prepared_waiting_explicit_start"
+            "resume_prepared_waiting_explicit_start",
+            "execution_started",
+            "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+            "repair_start_receipt_invalid"
           ]
         }
       ],

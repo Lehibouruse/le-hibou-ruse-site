@@ -338,7 +338,10 @@
             "stage_progress: progress.stage_progress",
             "visual_ready",
             "stage_elapsed_seconds",
-            "stage_progress"
+            "stage_progress",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "HIBOU_VIDEO_RENDER_REPAIR_RESUME_APPLIED_V1",
+            "_hibou_video_resume_apply_receipt.json"
           ]
         },
         {
@@ -368,7 +371,10 @@
           "markers": [
             "rawStageProgress",
             "stage_progress: stageProgress",
-            "stage_elapsed_seconds"
+            "stage_elapsed_seconds",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1",
+            "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1"
           ]
         },
         {
@@ -395,7 +401,8 @@
         "tests/video-image-factory.test.mjs",
         "tests/video-pipeline-stage-history.test.mjs",
         "tests/video-worker-heartbeat-progress.test.mjs",
-        "tests/video-resume-state.test.mjs"
+        "tests/video-resume-state.test.mjs",
+        "tests/video-remote-repair-resume.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -472,7 +479,10 @@
             "stage_progress: progress.stage_progress",
             "visual_ready",
             "stage_elapsed_seconds",
-            "stage_progress"
+            "stage_progress",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "HIBOU_VIDEO_RENDER_REPAIR_RESUME_APPLIED_V1",
+            "_hibou_video_resume_apply_receipt.json"
           ]
         },
         {
@@ -488,7 +498,10 @@
           "markers": [
             "rawStageProgress",
             "stage_progress: stageProgress",
-            "stage_elapsed_seconds"
+            "stage_elapsed_seconds",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1",
+            "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1"
           ]
         },
         {
@@ -513,7 +526,8 @@
         "tests/video-worker-failure-resume-diagnostic.test.mjs",
         "tests/video-pipeline-stage-history.test.mjs",
         "tests/video-worker-heartbeat-progress.test.mjs",
-        "tests/video-resume-state.test.mjs"
+        "tests/video-resume-state.test.mjs",
+        "tests/video-remote-repair-resume.test.mjs"
       ],
       "e2e_pending": true
     },

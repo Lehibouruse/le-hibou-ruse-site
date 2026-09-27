@@ -2,6 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { statfsSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import os from "node:os";
 
 function command(command, args = []) {
@@ -100,7 +101,7 @@ export function collectPreflight(root = process.cwd()) {
   return { ...report, decision: classify(report, minFreeGiB) };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const report = collectPreflight();
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   const requireReady = process.argv.includes("--require-ready") || process.argv.includes("--require-gpu");

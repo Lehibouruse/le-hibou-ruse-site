@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { buildImagePlan } from "./video-image-plan.mjs";
@@ -9,6 +10,7 @@ import { qcImageBatch } from "./video-image-qc.mjs";
 import { buildTargetedRegeneration } from "./video-image-regenerate.mjs";
 
 function fail(m){throw new Error(m);}
+const SCRIPT_DIR=dirname(fileURLToPath(import.meta.url));
 function load(p){return JSON.parse(readFileSync(resolve(p),"utf8"));}
 function write(p,v){writeFileSync(resolve(p),JSON.stringify(v,null,2)+"\n");}
 function arg(name,fallback=""){
@@ -17,7 +19,7 @@ function arg(name,fallback=""){
 }
 function runPerceptual(techPath,outPath,reference=""){
   const python=String(process.env.HIBOU_QC_PYTHON||process.env.HIBOU_PYTHON||"python").trim();
-  const args=[resolve("scripts/video-image-perceptual-qc.py"),resolve(techPath),resolve(outPath)];
+  const args=[resolve(SCRIPT_DIR,"video-image-perceptual-qc.py"),resolve(techPath),resolve(outPath)];
   if(reference) args.push(resolve(reference));
   const r=spawnSync(python,args,{encoding:"utf8",windowsHide:true,shell:false,maxBuffer:16*1024*1024});
   if(r.status!==0) fail("perceptual QC failed: "+String(r.stderr||r.stdout||"").slice(-3000));

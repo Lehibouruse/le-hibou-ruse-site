@@ -39,6 +39,10 @@ const VIDEO_REMOTE_REPAIR_RESUME_ENABLED =
   String(process.env.HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED || "")
     .trim()
     .toLowerCase() === "true";
+const VIDEO_REMOTE_REPAIR_START_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
 const VIDEO_CANCEL_GRACE_MS = Math.max(
   1000,
   Math.min(30000, Number(process.env.HIBOU_VIDEO_CANCEL_GRACE_MS || 5000)),
@@ -1517,7 +1521,19 @@ async function processVideoRender(job, processed) {
     !Array.isArray(job.options.repair_resume_request)
       ? job.options.repair_resume_request
       : null;
+  const remoteRepairStart =
+    job.options?.repair_start_request &&
+    typeof job.options.repair_start_request === "object" &&
+    !Array.isArray(job.options.repair_start_request)
+      ? job.options.repair_start_request
+      : null;
+  if (remoteRepairResume && remoteRepairStart) {
+    throw new Error(
+      "VIDEO_RENDER repair prepare and repair start cannot be requested together",
+    );
+  }
   let repairResumeApplied = null;
+  let repairStartApplied = null;
 
   if (remoteRepairResume) {
     if (!VIDEO_REMOTE_REPAIR_RESUME_ENABLED) {
@@ -1770,6 +1786,285 @@ async function processVideoRender(job, processed) {
     };
   }
 
+  if (remoteRepairStart) {
+    if (!VIDEO_REMOTE_REPAIR_START_ENABLED) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start is disabled locally",
+      );
+    }
+    if (
+      remoteRepairStart.schema !==
+      "HIBOU_VIDEO_REPAIR_START_REQUEST_V1"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start schema invalid",
+      );
+    }
+    if (remoteRepairStart.human_confirmed !== true) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start requires human confirmation",
+      );
+    }
+    if (String(remoteRepairStart.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start content mismatch",
+      );
+    }
+    if (!existsSync(pipelineStatePath)) {
+      throw new Error(
+        "VIDEO_RENDER prepared pipeline state missing for repair start",
+      );
+    }
+
+    const markerPath = path.join(
+      dir,
+      "_hibou_video_remote_repair_prepared.json",
+    );
+    if (!existsSync(markerPath)) {
+      throw new Error(
+        "VIDEO_RENDER local prepared-repair marker missing",
+      );
+    }
+
+    let marker;
+    try {
+      marker = JSON.parse(readFileSync(markerPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER prepared-repair marker unreadable: ${error?.message || error}`,
+      );
+    }
+
+    if (
+      marker?.schema !== "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1" ||
+      marker.requires_separate_render_start !== true ||
+      marker.execution_started !== false ||
+      marker.publication_authorized !== false
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared-repair marker is not startable",
+      );
+    }
+
+    const expectedFields = [
+      ["plan_sha256", "repair start plan hash mismatch"],
+      ["source_state_sha256", "repair start source-state hash mismatch"],
+      ["receipt_sha256", "repair start receipt hash mismatch"],
+      ["state_file_sha256", "repair start prepared-state hash mismatch"],
+    ];
+    for (const [field, message] of expectedFields) {
+      const requested = String(remoteRepairStart?.[field] || "")
+        .trim().toLowerCase();
+      const local = String(marker?.[field] || "")
+        .trim().toLowerCase();
+      if (
+        !/^[0-9a-f]{64}$/.test(requested) ||
+        requested !== local
+      ) {
+        throw new Error("VIDEO_RENDER " + message);
+      }
+    }
+
+    const requestedResumeStage = String(
+      remoteRepairStart.resume_stage || "",
+    ).trim();
+    if (
+      !requestedResumeStage ||
+      requestedResumeStage !== String(marker.resume_stage || "").trim()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair start resume-stage mismatch",
+      );
+    }
+    if (String(marker.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER prepared-repair marker content mismatch",
+      );
+    }
+
+    const receiptPath = path.join(
+      dir,
+      "_hibou_video_resume_apply_receipt.json",
+    );
+    if (!existsSync(receiptPath)) {
+      throw new Error(
+        "VIDEO_RENDER prepared repair receipt missing at start",
+      );
+    }
+    if (
+      sha256(receiptPath).toLowerCase() !==
+      String(remoteRepairStart.receipt_sha256).toLowerCase()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared repair receipt bytes changed before start",
+      );
+    }
+
+    let receipt;
+    try {
+      receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER prepared repair receipt unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      receipt?.schema !== "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1" ||
+      String(receipt.plan_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.plan_sha256).toLowerCase() ||
+      String(receipt.source_state_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.source_state_sha256).toLowerCase() ||
+      String(receipt.state_file_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.state_file_sha256).toLowerCase() ||
+      receipt.execution_started === true ||
+      receipt.artifacts_deleted === true ||
+      receipt.caches_deleted === true ||
+      receipt.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared repair receipt invalid at start",
+      );
+    }
+
+    const currentPreparedStateSha = sha256(pipelineStatePath).toLowerCase();
+    if (
+      currentPreparedStateSha !==
+      String(remoteRepairStart.state_file_sha256).toLowerCase()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared pipeline state changed before explicit start",
+      );
+    }
+
+    let preparedState;
+    try {
+      preparedState = JSON.parse(
+        readFileSync(pipelineStatePath, "utf8"),
+      );
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER prepared pipeline state unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      preparedState?.schema !== "HIBOU_VIDEO_MASTER_RUN_V1" ||
+      preparedState.pipeline_status !== "RESUME_PREPARED" ||
+      preparedState?.resume_prepared?.execution_started !== false ||
+      String(preparedState?.resume_prepared?.plan_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.plan_sha256).toLowerCase() ||
+      String(preparedState?.resume_prepared?.source_state_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.source_state_sha256).toLowerCase() ||
+      String(preparedState?.resume_prepared?.resume_stage || "") !==
+        requestedResumeStage ||
+      preparedState?.resume_prepared?.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared pipeline state is not eligible for explicit start",
+      );
+    }
+
+    const startedAt = new Date().toISOString();
+    const markerBeforeSha = sha256(markerPath).toLowerCase();
+    preparedState.pipeline_status = "REPAIR_EXECUTION_STARTED";
+    preparedState.resume_prepared.execution_started = true;
+    preparedState.resume_prepared.execution_started_at = startedAt;
+    preparedState.repair_execution = {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_EXECUTION_V1",
+      started_at: startedAt,
+      resume_stage: requestedResumeStage,
+      plan_sha256: String(remoteRepairStart.plan_sha256).toLowerCase(),
+      source_state_sha256:
+        String(remoteRepairStart.source_state_sha256).toLowerCase(),
+      receipt_sha256: String(remoteRepairStart.receipt_sha256).toLowerCase(),
+      prepared_state_sha256:
+        String(remoteRepairStart.state_file_sha256).toLowerCase(),
+      human_confirmed: true,
+      publication_authorized: false,
+    };
+
+    const stateTemp = pipelineStatePath + ".repair-start-" + process.pid;
+    writeFileSync(
+      stateTemp,
+      JSON.stringify(preparedState, null, 2) + "\n",
+      "utf8",
+    );
+    renameSync(stateTemp, pipelineStatePath);
+    const executionStateSha = sha256(pipelineStatePath).toLowerCase();
+
+    marker.execution_started = true;
+    marker.execution_started_at = startedAt;
+    marker.requires_separate_render_start = false;
+    marker.execution_state_sha256 = executionStateSha;
+    marker.start_request = {
+      schema: remoteRepairStart.schema,
+      plan_sha256: String(remoteRepairStart.plan_sha256).toLowerCase(),
+      source_state_sha256:
+        String(remoteRepairStart.source_state_sha256).toLowerCase(),
+      receipt_sha256: String(remoteRepairStart.receipt_sha256).toLowerCase(),
+      state_file_sha256:
+        String(remoteRepairStart.state_file_sha256).toLowerCase(),
+      human_confirmed: true,
+      publication_authorized: false,
+    };
+
+    const markerTemp = markerPath + ".repair-start-" + process.pid;
+    writeFileSync(
+      markerTemp,
+      JSON.stringify(marker, null, 2) + "\n",
+      "utf8",
+    );
+    renameSync(markerTemp, markerPath);
+    const markerAfterSha = sha256(markerPath).toLowerCase();
+
+    const startedReceiptPath = path.join(
+      dir,
+      "_hibou_video_remote_repair_started.json",
+    );
+    const startedReceipt = {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      started_at: startedAt,
+      resume_stage: requestedResumeStage,
+      plan_sha256: String(remoteRepairStart.plan_sha256).toLowerCase(),
+      source_state_sha256:
+        String(remoteRepairStart.source_state_sha256).toLowerCase(),
+      receipt_sha256: String(remoteRepairStart.receipt_sha256).toLowerCase(),
+      prepared_state_sha256:
+        String(remoteRepairStart.state_file_sha256).toLowerCase(),
+      execution_state_sha256: executionStateSha,
+      prepared_marker_before_sha256: markerBeforeSha,
+      prepared_marker_after_sha256: markerAfterSha,
+      artifacts_deleted: false,
+      caches_deleted: false,
+      human_confirmed: true,
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    };
+    writeFileSync(
+      startedReceiptPath,
+      JSON.stringify(startedReceipt, null, 2) + "\n",
+      "utf8",
+    );
+
+    repairStartApplied = {
+      ...startedReceipt,
+      receipt_path: startedReceiptPath,
+      start_receipt_sha256: sha256(startedReceiptPath).toLowerCase(),
+    };
+
+    log("VIDEO_RENDER explicit repair execution start accepted", {
+      job: job.id,
+      content_id: contentId,
+      resume_stage: requestedResumeStage,
+      execution_state_sha256: executionStateSha,
+      start_receipt_sha256: repairStartApplied.start_receipt_sha256,
+    });
+  }
+
   if (!existsSync(VIDEO_BINDING)) {
     throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
   }
@@ -1917,6 +2212,8 @@ async function processVideoRender(job, processed) {
     candidates_per_scene: candidatesPerScene,
     repair_resume_applied: Boolean(repairResumeApplied),
     repair_resume_stage: repairResumeApplied?.resume_stage || null,
+    repair_start_applied: Boolean(repairStartApplied),
+    repair_start_stage: repairStartApplied?.resume_stage || null,
   });
 
   await reportVideoProgress(job, "Running", {
@@ -2423,6 +2720,7 @@ async function processVideoRender(job, processed) {
     reuse_integrity: reuseIntegrity,
     incremental_retouch: incrementalRetouch,
     repair_resume: repairResumeApplied,
+    repair_start: repairStartApplied,
     human_review_required: true,
     publication_authorized: false,
     runtime_commit: runtime.commit,
@@ -2703,6 +3001,7 @@ function healthServer() {
       runtime_resume_state_sha256: state.runtime_resume_state_sha256 || null,
       runtime_resume_state_path: state.runtime_resume_state_path || null,
       video_remote_repair_resume_enabled: VIDEO_REMOTE_REPAIR_RESUME_ENABLED,
+      video_remote_repair_start_enabled: VIDEO_REMOTE_REPAIR_START_ENABLED,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

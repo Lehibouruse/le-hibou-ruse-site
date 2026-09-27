@@ -632,35 +632,54 @@ async function ensureComfyUIReady() {
     throw new Error(`Invalid ComfyUI port: ${url.port}`);
   }
 
-  log("Starting ComfyUI automatically", { endpoint, port });
+  log("Starting ComfyUI automatically", { endpoint, port, startScript });
 
-  const child = spawn(
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-File",
-      startScript,
-      "-Port",
-      String(port),
-    ],
-    {
-      cwd: PROJECT_ROOT,
-      windowsHide: true,
-      shell: false,
-      detached: true,
-      stdio: "ignore",
-      env: process.env,
-    },
-  );
-  child.unref();
+  let starterResult;
+  try {
+    starterResult = await run(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        startScript,
+        "-Port",
+        String(port),
+      ],
+      PROJECT_ROOT,
+    );
+  } catch (error) {
+    throw new Error(
+      "ComfyUI starter failed before readiness polling\n" +
+      String(error?.message || error),
+    );
+  }
+
+  log("ComfyUI starter returned", {
+    endpoint,
+    stdout: String(starterResult?.stdout || "").slice(-3000),
+    stderr: String(starterResult?.stderr || "").slice(-3000),
+  });
+
+  const statePath = path.join(LOG_DIR, "logs", "comfyui-autostart-state.json");
+  let startedPid = null;
+  try {
+    const startedState = JSON.parse(
+      readFileSync(statePath, "utf8").replace(/^\uFEFF/, ""),
+    );
+    startedPid = Number(startedState?.pid || 0) || null;
+  } catch {}
 
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     if (await comfyReady(endpoint)) {
-      log("ComfyUI ready", { endpoint });
+      log("ComfyUI ready", { endpoint, pid: startedPid });
       return { endpoint, started: true };
+    }
+    if (startedPid && !pidAlive(startedPid)) {
+      log("ComfyUI child exited before readiness", { endpoint, pid: startedPid });
+      break;
     }
     await sleep(2000);
   }
@@ -675,6 +694,9 @@ async function ensureComfyUIReady() {
   const stdoutTail = tail(stdoutPath);
   throw new Error(
     `ComfyUI did not become ready within 180 seconds: ${endpoint}` +
+    (startedPid ? `\nComfyUI child pid: ${startedPid}; alive=${pidAlive(startedPid)}` : "\nComfyUI child pid: unavailable") +
+    (starterResult?.stderr ? `\n--- starter stderr ---\n${String(starterResult.stderr).slice(-3000)}` : "") +
+    (starterResult?.stdout ? `\n--- starter stdout ---\n${String(starterResult.stdout).slice(-3000)}` : "") +
     (stderrTail ? `\n--- ComfyUI stderr tail ---\n${stderrTail}` : "") +
     (stdoutTail ? `\n--- ComfyUI stdout tail ---\n${stdoutTail}` : "")
   );

@@ -12,7 +12,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V2"
+ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V3_PROSODY"
 
 def fail(message):
     raise RuntimeError(message)
@@ -124,16 +124,26 @@ for scene in scenes:
         "audio_prompt_path": audio_prompt,
         "audio_prompt_sha256": audio_prompt_hash,
     }
+    prosody_plan = ((scene.get("voice") or {}).get("prosody_plan") or {})
+    prosody_units = prosody_plan.get("units") if prosody_plan.get("schema") == "HIBOU_PROSODY_PLAN_V1" else None
+    if prosody_units:
+        if prosody_plan.get("mode") != "verbatim_segmented" or prosody_plan.get("lexical_transform") is not False:
+            fail(f"{scene_id}: invalid prosody plan mode")
+        source_spans = "".join(str(unit.get("source_span") or "") for unit in prosody_units)
+        if source_spans != text:
+            fail(f"{scene_id}: prosody plan does not preserve exact verbatim source")
     fingerprint = sha256_json({
         "engine_revision": ENGINE_REVISION,
         "text": text,
         "native": native_used,
+        "prosody_units": prosody_units,
     })
     scene_path = scene_dir / f"{scene_id}.wav"
     manifest_path = scene_dir / f"{scene_id}.manifest.json"
     cache = load_cache(manifest_path, scene_path, fingerprint)
     descriptors.append({
         "scene": scene, "scene_id": scene_id, "text": text, "native": native_used,
+        "prosody_units": prosody_units,
         "fingerprint": fingerprint, "scene_path": scene_path, "manifest_path": manifest_path, "cache": cache,
     })
 
@@ -176,6 +186,83 @@ def generate_scene(model, text, native, scene_id):
             except Exception as retry_exc:
                 fail(f"{scene_id}: CUDA voice generation failed after one cleanup retry: {retry_exc}")
         fail(f"{scene_id}: voice generation failed: {exc}")
+
+def atempo_waveform(wav, sample_rate, factor, scene_id, unit_id):
+    factor = max(0.85, min(1.15, float(factor)))
+    if abs(factor - 1.0) < 0.001:
+        return wav
+    temp_in = scene_dir / f".{scene_id}-{unit_id}-atempo-in.wav"
+    temp_out = scene_dir / f".{scene_id}-{unit_id}-atempo-out.wav"
+    try:
+        ta.save(str(temp_in), wav.detach().cpu(), sample_rate)
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(temp_in),
+             "-filter:a", f"atempo={factor:.3f}", "-ar", str(sample_rate), str(temp_out)],
+            text=True, capture_output=True, check=False,
+        )
+        if result.returncode != 0:
+            fail(f"{scene_id}/{unit_id}: ffmpeg atempo failed: {result.stderr[-2000:]}")
+        stretched, stretched_sr = ta.load(str(temp_out))
+        if int(stretched_sr) != int(sample_rate):
+            fail(f"{scene_id}/{unit_id}: atempo sample-rate mismatch")
+        return stretched
+    finally:
+        for p in (temp_in, temp_out):
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
+def generate_prosody_scene(model, item, np, torch, sample_rate):
+    units = item.get("prosody_units") or []
+    if not units:
+        set_seed(item["native"]["seed"], np, torch, device)
+        return generate_scene(model, item["text"], item["native"], item["scene_id"]), []
+    parts = []
+    unit_meta = []
+    for index, unit in enumerate(units, start=1):
+        tts_text = str(unit.get("tts_text") or "")
+        if not tts_text:
+            fail(f"{item['scene_id']}: empty prosody unit")
+        native = dict(item["native"])
+        mapped = unit.get("chatterbox_native") or {}
+        for key in ("exaggeration", "temperature", "cfg_weight"):
+            if key in mapped:
+                native[key] = float(mapped[key])
+        native["seed"] = int(item["native"]["seed"]) + index - 1
+        set_seed(native["seed"], np, torch, device)
+        before_ms = max(0, int(unit.get("pause_before_ms") or 0))
+        after_ms = max(0, int(unit.get("pause_after_ms") or 0))
+        if before_ms:
+            parts.append(torch.zeros((1, round(sample_rate * before_ms / 1000)), dtype=torch.float32))
+        wav = generate_scene(model, tts_text, native, f"{item['scene_id']}/{unit.get('id') or index}")
+        wav = wav.detach().cpu()
+        if wav.ndim == 1:
+            wav = wav.unsqueeze(0)
+        factor = max(0.85, min(1.15, float(unit.get("ffmpeg_atempo") or 1.0)))
+        wav = atempo_waveform(wav, sample_rate, factor, item["scene_id"], str(unit.get("id") or index))
+        parts.append(wav)
+        if after_ms:
+            parts.append(torch.zeros((wav.shape[0], round(sample_rate * after_ms / 1000)), dtype=wav.dtype))
+        unit_meta.append({
+            "id": unit.get("id"),
+            "tts_text": tts_text,
+            "source_start": unit.get("source_start"),
+            "source_end": unit.get("source_end"),
+            "pause_before_ms": before_ms,
+            "pause_after_ms": after_ms,
+            "relative_speed_pct": unit.get("relative_speed_pct", 100),
+            "ffmpeg_atempo": factor,
+            "emphasis": unit.get("emphasis"),
+            "intent": unit.get("intent"),
+            "chatterbox_native_used": native,
+        })
+        clear_cuda_cache()
+    if not parts:
+        fail(f"{item['scene_id']}: prosody plan produced no audio")
+    channels = max(part.shape[0] for part in parts)
+    normalized = [part if part.shape[0] == channels else part.repeat(channels, 1) for part in parts]
+    return torch.cat(normalized, dim=-1), unit_meta
 
 needs_generation = any(item["cache"] is None for item in descriptors)
 model = None
@@ -319,6 +406,7 @@ cache_misses = 0
 for item in descriptors:
     scene = item["scene"]
     scene_id = item["scene_id"]
+    prosody_units_used = []
     if item["cache"] is not None:
         wav, cached_sr = ta.load(str(item["scene_path"]))
         cached_sr = int(cached_sr)
@@ -330,8 +418,7 @@ for item in descriptors:
         cache_state = "hit"
     else:
         native = item["native"]
-        set_seed(native["seed"], np, torch, device)
-        wav = generate_scene(model, item["text"], native, scene_id)
+        wav, prosody_units_used = generate_prosody_scene(model, item, np, torch, sample_rate)
         wav = wav.detach().cpu()
         clear_cuda_cache()
         if wav.ndim == 1:
@@ -348,6 +435,7 @@ for item in descriptors:
             "sample_rate": sample_rate,
             "native": item["native"],
             "text": item["text"],
+            "prosody_units_used": prosody_units_used,
         }
         item["manifest_path"].write_text(json.dumps(scene_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         cache_misses += 1
@@ -376,6 +464,9 @@ for item in descriptors:
         "span_end_s": end_samples / sample_rate,
         "span_duration_s": (end_samples - start_samples) / sample_rate,
         "native": item["native"],
+        "prosody_plan_schema": ((scene.get("voice") or {}).get("prosody_plan") or {}).get("schema"),
+        "prosody_units_used": prosody_units_used,
+        "verbatim_preserved": True,
         "prosody_metadata_not_native": scene.get("voice"),
         "cache": cache_state,
         "fingerprint": item["fingerprint"],
@@ -428,7 +519,7 @@ updated["validation"]["publication_authorized"] = False
 contract_out = output_dir / "contract-audio-ready.json"
 contract_out.write_text(json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
 manifest = {
-    "schema": "HIBOU_CHATTERBOX_BATCH_V2",
+    "schema": "HIBOU_CHATTERBOX_BATCH_V3",
     "engine_revision": ENGINE_REVISION,
     "contract_source": str(contract_path),
     "contract_output": str(contract_out),

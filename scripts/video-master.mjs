@@ -694,7 +694,12 @@ async function main(){
   const registrySpec=resolve(root,"registry-spec.json");
   const registry=resolve(root,"artifact-registry.json");
   stage(state,"registry",()=>{
-    writeJson(registrySpec,{entries:[
+    writeJson(registrySpec,{
+      schema:"HIBOU_VIDEO_ARTIFACT_REGISTRY_SPEC_V2",
+      production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
+      human_review_required:true,
+      publication_authorized:false,
+      entries:[
       {kind:"storyboard",path:storyboard},
       {kind:"audio",path:mastered},
       {kind:"subtitles",path:ass},
@@ -706,7 +711,8 @@ async function main(){
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
       ...(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)?[{kind:"incremental_retouch_plan",path:incrementalPlanPath}]:[]),
       {kind:"pipeline_state",path:statePath}
-    ]});
+      ]
+    });
     run(process.execPath,[postRuntime.registry,registrySpec,registry]);
   });
 
@@ -749,6 +755,8 @@ async function main(){
     },
     incremental_retouch:state.incremental_retouch||{enabled:false},
     execution_profile:state.execution_profile||null,
+    production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
+    preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,
     publication_authorized:false

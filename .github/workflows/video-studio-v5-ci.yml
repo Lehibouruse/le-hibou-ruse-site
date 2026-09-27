@@ -1,0 +1,52 @@
+name: Video Studio V5 branch CI
+
+on:
+  push:
+    branches:
+      - feat/video-studio-v5
+
+permissions:
+  contents: read
+
+concurrency:
+  group: video-studio-v5-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpu-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: JS syntax
+        run: |
+          node --check scripts/video-scene-compositor.mjs
+          node --check scripts/video-hibou-pose-registry.mjs
+          node --check scripts/video-prosody-plan.mjs
+          node --check scripts/video-audio-mix.mjs
+          node --check scripts/hibou-github-worker.mjs
+          node --check scripts/video-master.mjs
+          node --check scripts/video-storyboard-promote.mjs
+          node --check scripts/video-airtable-sync.mjs
+          node --check app/api/local-worker-queue/route.js
+      - name: Python syntax only
+        run: |
+          python3 -m py_compile scripts/video-creative-qc.py
+          python3 -m py_compile scripts/chatterbox-storyboard-batch.py
+      - name: V5 targeted CPU tests
+        run: |
+          node --test \
+            tests/video-scene-timeline-v1.test.mjs \
+            tests/video-creative-qc.test.mjs \
+            tests/video-hibou-pose-registry.test.mjs \
+            tests/video-prosody-plan.test.mjs \
+            tests/video-audio-mix.test.mjs \
+            tests/video-remote-cancel.test.mjs \
+            tests/video-studio-v5-orchestration.test.mjs
+      - name: Existing unit suite
+        run: npm test

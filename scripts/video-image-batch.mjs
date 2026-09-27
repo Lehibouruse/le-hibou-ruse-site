@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { runImageGen } from "./video-local-adapters.mjs";
 
 function fail(message){throw new Error(message);}
@@ -89,7 +90,7 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
   return {manifest:state,selections,cache_hits:cacheHits,generated_this_run:generated};
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [planPath,manifestPath,selectionPath,...rest]=process.argv.slice(2);
   if(!planPath||!manifestPath||!selectionPath) fail("usage: video-image-batch.mjs image-plan.json batch-manifest.json selections.template.json [--max-scenes=N]");
   const plan=JSON.parse(readFileSync(resolve(planPath),"utf8"));

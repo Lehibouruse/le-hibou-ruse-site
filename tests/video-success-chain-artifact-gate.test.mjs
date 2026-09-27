@@ -10,7 +10,7 @@ const route = readFileSync(
 test("success chaining requires a validated video artifact", () => {
   assert.match(route, /function completedArtifactGate/);
   assert.match(route, /HIBOU_VIDEO_RENDER_RESULT_V1/);
-  assert.match(route, /master\.mp4\$/);
+  assert.equal(route.includes('/master\\.mp4$/i.test(pathValue)'), true);
   assert.match(route, /\^\[0-9a-f\]\{64\}\$/i);
   assert.match(route, /master_bytes/);
   assert.match(route, /bytes > 0/);

@@ -98,11 +98,19 @@ if (-not $queue.ok -or $queue.schema -ne "HIBOU_VIDEO_RENDER_QUEUE_V2") {
 }
 Write-Host ("Queue authentifiee OK - jobs visibles : {0}" -f @($queue.jobs).Count) -ForegroundColor Green
 
-$RuntimeCommit = [string]$queue.runtime_commit
-if (
-  [string]::IsNullOrWhiteSpace($RuntimeCommit) -or
-  $RuntimeCommit.Length -ne 40 -or
-  $RuntimeCommit -notmatch '^[0-9a-fA-F]+ = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
+$RuntimeCommit = ([string]$queue.runtime_commit).Trim()
+if ([string]::IsNullOrWhiteSpace($RuntimeCommit) -or $RuntimeCommit.Length -ne 40) {
+  throw "Queue VIDEO_RENDER sans runtime_commit valide."
+}
+foreach ($ch in $RuntimeCommit.ToCharArray()) {
+  if ("0123456789abcdefABCDEF".IndexOf($ch) -lt 0) {
+    throw "Queue VIDEO_RENDER avec runtime_commit non hexadecimal."
+  }
+}
+$RuntimeCommit = $RuntimeCommit.ToLowerInvariant()
+Write-Host ("Runtime deploye : {0}" -f $RuntimeCommit) -ForegroundColor Green
+
+$FailedJobsPath = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
 if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
   try {
     $failedJobs = Get-Content -Raw $FailedJobsPath | ConvertFrom-Json

@@ -141,6 +141,7 @@ const IMAGE_RUNTIME_FILES=[
   ["video-image-qc.mjs","HIBOU_IMAGE_BATCH_V1","scripts/video-image-qc.mjs"],
   ["video-image-regenerate.mjs","buildTargetedRegeneration","scripts/video-image-regenerate.mjs"],
   ["video-candidate-review.mjs","HIBOU_CANDIDATE_REVIEW_V1","scripts/video-candidate-review.mjs"],
+  ["video-candidate-selection-apply.mjs","HIBOU_HUMAN_IMAGE_SELECTION_V1","scripts/video-candidate-selection-apply.mjs"],
   ["video-image-perceptual-qc.py","input must contain technical QC rows","scripts/video-image-perceptual-qc.py"],
   ["rog-g814ji-rtx4070-8gb.json","VALIDATED_LOCAL_BASELINE","video/hardware/rog-g814ji-rtx4070-8gb.json"]
 ];
@@ -165,7 +166,10 @@ async function ensureImageRuntimeBundle(commit){
       writeFileSync(target,source,"utf8");
     }
   }
-  return resolve(localBase,"video-image-factory.mjs");
+  return {
+    factory:resolve(localBase,"video-image-factory.mjs"),
+    selectionApply:resolve(localBase,"video-candidate-selection-apply.mjs")
+  };
 }
 
 const POST_RUNTIME_FILES=[
@@ -597,12 +601,12 @@ async function main(){
     writeJson(statePath,state);
   });
 
-  const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
+  const imageRuntime=await ensureImageRuntimeBundle(runtimeCommit);
   const postRuntime=await ensurePostRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");
   stage(state,"images",()=>{
     run(process.execPath,[
-      imageFactoryScript,
+      imageRuntime.factory,
       assetResolved,resolve(bindingArg),imageDir,
       "--max-scenes="+policy.max_scenes,
       "--regen-attempts="+policy.regeneration_attempts

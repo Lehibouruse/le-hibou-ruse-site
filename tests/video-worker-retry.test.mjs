@@ -25,3 +25,15 @@ test("VIDEO_RENDER failures report the exact failed pipeline stage", () => {
   assert.match(worker, /stage=\$\{stageName\}/);
   assert.match(worker, /pipelineFailureDetail\(dir\)/);
 });
+
+
+test("explicit video stack restart clears backoff only for currently pending queue jobs", () => {
+  const launcher = readFileSync(
+    new URL("../scripts/start-hibou-video-stack.ps1", import.meta.url),
+    "utf8",
+  );
+  assert.match(launcher, /failed-jobs\.json/);
+  assert.match(launcher, /foreach \(\$job in @\(\$queue\.jobs\)\)/);
+  assert.match(launcher, /PSObject\.Properties\.Remove\(\$job\.id\)/);
+  assert.match(launcher, /Backoff local leve/);
+});

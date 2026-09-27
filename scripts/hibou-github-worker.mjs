@@ -2343,6 +2343,9 @@ async function processVideoRender(job, processed) {
 
   await reportVideoProgress(job, "Running", {
     local_path: dir,
+    ...(repairStartApplied
+      ? { result: repairStartApplied }
+      : {}),
   });
 
   const preflight = spawnSync(

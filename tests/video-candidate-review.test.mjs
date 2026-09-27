@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildCandidateReview,
   CANDIDATE_REVIEW_SCHEMA,
+  buildCandidateDecisionTemplate,
   renderCandidateReviewHtml,
 } from "../scripts/video-candidate-review.mjs";
 
@@ -91,6 +92,7 @@ test("candidate review keeps machine recommendation separate from human choice",
   const review = buildCandidateReview(fixtures());
 
   assert.equal(review.schema, CANDIDATE_REVIEW_SCHEMA);
+  assert.match(review.review_fingerprint_sha256, /^[0-9a-f]{64}$/);
   assert.equal(review.publication_authorized, false);
   assert.equal(review.human_review_required, true);
 
@@ -177,5 +179,35 @@ test("contact sheet rejects incompatible review schema", () => {
   assert.throws(
     () => renderCandidateReviewHtml({ schema: "OTHER" }),
     /HIBOU_CANDIDATE_REVIEW_V1 required for HTML/,
+  );
+});
+
+
+test("decision template is bound to exact candidate review fingerprint", () => {
+  const review = buildCandidateReview(fixtures());
+  const template = buildCandidateDecisionTemplate(review);
+
+  assert.equal(template.schema, "HIBOU_HUMAN_IMAGE_SELECTION_V1");
+  assert.equal(
+    template.review_fingerprint_sha256,
+    review.review_fingerprint_sha256,
+  );
+  assert.deepEqual(Object.keys(template.decisions).sort(), ["S01"]);
+  assert.equal(template.decisions.S01.candidate_id, null);
+  assert.equal(template.decisions.S01.human_confirmed, false);
+  assert.equal(template.publication_authorized, false);
+});
+
+test("candidate review fingerprint changes when candidate identity changes", () => {
+  const one = buildCandidateReview(fixtures());
+  const changed = fixtures();
+  changed.perceptualQc.rows[0].candidate_id = "S01-C9";
+  changed.plan.requests[0].candidate_id = "S01-C9";
+  changed.provisionalSelections.S01.selected_candidate_id = "S01-C9";
+  const two = buildCandidateReview(changed);
+
+  assert.notEqual(
+    one.review_fingerprint_sha256,
+    two.review_fingerprint_sha256,
   );
 });

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildCandidateReview,
   CANDIDATE_REVIEW_SCHEMA,
+  renderCandidateReviewHtml,
 } from "../scripts/video-candidate-review.mjs";
 
 function fixtures() {
@@ -155,5 +156,26 @@ test("candidate review rejects incompatible input schemas", () => {
         perceptualQc: { schema: "OTHER" },
       }),
     /HIBOU_IMAGE_PERCEPTUAL_QC_V1 required/,
+  );
+});
+
+
+test("contact sheet keeps recommendation machine visibly advisory", () => {
+  const review = buildCandidateReview(fixtures());
+  const html = renderCandidateReviewHtml(review);
+
+  assert.match(html, /Revue des candidats images/);
+  assert.match(html, /recommandation machine/);
+  assert.match(html, /Aucun candidat n’est approuvé automatiquement/);
+  assert.match(html, /Décision humaine : <strong>EN ATTENTE<\/strong>/);
+  assert.match(html, /S01-C1/);
+  assert.match(html, /S01-C2/);
+  assert.doesNotMatch(html, /publication_authorized=true/);
+});
+
+test("contact sheet rejects incompatible review schema", () => {
+  assert.throws(
+    () => renderCandidateReviewHtml({ schema: "OTHER" }),
+    /HIBOU_CANDIDATE_REVIEW_V1 required for HTML/,
   );
 });

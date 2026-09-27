@@ -98,6 +98,26 @@ if (-not $queue.ok -or $queue.schema -ne "HIBOU_VIDEO_RENDER_QUEUE_V2") {
 }
 Write-Host ("Queue authentifiee OK - jobs visibles : {0}" -f @($queue.jobs).Count) -ForegroundColor Green
 
+$FailedJobsPath = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
+if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
+  try {
+    $failedJobs = Get-Content -Raw $FailedJobsPath | ConvertFrom-Json
+    $cleared = 0
+    foreach ($job in @($queue.jobs)) {
+      if ($null -ne $failedJobs -and $null -ne $failedJobs.PSObject.Properties[$job.id]) {
+        $failedJobs.PSObject.Properties.Remove($job.id)
+        $cleared += 1
+      }
+    }
+    if ($cleared -gt 0) {
+      $failedJobs | ConvertTo-Json -Depth 8 | Set-Content -Path $FailedJobsPath -Encoding UTF8
+      Write-Host ("Backoff local leve pour {0} job(s) VIDEO_RENDER Pending." -f $cleared) -ForegroundColor Green
+    }
+  } catch {
+    throw "Impossible de lever proprement le backoff local VIDEO_RENDER : $($_.Exception.Message)"
+  }
+}
+
 $InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
 $Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
 $WorkerUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/hibou-github-worker.mjs"

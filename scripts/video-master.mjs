@@ -140,6 +140,7 @@ const IMAGE_RUNTIME_FILES=[
   ["video-image-plan.mjs","HIBOU_IMAGE_PLAN_V1","scripts/video-image-plan.mjs"],
   ["video-image-qc.mjs","HIBOU_IMAGE_BATCH_V1","scripts/video-image-qc.mjs"],
   ["video-image-regenerate.mjs","buildTargetedRegeneration","scripts/video-image-regenerate.mjs"],
+  ["video-candidate-review.mjs","HIBOU_CANDIDATE_REVIEW_V1","scripts/video-candidate-review.mjs"],
   ["video-image-perceptual-qc.py","input must contain technical QC rows","scripts/video-image-perceptual-qc.py"],
   ["rog-g814ji-rtx4070-8gb.json","VALIDATED_LOCAL_BASELINE","video/hardware/rog-g814ji-rtx4070-8gb.json"]
 ];
@@ -605,6 +606,20 @@ async function main(){
       "--regen-attempts="+policy.regeneration_attempts
     ]);
     const result=json(resolve(imageDir,"factory-run.json"));
+    const candidateReviewPath=resolve(imageDir,"candidate-review.json");
+    if(existsSync(candidateReviewPath)){
+      const review=json(candidateReviewPath);
+      state.candidate_review={
+        path:candidateReviewPath,
+        schema:String(review.schema||""),
+        scene_count:Number(review.scene_count||0),
+        blocking_scene_count:Number(review.blocking_scene_count||0),
+        all_scenes_reviewable:Boolean(review.all_scenes_reviewable),
+        human_review_required:true,
+        publication_authorized:false
+      };
+      writeJson(statePath,state);
+    }
     if(result.all_scenes_have_candidate!==true){
       const diagnostic={
         technical_qc:result.technical_qc||null,
@@ -708,6 +723,7 @@ async function main(){
       {kind:"master",path:master},
       {kind:"qc",path:masterQc},
       ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
+      ...(existsSync(resolve(imageDir,"candidate-review.json"))?[{kind:"candidate_review",path:resolve(imageDir,"candidate-review.json")}]:[]),
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
       ...(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)?[{kind:"incremental_retouch_plan",path:incrementalPlanPath}]:[]),
       {kind:"pipeline_state",path:statePath}
@@ -745,6 +761,13 @@ async function main(){
     asset_resolution:state.asset_resolution||{enabled:false,full_reuse_scenes:0,generation_required_scenes:0,generation_slots:0},
     qc_status:json(masterQc).status,
     creative_qc_status:state.creative_qc_status||"DISABLED",
+    candidate_review:state.candidate_review||null,
+    image_selection_policy:{
+      technical_provisional_selection_allowed:true,
+      machine_ranking_is_advisory:true,
+      human_candidate_review_required:true,
+      publication_authorized:false
+    },
     features:{
       video_timeline_v1:timelineEnabled,
       video_prosody_v1:prosodyEnabled,

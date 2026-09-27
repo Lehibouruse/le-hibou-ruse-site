@@ -120,16 +120,17 @@ export async function runImageGen(rawRequest) {
 
   const workflowFile = resolve(request.workflow_path);
   const workflow = applyWorkflowOverrides(JSON.parse(readFileSync(workflowFile, "utf8")), request.overrides || {});
-  const promptId = jobId;
   let lastError;
 
   for (let attempt = 0; attempt <= request.max_retries; attempt += 1) {
     try {
-      await fetchJson(new URL("/prompt", request.endpoint), {
+      const submitted = await fetchJson(new URL("/prompt", request.endpoint), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: workflow, client_id: "hibou-local-worker", prompt_id: promptId }),
+        body: JSON.stringify({ prompt: workflow, client_id: "hibou-local-worker" }),
       });
+      const promptId = String(submitted?.prompt_id || "").trim();
+      if (!promptId) fail("ComfyUI /prompt returned no prompt_id");
       const deadline = Date.now() + request.timeout_seconds * 1000;
       let history;
       while (Date.now() < deadline) {

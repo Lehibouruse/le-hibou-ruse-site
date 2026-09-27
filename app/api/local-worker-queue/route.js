@@ -309,6 +309,31 @@ async function autoChainAfterSuccess(completedRecordId) {
   };
 }
 
+async function markQueueValidationError(record, reason) {
+  const now = new Date().toISOString();
+  const error = cut(reason, 4000);
+
+  await updateRecord(TABLES.localWorkerQueue, record.id, {
+    Statut: "Error",
+    "Termin\u00e9 le": now,
+    Erreur: "queue_validation_failed: " + error,
+    "R\u00e9sultat JSON": JSON.stringify({
+      schema: "HIBOU_VIDEO_RENDER_QUEUE_VALIDATION_V1",
+      validated_at: now,
+      queue_valid: false,
+      error,
+      publication_authorized: false,
+      paid_fallback: false,
+    }),
+  });
+
+  return {
+    job_id: record.id,
+    error,
+    sanitized_at: now,
+  };
+}
+
 async function reconcileStaleRunning(request) {
   const session = cut(request.headers.get("x-hibou-worker-session"), 240);
   const worker = cut(request.headers.get("x-hibou-worker"), 180);
@@ -380,11 +405,13 @@ export async function GET(request) {
       filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
       pageSize: 50,
     });
-    const records = sortPendingRecords(pendingRecords).slice(0, 5);
+    const records = sortPendingRecords(pendingRecords);
 
     const jobs = [];
+    const queue_sanitization = [];
 
     for (const record of records) {
+      if (jobs.length >= 5) break;
       const options = parseOptions(record.fields?.["Options JSON"]);
       const contentId = String(options.content_id || "").trim();
 
@@ -417,8 +444,11 @@ export async function GET(request) {
       };
 
       if (!/^rec[A-Za-z0-9]{14}$/.test(contentId)) {
-        job.queue_error = "invalid_content_id";
-        jobs.push(job);
+        const sanitized = await markQueueValidationError(
+          record,
+          "invalid_content_id",
+        );
+        queue_sanitization.push(sanitized);
         continue;
       }
 
@@ -440,7 +470,13 @@ export async function GET(request) {
         job.storyboard = buildStoryboardContract(content, scenes);
         job.storyboard.runtime_commit = RUNTIME_COMMIT;
       } catch (error) {
-        job.queue_error = cut(error?.message || error, 1000);
+        const message = cut(error?.message || error, 1000);
+        const sanitized = await markQueueValidationError(
+          record,
+          message,
+        );
+        queue_sanitization.push(sanitized);
+        continue;
       }
 
       jobs.push(job);
@@ -453,6 +489,7 @@ export async function GET(request) {
       runtime_commit: RUNTIME_COMMIT,
       reconciliation,
       auto_activation,
+      queue_sanitization,
       generated_at: new Date().toISOString(),
     });
   } catch (error) {

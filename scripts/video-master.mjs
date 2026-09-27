@@ -331,7 +331,13 @@ async function main(){
       "--regen-attempts="+policy.regeneration_attempts
     ]);
     const result=json(resolve(imageDir,"factory-run.json"));
-    if(result.all_scenes_have_candidate!==true) fail("one or more scenes still have no QC PASS candidate");
+    if(result.all_scenes_have_candidate!==true){
+      const diagnostic={
+        technical_qc:result.technical_qc||null,
+        perceptual_qc:result.perceptual_qc||null
+      };
+      fail("one or more scenes still have no QC PASS candidate; diagnostics="+JSON.stringify(diagnostic));
+    }
   });
 
   const selections=resolve(imageDir,"selections.json");

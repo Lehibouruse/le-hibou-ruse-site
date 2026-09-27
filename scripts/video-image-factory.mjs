@@ -113,6 +113,33 @@ function provisionalSelections(qc,manifest){
   }
   return out;
 }
+
+function aggregatePerceptual(perceptual){
+  const reasons={};
+  const warnings={};
+  for(const summary of Object.values(perceptual?.scene_summary||{})){
+    for(const [name,count] of Object.entries(summary?.reason_counts||{})){
+      reasons[name]=(reasons[name]||0)+Number(count||0);
+    }
+    for(const [name,count] of Object.entries(summary?.warning_counts||{})){
+      warnings[name]=(warnings[name]||0)+Number(count||0);
+    }
+  }
+  return {
+    all_scenes_have_candidate:Boolean(perceptual?.all_scenes_have_candidate),
+    reason_counts:reasons,
+    warning_counts:warnings
+  };
+}
+
+function aggregateDimensions(tech){
+  const counts={};
+  for(const row of tech?.rows||[]){
+    const key=`${row.width||"?"}x${row.height||"?"}`;
+    counts[key]=(counts[key]||0)+1;
+  }
+  return counts;
+}
 export function factoryPolicy({maxScenes=1,maxRegenerationAttempts=1}={}){
   const scenes=Number(maxScenes), attempts=Number(maxRegenerationAttempts);
   if(!Number.isInteger(scenes)||scenes<1||scenes>20) fail("maxScenes must be 1..20");
@@ -192,6 +219,15 @@ async function main(){
     policy,
     regeneration_runs:regenRuns,
     all_scenes_have_candidate:perceptual.all_scenes_have_candidate,
+    technical_qc:{
+      all_scenes_have_candidate:Boolean(tech?.all_scenes_have_candidate),
+      failed_check_counts:tech?.failed_check_counts||{},
+      dimensions:aggregateDimensions(tech),
+      min_width:tech?.min_width??null,
+      min_height:tech?.min_height??null,
+      aspect_tolerance:tech?.aspect_tolerance??null
+    },
+    perceptual_qc:aggregatePerceptual(perceptual),
     provisional_selections:selections,
     publication_authorized:false
   };

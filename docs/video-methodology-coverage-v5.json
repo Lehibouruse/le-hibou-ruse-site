@@ -389,6 +389,15 @@
             "canonical suffix from resume_stage",
             "atomicWriteJson"
           ]
+        },
+        {
+          "path": "scripts/video-run-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RUN_AUDIT_V1",
+            "filesystem_mutation_performed: false",
+            "process_started: false",
+            "auditVideoRun"
+          ]
         }
       ],
       "tests": [
@@ -402,7 +411,8 @@
         "tests/video-pipeline-stage-history.test.mjs",
         "tests/video-worker-heartbeat-progress.test.mjs",
         "tests/video-resume-state.test.mjs",
-        "tests/video-remote-repair-resume.test.mjs"
+        "tests/video-remote-repair-resume.test.mjs",
+        "tests/video-run-audit.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -516,6 +526,15 @@
             "canonical suffix from resume_stage",
             "atomicWriteJson"
           ]
+        },
+        {
+          "path": "scripts/video-run-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RUN_AUDIT_V1",
+            "filesystem_mutation_performed: false",
+            "process_started: false",
+            "auditVideoRun"
+          ]
         }
       ],
       "tests": [
@@ -527,7 +546,8 @@
         "tests/video-pipeline-stage-history.test.mjs",
         "tests/video-worker-heartbeat-progress.test.mjs",
         "tests/video-resume-state.test.mjs",
-        "tests/video-remote-repair-resume.test.mjs"
+        "tests/video-remote-repair-resume.test.mjs",
+        "tests/video-run-audit.test.mjs"
       ],
       "e2e_pending": true
     },

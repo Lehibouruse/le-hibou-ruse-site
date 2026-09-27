@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 function fail(message){ throw new Error(message); }
@@ -285,4 +286,4 @@ async function main(){
   writeJson(resolve(root,"master-result.json"),final);
   process.stdout.write(JSON.stringify(final,null,2)+"\n");
 }
-if(import.meta.url===`file://${process.argv[1]}`) main().catch(error=>{console.error(String(error?.stack||error));process.exitCode=1;});
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href) main().catch(error=>{console.error(String(error?.stack||error));process.exitCode=1;});

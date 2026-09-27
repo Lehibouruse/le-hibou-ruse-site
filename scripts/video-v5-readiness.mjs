@@ -12,6 +12,7 @@ const FEATURE_GATES = [
   ["video_prosody_v1", "HIBOU_VIDEO_PROSODY_V1"],
   ["video_music_mix_v1", "HIBOU_VIDEO_MUSIC_V1"],
   ["video_incremental_retouch_v1", "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1"],
+  ["video_human_candidate_selection_v1", "HIBOU_VIDEO_HUMAN_SELECTION_V1"],
 ];
 
 function fail(message) {

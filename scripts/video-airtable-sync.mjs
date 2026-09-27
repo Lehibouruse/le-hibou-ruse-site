@@ -17,10 +17,11 @@ function parseJsonArray(value){
   try{ const parsed=JSON.parse(value); return Array.isArray(parsed)?parsed:[]; }catch{return [];}
 }
 
-export function buildStoryboardContract(contentRecord, sceneRecords){
+export function buildStoryboardContract(contentRecord, sceneRecords, profileRecord=null){
   const content=contentRecord?.fields||{};
+  const profile=profileRecord?.fields||{};
   const ordered=[...sceneRecords].sort((a,b)=>Number(a.fields?.Ordre||0)-Number(b.fields?.Ordre||0));
-  if(ordered.length<15||ordered.length>25) fail(`scene_count must be 15..25, got ${ordered.length}`);
+  if(ordered.length<8||ordered.length>18) fail(`scene_count must be 8..18, got ${ordered.length}`);
   const script=norm(content.Script);
   if(!script) fail("Content Pipeline Script is empty");
   const reconstructed=norm(ordered.map(r=>r.fields?.Narration||"").join(" "));
@@ -33,7 +34,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords){
     const order=Number(f.Ordre);
     if(order!==index+1) fail("scene order must be contiguous");
     const duration=Number(f["Durée secondes"]);
-    if(!Number.isFinite(duration)||duration<1.5||duration>2.5) fail(`${f.Scène||record.id}: duration must be 1.5..2.5 s`);
+    if(!Number.isFinite(duration)||duration<2.5||duration>5.5) fail(`${f.Scène||record.id}: duration must be 2.5..5.5 s`);
     total+=duration;
     const candidates=parseJsonArray(f["Candidats JSON"]);
     return {
@@ -68,10 +69,32 @@ export function buildStoryboardContract(contentRecord, sceneRecords){
       content_id:contentRecord.id,
       title:String(content.Sujet||""),
       script_version:Number(content["Version script"]||1),
-      profile_version:"HIBOU_VIRAL_V1@2.0",
-      method_version:"VIDEO_METHOD_V3",
+      profile_version:String(profile.Version||"HIBOU_VIRAL_V1@2.3-V4.1"),
+      method_version:"VIDEO_METHOD_V4",
       source:"airtable",
       exported_at:new Date().toISOString()
+    },
+    creative:{
+      profile_name:String(profile.Profil||"HIBOU_VIRAL_V1"),
+      description:String(profile.Description||""),
+      style_lock:String(profile["Style lock"]||""),
+      negative_prompt:String(profile["Negative prompt"]||""),
+      character_lock:String(profile["Character lock Hibou"]||""),
+      content_brief:String(content["Prompt / consignes"]||""),
+      language:"fr",
+      text_in_generated_images:false,
+      branding:{
+        text:"Le Hibou Rusé",
+        position:"bottom-center",
+        size:"small",
+        color:"ink",
+        source:"post-production"
+      },
+      pacing:{
+        scene_duration_target_s:[2.5,4.5],
+        scene_duration_allowed_s:[2.5,5.5],
+        cadence:"intonation-adaptive"
+      }
     },
     engine:{renderer:"ffmpeg",renderer_version:"video-local-render-v1",fps:30,width:1080,height:1920,preset:"medium"},
     scenes,
@@ -129,7 +152,9 @@ export async function exportFromAirtable(contentId, outputPath){
   if(!ids.length) fail("Content Pipeline record has no linked Scènes vidéo");
   const scenes=[];
   for(const id of ids) scenes.push(await getRecord(TABLES.videoScenes,id));
-  const contract=buildStoryboardContract(content,scenes);
+  const profileIds=linkedIds(content.fields?.["Profil vidéo"]);
+  const profile=profileIds.length?await getRecord(TABLES.videoProfiles,profileIds[0]):null;
+  const contract=buildStoryboardContract(content,scenes,profile);
   mkdirSync(dirname(resolve(outputPath)),{recursive:true});
   writeFileSync(resolve(outputPath),JSON.stringify(contract,null,2));
   return contract;

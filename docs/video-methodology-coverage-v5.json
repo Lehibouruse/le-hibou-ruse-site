@@ -97,6 +97,13 @@
           "markers": [
             "HIBOU_PROSODY_PLAN_V1"
           ]
+        },
+        {
+          "path": "scripts/video-voice-duration-qc.mjs",
+          "markers": [
+            "HIBOU_VOICE_DURATION_QC_V1",
+            "duration_far_above_expected_speech_rate"
+          ]
         }
       ],
       "tests": [
@@ -112,12 +119,25 @@
           "path": "scripts/video-audio-master.mjs"
         },
         {
-          "path": "scripts/chatterbox-storyboard-batch.py"
+          "path": "scripts/chatterbox-storyboard-batch.py",
+          "markers": [
+            "HIBOU_VOICE_DURATION_RETRY",
+            "duration_retry_seed_offset"
+          ]
+        },
+        {
+          "path": "scripts/video-voice-duration-qc.mjs",
+          "markers": [
+            "HIBOU_VOICE_DURATION_QC_V1",
+            "duration_far_above_expected_speech_rate"
+          ]
         }
       ],
       "tests": [
         "tests/video-voice-qc.test.mjs",
-        "tests/video-voice-low-vram.test.mjs"
+        "tests/video-voice-low-vram.test.mjs",
+        "tests/video-voice-duration-qc.test.mjs",
+        "tests/video-voice-duration-retry.test.mjs"
       ],
       "e2e_pending": true
     },

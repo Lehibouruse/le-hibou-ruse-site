@@ -89,6 +89,7 @@ jobs:
             tests/video-resume-state.test.mjs \
             tests/video-worker-failure-resume-diagnostic.test.mjs \
             tests/video-pipeline-stage-history.test.mjs \
+            tests/video-pipeline-atomic-state.test.mjs \
             tests/video-worker-heartbeat-progress.test.mjs \
             tests/video-comfy-runtime-health.test.mjs \
             tests/video-local-render.test.mjs \

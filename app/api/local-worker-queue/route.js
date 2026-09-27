@@ -432,6 +432,10 @@ export async function GET(request) {
             0,
             Math.min(2, Number(options.regen_attempts || 1)),
           ),
+          preview_mode: options.preview_mode === true,
+          candidates_per_scene: options.preview_mode === true
+            ? 1
+            : Math.max(1, Math.min(3, Number(options.candidates_per_scene || 3))),
           report_airtable: false,
           human_review_required: true,
           publication_authorized: false,
@@ -467,7 +471,24 @@ export async function GET(request) {
           scenes.push(await getRecord(TABLES.videoScenes, sceneId));
         }
 
-        job.storyboard = buildStoryboardContract(content, scenes);
+        const profileIds = linkedIds(content.fields?.["Profil vidéo"]);
+        const profile = profileIds.length
+          ? await getRecord(TABLES.videoProfiles, profileIds[0])
+          : null;
+
+        job.storyboard = buildStoryboardContract(content, scenes, profile);
+        job.storyboard.production = {
+          mode: options.preview_mode === true ? "preview" : "final",
+          candidates_per_scene: options.preview_mode === true
+            ? 1
+            : Math.max(1, Math.min(3, Number(options.candidates_per_scene || 3))),
+          regeneration_attempts: options.preview_mode === true
+            ? 0
+            : Math.max(0, Math.min(2, Number(options.regen_attempts || 1))),
+          full_master_allowed: options.preview_mode !== true,
+          human_review_required: true,
+          publication_authorized: false
+        };
         job.storyboard.runtime_commit = RUNTIME_COMMIT;
       } catch (error) {
         const message = cut(error?.message || error, 1000);

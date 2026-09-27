@@ -84,6 +84,8 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-audio-master.mjs","masterAudio"],
   ["video-audio-mix.mjs","HIBOU_AUDIO_MIX_V1"],
   ["video-prosody-plan.mjs","HIBOU_PROSODY_PLAN_V1"],
+  ["video-hibou-pose-registry.mjs","HIBOU_POSE_REGISTRY_V1"],
+  ["hibou-poses.registry.v1.json","HIBOU_POSE_REGISTRY_V1","video/assets/hibou-poses.registry.v1.json"],
   ["video-attach-mastered-audio.mjs","attachMasteredAudio"],
   ["video-subtitles.mjs","buildAss"],
   ["video-attach-subtitles.mjs","attachSubtitles"],
@@ -100,11 +102,12 @@ async function ensurePreImageRuntimeBundle(commit){
     "LeHibou","pre-image-runtime",normalized
   );
   mkdirSync(localBase,{recursive:true});
-  for(const [name,marker] of PRE_IMAGE_RUNTIME_FILES){
+  for(const [name,marker,sourcePath] of PRE_IMAGE_RUNTIME_FILES){
     const target=resolve(localBase,name);
     let source=existsSync(target)?readFileSync(target,"utf8"):"";
     if(!source.includes(marker)){
-      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/scripts/${name}`;
+      const repoPath=sourcePath||`scripts/${name}`;
+      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/${repoPath}`;
       const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
       if(!response.ok) fail(`pre-image runtime download failed HTTP ${response.status}: ${name}@${normalized}`);
       source=await response.text();
@@ -116,6 +119,8 @@ async function ensurePreImageRuntimeBundle(commit){
     audioMaster:resolve(localBase,"video-audio-master.mjs"),
     audioMix:resolve(localBase,"video-audio-mix.mjs"),
     prosody:resolve(localBase,"video-prosody-plan.mjs"),
+    poseRegistryScript:resolve(localBase,"video-hibou-pose-registry.mjs"),
+    poseRegistry:resolve(localBase,"hibou-poses.registry.v1.json"),
     attachAudio:resolve(localBase,"video-attach-mastered-audio.mjs"),
     subtitles:resolve(localBase,"video-subtitles.mjs"),
     attachSubtitles:resolve(localBase,"video-attach-subtitles.mjs"),
@@ -297,7 +302,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","prosody","voice","audio_master","music_mix","audio_attach","subtitles","style","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","prosody","voice","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -378,12 +383,33 @@ async function main(){
     else writeJson(styled,json(captioned));
   });
 
+  const poseRegistryEnabled=contractFeature(storyboardData,"video_pose_registry_v1","HIBOU_VIDEO_POSE_REGISTRY_V1");
+  const posed=resolve(root,"contract-posed.json");
+  if(poseRegistryEnabled){
+    stage(state,"pose_registry",()=>{
+      run(process.execPath,[preRuntime.poseRegistryScript,styled,preRuntime.poseRegistry,posed]);
+      const p=json(posed).pose_registry_application||{};
+      state.pose_registry={
+        applied_scenes:Number(p.applied_scenes||0),
+        unresolved_scenes:Number(p.unresolved_scenes||0),
+        generation_requested:false
+      };
+      writeJson(statePath,state);
+    });
+  }else{
+    if(!existsSync(posed)) writeJson(posed,json(styled));
+    if(!state.stages.pose_registry){
+      state.stages.pose_registry={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+      writeJson(statePath,state);
+    }
+  }
+
   const assetResolved=resolve(root,"contract-assets-resolved.json");
   stage(state,"asset_resolution",()=>{
     if(assetGraphArg){
-      run(process.execPath,[preRuntime.assetResolve,styled,resolve(assetGraphArg),assetResolved]);
+      run(process.execPath,[preRuntime.assetResolve,posed,resolve(assetGraphArg),assetResolved]);
     }else{
-      writeJson(assetResolved,json(styled));
+      writeJson(assetResolved,json(posed));
     }
     const resolved=json(assetResolved);
     state.asset_resolution={
@@ -542,7 +568,8 @@ async function main(){
     features:{
       video_prosody_v1:prosodyEnabled,
       video_music_mix_v1:musicEnabled,
-      video_creative_qc_v1:creativeQcEnabled
+      video_creative_qc_v1:creativeQcEnabled,
+      video_pose_registry_v1:poseRegistryEnabled
     },
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,

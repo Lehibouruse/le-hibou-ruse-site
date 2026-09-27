@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyPoseToScene, resolvePose, validatePoseRegistry } from "../scripts/video-hibou-pose-registry.mjs";
+import { applyPoseRegistryToContract, applyPoseToScene, resolvePose, validatePoseRegistry } from "../scripts/video-hibou-pose-registry.mjs";
 
 const registry={
  schema:"HIBOU_POSE_REGISTRY_V1",
@@ -33,4 +33,17 @@ test("pose can be applied statically or as an intra-scene timed event",()=>{
  const timed=applyPoseToScene({scene_id:"S02"},pose,{timelineWindow:{start_s:2,end_s:5}});
  assert.equal(timed.timeline.events[0].type,"pose");
  assert.equal(timed.timeline.events[0].start_s,2);
+});
+
+test("contract application reuses only ready poses and never generates planned ones",()=>{
+ const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",scenes:[
+   {scene_id:"S01",pose_request:"pointe"},
+   {scene_id:"S02",pose_request:"contrat"}
+ ]};
+ const out=applyPoseRegistryToContract(contract,registry,{registryPath:"/tmp/poses/registry.json"});
+ assert.equal(out.pose_registry_application.applied_scenes,1);
+ assert.equal(out.pose_registry_application.unresolved_scenes,1);
+ assert.equal(out.pose_registry_application.generation_requested,false);
+ assert.match(out.scenes[0].composition.character_pose.path,/poses\/pointe\.webp$/);
+ assert.equal(out.scenes[1].pose_registry_resolution.status,"UNRESOLVED");
 });

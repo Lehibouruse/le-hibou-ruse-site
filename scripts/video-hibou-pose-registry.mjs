@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export const POSE_REGISTRY_SCHEMA="HIBOU_POSE_REGISTRY_V1";
 
@@ -87,4 +89,74 @@ export function applyPoseToScene(scene, pose, {timelineWindow=null,overrides={}}
     sha256:pose.sha256||null
   };
   return out;
+}
+
+export function applyPoseRegistryToContract(contract, registry, {registryPath=""}={}){
+  validatePoseRegistry(registry);
+  const out=JSON.parse(JSON.stringify(contract||{}));
+  if(out.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported video contract");
+  const root=registryPath?dirname(resolve(registryPath)):process.cwd();
+  let applied=0, unresolved=0;
+  out.scenes=(out.scenes||[]).map(scene=>{
+    const request=String(scene.pose_request||"").trim();
+    if(!request) return scene;
+    const result=resolvePose(registry,request);
+    if(!result.found){
+      unresolved+=1;
+      return {
+        ...scene,
+        pose_registry_resolution:{
+          schema:POSE_REGISTRY_SCHEMA,
+          request,
+          status:"UNRESOLVED",
+          reason:result.reason,
+          generation_requested:false
+        }
+      };
+    }
+    const selected={...result.pose};
+    selected.asset_ref=isAbsolute(selected.asset_ref)
+      ?selected.asset_ref
+      :resolve(root,selected.asset_ref);
+    const withPose=applyPoseToScene(scene,selected);
+    withPose.pose_registry_resolution={
+      schema:POSE_REGISTRY_SCHEMA,
+      request,
+      status:"READY_REUSE",
+      pose_id:selected.id,
+      asset_ref:selected.asset_ref,
+      sha256:selected.sha256||null,
+      generation_requested:false
+    };
+    applied+=1;
+    return withPose;
+  });
+  out.pose_registry_application={
+    schema:"HIBOU_POSE_REGISTRY_APPLICATION_V1",
+    registry_schema:registry.schema,
+    identity:registry.identity||"HIBOU_CANONICAL_V1",
+    applied_scenes:applied,
+    unresolved_scenes:unresolved,
+    generation_requested:false,
+    paid_fallback:false
+  };
+  return out;
+}
+
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+  const [contractPath,registryPath,outputPath]=process.argv.slice(2);
+  if(!contractPath||!registryPath||!outputPath){
+    fail("usage: video-hibou-pose-registry.mjs contract.json registry.json output.json");
+  }
+  const contract=JSON.parse(readFileSync(resolve(contractPath),"utf8"));
+  const registry=loadPoseRegistry(resolve(registryPath));
+  const out=applyPoseRegistryToContract(contract,registry,{registryPath});
+  writeFileSync(resolve(outputPath),JSON.stringify(out,null,2)+"\n","utf8");
+  process.stdout.write(JSON.stringify({
+    ok:true,
+    schema:"HIBOU_POSE_REGISTRY_APPLICATION_V1",
+    output:resolve(outputPath),
+    applied_scenes:out.pose_registry_application.applied_scenes,
+    unresolved_scenes:out.pose_registry_application.unresolved_scenes
+  })+"\n");
 }

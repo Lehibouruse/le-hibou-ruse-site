@@ -7,7 +7,7 @@ const promote=readFileSync(new URL("../scripts/video-storyboard-promote.mjs",imp
 
 test("V5 execution needs both GLOBAL contract feature and local runtime gate",()=>{
  assert.match(master,/contract\?\.features\?\.\[name\]===true && envFlag\(envName\)/);
- for(const name of ["HIBOU_VIDEO_PROSODY_V1","HIBOU_VIDEO_MUSIC_V1","HIBOU_VIDEO_CREATIVE_QC_V1"]) assert.match(master,new RegExp(name));
+ for(const name of ["HIBOU_VIDEO_PROSODY_V1","HIBOU_VIDEO_MUSIC_V1","HIBOU_VIDEO_CREATIVE_QC_V1","HIBOU_VIDEO_POSE_REGISTRY_V1"]) assert.match(master,new RegExp(name));
 });
 
 test("Airtable export separates GLOBAL feature/music configuration from scene-specific events",()=>{
@@ -23,4 +23,11 @@ test("promotion copies timed object and pose assets before render",()=>{
  assert.match(promote,/scene\?\.timeline\?\.events/);
  assert.match(promote,/\["object","pose"\]/);
  assert.match(promote,/timeline-\$\{index\+1\}/);
+});
+
+test("pose registry is commit-pinned and applied before asset resolution",()=>{
+ assert.match(master,/video-hibou-pose-registry\.mjs/);
+ assert.match(master,/video\/assets\/hibou-poses\.registry\.v1\.json/);
+ assert.match(master,/stage\(state,"pose_registry"/);
+ assert.ok(master.indexOf('stage(state,"pose_registry"') < master.indexOf('stage(state,"asset_resolution"'));
 });

@@ -23,7 +23,8 @@ test("queue ordering has stable record id tie-break", () => {
   assert.match(route, /localeCompare\(String\(b\.id \|\| ""\)\)/);
 });
 
-test("route inspects a wider pending window but serves only five ordered jobs", () => {
+test("route inspects a wider pending window and stops after five valid ordered jobs", () => {
   assert.match(route, /pageSize: 50/);
-  assert.match(route, /sortPendingRecords\(pendingRecords\)\.slice\(0, 5\)/);
+  assert.match(route, /const records = sortPendingRecords\(pendingRecords\)/);
+  assert.match(route, /if \(jobs\.length >= 5\) break/);
 });

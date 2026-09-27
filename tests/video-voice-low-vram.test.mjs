@@ -36,3 +36,28 @@ test("video master captures child stdout and stderr tails on failure", () => {
   assert.match(master, /process\.stderr\.write\(r\.stderr\)/);
   assert.match(master, /String\(r\.stderr\|\|r\.stdout\|\|""\)\.slice\(-12000\)/);
 });
+
+
+test("launcher installs canonical video runtimes outside the working repository", () => {
+  const launcher = readFileSync(
+    new URL("../scripts/start-hibou-video-stack.ps1", import.meta.url),
+    "utf8",
+  );
+  assert.match(launcher, /video-master\.runtime\.mjs/);
+  assert.match(launcher, /chatterbox-storyboard-batch\.runtime\.py/);
+  assert.match(launcher, /HIBOU_VIDEO_MASTER_SCRIPT/);
+  assert.match(launcher, /HIBOU_CHATTERBOX_BATCH_SCRIPT/);
+  assert.match(launcher, /-m py_compile \$RuntimeVoice/);
+  assert.doesNotMatch(launcher, /OutFile \(Join-Path \$ProjectRoot "scripts\\video-master\.mjs"\)/);
+});
+
+test("worker and master honor installed runtime overrides", () => {
+  const worker = readFileSync(
+    new URL("../scripts/hibou-github-worker.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(worker, /HIBOU_VIDEO_MASTER_SCRIPT/);
+  assert.match(worker, /video_master_script_exists/);
+  assert.match(master, /HIBOU_CHATTERBOX_BATCH_SCRIPT/);
+  assert.match(master, /chatterbox batch script missing/);
+});

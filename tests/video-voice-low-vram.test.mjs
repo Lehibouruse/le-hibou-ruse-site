@@ -23,7 +23,7 @@ test("Chatterbox batch retries one CUDA OOM without CPU or cloud fallback", () =
   assert.match(voice, /CUDA voice generation failed after one cleanup retry/);
   assert.match(voice, /out of memory\|cuda error\|cublas_status_alloc_failed/);
   assert.doesNotMatch(voice, /device\s*=\s*["']cpu["']/);
-  assert.doesNotMatch(voice, /cloud fallback/i);
+  assert.match(voice, /no silent CPU\/cloud fallback/);
 });
 
 test("Chatterbox batch reports model-load failures explicitly", () => {

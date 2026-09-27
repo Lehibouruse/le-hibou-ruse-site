@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSceneRenderFingerprint, renderEncodingPolicy, validateVideoContract } from "../scripts/video-local-render.mjs";
+import { buildSceneRenderFingerprint, buildSubtitleFontRuntime, renderEncodingPolicy, validateVideoContract } from "../scripts/video-local-render.mjs";
 
 test("un contrat storyboard est refusé explicitement par le renderer", () => {
   const contract = {
@@ -58,4 +58,30 @@ test("scene render fingerprint changes when encode quality changes",()=>{
   const a=buildSceneRenderFingerprint({contract,plan,assetHashes:["a".repeat(64)],duration:4,preset:"veryfast",crf:23});
   const b=buildSceneRenderFingerprint({contract,plan,assetHashes:["a".repeat(64)],duration:4,preset:"veryfast",crf:18});
   assert.notEqual(a,b);
+});
+
+
+test("windows subtitle runtime is self-contained and points at Windows fonts",()=> {
+  const plan=buildSubtitleFontRuntime({
+    platform:"win32",
+    workDir:"C:\\temp\\hibou-render",
+    windowsDir:"C:\\Windows",
+  });
+  assert.equal(plan.enabled,true);
+  assert.match(plan.fonts_dir,/Windows[\\/]Fonts$/);
+  assert.match(plan.fontconfig_file,/fontconfig[\\/]fonts\.conf$/);
+  assert.match(plan.fontconfig_xml,/<fontconfig>/);
+  assert.match(plan.fontconfig_xml,/Windows\/Fonts/);
+  assert.equal(plan.env.FONTCONFIG_FILE,plan.fontconfig_file);
+  assert.equal(plan.env.FONTCONFIG_PATH,plan.fontconfig_dir);
+});
+
+test("non-Windows subtitle runtime leaves system font configuration untouched",()=> {
+  const plan=buildSubtitleFontRuntime({
+    platform:"linux",
+    workDir:"/tmp/hibou-render",
+  });
+  assert.equal(plan.enabled,false);
+  assert.deepEqual(plan.env,{});
+  assert.equal(plan.fonts_dir,null);
 });

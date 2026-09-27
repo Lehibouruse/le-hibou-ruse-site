@@ -448,16 +448,34 @@ async function ensureCanonicalVideoRuntimes(job) {
     throw new Error("VIDEO_RENDER runtime_commit missing or invalid");
   }
 
+  const diagnosticRuntimeDir = path.join(
+    LOG_DIR,
+    "diagnostic-runtime",
+    commit,
+  );
+  const resumePlanScript = path.join(
+    diagnosticRuntimeDir,
+    "video-resume-plan.mjs",
+  );
+  const voiceDurationQcScript = path.join(
+    diagnosticRuntimeDir,
+    "video-voice-duration-qc.mjs",
+  );
+
   if (
     state.runtime_commit === commit &&
     existsSync(VIDEO_MASTER_SCRIPT) &&
-    existsSync(CHATTERBOX_BATCH_SCRIPT)
+    existsSync(CHATTERBOX_BATCH_SCRIPT) &&
+    existsSync(resumePlanScript) &&
+    existsSync(voiceDurationQcScript)
   ) {
+    state.runtime_resume_plan_path = resumePlanScript;
     return {
       commit,
       master: VIDEO_MASTER_SCRIPT,
       voice: CHATTERBOX_BATCH_SCRIPT,
       comfy_start: COMFYUI_START_SCRIPT,
+      resume_plan: resumePlanScript,
       refreshed: false,
     };
   }
@@ -492,10 +510,33 @@ async function ensureCanonicalVideoRuntimes(job) {
     ],
   );
 
+  const voiceDurationQc = await installPinnedRuntime(
+    commit,
+    "scripts/video-voice-duration-qc.mjs",
+    voiceDurationQcScript,
+    [
+      "HIBOU_VOICE_DURATION_QC_V1",
+      "auditVoiceDurations",
+    ],
+  );
+
+  const resumePlan = await installPinnedRuntime(
+    commit,
+    "scripts/video-resume-plan.mjs",
+    resumePlanScript,
+    [
+      "HIBOU_VIDEO_RESUME_PLAN_V1",
+      "execution_performed: false",
+    ],
+  );
+
   state.runtime_commit = commit;
   state.runtime_master_sha256 = master.sha256;
   state.runtime_voice_sha256 = voice.sha256;
   state.runtime_comfy_start_sha256 = comfyStart.sha256;
+  state.runtime_voice_duration_qc_sha256 = voiceDurationQc.sha256;
+  state.runtime_resume_plan_sha256 = resumePlan.sha256;
+  state.runtime_resume_plan_path = resumePlan.path;
 
   log("VIDEO_RENDER runtimes refreshed", {
     commit,
@@ -505,6 +546,8 @@ async function ensureCanonicalVideoRuntimes(job) {
     voice_sha256: voice.sha256,
     comfy_start: comfyStart.path,
     comfy_start_sha256: comfyStart.sha256,
+    resume_plan: resumePlan.path,
+    resume_plan_sha256: resumePlan.sha256,
   });
 
   return {
@@ -512,6 +555,7 @@ async function ensureCanonicalVideoRuntimes(job) {
     master: master.path,
     voice: voice.path,
     comfy_start: comfyStart.path,
+    resume_plan: resumePlan.path,
     refreshed: true,
   };
 }
@@ -546,6 +590,102 @@ function pipelineFailureDetail(dir) {
   } catch {
     return "";
   }
+}
+
+function buildVideoFailureDiagnostic(job, errorMessage) {
+  const jobId = String(job?.id || "").trim();
+  const dir = jobId
+    ? path.join(VIDEO_OUTPUT_ROOT, safePart(jobId))
+    : null;
+  const generatedAt = new Date().toISOString();
+  const diagnostic = {
+    schema: "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+    job: jobId || null,
+    content_id: String(job?.options?.content_id || "") || null,
+    worker: WORKER_ID,
+    worker_session: state.worker_session,
+    generated_at: generatedAt,
+    error: String(errorMessage || "").slice(0, 12000),
+    local_root: dir,
+    resume_plan_path: null,
+    resume_plan: null,
+    resume_planner_executed: false,
+    resume_execution_performed: false,
+    human_review_required: true,
+    publication_authorized: false,
+    paid_fallback: false,
+  };
+
+  if (!dir || !existsSync(path.join(dir, "pipeline-run.json"))) {
+    return diagnostic;
+  }
+
+  const planner = String(state.runtime_resume_plan_path || "").trim();
+  if (!planner || !existsSync(planner)) {
+    diagnostic.resume_plan_error = "commit-pinned resume planner unavailable";
+    return diagnostic;
+  }
+
+  const output = path.join(dir, "_hibou_video_resume_plan.json");
+  const planned = spawnSync(
+    process.execPath,
+    [planner, dir, output, `--platform=${process.platform}`],
+    {
+      cwd: PROJECT_ROOT,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+      maxBuffer: 8 * 1024 * 1024,
+    },
+  );
+  diagnostic.resume_planner_executed = true;
+
+  if (planned.status !== 0 || !existsSync(output)) {
+    diagnostic.resume_plan_error =
+      String(planned.stderr || planned.stdout || "resume planner failed")
+        .slice(-4000);
+    return diagnostic;
+  }
+
+  try {
+    const plan = JSON.parse(readFileSync(output, "utf8"));
+    diagnostic.resume_plan_path = output;
+    diagnostic.resume_plan = {
+      schema: plan.schema || null,
+      resume_required: Boolean(plan.resume_required),
+      resume_stage: plan.resume_stage || null,
+      failed_stages: Array.isArray(plan.failed_stages)
+        ? plan.failed_stages.slice(0, 30)
+        : [],
+      inferred_invalidations: Array.isArray(plan.inferred_invalidations)
+        ? plan.inferred_invalidations.slice(0, 30)
+        : [],
+      stages_to_reset: Array.isArray(plan.stages_to_reset)
+        ? plan.stages_to_reset.slice(0, 40)
+        : [],
+      preservable_artifacts: plan.preservable_artifacts || null,
+      required_runtime_capabilities:
+        Array.isArray(plan.required_runtime_capabilities)
+          ? plan.required_runtime_capabilities.slice(0, 30)
+          : [],
+      execution_performed: false,
+      publication_authorized: false,
+    };
+  } catch (error) {
+    diagnostic.resume_plan_error =
+      "resume plan unreadable: " + String(error?.message || error);
+  }
+
+  try {
+    writeFileSync(
+      path.join(dir, "_hibou_video_failure_diagnostic.json"),
+      JSON.stringify(diagnostic, null, 2) + "\n",
+      "utf8",
+    );
+  } catch {}
+
+  return diagnostic;
 }
 
 function pipelineHeartbeatSnapshot(dir) {
@@ -2065,10 +2205,14 @@ async function tick() {
       error: message,
     });
 
+    let failureDiagnostic = null;
     try {
       if (job?.type === "VIDEO_RENDER") {
+        failureDiagnostic = buildVideoFailureDiagnostic(job, message);
         await reportVideoProgress(job, "Error", {
           error: message,
+          local_path: failureDiagnostic.local_root || undefined,
+          result: failureDiagnostic,
         });
       } else {
         await reportProgress(job, "Error", {
@@ -2092,6 +2236,9 @@ async function tick() {
       attempts,
       last_error: message.slice(0, 1500),
       failed_at: new Date().toISOString(),
+      resume_stage: failureDiagnostic?.resume_plan?.resume_stage || null,
+      resume_plan_path: failureDiagnostic?.resume_plan_path || null,
+      resume_execution_performed: false,
       retry_after:
         Date.now() +
         (attempts >= 2
@@ -2141,6 +2288,9 @@ function healthServer() {
       runtime_master_sha256: state.runtime_master_sha256 || null,
       runtime_voice_sha256: state.runtime_voice_sha256 || null,
       runtime_comfy_start_sha256: state.runtime_comfy_start_sha256 || null,
+      runtime_voice_duration_qc_sha256: state.runtime_voice_duration_qc_sha256 || null,
+      runtime_resume_plan_sha256: state.runtime_resume_plan_sha256 || null,
+      runtime_resume_plan_path: state.runtime_resume_plan_path || null,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

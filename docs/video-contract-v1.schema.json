@@ -232,8 +232,48 @@
               },
               "intent": {
                 "type": "string"
+              },
+              "verbatim": {
+                "type": "boolean"
+              },
+              "prosody_cues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phrase": {
+                      "type": "string"
+                    },
+                    "pause_before_ms": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "pause_after_ms": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "relative_speed_pct": {
+                      "type": "number",
+                      "minimum": 85,
+                      "maximum": 115
+                    },
+                    "emphasis": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
+          },
+          "timeline": {
+            "$ref": "./video-scene-timeline-v1.schema.json"
+          },
+          "pose_request": {
+            "type": "string"
           }
         }
       }
@@ -260,6 +300,27 @@
         "render_ready",
         "rendered"
       ]
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "video_timeline_v1": {
+          "type": "boolean"
+        },
+        "video_creative_qc_v1": {
+          "type": "boolean"
+        },
+        "video_pose_registry_v1": {
+          "type": "boolean"
+        },
+        "video_prosody_v1": {
+          "type": "boolean"
+        },
+        "video_music_mix_v1": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
     }
   }
 }

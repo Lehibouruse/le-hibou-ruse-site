@@ -123,6 +123,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
       fps: contract.engine.fps,
       preset,
       composition: plan.normalized,
+      timeline: plan.timeline,
       asset_sha256: assetHashes,
       duration,
     });

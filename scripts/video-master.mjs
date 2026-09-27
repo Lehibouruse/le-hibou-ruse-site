@@ -177,6 +177,7 @@ const POST_RUNTIME_FILES=[
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
   ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
   ["video-review-diff.mjs","HIBOU_INCREMENTAL_REVIEW_DIFF_V1"],
+  ["video-durable-storage-plan.mjs","HIBOU_DURABLE_STORAGE_PLAN_V1"],
   ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1"]
 ];
 
@@ -207,6 +208,7 @@ async function ensurePostRuntimeBundle(commit){
     registry:resolve(localBase,"video-artifact-registry.mjs"),
     humanReview:resolve(localBase,"video-human-review-package.mjs"),
     reviewDiff:resolve(localBase,"video-review-diff.mjs"),
+    storagePlan:resolve(localBase,"video-durable-storage-plan.mjs"),
     creativeQc:resolve(localBase,"video-creative-qc.py")
   };
 }
@@ -905,6 +907,29 @@ async function main(){
     run(process.execPath,[postRuntime.registry,registrySpec,registry]);
   });
 
+  const durableStoragePlan=resolve(root,"durable-storage-plan.json");
+  stage(state,"durable_storage_plan",()=>{
+    run(process.execPath,[
+      postRuntime.storagePlan,
+      registry,
+      durableStoragePlan,
+      contentId||String(storyboardData.content?.content_id||""),
+      ""
+    ]);
+    const plan=json(durableStoragePlan);
+    state.durable_storage_plan={
+      path:durableStoragePlan,
+      schema:String(plan.schema||""),
+      entry_count:Number(plan.entry_count||0),
+      total_size_bytes:Number(plan.total_size_bytes||0),
+      upload_performed:false,
+      files_moved:false,
+      files_deleted:false,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+  });
+
   stage(state,"airtable_report",()=>{
     if(!contentId){
       state.stages.airtable_report={status:"SKIPPED",reason:"file storyboard input"};
@@ -931,6 +956,7 @@ async function main(){
     master,
     master_qc:masterQc,
     artifact_registry:registry,
+    durable_storage_plan:state.durable_storage_plan||null,
     asset_resolution:state.asset_resolution||{enabled:false,full_reuse_scenes:0,generation_required_scenes:0,generation_slots:0},
     qc_status:json(masterQc).status,
     creative_qc_status:state.creative_qc_status||"DISABLED",

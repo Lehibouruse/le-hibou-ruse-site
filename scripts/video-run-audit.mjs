@@ -159,6 +159,49 @@ function imageSummary(root) {
   };
 }
 
+function resumePreparationSummary(root, state) {
+  const receipt = readJsonIf(
+    join(root, "_hibou_video_resume_apply_receipt.json"),
+  );
+  const remoteMarker = readJsonIf(
+    join(root, "_hibou_video_remote_repair_prepared.json"),
+  );
+  const prepared =
+    state?.pipeline_status === "RESUME_PREPARED" &&
+    state?.resume_prepared &&
+    typeof state.resume_prepared === "object";
+
+  return {
+    prepared: Boolean(prepared),
+    pipeline_status: state?.pipeline_status || null,
+    resume_stage:
+      String(
+        remoteMarker?.resume_stage ||
+        state?.resume_prepared?.resume_stage ||
+        "",
+      ) || null,
+    reset_stages: Array.isArray(remoteMarker?.reset_stages)
+      ? remoteMarker.reset_stages
+      : Array.isArray(receipt?.reset_stages)
+        ? receipt.reset_stages
+        : Array.isArray(state?.resume_prepared?.reset_stages)
+          ? state.resume_prepared.reset_stages
+          : [],
+    receipt_available: Boolean(receipt),
+    receipt_schema: receipt?.schema || null,
+    receipt_plan_sha256: receipt?.plan_sha256 || null,
+    remote_marker_available: Boolean(remoteMarker),
+    remote_marker_schema: remoteMarker?.schema || null,
+    requires_separate_render_start:
+      remoteMarker?.requires_separate_render_start === true ||
+      Boolean(prepared),
+    execution_started:
+      remoteMarker?.execution_started === true ||
+      state?.resume_prepared?.execution_started === true,
+    publication_authorized: false,
+  };
+}
+
 function renderSummary(root) {
   const cache = join(root, ".video-render-cache");
   const sceneClips = listMatching(
@@ -194,6 +237,7 @@ export function auditVideoRun(rootArg, { platform = process.platform } = {}) {
   const voice = voiceSummary(root);
   const images = imageSummary(root);
   const render = renderSummary(root);
+  const resumePreparation = resumePreparationSummary(root, state);
 
   let resume = null;
   try {
@@ -253,6 +297,17 @@ export function auditVideoRun(rootArg, { platform = process.platform } = {}) {
       scene_ids: images.candidate_review_ambiguous_scene_ids,
     });
   }
+  if (
+    resumePreparation.prepared &&
+    resumePreparation.requires_separate_render_start &&
+    !resumePreparation.execution_started
+  ) {
+    attention.push({
+      code: "resume_prepared_waiting_explicit_start",
+      resume_stage: resumePreparation.resume_stage,
+      reset_stages: resumePreparation.reset_stages,
+    });
+  }
 
   return {
     schema: RUN_AUDIT_SCHEMA,
@@ -274,6 +329,7 @@ export function auditVideoRun(rootArg, { platform = process.platform } = {}) {
     images,
     render,
     resume,
+    resume_preparation: resumePreparation,
     attention_required: attention.length > 0,
     attention,
     policy: {

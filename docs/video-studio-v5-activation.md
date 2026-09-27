@@ -77,6 +77,19 @@ Usages à différer jusqu'à la fin du rendu actif :
 Après le rendu actif, Desktop Commander pourra exécuter les E2E Windows, lire les manifests locaux, vérifier les caches et la reprise humaine, et réduire les copier-coller PowerShell. Le pipeline doit toutefois rester autonome si Desktop Commander est indisponible.
 
 
+
+### Audit local en lecture seule
+
+`node scripts/video-run-audit.mjs <render-root> --platform=win32` consolide sans mutation :
+- état et durée des stages ;
+- anomalies de durée voix ;
+- candidats/images générés et sélections ;
+- ambiguïtés de ranking ;
+- clips/visuel/master disponibles ;
+- plan de reprise calculé et caches conservables.
+
+Cette commande n'écrit rien dans le run, ne démarre aucun processus métier et peut être exécutée via Desktop Commander pour diagnostiquer un run depuis le téléphone.
+
 ## Reprise humaine distante
 
 Un job FINAL en `WAITING_HUMAN_SELECTION` peut être repris à distance sans accès direct au dossier local si :

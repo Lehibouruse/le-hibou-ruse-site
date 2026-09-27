@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderEncodingPolicy, validateVideoContract } from "../scripts/video-local-render.mjs";
+import { buildSceneRenderFingerprint, renderEncodingPolicy, validateVideoContract } from "../scripts/video-local-render.mjs";
 
 test("un contrat storyboard est refusé explicitement par le renderer", () => {
   const contract = {
@@ -49,4 +49,13 @@ test("final encoding keeps the premium defaults",()=>{
 
 test("encoding policy rejects unknown modes",()=>{
   assert.throws(()=>renderEncodingPolicy({production:{mode:"fastest"},engine:{}}),/preview or final/);
+});
+
+
+test("scene render fingerprint changes when encode quality changes",()=>{
+  const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",engine:{renderer:"ffmpeg",renderer_version:"v1",width:1080,height:1920,fps:30}};
+  const plan={normalized:{background:"x.png"},timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[]}};
+  const a=buildSceneRenderFingerprint({contract,plan,assetHashes:["a".repeat(64)],duration:4,preset:"veryfast",crf:23});
+  const b=buildSceneRenderFingerprint({contract,plan,assetHashes:["a".repeat(64)],duration:4,preset:"veryfast",crf:18});
+  assert.notEqual(a,b);
 });

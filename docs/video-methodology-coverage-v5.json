@@ -152,13 +152,25 @@
           ]
         },
         {
-          "path": "scripts/video-image-batch.mjs"
+          "path": "scripts/video-image-batch.mjs",
+          "markers": [
+            "elapsed_ms",
+            "mean_generated_candidate_elapsed_ms"
+          ]
+        },
+        {
+          "path": "scripts/video-image-factory.mjs",
+          "markers": [
+            "HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
+            "estimated_generation_seconds"
+          ]
         }
       ],
       "tests": [
         "tests/video-image-plan.test.mjs",
         "tests/video-image-batch.test.mjs",
-        "tests/comfy-prompt-id.test.mjs"
+        "tests/comfy-prompt-id.test.mjs",
+        "tests/video-image-factory.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -323,6 +335,20 @@
             "_hibou_video_resume_plan.json",
             "resume_execution_performed: false"
           ]
+        },
+        {
+          "path": "scripts/video-image-batch.mjs",
+          "markers": [
+            "elapsed_ms",
+            "mean_generated_candidate_elapsed_ms"
+          ]
+        },
+        {
+          "path": "scripts/video-image-factory.mjs",
+          "markers": [
+            "HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
+            "estimated_generation_seconds"
+          ]
         }
       ],
       "tests": [
@@ -330,7 +356,9 @@
         "tests/video-incremental-reuse.test.mjs",
         "tests/video-review-diff.test.mjs",
         "tests/video-resume-plan.test.mjs",
-        "tests/video-worker-failure-resume-diagnostic.test.mjs"
+        "tests/video-worker-failure-resume-diagnostic.test.mjs",
+        "tests/video-image-batch.test.mjs",
+        "tests/video-image-factory.test.mjs"
       ],
       "e2e_pending": true
     },

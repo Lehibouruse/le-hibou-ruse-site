@@ -19,7 +19,10 @@ test("voice runtime repairs Perth by pinning setuptools below 81 once", () => {
   assert.match(voice, /HIBOU_PERTH_REPAIR_ATTEMPTED/);
   assert.match(voice, /HIBOU_PERTH_REPAIR_START/);
   assert.match(voice, /HIBOU_PERTH_REPAIR_RESTART/);
-  assert.match(voice, /os\.execve\(sys\.executable/);
+  assert.match(voice, /restart = subprocess\.run\(/);
+  assert.match(voice, /\[sys\.executable, \*sys\.argv\]/);
+  assert.match(voice, /raise SystemExit\(restart\.returncode\)/);
+  assert.doesNotMatch(voice, /os\.execve\(/);
 });
 
 test("voice runtime fails closed if Perth repair does not succeed", () => {

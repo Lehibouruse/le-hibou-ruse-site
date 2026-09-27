@@ -235,7 +235,12 @@ def ensure_perth_watermarker():
         file=sys.stderr,
         flush=True,
     )
-    os.execve(sys.executable, [sys.executable, *sys.argv], env)
+    restart = subprocess.run(
+        [sys.executable, *sys.argv],
+        env=env,
+        check=False,
+    )
+    raise SystemExit(restart.returncode)
 
 if needs_generation:
     ensure_perth_watermarker()

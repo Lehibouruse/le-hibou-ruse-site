@@ -637,9 +637,91 @@ async function main(){
   });
 
   const selections=resolve(imageDir,"selections.json");
+  const candidateReviewPath=resolve(imageDir,"candidate-review.json");
+  const candidateDecisionsPath=resolve(imageDir,"candidate-decisions.json");
+  const humanSelectionManifest=resolve(imageDir,"candidate-selection-manifest.json");
+  const humanSelectionFeatureEnabled=contractFeature(
+    storyboardData,
+    "video_human_candidate_selection_v1",
+    "HIBOU_VIDEO_HUMAN_SELECTION_V1"
+  );
+  const humanSelectionEnabled=
+    humanSelectionFeatureEnabled &&
+    String(storyboardData.production?.mode||"final").toLowerCase()==="final";
+  const candidateReviewData=existsSync(candidateReviewPath)?json(candidateReviewPath):null;
+  const generatedCandidateSceneCount=Number(candidateReviewData?.scene_count||0);
+
+  if(humanSelectionFeatureEnabled&&!humanSelectionEnabled){
+    state.human_candidate_selection={
+      enabled:false,
+      reason:"preview_mode_does_not_pause_for_human_candidate_selection",
+      review_path:existsSync(candidateReviewPath)?candidateReviewPath:null,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+  }
+
+  if(
+    humanSelectionEnabled &&
+    generatedCandidateSceneCount>0 &&
+    !existsSync(candidateDecisionsPath)
+  ){
+    const waitingPath=resolve(root,"awaiting-human-selection.json");
+    const waiting={
+      schema:"HIBOU_VIDEO_MASTER_WAITING_HUMAN_SELECTION_V1",
+      status:"WAITING_HUMAN_SELECTION",
+      root,
+      candidate_review:candidateReviewPath,
+      candidate_review_html:existsSync(resolve(imageDir,"candidate-review.html"))?resolve(imageDir,"candidate-review.html"):null,
+      decisions_path:candidateDecisionsPath,
+      scene_count:generatedCandidateSceneCount,
+      resume_same_job:true,
+      images_will_be_reused:true,
+      human_review_required:true,
+      publication_authorized:false
+    };
+    state.human_candidate_selection={
+      enabled:true,
+      status:"WAITING_HUMAN_SELECTION",
+      review_path:candidateReviewPath,
+      decisions_path:candidateDecisionsPath,
+      scene_count:generatedCandidateSceneCount,
+      resume_same_job:true,
+      publication_authorized:false
+    };
+    state.pipeline_status="WAITING_HUMAN_SELECTION";
+    writeJson(waitingPath,waiting);
+    writeJson(statePath,state);
+    process.stdout.write(JSON.stringify({ok:true,...waiting})+"\n");
+    return;
+  }
+
   stage(state,"technical_selection",()=>{
     const provisional=json(resolve(imageDir,"selections.provisional.json"));
-    if(Object.keys(provisional||{}).length===0){
+    if(
+      humanSelectionEnabled &&
+      generatedCandidateSceneCount>0
+    ){
+      run(process.execPath,[
+        imageRuntime.selectionApply,
+        candidateReviewPath,
+        candidateDecisionsPath,
+        selections,
+        humanSelectionManifest
+      ]);
+      const humanManifest=json(humanSelectionManifest);
+      state.human_candidate_selection={
+        enabled:true,
+        status:"HUMAN_SELECTION_APPLIED",
+        review_path:candidateReviewPath,
+        decisions_path:candidateDecisionsPath,
+        manifest_path:humanSelectionManifest,
+        selection_count:Number(humanManifest.selection_count||0),
+        publication_authorized:false
+      };
+      state.pipeline_status="RUNNING_AFTER_HUMAN_SELECTION";
+      writeJson(statePath,state);
+    }else if(Object.keys(provisional||{}).length===0){
       writeJson(selections,{});
     }else{
       writeJson(selections,buildTechnicalSelections(provisional));
@@ -726,7 +808,8 @@ async function main(){
       video_music_mix_v1:musicEnabled,
       video_creative_qc_v1:creativeQcEnabled,
       video_pose_registry_v1:poseRegistryEnabled,
-      video_incremental_retouch_v1:incrementalEnabled
+      video_incremental_retouch_v1:incrementalEnabled,
+      video_human_candidate_selection_v1:humanSelectionEnabled
     }
   });
   stage(state,"human_review_manifest",()=>{
@@ -816,7 +899,8 @@ async function main(){
       video_music_mix_v1:musicEnabled,
       video_creative_qc_v1:creativeQcEnabled,
       video_pose_registry_v1:poseRegistryEnabled,
-      video_incremental_retouch_v1:incrementalEnabled
+      video_incremental_retouch_v1:incrementalEnabled,
+      video_human_candidate_selection_v1:humanSelectionEnabled
     },
     incremental_retouch:state.incremental_retouch||{enabled:false},
     execution_profile:state.execution_profile||null,

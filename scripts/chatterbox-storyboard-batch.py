@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy
+import gc
 import hashlib
 import json
 import os
@@ -132,12 +133,45 @@ for scene in scenes:
         "fingerprint": fingerprint, "scene_path": scene_path, "manifest_path": manifest_path, "cache": cache,
     })
 
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 try:
     import numpy as np
     import torch
     import torchaudio as ta
 except Exception as exc:
     fail(f"PyTorch/torchaudio dependencies unavailable: {exc}")
+
+def clear_cuda_cache():
+    gc.collect()
+    if device.startswith("cuda") and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+def generate_scene(model, text, native, scene_id):
+    clear_cuda_cache()
+    try:
+        return model.generate(
+            text,
+            language_id="fr",
+            exaggeration=native["exaggeration"],
+            temperature=native["temperature"],
+            cfg_weight=native["cfg_weight"],
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        if device.startswith("cuda") and re.search(r"out of memory|cuda error|cublas_status_alloc_failed", message, re.I):
+            clear_cuda_cache()
+            try:
+                return model.generate(
+                    text,
+                    language_id="fr",
+                    exaggeration=native["exaggeration"],
+                    temperature=native["temperature"],
+                    cfg_weight=native["cfg_weight"],
+                )
+            except Exception as retry_exc:
+                fail(f"{scene_id}: CUDA voice generation failed after one cleanup retry: {retry_exc}")
+        fail(f"{scene_id}: voice generation failed: {exc}")
 
 needs_generation = any(item["cache"] is None for item in descriptors)
 model = None
@@ -149,7 +183,11 @@ if needs_generation:
         fail(f"Chatterbox dependency unavailable: {exc}")
     if device.startswith("cuda") and not torch.cuda.is_available():
         fail("CUDA requested but unavailable; no silent CPU/cloud fallback")
-    model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model=model_variant)
+    clear_cuda_cache()
+    try:
+        model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model=model_variant)
+    except Exception as exc:
+        fail(f"Chatterbox model load failed on {device}: {exc}")
     if audio_prompt:
         model.prepare_conditionals(audio_prompt, exaggeration=default_exaggeration)
     sample_rate = int(model.sr)
@@ -175,14 +213,9 @@ for item in descriptors:
     else:
         native = item["native"]
         set_seed(native["seed"], np, torch, device)
-        wav = model.generate(
-            item["text"],
-            language_id="fr",
-            exaggeration=native["exaggeration"],
-            temperature=native["temperature"],
-            cfg_weight=native["cfg_weight"],
-        )
+        wav = generate_scene(model, item["text"], native, scene_id)
         wav = wav.detach().cpu()
+        clear_cuda_cache()
         if wav.ndim == 1:
             wav = wav.unsqueeze(0)
         if wav.ndim != 2:

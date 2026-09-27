@@ -282,6 +282,24 @@ export function masterPolicy({maxScenes=20,regenAttempts=1}={}){
     paid_fallback:false
   };
 }
+export function normalizeExecutionProfileOverride({mode="",candidates=""}={}){
+  const rawMode=String(mode||"").trim().toLowerCase();
+  if(rawMode && !["preview","final"].includes(rawMode)){
+    fail("production-mode override must be preview or final");
+  }
+  let candidateCount=null;
+  if(String(candidates??"").trim()!==""){
+    candidateCount=Number(candidates);
+    if(!Number.isInteger(candidateCount)||candidateCount<1||candidateCount>3){
+      fail("candidates-per-scene override must be 1..3");
+    }
+  }
+  return {
+    production_mode:rawMode||null,
+    candidates_per_scene:candidateCount
+  };
+}
+
 export function buildTechnicalSelections(provisional){
   const out={};
   for(const [sceneId,pick] of Object.entries(provisional||{})){
@@ -325,6 +343,8 @@ async function main(){
   const styleArg=arg("style","");
   const assetGraphArg=arg("asset-graph","");
   const reuseFromArg=arg("reuse-from","");
+  const productionModeArg=arg("production-mode","");
+  const candidatesPerSceneArg=arg("candidates-per-scene","");
   const maxScenes=Number(arg("max-scenes","20"));
   const regenAttempts=Number(arg("regen-attempts","1"));
   const reportAirtable=flag("report-airtable");
@@ -337,6 +357,10 @@ async function main(){
   if(assetGraphArg&&!existsSync(resolve(assetGraphArg))) fail("asset graph missing");
 
   const policy=masterPolicy({maxScenes,regenAttempts});
+  const executionOverride=normalizeExecutionProfileOverride({
+    mode:productionModeArg,
+    candidates:candidatesPerSceneArg
+  });
   const root=resolve(outputArg);
   mkdirSync(root,{recursive:true});
   const storyboard=resolve(root,"storyboard.json");
@@ -350,6 +374,7 @@ async function main(){
       root:resolve(reuseFromArg),
       storyboard_sha256:existsSync(resolve(reuseFromArg,"storyboard.json"))?sha256(resolve(reuseFromArg,"storyboard.json")):null
     }:null,
+    execution_override:executionOverride,
     policy
   };
   ensureSameRun(statePath,inputs);
@@ -386,6 +411,31 @@ async function main(){
   });
 
   const storyboardData=json(storyboard);
+  if(executionOverride.production_mode||executionOverride.candidates_per_scene!=null){
+    storyboardData.production={
+      ...(storyboardData.production||{}),
+      ...(executionOverride.production_mode?{mode:executionOverride.production_mode}:{}),
+      ...(executionOverride.candidates_per_scene!=null?{candidates_per_scene:executionOverride.candidates_per_scene}:{})
+    };
+    state.execution_profile={
+      source:"job_override",
+      production_mode:String(storyboardData.production.mode||"final"),
+      candidates_per_scene:Number(storyboardData.production.candidates_per_scene||0)||null,
+      global_visual_identity_unchanged:true,
+      publication_authorized:false
+    };
+    writeJson(storyboard,storyboardData);
+    writeJson(statePath,state);
+  }else{
+    state.execution_profile={
+      source:"storyboard_global_default",
+      production_mode:String(storyboardData.production?.mode||"final"),
+      candidates_per_scene:Number(storyboardData.production?.candidates_per_scene||0)||null,
+      global_visual_identity_unchanged:true,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+  }
   const timelineEnabled=contractFeature(storyboardData,"video_timeline_v1","HIBOU_VIDEO_TIMELINE_V1");
   if(!timelineEnabled){
     let stripped=0;
@@ -698,6 +748,7 @@ async function main(){
       video_incremental_retouch_v1:incrementalEnabled
     },
     incremental_retouch:state.incremental_retouch||{enabled:false},
+    execution_profile:state.execution_profile||null,
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,
     publication_authorized:false

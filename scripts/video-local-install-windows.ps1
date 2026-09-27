@@ -197,7 +197,18 @@ if ($InstallComfyUI) {
   }
   $versionScript = Join-Path $ComfyDir "comfyui_version.py"
   if (-not (Test-Path $versionScript)) { throw "Version ComfyUI introuvable : installation refusée." }
-  $actualComfyVersion = (& $ComfyPython -c "import importlib.util; s=importlib.util.spec_from_file_location('cv', r'$versionScript'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.__version__)" | Select-Object -First 1).Trim()
+  $versionProbe = Join-Path $env:TEMP "hibou-comfy-version-probe.py"
+  @(
+    "import importlib.util",
+    "from pathlib import Path",
+    "p = Path(__import__('sys').argv[1])",
+    "s = importlib.util.spec_from_file_location('cv', str(p))",
+    "m = importlib.util.module_from_spec(s)",
+    "s.loader.exec_module(m)",
+    "print(m.__version__)"
+  ) | Set-Content -Path $versionProbe -Encoding UTF8
+  $actualComfyVersion = (& $ComfyPython $versionProbe $versionScript | Select-Object -First 1).Trim()
+  Remove-Item -Force $versionProbe -ErrorAction SilentlyContinue
   if ($actualComfyVersion -ne $ComfyVersion) {
     throw "Version ComfyUI inattendue : $actualComfyVersion (attendue $ComfyVersion)."
   }

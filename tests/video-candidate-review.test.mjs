@@ -97,7 +97,10 @@ test("candidate review keeps machine recommendation separate from human choice",
   assert.equal(review.human_review_required, true);
 
   const scene = review.scenes.find((x) => x.scene_id === "S01");
-  assert.equal(scene.machine_recommended_candidate_id, "S01-C1");
+  assert.equal(scene.technical_provisional_candidate_id, "S01-C1");
+  assert.equal(scene.machine_recommended_candidate_id, "S01-C2");
+  assert.equal(scene.machine_recommendation_status, "RECOMMENDED");
+  assert.equal(scene.machine_recommendation_score_gap, 15);
   assert.equal(scene.human_selected_candidate_id, null);
   assert.equal(scene.human_decision, "PENDING");
   assert.equal(scene.ranking_is_advisory, true);
@@ -210,4 +213,34 @@ test("candidate review fingerprint changes when candidate identity changes", () 
     one.review_fingerprint_sha256,
     two.review_fingerprint_sha256,
   );
+});
+
+
+test("equal top scores are explicitly ambiguous instead of preferring C1", () => {
+  const input = fixtures();
+  input.perceptualQc.rows[0].perceptual_score = 100;
+  input.perceptualQc.rows[1].perceptual_score = 100;
+  const review = buildCandidateReview(input);
+  const scene = review.scenes.find((x) => x.scene_id === "S01");
+
+  assert.equal(scene.technical_provisional_candidate_id, "S01-C1");
+  assert.equal(scene.machine_recommended_candidate_id, null);
+  assert.equal(scene.machine_recommendation_status, "AMBIGUOUS");
+  assert.equal(scene.machine_recommendation_score_gap, 0);
+  assert.equal(
+    scene.machine_recommendation_reason,
+    "top_candidates_within_score_gap",
+  );
+});
+
+test("near-tied candidates inside configured margin remain ambiguous", () => {
+  const input = fixtures();
+  input.perceptualQc.rows[0].perceptual_score = 98.5;
+  input.perceptualQc.rows[1].perceptual_score = 100;
+  const review = buildCandidateReview(input,);
+  const scene = review.scenes.find((x) => x.scene_id === "S01");
+
+  assert.equal(scene.machine_recommended_candidate_id, null);
+  assert.equal(scene.machine_recommendation_status, "AMBIGUOUS");
+  assert.equal(scene.machine_recommendation_score_gap, 1.5);
 });

@@ -875,7 +875,48 @@ function comfyEndpointFromBinding() {
   return url.toString().replace(/\/$/, "");
 }
 
-async function comfyReady(endpoint) {
+function assessComfySystemStats(stats) {
+  const devices = Array.isArray(stats?.devices) ? stats.devices : [];
+  const cuda = devices.find((device) => {
+    const type = String(device?.type || "").trim().toLowerCase();
+    const name = String(device?.name || "").trim().toLowerCase();
+    return type === "cuda" || name.startsWith("cuda:");
+  }) || null;
+
+  if (!cuda) {
+    return {
+      ready: false,
+      reason: "cuda_device_missing",
+      device: null,
+      vram_total_bytes: null,
+      vram_free_bytes: null,
+    };
+  }
+
+  const total = Number(cuda.vram_total);
+  const free = Number(cuda.vram_free);
+  const minimum = 4 * 1024 ** 3;
+
+  if (Number.isFinite(total) && total > 0 && total < minimum) {
+    return {
+      ready: false,
+      reason: "cuda_vram_below_project_floor",
+      device: String(cuda.name || "cuda"),
+      vram_total_bytes: total,
+      vram_free_bytes: Number.isFinite(free) ? free : null,
+    };
+  }
+
+  return {
+    ready: true,
+    reason: "cuda_ready",
+    device: String(cuda.name || "cuda"),
+    vram_total_bytes: Number.isFinite(total) ? total : null,
+    vram_free_bytes: Number.isFinite(free) ? free : null,
+  };
+}
+
+async function comfyHealth(endpoint) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
   try {
@@ -883,19 +924,59 @@ async function comfyReady(endpoint) {
       signal: controller.signal,
       headers: { "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
     });
-    return response.ok;
-  } catch {
-    return false;
+    if (!response.ok) {
+      return {
+        ready: false,
+        reason: "system_stats_http_" + response.status,
+        http_status: response.status,
+      };
+    }
+
+    let stats;
+    try {
+      stats = await response.json();
+    } catch (error) {
+      return {
+        ready: false,
+        reason: "system_stats_invalid_json",
+        error: String(error?.message || error).slice(0, 500),
+      };
+    }
+
+    return {
+      http_status: response.status,
+      ...assessComfySystemStats(stats),
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      reason: error?.name === "AbortError"
+        ? "system_stats_timeout"
+        : "system_stats_unreachable",
+      error: String(error?.message || error).slice(0, 500),
+    };
   } finally {
     clearTimeout(timeout);
   }
 }
 
+async function comfyReady(endpoint) {
+  return (await comfyHealth(endpoint)).ready;
+}
+
 async function ensureComfyUIReady() {
   const endpoint = comfyEndpointFromBinding();
-  if (await comfyReady(endpoint)) {
-    return { endpoint, started: false };
+  const initialHealth = await comfyHealth(endpoint);
+  if (initialHealth.ready) {
+    return { endpoint, started: false, health: initialHealth };
   }
+
+  log("ComfyUI health gate not ready", {
+    endpoint,
+    reason: initialHealth.reason || "unknown",
+    device: initialHealth.device || null,
+    vram_total_bytes: initialHealth.vram_total_bytes || null,
+  });
 
   if (!VIDEO_AUTOSTART_COMFYUI) {
     throw new Error(
@@ -961,13 +1042,24 @@ async function ensureComfyUIReady() {
   } catch {}
 
   const deadline = Date.now() + 180_000;
+  let lastHealth = initialHealth;
   while (Date.now() < deadline) {
-    if (await comfyReady(endpoint)) {
-      log("ComfyUI ready", { endpoint, pid: startedPid });
-      return { endpoint, started: true };
+    lastHealth = await comfyHealth(endpoint);
+    if (lastHealth.ready) {
+      log("ComfyUI ready", {
+        endpoint,
+        pid: startedPid,
+        device: lastHealth.device || null,
+        vram_total_bytes: lastHealth.vram_total_bytes || null,
+      });
+      return { endpoint, started: true, health: lastHealth };
     }
     if (startedPid && !pidAlive(startedPid)) {
-      log("ComfyUI child exited before readiness", { endpoint, pid: startedPid });
+      log("ComfyUI child exited before readiness", {
+        endpoint,
+        pid: startedPid,
+        health_reason: lastHealth.reason || "unknown",
+      });
       break;
     }
     await sleep(2000);
@@ -982,7 +1074,8 @@ async function ensureComfyUIReady() {
   const stderrTail = tail(stderrPath);
   const stdoutTail = tail(stdoutPath);
   throw new Error(
-    `ComfyUI did not become ready within 180 seconds: ${endpoint}` +
+    `ComfyUI did not become CUDA-ready within 180 seconds: ${endpoint}` +
+    `\nHealth gate: ${JSON.stringify(lastHealth || { ready: false, reason: "unknown" })}` +
     (startedPid ? `\nComfyUI child pid: ${startedPid}; alive=${pidAlive(startedPid)}` : "\nComfyUI child pid: unavailable") +
     (starterResult?.stderr ? `\n--- starter stderr ---\n${String(starterResult.stderr).slice(-3000)}` : "") +
     (starterResult?.stdout ? `\n--- starter stdout ---\n${String(starterResult.stdout).slice(-3000)}` : "") +

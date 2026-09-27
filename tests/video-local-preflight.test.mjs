@@ -43,3 +43,54 @@ test("preflight CLI emits JSON and never enables paid fallback", () => {
   assert.equal(typeof report.disk_free_gib, "number");
   assert.equal(typeof report.decision.ready_for_model_smoke_test, "boolean");
 });
+
+
+test("preflight blocks a loaded machine before a long GPU render", () => {
+  const d = classify(
+    {
+      gpus: [
+        {
+          index: 0,
+          memory_total_mib: 8188,
+          memory_free_mib: 2200,
+        },
+      ],
+      python_3_11: { available: true },
+      ffmpeg: { available: true },
+      ffprobe: { available: true },
+      disk_free_gib: 100,
+      ram_free_gib: 2.5,
+    },
+    25,
+    4,
+    3072,
+  );
+  assert.equal(d.ready_for_model_smoke_test, false);
+  assert(d.blocking_reasons.includes("low_free_ram"));
+  assert(d.blocking_reasons.includes("low_free_vram"));
+  assert.equal(d.project_ram_safety_floor_gib, 4);
+  assert.equal(d.project_gpu_free_safety_floor_mib, 3072);
+});
+
+test("preflight resource floors are configurable and pass a healthy RTX 4070 state", () => {
+  const d = classify(
+    {
+      gpus: [
+        {
+          index: 0,
+          memory_total_mib: 8188,
+          memory_free_mib: 5200,
+        },
+      ],
+      python_3_11: { available: true },
+      ffmpeg: { available: true },
+      ffprobe: { available: true },
+      disk_free_gib: 100,
+      ram_free_gib: 6.5,
+    },
+    25,
+    4,
+    3072,
+  );
+  assert.equal(d.ready_for_model_smoke_test, true);
+});

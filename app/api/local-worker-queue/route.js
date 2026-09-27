@@ -192,25 +192,46 @@ function humanSelectionResumePayload(record) {
     return { eligible: false, reason: "human_selection_decisions_invalid" };
   }
 
+  const normalizedRows = {};
   for (const [sceneId, decision] of entries) {
+    const normalizedSceneId = String(sceneId).trim();
+    const candidateId = cut(decision?.candidate_id || "", 120).trim();
     if (
-      !/^S[0-9A-Za-z_-]{1,30}$/.test(String(sceneId)) ||
+      !/^S[0-9A-Za-z_-]{1,30}$/.test(normalizedSceneId) ||
       !decision ||
       typeof decision !== "object" ||
       Array.isArray(decision) ||
-      !String(decision.candidate_id || "").trim() ||
+      !candidateId ||
       decision.human_confirmed !== true
     ) {
       return { eligible: false, reason: "human_selection_decision_row_invalid" };
     }
+    normalizedRows[normalizedSceneId] = {
+      candidate_id: candidateId,
+      human_confirmed: true,
+      note: cut(decision.note || "", 1000) || null,
+    };
   }
+
+  const normalizedDecisions = {
+    schema: "HIBOU_HUMAN_IMAGE_SELECTION_V1",
+    content_id: contentId,
+    review_fingerprint_sha256: pausedFingerprint,
+    decisions: normalizedRows,
+    publication_authorized: false,
+  };
 
   return {
     eligible: true,
     reason: "human_selection_ready",
     content_id: contentId,
     review_fingerprint_sha256: pausedFingerprint,
-    decisions,
+    decisions: normalizedDecisions,
+    normalized_options: {
+      ...options,
+      resume_human_selection: true,
+      human_candidate_decisions: normalizedDecisions,
+    },
   };
 }
 
@@ -252,6 +273,7 @@ async function autoResumeHumanSelection(request) {
   const resumedAt = new Date().toISOString();
   await updateRecord(TABLES.localWorkerQueue, record.id, {
     Statut: "Pending",
+    "Options JSON": JSON.stringify(decision.normalized_options),
     "Résultat JSON": JSON.stringify({
       schema: "HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1",
       status: "HUMAN_SELECTION_RESUME_SCHEDULED",

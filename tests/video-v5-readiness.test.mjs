@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  buildV5Readiness,
+  READINESS_SCHEMA,
+} from "../scripts/video-v5-readiness.mjs";
+
+function contract() {
+  return {
+    contract_version: "HIBOU_VIDEO_CONTRACT_V1",
+    contract_state: "storyboard",
+    content: { content_id: "recCONTENT1234567" },
+    production: {
+      mode: "preview",
+      full_master_allowed: false,
+      publication_authorized: false,
+    },
+    features: {
+      video_timeline_v1: true,
+      video_creative_qc_v1: false,
+      video_pose_registry_v1: false,
+      video_prosody_v1: true,
+      video_music_mix_v1: true,
+      video_incremental_retouch_v1: true,
+    },
+    music: {
+      reference: "music.wav",
+    },
+  };
+}
+
+test("readiness activates only features with both GLOBAL and runtime gates", () => {
+  const report = buildV5Readiness(contract(), {
+    HIBOU_VIDEO_TIMELINE_V1: "true",
+    HIBOU_VIDEO_PROSODY_V1: "false",
+    HIBOU_VIDEO_MUSIC_V1: "true",
+    HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1: "true",
+    HIBOU_VIDEO_CREATIVE_QC_V1: "true",
+  });
+
+  assert.equal(report.schema, READINESS_SCHEMA);
+  assert.equal(report.preview_only, true);
+  assert.equal(report.publication_authorized, false);
+  assert.equal(report.gpu_execution_performed, false);
+  assert.equal(report.airtable_mutation_performed, false);
+  assert.equal(report.features.video_timeline_v1.active, true);
+  assert.equal(report.features.video_prosody_v1.active, false);
+  assert.equal(report.features.video_music_mix_v1.active, true);
+  assert.equal(report.features.video_incremental_retouch_v1.active, true);
+  assert.equal(report.features.video_creative_qc_v1.active, false);
+  assert.equal(report.warnings.some((x) =>
+    x.code === "runtime_enabled_global_disabled"
+    && x.feature === "video_creative_qc_v1"
+  ), true);
+  assert.equal(report.ready_for_cpu_planning, true);
+});
+
+test("readiness blocks preview contracts that authorize a full master", () => {
+  const input = contract();
+  input.production.full_master_allowed = true;
+  const report = buildV5Readiness(input, {});
+  assert.equal(report.ready_for_cpu_planning, false);
+  assert.equal(report.blocking.some((x) =>
+    x.code === "preview_cannot_allow_full_master"
+  ), true);
+});
+
+test("readiness blocks any publication authorization signal", () => {
+  const input = contract();
+  input.validation = { publication_authorized: true };
+  const report = buildV5Readiness(input, {});
+  assert.equal(report.ready_for_cpu_planning, false);
+  assert.equal(report.blocking.some((x) =>
+    x.code === "publication_authorization_must_remain_false"
+  ), true);
+  assert.equal(report.publication_authorized, false);
+});
+
+test("readiness requires a music reference only when music mixing is actually active", () => {
+  const input = contract();
+  delete input.music.reference;
+
+  const inactive = buildV5Readiness(input, {
+    HIBOU_VIDEO_MUSIC_V1: "false",
+  });
+  assert.equal(inactive.ready_for_cpu_planning, true);
+
+  const active = buildV5Readiness(input, {
+    HIBOU_VIDEO_MUSIC_V1: "true",
+  });
+  assert.equal(active.ready_for_cpu_planning, false);
+  assert.equal(active.blocking.some((x) =>
+    x.code === "music_reference_required_when_music_mix_active"
+  ), true);
+});
+
+test("readiness exposes remote cancel as runtime-only", () => {
+  const report = buildV5Readiness(contract(), {
+    HIBOU_VIDEO_REMOTE_CANCEL_ENABLED: "true",
+  });
+  assert.equal(report.features.video_remote_cancel_v1.global_enabled, null);
+  assert.equal(report.features.video_remote_cancel_v1.active, true);
+});
+
+test("readiness rejects unsupported contracts", () => {
+  assert.throws(
+    () => buildV5Readiness({ contract_version: "OTHER" }, {}),
+    /HIBOU_VIDEO_CONTRACT_V1 required/,
+  );
+});

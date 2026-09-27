@@ -12,6 +12,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |
 | Musique/mix FFmpeg V1 | yes | yes (plan/policy; audio E2E pending) | no | no | no |
 | Cancel / supersede distant V1 | yes | yes (control protocol/static regression; Windows process E2E pending) | no | no | no |
+| Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile CPU tests; real media reuse E2E pending) | no | no | no |
 
 ## Feature gates
 
@@ -23,6 +24,7 @@ All V5 execution remains opt-in. Relevant runtime gates:
 - `HIBOU_VIDEO_PROSODY_V1`
 - `HIBOU_VIDEO_MUSIC_V1`
 - `HIBOU_VIDEO_REMOTE_CANCEL_ENABLED`
+- `HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1`
 
 Timeline, creative QC, pose registry, prosody and music additionally require the corresponding GLOBAL contract flag. A scene-specific brief cannot silently enable them.
 
@@ -42,7 +44,8 @@ Apply schema changes only when the local production render is idle. Do not rewri
 5. Music: mix a rights-controlled local test track, inspect ducking/fades and loudness, then human-listen for pumping or clipping.
 6. Cancel: on Windows with a disposable test job, request cancel during Chatterbox and during ComfyUI generation; verify only the matching child tree/client_id prompts stop, terminal status is correct, no retry occurs, GPU activity returns to idle, then verify supersede.
 7. Resume/cache regression: cancel/restart a separate disposable job and confirm manifests/hashes/cache remain valid.
-8. Full human review: render one complete V5 video with publication still disabled.
+8. Incremental preview: create a disposable PREVIEW from a completed test run with `--reuse-from`; verify unchanged Chatterbox scenes, unchanged image requests and unchanged FFmpeg scene clips are cache hits, while one edited caption/image/voice unit invalidates only its expected dependency path.
+9. Full human review: render one complete V5 video with publication still disabled.
 
 ## Recommended activation order
 
@@ -53,5 +56,6 @@ Apply schema changes only when the local production render is idle. Do not rewri
 5. Music mix V1.
 6. Creative QC in advisory mode (`block_on_reject=false`) until thresholds are calibrated.
 7. Creative QC blocking only after fixture calibration.
-8. Remote cancel/supersede last, after the dedicated Windows E2E.
-9. Keep automatic publication disabled throughout; production activation requires explicit separate validation.
+8. Preview + incremental retouch after cache-reuse E2E; keep the GLOBAL flag false until then.
+9. Remote cancel/supersede last, after the dedicated Windows E2E.
+10. Keep automatic publication disabled throughout; production activation requires explicit separate validation.

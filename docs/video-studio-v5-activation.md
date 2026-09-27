@@ -32,3 +32,26 @@ Avant toute activation ou E2E local, le contrat peut être audité sans lancer d
 L'audit ne lance ni ComfyUI, ni Chatterbox, ni FFmpeg, ne modifie pas Airtable et n'autorise jamais la publication. Il affiche pour chaque brique V5 l'état du flag GLOBAL, du gate runtime et l'état réellement actif. Il bloque notamment un mode de production invalide, tout signal `publication_authorized=true`, un PREVIEW autorisant un full master, ou un mix musique actif sans référence musicale.
 
 Cet audit est un contrôle préparatoire CPU uniquement. Un résultat vert ne remplace pas les E2E média réels ni la revue humaine.
+
+
+## Sélection humaine des candidats
+
+La sélection humaine est une extension opt-in distincte du ranking machine. Elle exige simultanément :
+
+- `features.video_human_candidate_selection_v1=true` dans le contrat GLOBAL ;
+- `HIBOU_VIDEO_HUMAN_SELECTION_V1=true` dans le runtime ;
+- un mode `production.mode=final`.
+
+PREVIEW ne se met jamais en pause pour cette étape.
+
+Quand la feature est active en FINAL, le pipeline produit :
+
+- `images/candidate-review.json` ;
+- `images/candidate-review.html` ;
+- `images/candidate-decisions.template.json`.
+
+Sans décision, le master s'arrête proprement avec `WAITING_HUMAN_SELECTION` et le worker remonte le job en `Paused`. Ce statut ne doit pas être repris par les mécanismes d'auto-start ordinaires.
+
+Pour reprendre, la décision doit utiliser `HIBOU_HUMAN_IMAGE_SELECTION_V1`, contenir `human_confirmed=true` pour chaque scène reviewable et référencer exactement `review_fingerprint_sha256` du lot courant. Toute décision périmée ou tout candidat non-PASS est rejeté. Après validation, le marqueur d'attente est supprimé, les images déjà générées sont réutilisées et le pipeline reprend au stage de sélection/QC/rendu.
+
+Le champ Airtable préparé `Sélection humaine candidats V1` reste non appliqué et faux par défaut tant que l'E2E Windows/ROG n'a pas été validé.

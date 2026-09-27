@@ -11,6 +11,12 @@ import { buildStoryboardContract } from "../../../scripts/video-airtable-sync.mj
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const RUNTIME_COMMIT = /^[0-9a-f]{40}$/i.test(
+  String(process.env.VERCEL_GIT_COMMIT_SHA || ""),
+)
+  ? String(process.env.VERCEL_GIT_COMMIT_SHA).toLowerCase()
+  : null;
+
 const ALLOWED_STATUS = new Set(["Running", "Completed", "Error"]);
 const MAX_BODY_BYTES = 20_000;
 
@@ -103,6 +109,7 @@ export async function GET(request) {
           paid_fallback: false,
         },
         active: true,
+        runtime_commit: RUNTIME_COMMIT,
         storyboard: null,
         queue_error: null,
       };
@@ -140,6 +147,7 @@ export async function GET(request) {
       ok: true,
       schema: "HIBOU_VIDEO_RENDER_QUEUE_V2",
       jobs,
+      runtime_commit: RUNTIME_COMMIT,
       generated_at: new Date().toISOString(),
     });
   } catch (error) {

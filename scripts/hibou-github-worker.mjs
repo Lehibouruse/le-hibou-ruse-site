@@ -742,6 +742,103 @@ async function reportVideoProgress(job, status, data = {}) {
   }
 }
 
+function localCompletedVideoResults(processed) {
+  if (!VIDEO_RENDER_ENABLED || !existsSync(VIDEO_OUTPUT_ROOT)) return [];
+  const out = [];
+  for (const name of readdirSync(VIDEO_OUTPUT_ROOT)) {
+    if (!/^rec[A-Za-z0-9]{14}$/.test(name) || processed.has(name)) continue;
+    const dir = path.join(VIDEO_OUTPUT_ROOT, name);
+    let st;
+    try { st = statSync(dir); } catch { continue; }
+    if (!st.isDirectory()) continue;
+    const resultPath = path.join(dir, "_hibou_video_result.json");
+    if (!existsSync(resultPath)) continue;
+    try {
+      const result = JSON.parse(readFileSync(resultPath, "utf8"));
+      const masterPath = path.resolve(String(result?.master_path || path.join(dir, "master.mp4")));
+      if (
+        result?.schema !== "HIBOU_VIDEO_RENDER_RESULT_V1" ||
+        String(result?.job || "") !== name ||
+        !existsSync(masterPath)
+      ) continue;
+      const masterStat = statSync(masterPath);
+      if (!masterStat.isFile() || masterStat.size <= 0) continue;
+      const digest = sha256(masterPath);
+      if (result.master_sha256 && String(result.master_sha256) !== digest) {
+        log("Local VIDEO_RENDER recovery skipped: hash mismatch", {
+          job: name,
+          expected: String(result.master_sha256),
+          actual: digest,
+        });
+        continue;
+      }
+      out.push({
+        id: name,
+        result,
+        master_path: masterPath,
+        master_sha256: digest,
+      });
+    } catch (error) {
+      log("Local VIDEO_RENDER recovery candidate invalid", {
+        job: name,
+        error: String(error?.message || error).slice(0, 700),
+      });
+    }
+  }
+  return out;
+}
+
+async function recoverCompletedLocalVideoReports(processed) {
+  const candidates = localCompletedVideoResults(processed);
+  if (!candidates.length) return { checked: 0, recovered: 0 };
+
+  let recovered = 0;
+  for (const item of candidates) {
+    try {
+      await reportVideoProgress(
+        { id: item.id, airtable_record_id: item.id },
+        "Completed",
+        {
+          local_path: item.master_path,
+          result_sha256: item.master_sha256,
+          result: {
+            ...item.result,
+            recovered_after_connectivity_loss: true,
+            recovery_reported_at: new Date().toISOString(),
+          },
+        },
+      );
+
+      processed.add(item.id);
+      saveProcessed(processed);
+
+      const failed = loadFailedJobs();
+      if (failed[item.id]) {
+        delete failed[item.id];
+        saveFailedJobs(failed);
+      }
+
+      state.recovered_video_reports =
+        Number(state.recovered_video_reports || 0) + 1;
+      recovered += 1;
+
+      log("Recovered completed VIDEO_RENDER report after connectivity loss", {
+        job: item.id,
+        master: item.master_path,
+        sha256: item.master_sha256,
+      });
+    } catch (error) {
+      log("Completed VIDEO_RENDER recovery report deferred", {
+        job: item.id,
+        error: String(error?.message || error).slice(0, 1000),
+      });
+      break;
+    }
+  }
+
+  return { checked: candidates.length, recovered };
+}
+
 async function reportProgress(job, status, data = {}) {
   if (!REPORT_TOKEN) {
     log("Progress report skipped", { job: job?.id, status, reason: "report_token_missing" });
@@ -1313,6 +1410,10 @@ async function tick() {
   }
 
   const processed = loadProcessed();
+  const recovery = await recoverCompletedLocalVideoReports(processed);
+  if (recovery.recovered > 0) {
+    state.last_video_recovery_at = new Date().toISOString();
+  }
   const failed = loadFailedJobs();
   const now = Date.now();
 

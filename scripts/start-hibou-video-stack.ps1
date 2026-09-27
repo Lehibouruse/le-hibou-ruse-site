@@ -133,9 +133,20 @@ Set-UserEnv "HIBOU_VIDEO_MASTER_SCRIPT" $RuntimeMaster
 Set-UserEnv "HIBOU_CHATTERBOX_BATCH_SCRIPT" $RuntimeVoice
 
 Write-Host "Actualisation des runtimes video canoniques depuis main..." -ForegroundColor Cyan
-Invoke-WebRequest -UseBasicParsing -Uri $WorkerUrl -OutFile $Worker
-Invoke-WebRequest -UseBasicParsing -Uri $MasterUrl -OutFile $RuntimeMaster
-Invoke-WebRequest -UseBasicParsing -Uri $VoiceUrl -OutFile $RuntimeVoice
+$cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$freshHeaders = @{ "Cache-Control" = "no-cache"; "Pragma" = "no-cache" }
+Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($WorkerUrl + "?hibou_cb=" + $cacheBust) -OutFile $Worker
+Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($MasterUrl + "?hibou_cb=" + $cacheBust) -OutFile $RuntimeMaster
+Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($VoiceUrl + "?hibou_cb=" + $cacheBust) -OutFile $RuntimeVoice
+
+$voiceSource = Get-Content -Raw $RuntimeVoice
+if ($voiceSource -notmatch 'inspect\.signature\(ChatterboxMultilingualTTS\.from_pretrained\)') {
+  throw "Runtime Chatterbox stale ou invalide: marqueur compatibilite API absent."
+}
+$masterSource = Get-Content -Raw $RuntimeMaster
+if ($masterSource -notmatch 'pathToFileURL\(resolve\(process\.argv\[1\]\)\)\.href') {
+  throw "Runtime video-master stale ou invalide: entrypoint portable absent."
+}
 
 & $Node --check $Worker
 if ($LASTEXITCODE -ne 0) {

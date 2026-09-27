@@ -100,6 +100,10 @@
 4. **Coverage audit méthodologie** : contrôle statique que chaque étape Airtable importante dispose d'un artefact/code/test attendu.
 5. **Durabilité des artefacts** : plan content-addressed codé, images sélectionnées incluses dans le registre ; reste à choisir/valider un backend durable et son uploader séparé après les E2E.
 
+## Desktop Commander
+
+Remote Desktop Commander est désormais disponible comme couche optionnelle d'inspection/E2E du ROG. Il pourra servir après le rendu actif à lire les logs/manifests, vérifier les caches et lancer les tests Windows sans copier-coller PowerShell. Il ne devient pas une dépendance du pipeline et ne doit pas perturber les jobs actifs.
+
 ## E2E à ne lancer qu'après fin du rendu/téléchargement local actuel
 
 - ComfyUI/FLUX PREVIEW 1–2 scènes ;
@@ -108,7 +112,7 @@
 - musique / ducking à l'écoute ;
 - QC créatif local CLIP/SigLIP ;
 - PREVIEW → retouche → FINAL avec cache hits réels ;
-- sélection humaine puis reprise ;
+- sélection humaine puis reprise locale et distante fingerprintée ;
 - cancel / supersede Windows ;
 - master V5 complet ;
 - revue humaine V4 complète.

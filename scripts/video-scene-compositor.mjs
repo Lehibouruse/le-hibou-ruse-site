@@ -108,6 +108,20 @@ export function normalizeSceneComposition(scene){
     if(numeric) textLayers.push(numeric);
   }
 
+  // Canonical brand signature is deterministic post-production text.
+  // It must never be delegated to the image generator.
+  const brand=normalizeTextLayer({
+    text:"Le Hibou Rusé",
+    z:95,
+    anchor:"bottom-center",
+    offset_y:150,
+    font_size:28,
+    font_color:"#172331",
+    border_width:0,
+    box:false
+  },"brand_signature",{z:95,font_size:28,anchor:"bottom-center",box:false,border_width:0});
+  if(brand) textLayers.push(brand);
+
   const camera=c.camera_transform||{};
   const zoomPercent=Math.min(4,Math.max(0,num(camera.zoom_percent,scene?.zoom_percent??3)));
   const cameraAnchor=String(camera.anchor||scene?.framing?.anchor||scene?.anchor||"center");

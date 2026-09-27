@@ -1,0 +1,55 @@
+name: Windows PowerShell Parse
+
+on:
+  pull_request:
+    paths:
+      - "scripts/**/*.ps1"
+      - ".github/workflows/windows-powershell-parse.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/**/*.ps1"
+      - ".github/workflows/windows-powershell-parse.yml"
+  workflow_dispatch:
+
+jobs:
+  parse-powershell:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell scripts with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $scripts = Get-ChildItem -Path "scripts" -Recurse -Filter "*.ps1" -File
+          if (-not $scripts) {
+            throw "No PowerShell scripts found under scripts/."
+          }
+
+          $failed = $false
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $script.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host ("Parser errors in {0}:" -f $script.FullName) -ForegroundColor Red
+              foreach ($err in $errors) {
+                Write-Host ("  Line {0}, Column {1}: {2}" -f $err.Extent.StartLineNumber, $err.Extent.StartColumnNumber, $err.Message) -ForegroundColor Red
+              }
+            } else {
+              Write-Host ("PASS {0}" -f $script.FullName) -ForegroundColor Green
+            }
+          }
+
+          if ($failed) {
+            exit 1
+          }

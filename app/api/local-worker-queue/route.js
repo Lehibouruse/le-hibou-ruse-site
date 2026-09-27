@@ -398,6 +398,16 @@ export async function GET(request) {
       );
     }
 
+    const pollWorker = cut(request.headers.get("x-hibou-worker"), 180);
+    const pollSession = cut(request.headers.get("x-hibou-worker-session"), 240);
+    const pollBuild = cut(request.headers.get("x-hibou-worker-build"), 180);
+    console.info("HIBOU_WORKER_POLL", JSON.stringify({
+      worker: pollWorker || null,
+      session: pollSession || null,
+      build: pollBuild || "legacy",
+      runtime_commit: RUNTIME_COMMIT,
+    }));
+
     const reconciliation = await reconcileStaleRunning(request);
     const auto_activation = await autoActivateWhenWorkerReady(request);
 

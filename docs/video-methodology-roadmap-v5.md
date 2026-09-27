@@ -80,6 +80,11 @@
 
 ### Itérations
 
+- `HIBOU_VIDEO_RESUME_PLAN_V1` analyse un run interrompu sans rien exécuter ;
+- détecte un ancien PASS devenu invalide (ex. durée voix), un artefact PASS manquant et les erreurs de rendu connues ;
+- choisit le point de reprise conservateur le plus précoce ;
+- conserve les caches voix/images/render et laisse les fingerprints décider de la réutilisation ;
+
 - `HIBOU_INCREMENTAL_RETOUCH_PLAN_V1` ;
 - invalidation par domaines : voix, image, composition, captions, GLOBAL ;
 - réutilisation inter-run de caches fingerprintés ;

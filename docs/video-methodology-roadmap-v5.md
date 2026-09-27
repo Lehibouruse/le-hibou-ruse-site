@@ -83,6 +83,9 @@
 
 ### Observabilité pipeline
 
+- heartbeat Airtable détaillé toutes les 30 s : `image_candidate`, `voice_scene` ou `scene_clip`, avec completed/failed/total, pourcentage et temps écoulé ;
+- le heartbeat est purement observatif et ses champs sont sanitisés côté API ;
+
 - `pipeline-run.json` conserve `stage_history` avec START/PASS/ERROR, numéro de tentative et durée ;
 - les stages PASS restent idempotents et l'historique n'est pas écrasé lors d'une nouvelle tentative ;
 

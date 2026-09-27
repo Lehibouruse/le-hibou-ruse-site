@@ -3,7 +3,7 @@ import test from "node:test";
 import { validateReuseLineage } from "../scripts/video-job-lineage.mjs";
 
 const currentJob = "recABCDEFGHIJKLMN";
-const parentJob = "recNOPQRSTUVWXYZAB";
+const parentJob = "recNOPQRSTUVWXYZA";
 const contentId = "recCONTENT1234567";
 
 function parent({

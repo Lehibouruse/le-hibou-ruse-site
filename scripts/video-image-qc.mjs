@@ -12,7 +12,7 @@ function probe(path){
  if(r.status!==0) return {ok:false,error:String(r.stderr||"ffprobe failed").trim()};
  try{const d=JSON.parse(r.stdout);const s=d.streams?.[0];return s?{ok:true,...s}:{ok:false,error:"no video/image stream"};}catch(e){return {ok:false,error:String(e)};}
 }
-export function qcImageBatch(batch,{minWidth=768,minHeight=1280,aspectTolerance=0.035}={}){
+export function qcImageBatch(batch,{minWidth=640,minHeight=1136,aspectTolerance=0.035}={}){
  if(batch?.schema!=="HIBOU_IMAGE_BATCH_V1") fail("unsupported image batch manifest");
  const target=9/16, seen=new Map(), rows=[];
  for(const [candidateId,item] of Object.entries(batch.results||{})){
@@ -25,13 +25,40 @@ export function qcImageBatch(batch,{minWidth=768,minHeight=1280,aspectTolerance=
        checks.vertical_aspect=Math.abs(aspect-target)<=aspectTolerance;
        if(seen.has(hash)){checks.unique_exact=false;duplicateOf=seen.get(hash);}else seen.set(hash,candidateId);
      }
-     rows.push({candidate_id:candidateId,scene_id:item.scene_id,candidate:item.candidate,path,sha256:hash,width:p.width??null,height:p.height??null,aspect_ratio:aspect,codec:p.codec_name??null,duplicate_of:duplicateOf,checks,status:Object.values(checks).every(Boolean)?"PASS":"REJECT",error:p.ok?"":p.error});
+     const failedChecks=Object.entries(checks).filter(([,ok])=>!ok).map(([name])=>name);
+     rows.push({candidate_id:candidateId,scene_id:item.scene_id,candidate:item.candidate,path,sha256:hash,width:p.width??null,height:p.height??null,aspect_ratio:aspect,codec:p.codec_name??null,duplicate_of:duplicateOf,checks,failed_checks:failedChecks,status:failedChecks.length===0?"PASS":"REJECT",error:p.ok?"":p.error});
    }
  }
  const byScene={};
  for(const row of rows){(byScene[row.scene_id]??=[]).push(row);}
- const sceneSummary=Object.fromEntries(Object.entries(byScene).map(([scene,items])=>[scene,{pass:items.filter(x=>x.status==="PASS").length,reject:items.filter(x=>x.status!=="PASS").length,total:items.length}]));
- return {schema:"HIBOU_IMAGE_TECH_QC_V1",content_id:batch.content_id,target_aspect_ratio:target,min_width:minWidth,min_height:minHeight,aspect_tolerance:aspectTolerance,rows,scene_summary:sceneSummary,all_scenes_have_candidate:Object.values(sceneSummary).every(x=>x.pass>=1),paid_fallback:false};
+ const sceneSummary=Object.fromEntries(Object.entries(byScene).map(([scene,items])=>{
+   const failed_check_counts={};
+   for(const item of items){
+     for(const name of item.failed_checks||[]) failed_check_counts[name]=(failed_check_counts[name]||0)+1;
+   }
+   return [scene,{pass:items.filter(x=>x.status==="PASS").length,reject:items.filter(x=>x.status!=="PASS").length,total:items.length,failed_check_counts}];
+ }));
+ const failed_check_counts={};
+ for(const row of rows){
+   for(const name of row.failed_checks||[]) failed_check_counts[name]=(failed_check_counts[name]||0)+1;
+ }
+ return {
+   schema:"HIBOU_IMAGE_TECH_QC_V1",
+   content_id:batch.content_id,
+   target_aspect_ratio:target,
+   min_width:minWidth,
+   min_height:minHeight,
+   aspect_tolerance:aspectTolerance,
+   accepted_profiles:{
+     primary:{width:768,height:1344},
+     fallback:{width:640,height:1136}
+   },
+   rows,
+   scene_summary:sceneSummary,
+   failed_check_counts,
+   all_scenes_have_candidate:Object.values(sceneSummary).every(x=>x.pass>=1),
+   paid_fallback:false
+ };
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [manifestPath,outPath]=process.argv.slice(2); if(!manifestPath||!outPath) fail("usage: video-image-qc.mjs batch-manifest.json image-qc.json");

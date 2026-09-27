@@ -1376,7 +1376,10 @@ async function processVideoRender(job, processed) {
     current_worker: WORKER_ID,
     worker_match: null,
     expected_master_sha256: job.reuse_lineage?.parent_result_sha256 || null,
+    result_declared_master_sha256: null,
     actual_master_sha256: null,
+    result_hash_verified: false,
+    file_hash_verified: false,
     hash_verified: false,
   };
   if (reuseFromJobId) {
@@ -1432,13 +1435,33 @@ async function processVideoRender(job, processed) {
           `VIDEO_RENDER reuse parent result unreadable: ${error?.message || error}`,
         );
       }
-      const actualParentHash = String(
+
+      const declaredParentHash = String(
         previousResult?.master_sha256 || "",
       ).trim().toLowerCase();
-      reuseIntegrity.actual_master_sha256 = actualParentHash || null;
-      reuseIntegrity.hash_verified =
-        /^[0-9a-f]{64}$/.test(actualParentHash) &&
+      reuseIntegrity.result_declared_master_sha256 =
+        declaredParentHash || null;
+      reuseIntegrity.result_hash_verified =
+        /^[0-9a-f]{64}$/.test(declaredParentHash) &&
+        declaredParentHash === expectedParentHash;
+
+      const previousMasterPath = path.join(
+        previousRoot,
+        "master.mp4",
+      );
+      if (!existsSync(previousMasterPath)) {
+        throw new Error(
+          `VIDEO_RENDER reuse parent master missing for hash verification: ${previousMasterPath}`,
+        );
+      }
+      const actualParentHash = sha256(previousMasterPath).toLowerCase();
+      reuseIntegrity.actual_master_sha256 = actualParentHash;
+      reuseIntegrity.file_hash_verified =
         actualParentHash === expectedParentHash;
+      reuseIntegrity.hash_verified =
+        reuseIntegrity.result_hash_verified &&
+        reuseIntegrity.file_hash_verified;
+
       if (!reuseIntegrity.hash_verified) {
         throw new Error(
           "VIDEO_RENDER reuse parent master hash mismatch",

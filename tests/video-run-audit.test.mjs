@@ -298,3 +298,110 @@ test("run audit identifies a prepared repair waiting for separate explicit start
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("run audit identifies explicit repair execution after second consent", () => {
+  const root = fixture();
+  try {
+    const statePath = join(root, "pipeline-run.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.pipeline_status = "REPAIR_EXECUTION_STARTED";
+    state.resume_prepared = {
+      resume_stage: "render",
+      reset_stages: ["render", "master_qc"],
+      execution_started: true,
+      execution_started_at: "2026-09-28T00:30:00.000Z",
+      publication_authorized: false,
+    };
+    state.repair_execution = {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_EXECUTION_V1",
+      execution_state_sha256: "b".repeat(64),
+      publication_authorized: false,
+    };
+    delete state.stages.render;
+    writeFileSync(statePath, JSON.stringify(state, null, 2));
+
+    write(root, "_hibou_video_resume_apply_receipt.json", {
+      schema: "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+      plan_sha256: "a".repeat(64),
+      reset_stages: ["render", "master_qc"],
+      execution_started: false,
+      publication_authorized: false,
+    });
+    write(root, "_hibou_video_remote_repair_prepared.json", {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+      resume_stage: "render",
+      reset_stages: ["render", "master_qc"],
+      requires_separate_render_start: false,
+      execution_started: true,
+      execution_state_sha256: "b".repeat(64),
+      publication_authorized: false,
+    });
+    write(root, "_hibou_video_remote_repair_started.json", {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+      started_at: "2026-09-28T00:30:00.000Z",
+      resume_stage: "render",
+      execution_state_sha256: "b".repeat(64),
+      human_confirmed: true,
+      publication_authorized: false,
+    });
+
+    const audit = auditVideoRun(root, { platform: "win32" });
+    assert.equal(audit.resume_preparation.prepared, true);
+    assert.equal(audit.resume_preparation.phase, "execution_started");
+    assert.equal(audit.resume_preparation.execution_started, true);
+    assert.equal(
+      audit.resume_preparation.requires_separate_render_start,
+      false,
+    );
+    assert.equal(audit.resume_preparation.start_receipt_available, true);
+    assert.equal(audit.resume_preparation.start_receipt_valid, true);
+    assert.equal(
+      audit.resume_preparation.start_receipt_schema,
+      "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+    );
+    assert.equal(
+      audit.attention.some(
+        (item) => item.code === "resume_prepared_waiting_explicit_start",
+      ),
+      false,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("run audit flags an invalid explicit repair start receipt", () => {
+  const root = fixture();
+  try {
+    const statePath = join(root, "pipeline-run.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.pipeline_status = "REPAIR_EXECUTION_STARTED";
+    state.resume_prepared = {
+      resume_stage: "render",
+      execution_started: true,
+      publication_authorized: false,
+    };
+    delete state.stages.render;
+    writeFileSync(statePath, JSON.stringify(state, null, 2));
+
+    write(root, "_hibou_video_remote_repair_started.json", {
+      schema: "BROKEN",
+      human_confirmed: true,
+      publication_authorized: false,
+    });
+
+    const audit = auditVideoRun(root, { platform: "win32" });
+    assert.equal(audit.resume_preparation.execution_started, true);
+    assert.equal(audit.resume_preparation.start_receipt_available, true);
+    assert.equal(audit.resume_preparation.start_receipt_valid, false);
+    assert.equal(
+      audit.attention.some(
+        (item) => item.code === "repair_start_receipt_invalid",
+      ),
+      true,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

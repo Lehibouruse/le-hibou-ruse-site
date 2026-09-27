@@ -39,7 +39,7 @@ test("CUDA repair removes stale embedded torch packages before reinstall", () =>
   assert.match(starter, /"torchaudio-\*\.dist-info"/);
   assert.match(starter, /"~ympy\*"/);
   assert.match(starter, /--no-warn-script-location/);
-  assert.match(starter, /Impossible de supprimer le residu PyTorch/);
+  assert.match(starter, /Impossible de supprimer le paquet PyTorch critique/);
 });
 
 

@@ -472,6 +472,7 @@ export async function GET(request) {
       if (jobs.length >= 5) break;
       const options = parseOptions(record.fields?.["Options JSON"]);
       const contentId = String(options.content_id || "").trim();
+      const reuseFromJobId = String(options.reuse_from_job_id || "").trim();
 
       const job = {
         id: record.id,
@@ -494,6 +495,7 @@ export async function GET(request) {
           candidates_per_scene: options.preview_mode === true
             ? 1
             : Math.max(1, Math.min(3, Number(options.candidates_per_scene || 3))),
+          reuse_from_job_id: reuseFromJobId || null,
           report_airtable: false,
           human_review_required: true,
           publication_authorized: false,
@@ -509,6 +511,21 @@ export async function GET(request) {
         const sanitized = await markQueueValidationError(
           record,
           "invalid_content_id",
+        );
+        queue_sanitization.push(sanitized);
+        continue;
+      }
+
+      if (
+        reuseFromJobId &&
+        (
+          !/^rec[A-Za-z0-9]{14}$/.test(reuseFromJobId) ||
+          reuseFromJobId === record.id
+        )
+      ) {
+        const sanitized = await markQueueValidationError(
+          record,
+          "invalid_reuse_from_job_id",
         );
         queue_sanitization.push(sanitized);
         continue;

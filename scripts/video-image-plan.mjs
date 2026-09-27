@@ -196,9 +196,20 @@ export function buildImagePlan(contract,binding){
     }
     const core=String(scene.image_prompt||scene.visual_idea||"").trim();
     if(!core) fail(`${scene.scene_id}: image prompt/visual idea missing`);
+    const deterministicCharacterOverlay=
+      String(creative.reference_mode||"")==="deterministic_character_overlay"
+      && Boolean(scene?.framing?.hibou);
+    const characterGenerationLock=deterministicCharacterOverlay
+      ? [
+          "BACKGROUND_ONLY_LOCK:",
+          "Do not render any owl, bird, animal, mascot or human in this image.",
+          "The canonical Le Hibou Rusé character is composited later in post-production.",
+          "Leave a visually useful foreground area for the character overlay while keeping the environment rich and complete."
+        ].join(" ")
+      : characterLock;
     const prompt=[
       prefix,
-      characterLock,
+      characterGenerationLock,
       styleLock,
       contentBrief,
       core,

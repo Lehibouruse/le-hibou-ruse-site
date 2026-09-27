@@ -331,6 +331,9 @@
         },
         "video_music_mix_v1": {
           "type": "boolean"
+        },
+        "video_incremental_retouch_v1": {
+          "type": "boolean"
         }
       },
       "additionalProperties": true
@@ -346,6 +349,16 @@
           ]
         },
         "candidates_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "preview_candidates_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "final_candidates_per_scene": {
           "type": "integer",
           "minimum": 1,
           "maximum": 3

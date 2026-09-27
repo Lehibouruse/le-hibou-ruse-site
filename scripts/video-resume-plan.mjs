@@ -7,7 +7,7 @@ import { auditVoiceDurations } from "./video-voice-duration-qc.mjs";
 
 export const RESUME_PLAN_SCHEMA = "HIBOU_VIDEO_RESUME_PLAN_V1";
 
-const STAGE_ORDER = [
+export const VIDEO_VIDEO_STAGE_ORDER = [
   "storyboard",
   "prosody",
   "voice",
@@ -111,8 +111,8 @@ function artifactStatus(root, stage) {
 }
 
 function downstreamFrom(stage) {
-  const index = STAGE_ORDER.indexOf(stage);
-  return index < 0 ? [] : STAGE_ORDER.slice(index);
+  const index = VIDEO_STAGE_ORDER.indexOf(stage);
+  return index < 0 ? [] : VIDEO_STAGE_ORDER.slice(index);
 }
 
 function parseSubtitleFont(root) {
@@ -209,7 +209,7 @@ function explicitInvalidations(values) {
   for (const raw of values || []) {
     const stage = String(raw || "").trim();
     if (!stage) continue;
-    if (!STAGE_ORDER.includes(stage)) {
+    if (!VIDEO_STAGE_ORDER.includes(stage)) {
       fail("unknown invalidation stage: " + stage);
     }
     out.push({
@@ -222,7 +222,7 @@ function explicitInvalidations(values) {
 
 function inferMissingPassArtifacts(root, state) {
   const out = [];
-  for (const stage of STAGE_ORDER) {
+  for (const stage of VIDEO_STAGE_ORDER) {
     if (stageStatus(state, stage) !== "PASS") continue;
     const artifacts = artifactStatus(root, stage);
     if (artifacts.complete === false) {
@@ -258,37 +258,37 @@ export function buildResumePlan({
 
   const invalidationStages = unique(diagnostics.map((item) => item.stage));
   const invalidationIndexes = invalidationStages
-    .map((stage) => STAGE_ORDER.indexOf(stage))
+    .map((stage) => VIDEO_STAGE_ORDER.indexOf(stage))
     .filter((index) => index >= 0);
   const earliestIndex = invalidationIndexes.length
     ? Math.min(...invalidationIndexes)
     : -1;
 
-  const failedStages = STAGE_ORDER.filter(
+  const failedStages = VIDEO_STAGE_ORDER.filter(
     (stage) => stageStatus(state, stage) === "ERROR",
   );
   const firstFailedIndex = failedStages.length
-    ? Math.min(...failedStages.map((stage) => STAGE_ORDER.indexOf(stage)))
+    ? Math.min(...failedStages.map((stage) => VIDEO_STAGE_ORDER.indexOf(stage)))
     : -1;
 
   let resumeIndex = earliestIndex;
   if (resumeIndex < 0 && firstFailedIndex >= 0) resumeIndex = firstFailedIndex;
 
   if (resumeIndex < 0) {
-    const runningStages = STAGE_ORDER.filter(
+    const runningStages = VIDEO_STAGE_ORDER.filter(
       (stage) => stageStatus(state, stage) === "RUNNING",
     );
     if (runningStages.length) {
       resumeIndex = Math.min(
-        ...runningStages.map((stage) => STAGE_ORDER.indexOf(stage)),
+        ...runningStages.map((stage) => VIDEO_STAGE_ORDER.indexOf(stage)),
       );
     }
   }
 
-  const resumeStage = resumeIndex >= 0 ? STAGE_ORDER[resumeIndex] : null;
+  const resumeStage = resumeIndex >= 0 ? VIDEO_STAGE_ORDER[resumeIndex] : null;
   const stagesToReset = resumeStage ? downstreamFrom(resumeStage) : [];
 
-  const stageRows = STAGE_ORDER.map((stage, index) => {
+  const stageRows = VIDEO_STAGE_ORDER.map((stage, index) => {
     const status = stageStatus(state, stage);
     const artifacts = artifactStatus(resolvedRoot, stage);
     const shouldReset = resumeIndex >= 0 && index >= resumeIndex;

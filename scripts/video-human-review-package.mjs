@@ -96,12 +96,11 @@ export function buildHumanReviewPackage({
     add(warnings, "candidate_review_not_available");
   }
 
-  if (artifactRegistry) {
-    if (artifactRegistry.publication_authorized === true) {
-      add(blockers, "artifact_registry_publication_must_be_false");
-    }
-  } else {
-    add(warnings, "artifact_registry_not_available");
+  if (
+    artifactRegistry &&
+    artifactRegistry.publication_authorized === true
+  ) {
+    add(blockers, "artifact_registry_publication_must_be_false");
   }
 
   if (masterResult?.publication_authorized === true) {

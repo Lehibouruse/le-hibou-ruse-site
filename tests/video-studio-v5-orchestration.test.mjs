@@ -121,3 +121,24 @@ test("incremental review diff is commit-pinned and remains human-only",()=>{
  assert.match(humanReview,/previous_human_approval_auto_reused:false/);
  assert.match(humanReview,/always_required_global_checks/);
 });
+
+
+test("remote human decisions are fingerprint-bound before local staging and skip ComfyUI wake-up",()=>{
+ assert.match(worker,/human_candidate_decisions/);
+ assert.match(worker,/HIBOU_HUMAN_IMAGE_SELECTION_V1/);
+ assert.match(worker,/remote human selection fingerprint mismatch/);
+ assert.match(worker,/candidate-decisions\.json/);
+ assert.match(worker,/humanSelectionResume = true/);
+ assert.match(worker,/if \(!humanSelectionResume\) \{/);
+ assert.match(worker,/human-selection resume skips ComfyUI wake-up/);
+ assert.match(worker,/review_fingerprint_sha256: reviewFingerprint/);
+ assert.match(queueRoute,/HUMAN_SELECTION_RESUME_SCHEDULED/);
+ assert.match(queueRoute,/resume_human_selection !== true/);
+});
+
+test("remote human resume remains a human gate and never authorizes publication",()=>{
+ assert.match(worker,/human_review_required: true/);
+ assert.match(worker,/publication_authorized: false/);
+ assert.match(queueRoute,/human_review_required: true/);
+ assert.match(queueRoute,/publication_authorized: false/);
+});

@@ -387,6 +387,68 @@ function pipelineFailureDetail(dir) {
   }
 }
 
+function readJsonFileSafe(filePath) {
+  try {
+    if (!filePath || !existsSync(filePath)) return null;
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function structuredVideoFailureDiagnostics(job, error) {
+  const jobId = String(job?.id || "").trim();
+  const dir = jobId ? path.join(VIDEO_OUTPUT_ROOT, safePart(jobId)) : "";
+  const pipelineStatePath = dir ? path.join(dir, "pipeline-run.json") : "";
+  const factoryRunPath = dir ? path.join(dir, "images", "factory-run.json") : "";
+  const pipeline = readJsonFileSafe(pipelineStatePath);
+  const factory = readJsonFileSafe(factoryRunPath);
+  const entries = Object.entries(pipeline?.stages || {});
+  const failed = entries.filter(([, info]) => info?.status === "ERROR").at(-1);
+  const running = entries.find(([, info]) => info?.status === "RUNNING");
+  const completed = entries
+    .filter(([, info]) => info?.status === "PASS")
+    .map(([name]) => name);
+  const rawError = String(error?.stack || error || "");
+
+  return {
+    schema: "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+    failed_at: new Date().toISOString(),
+    job_id: jobId || null,
+    content_id: String(job?.options?.content_id || "").trim() || null,
+    output_root: dir || null,
+    failed_stage: failed?.[0] || null,
+    running_stage: running?.[0] || null,
+    completed_stages: completed,
+    pipeline_state_path: pipelineStatePath || null,
+    factory_run_path: existsSync(factoryRunPath) ? factoryRunPath : null,
+    image_qc: factory ? {
+      all_scenes_have_candidate: Boolean(factory.all_scenes_have_candidate),
+      image_profile: factory.image_profile || null,
+      technical_qc: factory.technical_qc ? {
+        all_scenes_have_candidate: Boolean(factory.technical_qc.all_scenes_have_candidate),
+        failed_check_counts: factory.technical_qc.failed_check_counts || {},
+        dimensions: factory.technical_qc.dimensions || {},
+        min_width: factory.technical_qc.min_width ?? null,
+        min_height: factory.technical_qc.min_height ?? null,
+        aspect_tolerance: factory.technical_qc.aspect_tolerance ?? null,
+      } : null,
+      perceptual_qc: factory.perceptual_qc ? {
+        all_scenes_have_candidate: Boolean(factory.perceptual_qc.all_scenes_have_candidate),
+        reason_counts: factory.perceptual_qc.reason_counts || {},
+        warning_counts: factory.perceptual_qc.warning_counts || {},
+      } : null,
+      regeneration_attempts: Array.isArray(factory.regeneration_runs)
+        ? factory.regeneration_runs.length
+        : 0,
+    } : null,
+    error_tail: rawError.length > 4000 ? rawError.slice(-4000) : rawError,
+    human_review_required: true,
+    publication_authorized: false,
+    paid_fallback: false,
+  };
+}
+
 function pipelineHeartbeatSnapshot(dir) {
   const statePath = path.join(dir, "pipeline-run.json");
   if (!existsSync(statePath)) {
@@ -1257,8 +1319,11 @@ async function tick() {
 
     try {
       if (job?.type === "VIDEO_RENDER") {
+        const diagnostic = structuredVideoFailureDiagnostics(job, error);
         await reportVideoProgress(job, "Error", {
           error: message,
+          local_path: diagnostic.output_root,
+          result: diagnostic,
         });
       } else {
         await reportProgress(job, "Error", {

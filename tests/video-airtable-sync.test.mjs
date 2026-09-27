@@ -30,3 +30,21 @@ test("scene report records hashes without URLs",()=>{
  assert.match(fields["Motif QC"],/render_sha256=abc/);
  assert.equal(fields.Erreur,"");
 });
+
+
+test("specific storyboard scenes may run up to 12 seconds",()=>{
+ const parts=Array.from({length:8},(_,i)=>`scene${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,i===2?9:4));
+ const c=buildStoryboardContract(content,scenes);
+ assert.equal(c.scenes[2].planned_duration_s,9);
+ assert.deepEqual(c.creative.pacing.scene_duration_allowed_s,[1.5,12]);
+ assert.equal(c.content.method_version,"VIDEO_METHOD_V4.3");
+});
+
+test("storyboard still rejects pathological scene duration above 12 seconds",()=>{
+ const parts=Array.from({length:8},(_,i)=>`scene${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,i===2?12.1:4));
+ assert.throws(()=>buildStoryboardContract(content,scenes),/duration must be 1\.5\.\.12 s/);
+});

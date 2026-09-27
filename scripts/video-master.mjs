@@ -9,6 +9,8 @@ function fail(message){ throw new Error(message); }
 function sha256(path){ return createHash("sha256").update(readFileSync(path)).digest("hex"); }
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
+function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
+function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
 async function ensureCanonicalReference(storyboardData, root){
   const creative=storyboardData?.creative||{};
   const url=String(creative.reference_image_url||"").trim();
@@ -80,6 +82,8 @@ function chatterboxBatchScript(){
 
 const PRE_IMAGE_RUNTIME_FILES=[
   ["video-audio-master.mjs","masterAudio"],
+  ["video-audio-mix.mjs","HIBOU_AUDIO_MIX_V1"],
+  ["video-prosody-plan.mjs","HIBOU_PROSODY_PLAN_V1"],
   ["video-attach-mastered-audio.mjs","attachMasteredAudio"],
   ["video-subtitles.mjs","buildAss"],
   ["video-attach-subtitles.mjs","attachSubtitles"],
@@ -110,6 +114,8 @@ async function ensurePreImageRuntimeBundle(commit){
   }
   return {
     audioMaster:resolve(localBase,"video-audio-master.mjs"),
+    audioMix:resolve(localBase,"video-audio-mix.mjs"),
+    prosody:resolve(localBase,"video-prosody-plan.mjs"),
     attachAudio:resolve(localBase,"video-attach-mastered-audio.mjs"),
     subtitles:resolve(localBase,"video-subtitles.mjs"),
     attachSubtitles:resolve(localBase,"video-attach-subtitles.mjs"),
@@ -157,7 +163,8 @@ const POST_RUNTIME_FILES=[
   ["video-local-render.mjs","renderVideoContract"],
   ["video-scene-compositor.mjs","buildSceneCompositePlan"],
   ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
-  ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V1"]
+  ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V1"],
+  ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1"]
 ];
 
 async function ensurePostRuntimeBundle(commit){
@@ -184,7 +191,8 @@ async function ensurePostRuntimeBundle(commit){
     promote:resolve(localBase,"video-storyboard-promote.mjs"),
     render:resolve(localBase,"video-local-render.mjs"),
     masterQc:resolve(localBase,"video-master-qc.mjs"),
-    registry:resolve(localBase,"video-artifact-registry.mjs")
+    registry:resolve(localBase,"video-artifact-registry.mjs"),
+    creativeQc:resolve(localBase,"video-creative-qc.py")
   };
 }
 
@@ -289,7 +297,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","voice","audio_master","subtitles","style","asset_resolution","images","technical_selection","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","prosody","voice","audio_master","music_mix","audio_attach","subtitles","style","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -314,6 +322,16 @@ async function main(){
   const runtimeCommit=String(storyboardData.runtime_commit||"").trim();
   const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
 
+  const prosodyEnabled=contractFeature(storyboardData,"video_prosody_v1","HIBOU_VIDEO_PROSODY_V1");
+  const prosodyStoryboard=resolve(root,"storyboard-prosody.json");
+  if(prosodyEnabled){
+    stage(state,"prosody",()=>run(process.execPath,[preRuntime.prosody,storyboard,prosodyStoryboard]));
+  }else if(!state.stages.prosody){
+    state.stages.prosody={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+    writeJson(statePath,state);
+  }
+  const voiceInput=prosodyEnabled?prosodyStoryboard:storyboard;
+
   const voiceDir=resolve(root,"voice");
   const voiceReady=resolve(voiceDir,"contract-audio-ready.json");
   const rawVoice=resolve(voiceDir,"voice-master.wav");
@@ -321,16 +339,31 @@ async function main(){
     const py=pythonCommand();
     const voiceScript=chatterboxBatchScript();
     if(!existsSync(voiceScript)) fail("chatterbox batch script missing: "+voiceScript);
-    run(py.cmd,[...py.prefix,voiceScript,storyboard,voiceDir]);
+    run(py.cmd,[...py.prefix,voiceScript,voiceInput,voiceDir]);
     if(!existsSync(voiceReady)||!existsSync(rawVoice)) fail("voice outputs missing");
   });
 
-  const mastered=resolve(voiceDir,"voice-mastered.wav");
+  const voiceMastered=resolve(voiceDir,"voice-mastered.wav");
+  stage(state,"audio_master",()=>run(process.execPath,[preRuntime.audioMaster,rawVoice,voiceMastered]));
+
+  const musicEnabled=contractFeature(storyboardData,"video_music_mix_v1","HIBOU_VIDEO_MUSIC_V1");
+  const musicMixed=resolve(voiceDir,"voice-music-mixed.wav");
+  const musicConfigPath=resolve(root,"music-global.json");
+  if(musicEnabled){
+    stage(state,"music_mix",()=>{
+      const globalMusic={...(storyboardData.music||{})};
+      if(!globalMusic.reference) fail("video_music_mix_v1 enabled but GLOBAL music.reference missing");
+      writeJson(musicConfigPath,globalMusic);
+      run(process.execPath,[preRuntime.audioMix,voiceMastered,musicConfigPath,musicMixed]);
+    });
+  }else if(!state.stages.music_mix){
+    state.stages.music_mix={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+    writeJson(statePath,state);
+  }
+
+  const mastered=musicEnabled?musicMixed:voiceMastered;
   const masteredContract=resolve(root,"contract-mastered.json");
-  stage(state,"audio_master",()=>{
-    run(process.execPath,[preRuntime.audioMaster,rawVoice,mastered]);
-    run(process.execPath,[preRuntime.attachAudio,voiceReady,mastered,masteredContract]);
-  });
+  stage(state,"audio_attach",()=>run(process.execPath,[preRuntime.attachAudio,voiceReady,mastered,masteredContract]));
 
   const ass=resolve(root,"subtitles.ass");
   const captioned=resolve(root,"contract-captioned.json");
@@ -392,6 +425,53 @@ async function main(){
     }
   });
 
+  const creativeQcEnabled=contractFeature(storyboardData,"video_creative_qc_v1","HIBOU_VIDEO_CREATIVE_QC_V1");
+  const creativeQcManifest=resolve(root,"creative-qc-input.json");
+  const creativeQcReport=resolve(root,"creative-qc.json");
+  if(creativeQcEnabled){
+    stage(state,"creative_qc",()=>{
+      const resolvedContract=json(assetResolved);
+      const picks=json(selections);
+      const scenes=[];
+      for(const scene of resolvedContract.scenes||[]){
+        const pick=picks[scene.scene_id];
+        let imagePath=pick?.selected?resolve(imageDir,pick.selected):"";
+        if(!imagePath&&scene?.composition?.background){
+          const raw=typeof scene.composition.background==="string"?scene.composition.background:String(scene.composition.background.path||scene.composition.background.reference||"");
+          if(raw) imagePath=resolve(dirname(assetResolved),raw);
+        }
+        if(!imagePath) continue;
+        scenes.push({
+          scene_id:scene.scene_id,
+          image:imagePath,
+          brief:String(scene.image_prompt||scene.visual_idea||""),
+          style_prompt:String(resolvedContract.creative?.style_lock||""),
+          expected_hibou:Boolean(scene.framing?.hibou)
+        });
+      }
+      writeJson(creativeQcManifest,{
+        canonical_hibou:canonicalReference||null,
+        thresholds:storyboardData.creative?.creative_qc?.thresholds||{},
+        scenes
+      });
+      const py=pythonCommand();
+      const model=String(storyboardData.creative?.creative_qc?.model||"").trim();
+      const args=[...py.prefix,postRuntime.creativeQc,creativeQcManifest,"--output",creativeQcReport];
+      if(model) args.push("--model",model);
+      run(py.cmd,args);
+      const report=json(creativeQcReport);
+      state.creative_qc_status=report.status;
+      state.creative_qc_failed_scene_count=Number(report.failed_scene_count||0);
+      writeJson(statePath,state);
+      if(report.status==="REJECT"&&storyboardData.creative?.creative_qc?.block_on_reject===true){
+        fail("creative semantic QC rejected one or more scenes");
+      }
+    });
+  }else if(!state.stages.creative_qc){
+    state.stages.creative_qc={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+    writeJson(statePath,state);
+  }
+
   const renderReady=resolve(root,"render-ready.json");
   stage(state,"promotion",()=>{
     run(process.execPath,[postRuntime.promote,assetResolved,selections,renderReady]);
@@ -423,6 +503,8 @@ async function main(){
       {kind:"contract",path:renderReady},
       {kind:"master",path:master},
       {kind:"qc",path:masterQc},
+      ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
+      ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
       {kind:"pipeline_state",path:statePath}
     ]});
     run(process.execPath,[postRuntime.registry,registrySpec,registry]);
@@ -456,6 +538,12 @@ async function main(){
     artifact_registry:registry,
     asset_resolution:state.asset_resolution||{enabled:false,full_reuse_scenes:0,generation_required_scenes:0,generation_slots:0},
     qc_status:json(masterQc).status,
+    creative_qc_status:state.creative_qc_status||"DISABLED",
+    features:{
+      video_prosody_v1:prosodyEnabled,
+      video_music_mix_v1:musicEnabled,
+      video_creative_qc_v1:creativeQcEnabled
+    },
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     human_master_review_required:true,
     publication_authorized:false

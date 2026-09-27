@@ -90,6 +90,13 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         selected_sha256:sha256(target),
       };
     }
+    if(Array.isArray(scene?.timeline?.events)){
+      scene.timeline.events=scene.timeline.events.map((event,index)=>{
+        if(!["object","pose"].includes(String(event?.type||""))) return event;
+        const copied=copyCompositionAsset(sceneId,`timeline-${index+1}`,event);
+        return {...event,...copied};
+      });
+    }
     scene.composition={
       ...(scene.composition||{}),
       brand_signature:{

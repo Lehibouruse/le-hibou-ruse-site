@@ -1,0 +1,99 @@
+{
+  "schema": "HIBOU_AIRTABLE_MIGRATION_PLAN_V1",
+  "id": "video-studio-v5-profile-fields",
+  "applied": false,
+  "tables": [
+    {
+      "logical_table": "Video Global Profile",
+      "add_fields": [
+        [
+          "Timeline intra-scène V1",
+          "checkbox"
+        ],
+        [
+          "QC créatif V1",
+          "checkbox"
+        ],
+        [
+          "Registry poses V1",
+          "checkbox"
+        ],
+        [
+          "Prosodie V1",
+          "checkbox"
+        ],
+        [
+          "Mix musique V1",
+          "checkbox"
+        ],
+        [
+          "Modèle QC créatif",
+          "singleLineText"
+        ],
+        [
+          "QC créatif bloquant",
+          "checkbox"
+        ],
+        [
+          "Seuils QC créatif JSON",
+          "longText"
+        ],
+        [
+          "Musique activée",
+          "checkbox"
+        ],
+        [
+          "Piste musique locale",
+          "singleLineText"
+        ],
+        [
+          "Licence musique",
+          "singleLineText"
+        ],
+        [
+          "Preuve licence musique",
+          "longText"
+        ],
+        [
+          "Niveau musique dB",
+          "number"
+        ],
+        [
+          "Ducking seuil",
+          "number"
+        ],
+        [
+          "Ducking ratio",
+          "number"
+        ],
+        [
+          "Musique fade-in s",
+          "number"
+        ],
+        [
+          "Musique fade-out s",
+          "number"
+        ]
+      ],
+      "defaults": "all feature checkboxes false; do not modify the active profile"
+    },
+    {
+      "logical_table": "Video Scenes",
+      "add_fields": [
+        [
+          "Timeline JSON",
+          "longText"
+        ],
+        [
+          "Prosodie JSON",
+          "longText"
+        ],
+        [
+          "Pose Hibou",
+          "singleLineText"
+        ]
+      ]
+    }
+  ],
+  "rollout": "Prepared only. Apply after the active render finishes and before enabling V5 flags."
+}

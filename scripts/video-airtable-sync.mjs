@@ -16,6 +16,13 @@ function parseJsonArray(value){
   if(!String(value||"").trim()) return [];
   try{ const parsed=JSON.parse(value); return Array.isArray(parsed)?parsed:[]; }catch{return [];}
 }
+function parseJsonObject(value){
+  if(!value) return null;
+  try{
+    const parsed=JSON.parse(String(value));
+    return parsed&&typeof parsed==="object"&&!Array.isArray(parsed)?parsed:null;
+  }catch{return null;}
+}
 
 export async function resolveCanonicalVideoProfile(contentRecord){
   const linked=linkedIds(contentRecord?.fields?.["Profil vidéo"]);
@@ -70,8 +77,12 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
         relative_speed_pct:Number(f["Vitesse relative voix %"]||100),
         pause_after_ms:Number(f["Pause après (ms)"]||0),
         emphasis:String(f["Accentuation voix"]||""),
-        intent:String(f["Intention voix"]||"")
+        intent:String(f["Intention voix"]||""),
+        verbatim:true,
+        prosody_cues:parseJsonArray(f["Prosodie JSON"])
       },
+      timeline:parseJsonObject(f["Timeline JSON"]),
+      pose_request:String(f["Pose Hibou"]||""),
       music_cue:String(f["Cue musique"]||"")
     };
   });
@@ -87,6 +98,13 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       method_version:"VIDEO_METHOD_V4.3",
       source:"airtable",
       exported_at:new Date().toISOString()
+    },
+    features:{
+      video_timeline_v1:Boolean(profile["Timeline intra-scène V1"]),
+      video_creative_qc_v1:Boolean(profile["QC créatif V1"]),
+      video_pose_registry_v1:Boolean(profile["Registry poses V1"]),
+      video_prosody_v1:Boolean(profile["Prosodie V1"]),
+      video_music_mix_v1:Boolean(profile["Mix musique V1"])
     },
     creative:{
       profile_name:String(profile.Profil||"HIBOU_VIRAL_V1"),
@@ -114,6 +132,11 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
         perceptible_beat_s:[2,3],
         full_composition_change_s:[3,5]
       },
+      creative_qc:{
+        model:String(profile["Modèle QC créatif"]||"openai/clip-vit-base-patch32"),
+        block_on_reject:Boolean(profile["QC créatif bloquant"]),
+        thresholds:parseJsonObject(profile["Seuils QC créatif JSON"])||{}
+      },
       production_defaults:{
         plans_min:Number(profile["Plans min"]||10),
         plans_max:Number(profile["Plans max"]||16),
@@ -126,7 +149,19 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
     engine:{renderer:"ffmpeg",renderer_version:"video-local-render-v1",fps:30,width:1080,height:1920,preset:"medium"},
     scenes,
     audio:{status:"pending",engine:"chatterbox_multilingual",reference:null},
-    music:{status:"none_commercial",policy:"master sans morceau commercial ; cues seulement"},
+    music:{
+      status:Boolean(profile["Musique activée"])?"configured":"none_commercial",
+      enabled:Boolean(profile["Musique activée"]),
+      reference:String(profile["Piste musique locale"]||""),
+      license:String(profile["Licence musique"]||""),
+      license_evidence:String(profile["Preuve licence musique"]||""),
+      level_db:Number(profile["Niveau musique dB"]||-24),
+      duck_threshold:Number(profile["Ducking seuil"]||0.025),
+      duck_ratio:Number(profile["Ducking ratio"]||8),
+      fade_in_s:Number(profile["Musique fade-in s"]||0.8),
+      fade_out_s:Number(profile["Musique fade-out s"]||1.2),
+      policy:"GLOBAL only; master sans morceau commercial non maîtrisé"
+    },
     subtitles:{status:"pending",source:"exact narration text"},
     qc:{status:"TIMING_PASS_MEDIA_NOT_RUN",technical:{planned_duration_s:Number(total.toFixed(3)),scene_count:scenes.length}},
     validation:{human_required:true,publication_authorized:false,status:"STORYBOARD_READY"}

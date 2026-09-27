@@ -35,6 +35,10 @@ const VIDEO_REMOTE_CANCEL_ENABLED =
   String(process.env.HIBOU_VIDEO_REMOTE_CANCEL_ENABLED || "")
     .trim()
     .toLowerCase() === "true";
+const VIDEO_REMOTE_REPAIR_RESUME_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
 const VIDEO_CANCEL_GRACE_MS = Math.max(
   1000,
   Math.min(30000, Number(process.env.HIBOU_VIDEO_CANCEL_GRACE_MS || 5000)),
@@ -461,21 +465,28 @@ async function ensureCanonicalVideoRuntimes(job) {
     diagnosticRuntimeDir,
     "video-voice-duration-qc.mjs",
   );
+  const resumeStateScript = path.join(
+    diagnosticRuntimeDir,
+    "video-resume-state.mjs",
+  );
 
   if (
     state.runtime_commit === commit &&
     existsSync(VIDEO_MASTER_SCRIPT) &&
     existsSync(CHATTERBOX_BATCH_SCRIPT) &&
     existsSync(resumePlanScript) &&
-    existsSync(voiceDurationQcScript)
+    existsSync(voiceDurationQcScript) &&
+    existsSync(resumeStateScript)
   ) {
     state.runtime_resume_plan_path = resumePlanScript;
+    state.runtime_resume_state_path = resumeStateScript;
     return {
       commit,
       master: VIDEO_MASTER_SCRIPT,
       voice: CHATTERBOX_BATCH_SCRIPT,
       comfy_start: COMFYUI_START_SCRIPT,
       resume_plan: resumePlanScript,
+      resume_state: resumeStateScript,
       refreshed: false,
     };
   }
@@ -530,6 +541,16 @@ async function ensureCanonicalVideoRuntimes(job) {
     ],
   );
 
+  const resumeState = await installPinnedRuntime(
+    commit,
+    "scripts/video-resume-state.mjs",
+    resumeStateScript,
+    [
+      "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
+      "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+    ],
+  );
+
   state.runtime_commit = commit;
   state.runtime_master_sha256 = master.sha256;
   state.runtime_voice_sha256 = voice.sha256;
@@ -537,6 +558,8 @@ async function ensureCanonicalVideoRuntimes(job) {
   state.runtime_voice_duration_qc_sha256 = voiceDurationQc.sha256;
   state.runtime_resume_plan_sha256 = resumePlan.sha256;
   state.runtime_resume_plan_path = resumePlan.path;
+  state.runtime_resume_state_sha256 = resumeState.sha256;
+  state.runtime_resume_state_path = resumeState.path;
 
   log("VIDEO_RENDER runtimes refreshed", {
     commit,
@@ -548,6 +571,8 @@ async function ensureCanonicalVideoRuntimes(job) {
     comfy_start_sha256: comfyStart.sha256,
     resume_plan: resumePlan.path,
     resume_plan_sha256: resumePlan.sha256,
+    resume_state: resumeState.path,
+    resume_state_sha256: resumeState.sha256,
   });
 
   return {
@@ -556,6 +581,7 @@ async function ensureCanonicalVideoRuntimes(job) {
     voice: voice.path,
     comfy_start: comfyStart.path,
     resume_plan: resumePlan.path,
+    resume_state: resumeState.path,
     refreshed: true,
   };
 }
@@ -651,10 +677,12 @@ function buildVideoFailureDiagnostic(job, errorMessage) {
   try {
     const plan = JSON.parse(readFileSync(output, "utf8"));
     diagnostic.resume_plan_path = output;
+    diagnostic.resume_plan_sha256 = sha256(output);
     diagnostic.resume_plan = {
       schema: plan.schema || null,
       resume_required: Boolean(plan.resume_required),
       resume_stage: plan.resume_stage || null,
+      source_state_sha256: String(plan.source_state_sha256 || "") || null,
       failed_stages: Array.isArray(plan.failed_stages)
         ? plan.failed_stages.slice(0, 30)
         : [],
@@ -2406,6 +2434,9 @@ function healthServer() {
       runtime_voice_duration_qc_sha256: state.runtime_voice_duration_qc_sha256 || null,
       runtime_resume_plan_sha256: state.runtime_resume_plan_sha256 || null,
       runtime_resume_plan_path: state.runtime_resume_plan_path || null,
+      runtime_resume_state_sha256: state.runtime_resume_state_sha256 || null,
+      runtime_resume_state_path: state.runtime_resume_state_path || null,
+      video_remote_repair_resume_enabled: VIDEO_REMOTE_REPAIR_RESUME_ENABLED,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

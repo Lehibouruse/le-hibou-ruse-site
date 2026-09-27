@@ -79,6 +79,7 @@ test("selection rejects a candidate that failed QC", () => {
         decisions: {
           schema: HUMAN_IMAGE_SELECTION_SCHEMA,
           content_id: "recCONTENT1234567",
+          review_fingerprint_sha256: "a".repeat(64),
           decisions: {
             S01: {
               candidate_id: "S01-C2",
@@ -99,6 +100,7 @@ test("selection requires explicit human confirmation", () => {
         decisions: {
           schema: HUMAN_IMAGE_SELECTION_SCHEMA,
           content_id: "recCONTENT1234567",
+          review_fingerprint_sha256: "a".repeat(64),
           decisions: {
             S01: {
               candidate_id: "S01-C1",
@@ -119,6 +121,7 @@ test("selection requires all reviewable scenes and ignores non-reviewable ones",
         decisions: {
           schema: HUMAN_IMAGE_SELECTION_SCHEMA,
           content_id: "recCONTENT1234567",
+          review_fingerprint_sha256: "a".repeat(64),
           decisions: {},
         },
       }),
@@ -153,6 +156,7 @@ test("selection rejects unknown scenes and content mismatch", () => {
         decisions: {
           schema: HUMAN_IMAGE_SELECTION_SCHEMA,
           content_id: "recCONTENT1234567",
+          review_fingerprint_sha256: "a".repeat(64),
           decisions: {
             S01: {
               candidate_id: "S01-C1",

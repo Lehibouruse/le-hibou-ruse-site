@@ -76,3 +76,10 @@ test("ComfyUI starter patches comfy-kitchen builtin list annotations for torch 2
   assert.match(starter, /comfy_kitchen_import_ok/);
   assert.match(starter, /comfy_kitchen reste incompatible avec torch 2\.6 apres patch/);
 });
+
+
+test("comfy-kitchen import validation uses a Python file to avoid Windows quoting issues", () => {
+  assert.match(starter, /comfy-kitchen-import-probe\.py/);
+  assert.match(starter, /Set-Content -LiteralPath \$importProbe -Encoding UTF8/);
+  assert.match(starter, /ArgumentList @\("-s", \$importProbe\)/);
+});

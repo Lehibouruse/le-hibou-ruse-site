@@ -166,13 +166,37 @@ function resumePreparationSummary(root, state) {
   const remoteMarker = readJsonIf(
     join(root, "_hibou_video_remote_repair_prepared.json"),
   );
+  const startedReceipt = readJsonIf(
+    join(root, "_hibou_video_remote_repair_started.json"),
+  );
   const prepared =
     state?.pipeline_status === "RESUME_PREPARED" &&
     state?.resume_prepared &&
     typeof state.resume_prepared === "object";
 
+  const executionStarted =
+    remoteMarker?.execution_started === true ||
+    state?.resume_prepared?.execution_started === true ||
+    state?.pipeline_status === "REPAIR_EXECUTION_STARTED";
+  const waitingExplicitStart =
+    Boolean(prepared) &&
+    !executionStarted &&
+    (
+      remoteMarker?.requires_separate_render_start === true ||
+      !remoteMarker
+    );
+  const startedReceiptValid =
+    startedReceipt?.schema === "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1" &&
+    startedReceipt.publication_authorized === false &&
+    startedReceipt.human_confirmed === true;
+
   return {
     prepared: Boolean(prepared),
+    phase: executionStarted
+      ? "execution_started"
+      : waitingExplicitStart
+        ? "prepared_waiting_explicit_start"
+        : "not_prepared",
     pipeline_status: state?.pipeline_status || null,
     resume_stage:
       String(
@@ -192,12 +216,19 @@ function resumePreparationSummary(root, state) {
     receipt_plan_sha256: receipt?.plan_sha256 || null,
     remote_marker_available: Boolean(remoteMarker),
     remote_marker_schema: remoteMarker?.schema || null,
-    requires_separate_render_start:
-      remoteMarker?.requires_separate_render_start === true ||
-      Boolean(prepared),
-    execution_started:
-      remoteMarker?.execution_started === true ||
-      state?.resume_prepared?.execution_started === true,
+    start_receipt_available: Boolean(startedReceipt),
+    start_receipt_schema: startedReceipt?.schema || null,
+    start_receipt_valid: startedReceiptValid,
+    start_receipt_started_at: startedReceipt?.started_at || null,
+    execution_state_sha256:
+      startedReceipt?.execution_state_sha256 ||
+      remoteMarker?.execution_state_sha256 ||
+      state?.repair_execution?.execution_state_sha256 ||
+      null,
+    start_receipt_sha256:
+      startedReceipt?.start_receipt_sha256 || null,
+    requires_separate_render_start: waitingExplicitStart,
+    execution_started: executionStarted,
     publication_authorized: false,
   };
 }
@@ -306,6 +337,16 @@ export function auditVideoRun(rootArg, { platform = process.platform } = {}) {
       code: "resume_prepared_waiting_explicit_start",
       resume_stage: resumePreparation.resume_stage,
       reset_stages: resumePreparation.reset_stages,
+    });
+  }
+  if (
+    resumePreparation.execution_started &&
+    resumePreparation.start_receipt_available &&
+    !resumePreparation.start_receipt_valid
+  ) {
+    attention.push({
+      code: "repair_start_receipt_invalid",
+      start_receipt_schema: resumePreparation.start_receipt_schema,
     });
   }
 

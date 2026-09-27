@@ -98,6 +98,153 @@ if (-not $queue.ok -or $queue.schema -ne "HIBOU_VIDEO_RENDER_QUEUE_V2") {
 }
 Write-Host ("Queue authentifiee OK - jobs visibles : {0}" -f @($queue.jobs).Count) -ForegroundColor Green
 
+$RuntimeCommit = [string]$queue.runtime_commit
+if ([string]::IsNullOrWhiteSpace($RuntimeCommit) -or $RuntimeCommit -notmatch '^[0-9a-fA-F]{40}
+
+$FailedJobsPath = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
+if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
+  try {
+    $failedJobs = Get-Content -Raw $FailedJobsPath | ConvertFrom-Json
+    $cleared = 0
+    foreach ($job in @($queue.jobs)) {
+      if ($null -ne $failedJobs -and $null -ne $failedJobs.PSObject.Properties[$job.id]) {
+        $failedJobs.PSObject.Properties.Remove($job.id)
+        $cleared += 1
+      }
+    }
+    if ($cleared -gt 0) {
+      $failedJobs | ConvertTo-Json -Depth 8 | Set-Content -Path $FailedJobsPath -Encoding UTF8
+      Write-Host ("Backoff local leve pour {0} job(s) VIDEO_RENDER Pending." -f $cleared) -ForegroundColor Green
+    }
+  } catch {
+    throw "Impossible de lever proprement le backoff local VIDEO_RENDER : $($_.Exception.Message)"
+  }
+}
+
+$InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
+$Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
+$RuntimeMaster = Join-Path $InstallDir "video-master.runtime.mjs"
+$RuntimeVoice = Join-Path $InstallDir "chatterbox-storyboard-batch.runtime.py"
+
+$RawBase = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/$RuntimeCommit"
+$WorkerUrl = "$RawBase/scripts/hibou-github-worker.mjs"
+$MasterUrl = "$RawBase/scripts/video-master.mjs"
+$VoiceUrl = "$RawBase/scripts/chatterbox-storyboard-batch.py"
+
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+
+Set-UserEnv "HIBOU_VIDEO_MASTER_SCRIPT" $RuntimeMaster
+Set-UserEnv "HIBOU_CHATTERBOX_BATCH_SCRIPT" $RuntimeVoice
+
+Write-Host ("Actualisation des runtimes video depuis le commit deploye {0}..." -f $RuntimeCommit) -ForegroundColor Cyan
+$cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$freshHeaders = @{ "Cache-Control" = "no-cache"; "Pragma" = "no-cache" }
+Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($WorkerUrl + "?hibou_cb=" + $cacheBust) -OutFile $Worker
+Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($MasterUrl + "?hibou_cb=" + $cacheBust) -OutFile $RuntimeMaster
+Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($VoiceUrl + "?hibou_cb=" + $cacheBust) -OutFile $RuntimeVoice
+
+$voiceSource = Get-Content -Raw $RuntimeVoice
+if ($voiceSource -notmatch 'inspect\.signature\(ChatterboxMultilingualTTS\.from_pretrained\)') {
+  throw "Runtime Chatterbox stale ou invalide: marqueur compatibilite API absent."
+}
+$masterSource = Get-Content -Raw $RuntimeMaster
+if ($masterSource -notmatch 'pathToFileURL\(resolve\(process\.argv\[1\]\)\)\.href') {
+  throw "Runtime video-master stale ou invalide: entrypoint portable absent."
+}
+
+& $Node --check $Worker
+if ($LASTEXITCODE -ne 0) {
+  throw "Le worker telecharge ne passe pas node --check."
+}
+& $Node --check $RuntimeMaster
+if ($LASTEXITCODE -ne 0) {
+  throw "Le video-master runtime ne passe pas node --check."
+}
+& $VoicePython -m py_compile $RuntimeVoice
+if ($LASTEXITCODE -ne 0) {
+  throw "Le batch Chatterbox runtime ne passe pas py_compile."
+}
+
+$RuntimeLauncher = Join-Path $InstallDir "start-hibou-video-stack.runtime.ps1"
+$CurrentLauncher = [System.IO.Path]::GetFullPath($PSCommandPath)
+$InstalledLauncher = [System.IO.Path]::GetFullPath($RuntimeLauncher)
+if ($CurrentLauncher -ne $InstalledLauncher) {
+  Copy-Item -LiteralPath $CurrentLauncher -Destination $RuntimeLauncher -Force
+}
+
+$StartupDir = [Environment]::GetFolderPath("Startup")
+$StartupCmd = Join-Path $StartupDir "LeHibouWorker.cmd"
+$CmdContent = @"
+@echo off
+start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$RuntimeLauncher"
+"@
+Set-Content -Path $StartupCmd -Value $CmdContent -Encoding ASCII
+
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like "*hibou-github-worker.mjs*" } |
+  ForEach-Object {
+    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+  }
+
+Start-Sleep -Milliseconds 500
+Start-Process -FilePath $Node -ArgumentList ('"' + $Worker + '"') -WorkingDirectory $InstallDir -WindowStyle Hidden
+
+$health = $null
+for ($i = 0; $i -lt 20; $i++) {
+  Start-Sleep -Milliseconds 500
+  try {
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 2
+    if ($health) { break }
+  } catch {}
+}
+
+if (-not $health) {
+  throw "Worker lance mais endpoint health indisponible."
+}
+if (-not $health.execution_enabled) {
+  throw "Worker actif mais execution_enabled=false."
+}
+if (-not $health.video_render_enabled) {
+  throw "Worker actif mais video_render_enabled=false."
+}
+if (-not $health.video_autostart_comfyui) {
+  throw "Worker actif mais video_autostart_comfyui=false."
+}
+if (-not $health.report_token_present) {
+  throw "Worker actif mais token absent."
+}
+if (-not $health.video_binding_exists) {
+  throw "Worker actif mais binding ComfyUI introuvable."
+}
+if (-not $health.video_master_script_exists) {
+  throw "Worker actif mais video-master runtime introuvable."
+}
+
+[ordered]@{
+  schema = "HIBOU_VIDEO_STACK_READY_V1"
+  worker = $health.worker
+  status = $health.status
+  execution_enabled = $health.execution_enabled
+  video_render_enabled = $health.video_render_enabled
+  video_autostart_comfyui = $health.video_autostart_comfyui
+  report_token_present = $health.report_token_present
+  video_binding_exists = $health.video_binding_exists
+  video_output_root = $health.video_output_root
+  video_master_script = $health.video_master_script
+  video_master_script_exists = $health.video_master_script_exists
+  chatterbox_batch_script = $RuntimeVoice
+  runtime_commit = $RuntimeCommit
+  startup = $StartupCmd
+  queue_jobs_visible = @($queue.jobs).Count
+} | ConvertTo-Json -Depth 4
+
+Write-Host "HIBOU_VIDEO_STACK_READY" -ForegroundColor Green
+) {
+  throw "Queue VIDEO_RENDER sans runtime_commit valide."
+}
+$RuntimeCommit = $RuntimeCommit.ToLowerInvariant()
+Write-Host ("Runtime deploye : {0}" -f $RuntimeCommit) -ForegroundColor Green
+
 $FailedJobsPath = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
 if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
   try {

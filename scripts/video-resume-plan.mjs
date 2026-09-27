@@ -7,7 +7,7 @@ import { auditVoiceDurations } from "./video-voice-duration-qc.mjs";
 
 export const RESUME_PLAN_SCHEMA = "HIBOU_VIDEO_RESUME_PLAN_V1";
 
-export const VIDEO_VIDEO_STAGE_ORDER = [
+export const VIDEO_STAGE_ORDER = [
   "storyboard",
   "prosody",
   "voice",

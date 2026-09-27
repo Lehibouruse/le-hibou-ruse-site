@@ -200,9 +200,10 @@ export function buildImagePlan(contract,binding){
     "All useful text, numbers, captions and the Le Hibou Rusé signature are added later in post-production.",
     "The image itself must contain zero readable text."
   ].join(" "):"";
-  const defaultCandidates=productionMode==="preview"
-    ?1
-    :Number(binding.candidates_per_scene||3);
+  const modeCandidates=productionMode==="preview"
+    ?Number(production.preview_candidates_per_scene??1)
+    :Number(production.final_candidates_per_scene??binding.candidates_per_scene??3);
+  const defaultCandidates=Number.isFinite(modeCandidates)?modeCandidates:(productionMode==="preview"?1:3);
   const requestedCandidates=production.candidates_per_scene==null||production.candidates_per_scene===""
     ?defaultCandidates
     :Number(production.candidates_per_scene);

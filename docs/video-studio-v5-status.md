@@ -20,6 +20,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
 | Plan stockage durable V1 | yes | yes (plan content-addressed, aucun transfert) | no | no | no |
 | Rendu ASS Windows autonome | yes | yes CPU (Fontconfig privé + Windows Fonts) | no | no | no |
+| Police ASS Windows native | yes | yes (Arial Windows + métadonnée contrat) | no | no | no |
 
 ## Feature gates
 

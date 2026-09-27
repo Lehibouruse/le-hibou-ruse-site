@@ -92,6 +92,7 @@ jobs:
             tests/video-pipeline-atomic-state.test.mjs \
             tests/video-worker-heartbeat-progress.test.mjs \
             tests/video-comfy-runtime-health.test.mjs \
+            tests/video-local-preflight.test.mjs \
             tests/video-local-render.test.mjs \
             tests/video-subtitles-font.test.mjs \
             tests/video-remote-cancel.test.mjs \

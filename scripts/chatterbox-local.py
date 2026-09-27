@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import inspect
 import random
 import sys
 from pathlib import Path
@@ -56,7 +57,11 @@ if seed:
 if device.startswith("cuda") and not torch.cuda.is_available():
     fail("CUDA requested but unavailable; choose a tested device explicitly rather than silently falling back")
 
-model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model=model_variant)
+signature = inspect.signature(ChatterboxMultilingualTTS.from_pretrained)
+load_kwargs = {"device": device}
+if "t3_model" in signature.parameters:
+    load_kwargs["t3_model"] = model_variant
+model = ChatterboxMultilingualTTS.from_pretrained(**load_kwargs)
 kwargs = {
     "language_id": "fr",
     "exaggeration": exaggeration,
@@ -79,6 +84,7 @@ meta = {
     "seed": seed,
     "device": device,
     "model_variant": model_variant,
+    "model_variant_native": model_variant if "t3_model" in signature.parameters else None,
     "audio_prompt_path": str(audio_prompt) if audio_prompt else None,
     "prosody_metadata_not_native": req.get("prosody"),
 }

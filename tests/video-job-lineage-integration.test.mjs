@@ -28,6 +28,10 @@ test("worker persists production and incremental lineage in the final result", (
   assert.match(worker, /VIDEO_RENDER reuse parent belongs to another worker/);
   assert.match(worker, /VIDEO_RENDER reuse parent master hash mismatch/);
   assert.match(worker, /_hibou_video_result\.json/);
+  assert.match(worker, /previousRoot,\s*"master\.mp4"/s);
+  assert.match(worker, /sha256\(previousMasterPath\)/);
+  assert.match(worker, /result_hash_verified/);
+  assert.match(worker, /file_hash_verified/);
   assert.match(worker, /incremental_retouch: incrementalRetouch/);
   assert.match(worker, /incremental-retouch-plan\.json/);
   assert.match(worker, /plan_sha256: sha256\(incrementalPlanPath\)/);

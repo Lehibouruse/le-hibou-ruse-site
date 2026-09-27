@@ -150,10 +150,8 @@ export function validateResumeApply({
 
 if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2);
-  const rootArg = args.find((arg) => !arg.startsWith("--"));
-  const planArg = args.find(
-    (arg, index) => index > args.indexOf(rootArg) && !arg.startsWith("--"),
-  );
+  const positionals = args.filter((arg) => !arg.startsWith("--"));
+  const [rootArg, planArg] = positionals;
   const apply = args.includes("--apply");
   const confirmArg = args.find((arg) =>
     arg.startsWith("--confirm-plan-sha256="),
@@ -176,6 +174,9 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
 
   const state = JSON.parse(readFileSync(statePath, "utf8"));
   const plan = JSON.parse(readFileSync(planPath, "utf8"));
+  if (resolve(String(plan?.root || "")) !== root) {
+    fail("resume plan root does not match requested render root");
+  }
   const actualPlanSha256 = sha256File(planPath);
   const preview = prepareResumeState({
     state,

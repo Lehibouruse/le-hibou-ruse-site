@@ -39,6 +39,7 @@ jobs:
           node --check scripts/video-methodology-coverage.mjs
           node --check scripts/video-durable-storage-plan.mjs
           node --check scripts/video-resume-plan.mjs
+          node --check scripts/video-resume-state.mjs
           node --check scripts/video-candidate-review.mjs
           node --check scripts/video-candidate-selection-apply.mjs
           node --check scripts/video-image-plan.mjs
@@ -81,6 +82,7 @@ jobs:
             tests/video-methodology-coverage.test.mjs \
             tests/video-durable-storage-plan.test.mjs \
             tests/video-resume-plan.test.mjs \
+            tests/video-resume-state.test.mjs \
             tests/video-worker-failure-resume-diagnostic.test.mjs \
             tests/video-pipeline-stage-history.test.mjs \
             tests/video-worker-heartbeat-progress.test.mjs \

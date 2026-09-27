@@ -31,6 +31,13 @@ const VIDEO_RENDER_ENABLED =
     .trim()
     .toLowerCase() === "true";
 
+const WORKER_SELF_UPDATE_SCHEMA = "HIBOU_GITHUB_WORKER_SELF_UPDATE_V1";
+const WORKER_SELF_UPDATE_ENABLED =
+  String(process.env.HIBOU_WORKER_SELF_UPDATE_ENABLED || "true")
+    .trim()
+    .toLowerCase() !== "false";
+const WORKER_SOURCE = path.resolve(process.argv[1] || "");
+
 const VIDEO_AUTOSTART_COMFYUI =
   String(process.env.HIBOU_VIDEO_AUTOSTART_COMFYUI || "")
     .trim()
@@ -241,6 +248,120 @@ function sha256(file) {
 function normalizeRuntimeCommit(value) {
   const commit = String(value || "").trim().toLowerCase();
   return /^[0-9a-f]{40}$/.test(commit) ? commit : null;
+}
+
+async function ensureWorkerSelfUpdate(commit) {
+  const normalized = normalizeRuntimeCommit(commit);
+
+  if (!WORKER_SELF_UPDATE_ENABLED) {
+    return { checked: false, updated: false, reason: "disabled" };
+  }
+
+  if (!normalized) {
+    return { checked: false, updated: false, reason: "runtime_commit_invalid" };
+  }
+
+  if (state.current_job || state.render_pid) {
+    return { checked: false, updated: false, reason: "worker_busy" };
+  }
+
+  if (state.worker_runtime_commit === normalized) {
+    return { checked: true, updated: false, commit: normalized, reason: "already_checked" };
+  }
+
+  const managedRoot = path.resolve(LOG_DIR) + path.sep;
+  const target = path.resolve(WORKER_SOURCE);
+
+  if (!target.startsWith(managedRoot)) {
+    state.worker_runtime_commit = normalized;
+    return {
+      checked: false,
+      updated: false,
+      commit: normalized,
+      reason: "unmanaged_worker_source",
+    };
+  }
+
+  const url =
+    `https://raw.githubusercontent.com/${RUNTIME_REPO}/${normalized}/scripts/hibou-github-worker.mjs`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Worker self-update HTTP ${response.status}: ${normalized}`,
+      );
+    }
+
+    const source = await response.text();
+    for (const marker of [
+      WORKER_SELF_UPDATE_SCHEMA,
+      "async function processVideoRender",
+    ]) {
+      if (!source.includes(marker)) {
+        throw new Error(
+          `Worker self-update marker missing at ${normalized}: ${marker}`,
+        );
+      }
+    }
+
+    const current = readFileSync(target, "utf8");
+    const currentHash = createHash("sha256").update(current).digest("hex");
+    const remoteHash = createHash("sha256").update(source).digest("hex");
+
+    state.worker_runtime_commit = normalized;
+    state.worker_source_sha256 = currentHash;
+
+    if (currentHash === remoteHash) {
+      return {
+        checked: true,
+        updated: false,
+        commit: normalized,
+        sha256: currentHash,
+        reason: "already_current",
+      };
+    }
+
+    const temp = `${target}.candidate-${process.pid}`;
+    writeFileSync(temp, source, "utf8");
+    const candidateHash = sha256(temp);
+
+    if (candidateHash !== remoteHash) {
+      try { unlinkSync(temp); } catch {}
+      throw new Error("Worker self-update candidate hash mismatch");
+    }
+
+    renameSync(temp, target);
+    state.worker_source_sha256 = remoteHash;
+    state.worker_self_update_pending = true;
+
+    log("Hibou worker self-update installed", {
+      schema: WORKER_SELF_UPDATE_SCHEMA,
+      commit: normalized,
+      sha256: remoteHash,
+      target,
+    });
+
+    return {
+      checked: true,
+      updated: true,
+      commit: normalized,
+      sha256: remoteHash,
+      reason: "worker_replaced",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function assertRuntimeTarget(target, label) {
@@ -558,6 +679,13 @@ async function fetchVideoQueue() {
 
     if (!data || !Array.isArray(data.jobs)) {
       throw new Error("Invalid VIDEO_RENDER queue format");
+    }
+
+    const selfUpdate = await ensureWorkerSelfUpdate(data.runtime_commit);
+    if (selfUpdate.updated) {
+      state.status = "self_updating";
+      setTimeout(() => process.exit(75), 100);
+      return [];
     }
 
     return data.jobs.filter(
@@ -1319,6 +1447,12 @@ function healthServer() {
       chatterbox_batch_script: CHATTERBOX_BATCH_SCRIPT,
       chatterbox_batch_script_exists: existsSync(CHATTERBOX_BATCH_SCRIPT),
       runtime_commit: state.runtime_commit || null,
+      worker_self_update_schema: WORKER_SELF_UPDATE_SCHEMA,
+      worker_self_update_enabled: WORKER_SELF_UPDATE_ENABLED,
+      worker_runtime_commit: state.worker_runtime_commit || null,
+      worker_self_update_pending: Boolean(state.worker_self_update_pending),
+      worker_source: WORKER_SOURCE,
+      worker_source_sha256: state.worker_source_sha256 || null,
       runtime_master_sha256: state.runtime_master_sha256 || null,
       runtime_voice_sha256: state.runtime_voice_sha256 || null,
       poll_ms: POLL_MS,

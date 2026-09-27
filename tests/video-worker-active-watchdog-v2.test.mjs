@@ -39,3 +39,14 @@ test("watchdog cleans Hibou render children but not ComfyUI", () => {
   assert.match(block, /chatterbox-storyboard-batch\.runtime\.py/);
   assert.doesNotMatch(block, /ComfyUI/i);
 });
+
+
+test("idle worker self-updates from the deployed commit without interrupting renders", () => {
+  assert.equal(worker.includes("HIBOU_GITHUB_WORKER_SELF_UPDATE_V1"), true);
+  assert.equal(worker.includes("async function ensureWorkerSelfUpdate(commit)"), true);
+  assert.equal(worker.includes("state.current_job || state.render_pid"), true);
+  assert.equal(worker.includes("await ensureWorkerSelfUpdate(data.runtime_commit)"), true);
+  assert.equal(worker.includes('state.status = "self_updating"'), true);
+  assert.equal(worker.includes("process.exit(75)"), true);
+  assert.equal(worker.includes("worker_self_update_pending"), true);
+});

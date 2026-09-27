@@ -173,6 +173,91 @@ if (-not $cudaProbe.ok) {
 }
 
 Write-Host ("CUDA ComfyUI OK : {0}" -f $cudaProbe.output) -ForegroundColor Green
+
+function Patch-ComfyKitchenTorch26 {
+  $kitchenRoot = Join-Path $SitePackages "comfy_kitchen"
+  if (-not (Test-Path -LiteralPath $kitchenRoot)) { return }
+
+  $patchScript = Join-Path $LogDir "patch-comfy-kitchen-torch26.py"
+  $patchReport = Join-Path $LogDir "patch-comfy-kitchen-torch26.json"
+
+  @'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+report_path = Path(sys.argv[2])
+replacements = {
+    "list[int]": "typing.List[int]",
+    "list[bool]": "typing.List[bool]",
+    "list[float]": "typing.List[float]",
+    "list[str]": "typing.List[str]",
+}
+changed = []
+
+for path in root.rglob("*.py"):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+
+    updated = text
+    for old, new in replacements.items():
+        updated = updated.replace(old, new)
+
+    if updated == text:
+        continue
+
+    if "import typing" not in updated:
+        lines = updated.splitlines()
+        future_positions = [
+            i for i, line in enumerate(lines)
+            if line.startswith("from __future__ import ")
+        ]
+        insert_at = max(future_positions) + 1 if future_positions else 0
+        lines.insert(insert_at, "import typing")
+        updated = "\n".join(lines)
+        if text.endswith("\n"):
+            updated += "\n"
+
+    path.write_text(updated, encoding="utf-8")
+    changed.append(str(path))
+
+report = {
+    "schema": "HIBOU_COMFY_KITCHEN_TORCH26_PATCH_V1",
+    "root": str(root),
+    "changed_count": len(changed),
+    "changed_files": changed,
+}
+report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+print(json.dumps(report))
+'@ | Set-Content -LiteralPath $patchScript -Encoding UTF8
+
+  $patchProcess = Start-Process -FilePath $Python -ArgumentList @("-s", $patchScript, $kitchenRoot, $patchReport) -WorkingDirectory $Portable -WindowStyle Hidden -Wait -PassThru
+  if ($patchProcess.ExitCode -ne 0) {
+    throw "Patch comfy-kitchen / torch 2.6 echoue avec code $($patchProcess.ExitCode)"
+  }
+
+  $importStdout = Join-Path $LogDir "comfy-kitchen-import.stdout.log"
+  $importStderr = Join-Path $LogDir "comfy-kitchen-import.stderr.log"
+  Remove-Item -LiteralPath $importStdout -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $importStderr -Force -ErrorAction SilentlyContinue
+
+  $importProcess = Start-Process -FilePath $Python -ArgumentList @("-s", "-c", "import comfy_kitchen; print('comfy_kitchen_import_ok')") -WorkingDirectory $Portable -RedirectStandardOutput $importStdout -RedirectStandardError $importStderr -WindowStyle Hidden -Wait -PassThru
+  if ($importProcess.ExitCode -ne 0) {
+    $stderrRaw = if (Test-Path -LiteralPath $importStderr) { Get-Content -LiteralPath $importStderr -Raw } else { "" }
+    $stderrText = if ($null -eq $stderrRaw) { "" } else { ([string]$stderrRaw).Trim() }
+    throw "comfy_kitchen reste incompatible avec torch 2.6 apres patch. STDERR=$stderrText"
+  }
+
+  if (Test-Path -LiteralPath $patchReport) {
+    Write-Host ("Compatibilite comfy-kitchen/torch 2.6 appliquee : {0}" -f (Get-Content -LiteralPath $patchReport -Raw)) -ForegroundColor Green
+  }
+}
+
+Patch-ComfyKitchenTorch26
+
 Start-Sleep -Milliseconds 750
 
 $args = @(

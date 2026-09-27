@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   pipelineStateFingerprint,
   VIDEO_STAGE_ORDER,
@@ -322,4 +326,106 @@ test("resume apply receipt rejects malformed hashes", () => {
       }),
     /planSha256 must be a sha256/,
   );
+});
+
+
+test("CLI apply creates a backup and cryptographic receipt without deleting caches", () => {
+  const root = mkdtempSync(join(tmpdir(), "hibou-resume-cli-"));
+  try {
+    const original = {
+      schema: "HIBOU_VIDEO_MASTER_RUN_V1",
+      pipeline_status: "ERROR",
+      stages: {
+        storyboard: { status: "PASS" },
+        voice: { status: "PASS" },
+        images: { status: "PASS" },
+        render: { status: "ERROR", error: "fontconfig" },
+      },
+      stage_history: [
+        { stage: "images", event: "PASS", attempt: 1 },
+        { stage: "render", event: "ERROR", attempt: 1 },
+      ],
+    };
+    const statePath = join(root, "pipeline-run.json");
+    writeFileSync(statePath, JSON.stringify(original, null, 2) + "\n");
+
+    const cachePath = join(root, ".video-render-cache-marker.txt");
+    const artifactPath = join(root, "existing-image-artifact.png");
+    writeFileSync(cachePath, "cache-must-survive");
+    writeFileSync(artifactPath, "artifact-must-survive");
+
+    const resumeStage = "render";
+    const plan = {
+      schema: "HIBOU_VIDEO_RESUME_PLAN_V1",
+      root,
+      source_state_sha256: pipelineStateFingerprint(original),
+      analysis_only: true,
+      execution_performed: false,
+      resume_required: true,
+      resume_stage: resumeStage,
+      stages_to_reset: VIDEO_STAGE_ORDER.slice(
+        VIDEO_STAGE_ORDER.indexOf(resumeStage),
+      ),
+      publication_authorized: false,
+    };
+    const planPath = join(root, "resume-plan.json");
+    const planBytes = JSON.stringify(plan, null, 2) + "\n";
+    writeFileSync(planPath, planBytes);
+    const planSha = createHash("sha256").update(planBytes).digest("hex");
+
+    const script = fileURLToPath(
+      new URL("../scripts/video-resume-state.mjs", import.meta.url),
+    );
+    const applied = spawnSync(
+      process.execPath,
+      [
+        script,
+        root,
+        planPath,
+        "--apply",
+        "--confirm-plan-sha256=" + planSha,
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          HIBOU_VIDEO_RESUME_APPLY_ENABLED: "true",
+        },
+      },
+    );
+
+    assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+    const result = JSON.parse(applied.stdout.trim());
+    assert.equal(result.applied, true);
+    assert.equal(result.execution_started, false);
+    assert.equal(result.publication_authorized, false);
+    assert.equal(result.resume_stage, "render");
+    assert.equal(existsSync(result.backup_path), true);
+    assert.equal(existsSync(result.receipt_path), true);
+
+    const prepared = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(prepared.pipeline_status, "RESUME_PREPARED");
+    assert.equal(prepared.stages.storyboard.status, "PASS");
+    assert.equal(prepared.stages.voice.status, "PASS");
+    assert.equal(prepared.stages.images.status, "PASS");
+    assert.equal(prepared.stages.render, undefined);
+    assert.equal(prepared.resume_prepared.execution_started, false);
+    assert.equal(prepared.resume_prepared.publication_authorized, false);
+
+    const receipt = JSON.parse(readFileSync(result.receipt_path, "utf8"));
+    assert.equal(receipt.schema, "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1");
+    assert.equal(receipt.plan_sha256, planSha);
+    assert.equal(receipt.source_state_sha256, pipelineStateFingerprint(original));
+    assert.equal(receipt.prepared_state_sha256, pipelineStateFingerprint(prepared));
+    assert.equal(receipt.execution_started, false);
+    assert.equal(receipt.publication_authorized, false);
+
+    assert.equal(readFileSync(cachePath, "utf8"), "cache-must-survive");
+    assert.equal(readFileSync(artifactPath, "utf8"), "artifact-must-survive");
+
+    const backup = JSON.parse(readFileSync(result.backup_path, "utf8"));
+    assert.deepEqual(backup, original);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

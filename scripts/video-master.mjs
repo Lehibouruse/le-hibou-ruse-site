@@ -40,6 +40,40 @@ function chatterboxBatchScript(){
   const explicit=String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT||"").trim();
   return explicit?resolve(explicit):resolve("scripts/chatterbox-storyboard-batch.py");
 }
+
+const IMAGE_RUNTIME_FILES=[
+  ["video-image-factory.mjs","executeImagePlan"],
+  ["video-image-batch.mjs","runImageGen"],
+  ["video-local-adapters.mjs","ComfyUI /prompt returned no prompt_id"],
+  ["video-image-plan.mjs","HIBOU_IMAGE_PLAN_V1"],
+  ["video-image-qc.mjs","HIBOU_IMAGE_BATCH_V1"],
+  ["video-image-regenerate.mjs","buildTargetedRegeneration"],
+  ["video-image-perceptual-qc.py","input must contain technical QC rows"]
+];
+
+async function ensureImageRuntimeBundle(commit){
+  const normalized=String(commit||"").trim().toLowerCase();
+  if(!/^[0-9a-f]{40}$/.test(normalized)) fail("storyboard runtime_commit missing or invalid");
+  const localBase=resolve(
+    process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
+    "LeHibou","image-runtime",normalized
+  );
+  mkdirSync(localBase,{recursive:true});
+  for(const [name,marker] of IMAGE_RUNTIME_FILES){
+    const target=resolve(localBase,name);
+    let source=existsSync(target)?readFileSync(target,"utf8"):"";
+    if(!source.includes(marker)){
+      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/scripts/${name}`;
+      const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+      if(!response.ok) fail(`image runtime download failed HTTP ${response.status}: ${name}@${normalized}`);
+      source=await response.text();
+      if(!source.includes(marker)) fail(`image runtime marker missing: ${name}@${normalized}`);
+      writeFileSync(target,source,"utf8");
+    }
+  }
+  return resolve(localBase,"video-image-factory.mjs");
+}
+
 function ensureSameRun(statePath,inputs){
   if(!existsSync(statePath)) return;
   const old=json(statePath);
@@ -207,10 +241,12 @@ async function main(){
     writeJson(statePath,state);
   });
 
+  const runtimeCommit=String(json(storyboard).runtime_commit||"").trim();
+  const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");
   stage(state,"images",()=>{
     run(process.execPath,[
-      resolve("scripts/video-image-factory.mjs"),
+      imageFactoryScript,
       assetResolved,resolve(bindingArg),imageDir,
       "--max-scenes="+policy.max_scenes,
       "--regen-attempts="+policy.regeneration_attempts

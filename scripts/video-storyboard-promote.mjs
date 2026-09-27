@@ -21,6 +21,8 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
   const targetRoot=dirname(outputPath);
   const contract=JSON.parse(readFileSync(contractPath,"utf8"));
   const selections=JSON.parse(readFileSync(selectionsPath,"utf8"));
+  const productionMode=String(contract?.production?.mode||"final").toLowerCase()==="preview"?"preview":"final";
+  const previewOnly=productionMode==="preview";
 
   if(contract.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract version");
   if(contract.contract_state!=="storyboard") fail("input contract must still be storyboard");
@@ -148,9 +150,32 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
   }
   contract.contract_state="render_ready";
   contract.qc={...(contract.qc||{}),status:"PENDING_RENDER"};
-  contract.validation={...(contract.validation||{}),human_required:true,publication_authorized:false,status:"READY_FOR_RENDER_NOT_PUBLICATION"};
+  contract.validation={
+    ...(contract.validation||{}),
+    human_required:true,
+    publication_authorized:false,
+    preview_only:previewOnly,
+    full_master_allowed:!previewOnly,
+    status:previewOnly?"PREVIEW_RENDER_ONLY":"READY_FOR_RENDER_NOT_PUBLICATION"
+  };
+  contract.delivery={
+    ...(contract.delivery||{}),
+    production_mode:productionMode,
+    class:previewOnly?"preview":"final_candidate",
+    preview_only:previewOnly,
+    human_review_required:true,
+    publication_authorized:false
+  };
   writeFileSync(outputPath,JSON.stringify(contract,null,2));
-  return {output:outputPath,scene_count:contract.scenes.length,audio_sha256:contract.audio.sha256,subtitles_burn_in:Boolean(contract.subtitles?.burn_in)};
+  return {
+    output:outputPath,
+    scene_count:contract.scenes.length,
+    audio_sha256:contract.audio.sha256,
+    subtitles_burn_in:Boolean(contract.subtitles?.burn_in),
+    production_mode:productionMode,
+    preview_only:previewOnly,
+    publication_authorized:false
+  };
 }
 
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

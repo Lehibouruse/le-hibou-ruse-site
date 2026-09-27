@@ -159,11 +159,27 @@
             "HIBOU_HUMAN_IMAGE_SELECTION_V1",
             "review fingerprint mismatch"
           ]
+        },
+        {
+          "path": "app/api/local-worker-queue/route.js",
+          "markers": [
+            "autoResumeHumanSelection",
+            "human_selection_fingerprint_mismatch"
+          ]
+        },
+        {
+          "path": "scripts/hibou-github-worker.mjs",
+          "markers": [
+            "remote human selection fingerprint mismatch",
+            "candidate-decisions.json"
+          ]
         }
       ],
       "tests": [
         "tests/video-candidate-review.test.mjs",
-        "tests/video-candidate-selection-apply.test.mjs"
+        "tests/video-candidate-selection-apply.test.mjs",
+        "tests/video-queue-auto-activation-chain.test.mjs",
+        "tests/video-studio-v5-orchestration.test.mjs"
       ],
       "e2e_pending": true
     },

@@ -9,8 +9,9 @@ const launcher = readFileSync(
 
 test("launcher requires a full deployed runtime commit from authenticated queue", () => {
   assert.match(launcher, /\$queue\.runtime_commit/);
-  assert.match(launcher, /\$RuntimeCommit\.Length -ne 40/);\n  assert.match(launcher, /\^\[0-9a-fA-F\]\+\$/);
-  assert.match(launcher, /Queue VIDEO_RENDER sans runtime_commit valide/);
+  assert.match(launcher, /\$RuntimeCommit\.Length -ne 40/);
+  assert.match(launcher, /0123456789abcdefABCDEF/);
+  assert.match(launcher, /runtime_commit non hexadecimal/);
 });
 
 test("launcher downloads worker and video runtimes from immutable deployed commit", () => {

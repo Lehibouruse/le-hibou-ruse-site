@@ -83,6 +83,7 @@ jobs:
             tests/video-resume-plan.test.mjs \
             tests/video-worker-failure-resume-diagnostic.test.mjs \
             tests/video-pipeline-stage-history.test.mjs \
+            tests/video-worker-heartbeat-progress.test.mjs \
             tests/video-local-render.test.mjs \
             tests/video-subtitles-font.test.mjs \
             tests/video-remote-cancel.test.mjs \

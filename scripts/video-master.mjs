@@ -613,6 +613,7 @@ async function main(){
       const review=json(candidateReviewPath);
       state.candidate_review={
         path:candidateReviewPath,
+        html_path:existsSync(resolve(imageDir,"candidate-review.html"))?resolve(imageDir,"candidate-review.html"):null,
         schema:String(review.schema||""),
         scene_count:Number(review.scene_count||0),
         blocking_scene_count:Number(review.blocking_scene_count||0),
@@ -758,6 +759,7 @@ async function main(){
       {kind:"qc",path:masterQc},
       ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.json"))?[{kind:"candidate_review",path:resolve(imageDir,"candidate-review.json")}]:[]),
+      ...(existsSync(resolve(imageDir,"candidate-review.html"))?[{kind:"candidate_review_html",path:resolve(imageDir,"candidate-review.html")}]:[]),
       ...(existsSync(humanReview)?[{kind:"human_review",path:humanReview}]:[]),
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
       ...(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)?[{kind:"incremental_retouch_plan",path:incrementalPlanPath}]:[]),

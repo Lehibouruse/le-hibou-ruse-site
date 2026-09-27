@@ -87,7 +87,8 @@ export function buildIterationPlan(previousContract,nextContract){
   }
   const previousContent=text(previousContract?.content?.content_id);
   const nextContent=text(nextContract?.content?.content_id);
-  if(previousContent && nextContent && previousContent!==nextContent) fail("incremental retouch requires the same content_id");
+  if(!previousContent||!nextContent) fail("incremental retouch requires content_id on both contracts");
+  if(previousContent!==nextContent) fail("incremental retouch requires the same content_id");
 
   const previousScenes=new Map((previousContract.scenes||[]).map((scene,index)=>[sceneId(scene,index),scene]));
   const nextScenes=new Map((nextContract.scenes||[]).map((scene,index)=>[sceneId(scene,index),scene]));

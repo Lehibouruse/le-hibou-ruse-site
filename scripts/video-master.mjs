@@ -179,6 +179,7 @@ const POST_RUNTIME_FILES=[
   ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
   ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
+  ["video-review-diff.mjs","HIBOU_INCREMENTAL_REVIEW_DIFF_V1"],
   ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1"]
 ];
 
@@ -208,6 +209,7 @@ async function ensurePostRuntimeBundle(commit){
     masterQc:resolve(localBase,"video-master-qc.mjs"),
     registry:resolve(localBase,"video-artifact-registry.mjs"),
     humanReview:resolve(localBase,"video-human-review-package.mjs"),
+    reviewDiff:resolve(localBase,"video-review-diff.mjs"),
     creativeQc:resolve(localBase,"video-creative-qc.py")
   };
 }
@@ -817,6 +819,27 @@ async function main(){
       video_human_candidate_selection_v1:humanSelectionEnabled
     }
   });
+  const reviewDiff=resolve(root,"review-diff.json");
+  if(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)){
+    stage(state,"review_diff",()=>{
+      run(process.execPath,[postRuntime.reviewDiff,incrementalPlanPath,reviewDiff]);
+      const diff=json(reviewDiff);
+      state.review_diff={
+        path:reviewDiff,
+        schema:String(diff.schema||""),
+        review_scope:String(diff.review_scope||""),
+        full_review_required:Boolean(diff.full_review_required),
+        changed_scene_ids:Array.isArray(diff.changed_scene_ids)?diff.changed_scene_ids:[],
+        human_review_required:true,
+        publication_authorized:false
+      };
+      writeJson(statePath,state);
+    });
+  }else if(!state.stages.review_diff){
+    state.stages.review_diff={status:"SKIPPED",reason:"incremental retouch plan required"};
+    writeJson(statePath,state);
+  }
+
   stage(state,"human_review_manifest",()=>{
     run(process.execPath,[postRuntime.humanReview,root,humanReview]);
     const review=json(humanReview);
@@ -853,6 +876,7 @@ async function main(){
       ...(existsSync(resolve(imageDir,"candidate-review.json"))?[{kind:"candidate_review",path:resolve(imageDir,"candidate-review.json")}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.html"))?[{kind:"candidate_review_html",path:resolve(imageDir,"candidate-review.html")}]:[]),
       ...(existsSync(humanReview)?[{kind:"human_review",path:humanReview}]:[]),
+      ...(existsSync(reviewDiff)?[{kind:"review_diff",path:reviewDiff}]:[]),
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),
       ...(incrementalEnabled&&reuseFromArg&&existsSync(incrementalPlanPath)?[{kind:"incremental_retouch_plan",path:incrementalPlanPath}]:[]),
       {kind:"pipeline_state",path:statePath}
@@ -892,6 +916,7 @@ async function main(){
     creative_qc_status:state.creative_qc_status||"DISABLED",
     candidate_review:state.candidate_review||null,
     human_review_package:state.human_review||null,
+    review_diff:state.review_diff||null,
     image_selection_policy:{
       technical_provisional_selection_allowed:true,
       machine_ranking_is_advisory:true,

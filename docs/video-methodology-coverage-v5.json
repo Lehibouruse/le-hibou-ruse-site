@@ -296,11 +296,19 @@
         },
         {
           "path": "scripts/video-airtable-sync.mjs"
+        },
+        {
+          "path": "scripts/video-durable-storage-plan.mjs",
+          "markers": [
+            "HIBOU_DURABLE_STORAGE_PLAN_V1",
+            "upload_performed:false"
+          ]
         }
       ],
       "tests": [
         "tests/video-airtable-smoke-report.test.mjs",
-        "tests/video-airtable-sync.test.mjs"
+        "tests/video-airtable-sync.test.mjs",
+        "tests/video-durable-storage-plan.test.mjs"
       ],
       "e2e_pending": true
     },

@@ -707,6 +707,14 @@ async function tick() {
   }
 
   const approvedJobs = loadApprovedJobs();
+
+  if (!VIDEO_RENDER_ENABLED) {
+    if (!APPROVED_JOB_ID && approvedJobs.size === 0) {
+      state.status = "waiting_local_job_approval";
+      return false;
+    }
+  }
+
   const processed = loadProcessed();
   const failed = loadFailedJobs();
   const now = Date.now();
@@ -739,12 +747,9 @@ async function tick() {
     if (APPROVED_JOB_ID || approvedJobs.size > 0) {
       const jobs = await fetchQueue();
 
-      job = jobs.find((candidate) => {
-        const approved =
-          candidate.id === APPROVED_JOB_ID ||
-          approvedJobs.has(candidate.id);
-
-        return approved && retryEligible(candidate);
+      job = jobs.find((x) => {
+        const approved = x.id === APPROVED_JOB_ID || approvedJobs.has(x.id);
+        return approved && retryEligible(x);
       }) || null;
     }
   }

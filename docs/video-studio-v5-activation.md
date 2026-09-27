@@ -55,3 +55,38 @@ Sans décision, le master s'arrête proprement avec `WAITING_HUMAN_SELECTION` et
 Pour reprendre, la décision doit utiliser `HIBOU_HUMAN_IMAGE_SELECTION_V1`, contenir `human_confirmed=true` pour chaque scène reviewable et référencer exactement `review_fingerprint_sha256` du lot courant. Toute décision périmée ou tout candidat non-PASS est rejeté. Après validation, le marqueur d'attente est supprimé, les images déjà générées sont réutilisées et le pipeline reprend au stage de sélection/QC/rendu.
 
 Le champ Airtable préparé `Sélection humaine candidats V1` reste non appliqué et faux par défaut tant que l'E2E Windows/ROG n'a pas été validé.
+
+
+## Desktop Commander comme outil E2E optionnel
+
+Remote Desktop Commander peut être utilisé comme couche d'inspection et d'exécution locale assistée sur le PC Windows, mais **n'est pas une dépendance du pipeline vidéo**.
+
+Usages autorisés pendant un rendu/téléchargement actif :
+- vérifier que le device est en ligne ;
+- lire des fichiers/logs explicitement non verrouillés ;
+- inspecter la configuration et l'état sans mutation ;
+- préparer les commandes/tests à exécuter plus tard.
+
+Usages à différer jusqu'à la fin du rendu actif :
+- lancer des E2E ComfyUI/FLUX ou Chatterbox ;
+- écrire dans les runtime actifs ;
+- redémarrer worker/ComfyUI ;
+- tuer des processus ;
+- déplacer/supprimer des artefacts.
+
+Après le rendu actif, Desktop Commander pourra exécuter les E2E Windows, lire les manifests locaux, vérifier les caches et la reprise humaine, et réduire les copier-coller PowerShell. Le pipeline doit toutefois rester autonome si Desktop Commander est indisponible.
+
+
+## Reprise humaine distante
+
+Un job FINAL en `WAITING_HUMAN_SELECTION` peut être repris à distance sans accès direct au dossier local si :
+- `resume_human_selection=true` est explicitement présent dans les options du job ;
+- `human_candidate_decisions` respecte `HIBOU_HUMAN_IMAGE_SELECTION_V1` ;
+- le `content_id` correspond ;
+- le `review_fingerprint_sha256` correspond exactement au lot local affiché ;
+- chaque ligne contient un `candidate_id` et `human_confirmed=true` ;
+- aucun autre job vidéo n'est actif.
+
+Le serveur ne remet alors qu'un unique job éligible en `Pending`. Le worker compare encore une fois le fingerprint avec `images/candidate-review.json`, écrit localement `candidate-decisions.json`, puis reprend le même run. Cette reprise ne réveille pas ComfyUI : les images déjà générées sont réutilisées.
+
+La publication reste interdite et la revue humaine du master reste obligatoire.

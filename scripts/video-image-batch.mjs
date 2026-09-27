@@ -46,10 +46,12 @@ function writeState(path,state){
   mkdirSync(dirname(resolve(path)),{recursive:true});
   writeFileSync(resolve(path),JSON.stringify(state,null,2));
 }
-export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",selectionTemplatePath="",maxScenes=Infinity}={}){
+export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",selectionTemplatePath="",maxScenes=Infinity,now=()=>Date.now()}={}){
   if(plan?.schema!=="HIBOU_IMAGE_PLAN_V1") fail("unsupported image plan");
   if(!Array.isArray(plan.requests)||!plan.requests.length) fail("image plan has no requests");
   const state=loadExisting(manifestPath,plan.content_id);
+  const runStartedMs=Number(now());
+  const generatedCandidateDurations=[];
   const requestedKeys=new Set(plan.requests.map(item=>item.candidate_id));
   let prunedCacheEntries=0;
   for(const key of Object.keys(state.results||{})){
@@ -71,31 +73,51 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     if(prior?.status==="completed"&&Array.isArray(prior.outputs)&&prior.outputs.length){
       invalidatedCacheEntries+=1;
     }
+    const candidateStartedMs=Number(now());
     try{
       let result;
       let fallbackUsed=false;
       let primaryError="";
+      let primaryElapsedMs=null;
+      let fallbackElapsedMs=null;
+      const primaryStartedMs=Number(now());
       try{
         result=await runner(item.request);
+        primaryElapsedMs=Math.max(0,Number(now())-primaryStartedMs);
       }catch(error){
+        primaryElapsedMs=Math.max(0,Number(now())-primaryStartedMs);
         if(!isCudaOom(error)||!item.fallback_request) throw error;
         primaryError=String(error?.message||error).slice(0,500);
+        const fallbackStartedMs=Number(now());
         result=await runner(item.fallback_request);
+        fallbackElapsedMs=Math.max(0,Number(now())-fallbackStartedMs);
         fallbackUsed=true;
       }
+      const candidateFinishedMs=Number(now());
+      const elapsedMs=Math.max(0,candidateFinishedMs-candidateStartedMs);
+      generatedCandidateDurations.push(elapsedMs);
       state.results[key]={
         status:"completed",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,
         request_fingerprint:requestFingerprint,
         job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,
-        fallback_used:fallbackUsed,primary_error:primaryError,error:""
+        fallback_used:fallbackUsed,primary_error:primaryError,error:"",
+        generation_started_at:new Date(candidateStartedMs).toISOString(),
+        generation_finished_at:new Date(candidateFinishedMs).toISOString(),
+        elapsed_ms:elapsedMs,
+        primary_elapsed_ms:primaryElapsedMs,
+        fallback_elapsed_ms:fallbackElapsedMs
       };
       generated+=1;
       writeState(manifestPath,state);
     }catch(error){
+      const candidateFinishedMs=Number(now());
       state.results[key]={
         status:"error",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,outputs:[],
         request_fingerprint:requestFingerprint,
-        fallback_used:false,error:String(error?.message||error).slice(0,700)
+        fallback_used:false,error:String(error?.message||error).slice(0,700),
+        generation_started_at:new Date(candidateStartedMs).toISOString(),
+        generation_finished_at:new Date(candidateFinishedMs).toISOString(),
+        elapsed_ms:Math.max(0,candidateFinishedMs-candidateStartedMs)
       };
       writeState(manifestPath,state);
       throw error;
@@ -115,8 +137,20 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     mkdirSync(dirname(resolve(selectionTemplatePath)),{recursive:true});
     writeFileSync(resolve(selectionTemplatePath),JSON.stringify(selections,null,2));
   }
-  state.updated_at=new Date().toISOString();
+  const runFinishedMs=Number(now());
+  const generatedCandidateElapsedMs=generatedCandidateDurations.reduce((sum,value)=>sum+value,0);
+  state.updated_at=new Date(runFinishedMs).toISOString();
   state.scene_count_processed=allowedScenes.length;
+  state.run_timing={
+    started_at:new Date(runStartedMs).toISOString(),
+    finished_at:new Date(runFinishedMs).toISOString(),
+    elapsed_ms:Math.max(0,runFinishedMs-runStartedMs),
+    generated_candidate_count:generatedCandidateDurations.length,
+    generated_candidate_elapsed_ms:generatedCandidateElapsedMs,
+    mean_generated_candidate_elapsed_ms:generatedCandidateDurations.length
+      ? generatedCandidateElapsedMs/generatedCandidateDurations.length
+      : null
+  };
   state.cache_hits=cacheHits;
   state.cache_invalidations=invalidatedCacheEntries;
   state.cache_pruned_entries=prunedCacheEntries;
@@ -129,7 +163,8 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     cache_hits:cacheHits,
     cache_invalidations:invalidatedCacheEntries,
     cache_pruned_entries:prunedCacheEntries,
-    generated_this_run:generated
+    generated_this_run:generated,
+    timing:state.run_timing
   };
 }
 
@@ -146,6 +181,7 @@ if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
     cache_hits:result.cache_hits,
     cache_invalidations:result.cache_invalidations,
     cache_pruned_entries:result.cache_pruned_entries,
-    generated_this_run:result.generated_this_run
+    generated_this_run:result.generated_this_run,
+    timing:result.timing
   })+"\n");
 }

@@ -228,16 +228,18 @@ export function buildImagePlan(contract,binding){
         : creativeLockEnabled
           ? characterLock
           : "";
-    const prompt=[
-      prefix,
-      characterGenerationLock,
-      styleLock,
-      contentBrief,
-      core,
-      negativeLock?("ABSOLUTELY AVOID: "+negativeLock):"",
-      textFreeLock,
-      suffix
-    ].filter(Boolean).join("\n");
+    const prompt=creativeLockEnabled
+      ? [
+          prefix,
+          characterGenerationLock,
+          styleLock,
+          contentBrief,
+          core,
+          negativeLock?("ABSOLUTELY AVOID: "+negativeLock):"",
+          textFreeLock,
+          suffix
+        ].filter(Boolean).join("\n")
+      : [prefix,core,suffix].filter(Boolean).join(" ");
     for(let candidate=1;candidate<=candidatesPerScene;candidate+=1){
       const seed=seedFor(contentId,scene.scene_id,candidate);
       const baseOverrides={

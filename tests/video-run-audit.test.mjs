@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -196,17 +197,13 @@ test("run audit is quiet on a clean completed run", () => {
   const root = fixture();
   try {
     const statePath = join(root, "pipeline-run.json");
-    const state = JSON.parse(
-      (await import("node:fs")).readFileSync(statePath, "utf8"),
-    );
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
     state.stages.render = { status: "PASS" };
     state.stages.voice_duration_qc = { status: "PASS" };
     writeFileSync(statePath, JSON.stringify(state, null, 2));
 
     const voicePath = join(root, "voice", "voice-batch-manifest.json");
-    const voice = JSON.parse(
-      (await import("node:fs")).readFileSync(voicePath, "utf8"),
-    );
+    const voice = JSON.parse(readFileSync(voicePath, "utf8"));
     voice.scenes[12].voice_duration_s = 4.5;
     writeFileSync(voicePath, JSON.stringify(voice, null, 2));
     write(root, "voice/voice-duration-qc.json", {
@@ -216,9 +213,7 @@ test("run audit is quiet on a clean completed run", () => {
     write(root, "master.mp4", "master");
 
     const reviewPath = join(root, "images", "candidate-review.json");
-    const review = JSON.parse(
-      (await import("node:fs")).readFileSync(reviewPath, "utf8"),
-    );
+    const review = JSON.parse(readFileSync(reviewPath, "utf8"));
     review.scenes = [];
     writeFileSync(reviewPath, JSON.stringify(review, null, 2));
 

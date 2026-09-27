@@ -214,77 +214,80 @@ if ($CurrentLauncher -ne $InstalledLauncher) {
 }
 
 $WatchdogScript = Join-Path $InstallDir "run-hibou-worker-watchdog.ps1"
-$WatchdogContent = @"
-`$ErrorActionPreference = "Continue"
+$WatchdogContent = @'
+$ErrorActionPreference = "Continue"
 
 function Stop-HibouRenderChildren {
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object {
-      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*video-master.runtime.mjs*") -or
-      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\LeHibou\image-runtime\*") -or
-      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\LeHibou\pre-runtime\*") -or
-      (`$_.Name -eq "node.exe" -and `$_.CommandLine -like "*\LeHibou\post-runtime\*") -or
-      (`$_.Name -match "^python(\.exe)?$" -and `$_.CommandLine -like "*chatterbox-storyboard-batch.runtime.py*")
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*video-master.runtime.mjs*") -or
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*\LeHibou\image-runtime\*") -or
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*\LeHibou\pre-runtime\*") -or
+      ($_.Name -eq "node.exe" -and $_.CommandLine -like "*\LeHibou\post-runtime\*") -or
+      ($_.Name -match "^python(\.exe)?$" -and $_.CommandLine -like "*chatterbox-storyboard-batch.runtime.py*")
     } |
     ForEach-Object {
-      try { Stop-Process -Id `$_.ProcessId -Force -ErrorAction Stop } catch {}
+      try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
     }
 }
 
-while (`$true) {
-  `$child = `$null
+while ($true) {
+  $child = $null
   try {
-    `$child = Start-Process -FilePath "$Node" -ArgumentList '"$Worker"' -WorkingDirectory "$InstallDir" -WindowStyle Hidden -PassThru
-    `$unhealthy = 0
+    $child = Start-Process -FilePath "__HIBOU_NODE__" -ArgumentList '"__HIBOU_WORKER__"' -WorkingDirectory "__HIBOU_INSTALL_DIR__" -WindowStyle Hidden -PassThru
+    $unhealthy = 0
 
-    while (-not `$child.HasExited) {
+    while (-not $child.HasExited) {
       Start-Sleep -Seconds 10
-      `$healthy = `$false
-      `$renderPid = 0
+      $healthy = $false
+      $renderPid = 0
 
       try {
-        `$health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 3
-        if (`$health -and [int]`$health.worker_pid -eq `$child.Id) {
-          `$healthy = `$true
-          if (`$health.render_pid) {
-            `$renderPid = [int]`$health.render_pid
+        $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 3
+        if ($health -and [int]$health.worker_pid -eq $child.Id) {
+          $healthy = $true
+          if ($health.render_pid) {
+            $renderPid = [int]$health.render_pid
           }
-          if (`$health.current_job -and `$health.render_pid -and `$health.last_video_heartbeat_at) {
-            `$last = [DateTimeOffset]::Parse([string]`$health.last_video_heartbeat_at)
-            `$ageSeconds = ([DateTimeOffset]::UtcNow - `$last.ToUniversalTime()).TotalSeconds
-            if (`$ageSeconds -gt 120) {
-              `$healthy = `$false
+          if ($health.current_job -and $health.render_pid -and $health.last_video_heartbeat_at) {
+            $last = [DateTimeOffset]::Parse([string]$health.last_video_heartbeat_at)
+            $ageSeconds = ([DateTimeOffset]::UtcNow - $last.ToUniversalTime()).TotalSeconds
+            if ($ageSeconds -gt 120) {
+              $healthy = $false
             }
           }
         }
       } catch {
-        `$healthy = `$false
+        $healthy = $false
       }
 
-      if (`$healthy) {
-        `$unhealthy = 0
+      if ($healthy) {
+        $unhealthy = 0
       } else {
-        `$unhealthy += 1
+        $unhealthy += 1
       }
 
-      if (`$unhealthy -ge 3) {
-        if (`$renderPid -gt 0) {
-          try { Stop-Process -Id `$renderPid -Force -ErrorAction Stop } catch {}
+      if ($unhealthy -ge 3) {
+        if ($renderPid -gt 0) {
+          try { Stop-Process -Id $renderPid -Force -ErrorAction Stop } catch {}
         }
-        try { Stop-Process -Id `$child.Id -Force -ErrorAction Stop } catch {}
+        try { Stop-Process -Id $child.Id -Force -ErrorAction Stop } catch {}
         break
       }
     }
 
-    if (`$child -and -not `$child.HasExited) {
-      try { `$child.WaitForExit() } catch {}
+    if ($child -and -not $child.HasExited) {
+      try { $child.WaitForExit() } catch {}
     }
   } catch {}
 
   Stop-HibouRenderChildren
   Start-Sleep -Seconds 5
 }
-"@
+'@
+$WatchdogContent = $WatchdogContent.Replace("__HIBOU_NODE__", $Node)
+$WatchdogContent = $WatchdogContent.Replace("__HIBOU_WORKER__", $Worker)
+$WatchdogContent = $WatchdogContent.Replace("__HIBOU_INSTALL_DIR__", $InstallDir)
 Set-Content -Path $WatchdogScript -Value $WatchdogContent -Encoding UTF8
 
 $StartupDir = [Environment]::GetFolderPath("Startup")

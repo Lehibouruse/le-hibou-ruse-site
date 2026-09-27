@@ -1,0 +1,173 @@
+param()
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== Le Hibou Ruse - demarrage stack video ===" -ForegroundColor Cyan
+
+function Get-UserEnv([string]$Name) {
+  return [Environment]::GetEnvironmentVariable($Name, "User")
+}
+
+function Set-UserEnv([string]$Name, [string]$Value) {
+  [Environment]::SetEnvironmentVariable($Name, $Value, "User")
+  Set-Item -Path "Env:$Name" -Value $Value
+}
+
+$ProjectRoot = Get-UserEnv "HIBOU_PROJECT_ROOT"
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+  $ProjectRoot = Join-Path $env:USERPROFILE "le-hibou-ruse-site"
+}
+
+$Binding = Get-UserEnv "HIBOU_VIDEO_BINDING"
+if ([string]::IsNullOrWhiteSpace($Binding)) {
+  $Binding = Join-Path $env:USERPROFILE "Documents\Codex\HibouVideo\comfyui-binding.json"
+}
+
+$OutputRoot = Get-UserEnv "HIBOU_VIDEO_OUTPUT_ROOT"
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+  $OutputRoot = Join-Path $env:USERPROFILE "HibouMedia\video-renders"
+}
+
+$Token = Get-UserEnv "HIBOU_LOCAL_REPORT_TOKEN"
+if ([string]::IsNullOrWhiteSpace($Token) -or $Token.Length -lt 32) {
+  throw "HIBOU_LOCAL_REPORT_TOKEN absent ou invalide dans les variables utilisateur Windows."
+}
+
+if (-not (Test-Path $ProjectRoot)) {
+  throw "Depot Hibou introuvable : $ProjectRoot"
+}
+if (-not (Test-Path $Binding)) {
+  throw "Binding ComfyUI introuvable : $Binding"
+}
+
+$VoicePython = Get-UserEnv "HIBOU_PYTHON"
+if ([string]::IsNullOrWhiteSpace($VoicePython)) {
+  $VoicePython = Join-Path $env:LOCALAPPDATA "LeHibou\video\chatterbox\venv\Scripts\python.exe"
+}
+if (-not (Test-Path $VoicePython)) {
+  throw "Python Chatterbox introuvable : $VoicePython"
+}
+
+$ComfyPortable = Join-Path $env:LOCALAPPDATA "LeHibou\video\comfyui\ComfyUI_windows_portable"
+$ComfyMain = Join-Path $ComfyPortable "ComfyUI\main.py"
+$Flux = Join-Path $ComfyPortable "ComfyUI\models\checkpoints\flux1-schnell-fp8.safetensors"
+if (-not (Test-Path $ComfyMain)) {
+  throw "ComfyUI local introuvable : $ComfyMain"
+}
+if (-not (Test-Path $Flux)) {
+  throw "FLUX Schnell FP8 introuvable : $Flux"
+}
+
+$Node = (Get-Command node -ErrorAction Stop).Source
+$null = Get-Command ffmpeg -ErrorAction Stop
+$null = Get-Command ffprobe -ErrorAction Stop
+
+Set-UserEnv "HIBOU_LOCAL_EXECUTION_ENABLED" "true"
+Set-UserEnv "HIBOU_VIDEO_RENDER_ENABLED" "true"
+Set-UserEnv "HIBOU_VIDEO_AUTOSTART_COMFYUI" "true"
+Set-UserEnv "HIBOU_PROJECT_ROOT" $ProjectRoot
+Set-UserEnv "HIBOU_VIDEO_BINDING" $Binding
+Set-UserEnv "HIBOU_VIDEO_OUTPUT_ROOT" $OutputRoot
+Set-UserEnv "HIBOU_PYTHON" $VoicePython
+
+New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
+
+Write-Host "Preflight local..." -ForegroundColor Cyan
+& $Node (Join-Path $ProjectRoot "scripts\video-local-preflight.mjs") --require-ready
+if ($LASTEXITCODE -ne 0) {
+  throw "Le preflight video local a echoue."
+}
+
+Write-Host "Test de la queue VIDEO_RENDER authentifiee..." -ForegroundColor Cyan
+$headers = @{
+  Authorization = "Bearer $Token"
+  "User-Agent" = "Le-Hibou-Video-Stack-Bootstrap/1.0"
+}
+try {
+  $queue = Invoke-RestMethod -Uri ("https://d4d5d6.com/api/local-worker-queue?t=" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Headers $headers -Method Get -TimeoutSec 20
+} catch {
+  $status = $null
+  try { $status = [int]$_.Exception.Response.StatusCode } catch {}
+  if ($status) {
+    throw "Queue VIDEO_RENDER inaccessible (HTTP $status). Verifier le secret Vercel HIBOU_LOCAL_REPORT_TOKEN et son scope projet."
+  }
+  throw "Queue VIDEO_RENDER inaccessible : $($_.Exception.Message)"
+}
+if (-not $queue.ok -or $queue.schema -ne "HIBOU_VIDEO_RENDER_QUEUE_V2") {
+  throw "Reponse queue VIDEO_RENDER inattendue."
+}
+Write-Host ("Queue authentifiee OK - jobs visibles : {0}" -f @($queue.jobs).Count) -ForegroundColor Green
+
+$InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
+$Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
+$WorkerUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/hibou-github-worker.mjs"
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+
+Write-Host "Actualisation du worker depuis main..." -ForegroundColor Cyan
+Invoke-WebRequest -UseBasicParsing -Uri $WorkerUrl -OutFile $Worker
+& $Node --check $Worker
+if ($LASTEXITCODE -ne 0) {
+  throw "Le worker telecharge ne passe pas node --check."
+}
+
+$StartupDir = [Environment]::GetFolderPath("Startup")
+$StartupCmd = Join-Path $StartupDir "LeHibouWorker.cmd"
+$CmdContent = @"
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing -Uri '$WorkerUrl' -OutFile '$Worker' } catch {}"
+start "" /min "$Node" "$Worker"
+"@
+Set-Content -Path $StartupCmd -Value $CmdContent -Encoding ASCII
+
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like "*hibou-github-worker.mjs*" } |
+  ForEach-Object {
+    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+  }
+
+Start-Sleep -Milliseconds 500
+Start-Process -FilePath $Node -ArgumentList ('"' + $Worker + '"') -WorkingDirectory $InstallDir -WindowStyle Hidden
+
+$health = $null
+for ($i = 0; $i -lt 20; $i++) {
+  Start-Sleep -Milliseconds 500
+  try {
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 2
+    if ($health) { break }
+  } catch {}
+}
+
+if (-not $health) {
+  throw "Worker lance mais endpoint health indisponible."
+}
+if (-not $health.execution_enabled) {
+  throw "Worker actif mais execution_enabled=false."
+}
+if (-not $health.video_render_enabled) {
+  throw "Worker actif mais video_render_enabled=false."
+}
+if (-not $health.video_autostart_comfyui) {
+  throw "Worker actif mais video_autostart_comfyui=false."
+}
+if (-not $health.report_token_present) {
+  throw "Worker actif mais token absent."
+}
+if (-not $health.video_binding_exists) {
+  throw "Worker actif mais binding ComfyUI introuvable."
+}
+
+[ordered]@{
+  schema = "HIBOU_VIDEO_STACK_READY_V1"
+  worker = $health.worker
+  status = $health.status
+  execution_enabled = $health.execution_enabled
+  video_render_enabled = $health.video_render_enabled
+  video_autostart_comfyui = $health.video_autostart_comfyui
+  report_token_present = $health.report_token_present
+  video_binding_exists = $health.video_binding_exists
+  video_output_root = $health.video_output_root
+  startup = $StartupCmd
+  queue_jobs_visible = @($queue.jobs).Count
+} | ConvertTo-Json -Depth 4
+
+Write-Host "HIBOU_VIDEO_STACK_READY" -ForegroundColor Green

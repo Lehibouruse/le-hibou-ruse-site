@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 function fail(message) { throw new Error(message); }
@@ -207,7 +208,7 @@ export function runVoiceGen(rawRequest) {
   return payload;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   const [kind, requestPath] = process.argv.slice(2);
   if (!kind || !requestPath) fail("usage: node scripts/video-local-adapters.mjs IMAGE_GEN|VOICE_GEN request.json");
   const request = JSON.parse(readFileSync(resolve(requestPath), "utf8"));

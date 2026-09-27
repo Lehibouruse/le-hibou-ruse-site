@@ -98,6 +98,18 @@ if (-not $queue.ok -or $queue.schema -ne "HIBOU_VIDEO_RENDER_QUEUE_V2") {
 }
 Write-Host ("Queue authentifiee OK - jobs visibles : {0}" -f @($queue.jobs).Count) -ForegroundColor Green
 
+$RuntimeCommit = ([string]$queue.runtime_commit).Trim()
+if ([string]::IsNullOrWhiteSpace($RuntimeCommit) -or $RuntimeCommit.Length -ne 40) {
+  throw "Queue VIDEO_RENDER sans runtime_commit valide."
+}
+foreach ($ch in $RuntimeCommit.ToCharArray()) {
+  if ("0123456789abcdefABCDEF".IndexOf($ch) -lt 0) {
+    throw "Queue VIDEO_RENDER avec runtime_commit non hexadecimal."
+  }
+}
+$RuntimeCommit = $RuntimeCommit.ToLowerInvariant()
+Write-Host ("Runtime deploye : {0}" -f $RuntimeCommit) -ForegroundColor Green
+
 $FailedJobsPath = Join-Path $env:LOCALAPPDATA "LeHibou\failed-jobs.json"
 if ((Test-Path $FailedJobsPath) -and @($queue.jobs).Count -gt 0) {
   try {
@@ -123,16 +135,17 @@ $Worker = Join-Path $InstallDir "hibou-github-worker.mjs"
 $RuntimeMaster = Join-Path $InstallDir "video-master.runtime.mjs"
 $RuntimeVoice = Join-Path $InstallDir "chatterbox-storyboard-batch.runtime.py"
 
-$WorkerUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/hibou-github-worker.mjs"
-$MasterUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/video-master.mjs"
-$VoiceUrl = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/scripts/chatterbox-storyboard-batch.py"
+$RawBase = "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/$RuntimeCommit"
+$WorkerUrl = "$RawBase/scripts/hibou-github-worker.mjs"
+$MasterUrl = "$RawBase/scripts/video-master.mjs"
+$VoiceUrl = "$RawBase/scripts/chatterbox-storyboard-batch.py"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 Set-UserEnv "HIBOU_VIDEO_MASTER_SCRIPT" $RuntimeMaster
 Set-UserEnv "HIBOU_CHATTERBOX_BATCH_SCRIPT" $RuntimeVoice
 
-Write-Host "Actualisation des runtimes video canoniques depuis main..." -ForegroundColor Cyan
+Write-Host ("Actualisation des runtimes video depuis le commit deploye {0}..." -f $RuntimeCommit) -ForegroundColor Cyan
 $cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $freshHeaders = @{ "Cache-Control" = "no-cache"; "Pragma" = "no-cache" }
 Invoke-WebRequest -UseBasicParsing -Headers $freshHeaders -Uri ($WorkerUrl + "?hibou_cb=" + $cacheBust) -OutFile $Worker
@@ -161,21 +174,18 @@ if ($LASTEXITCODE -ne 0) {
   throw "Le batch Chatterbox runtime ne passe pas py_compile."
 }
 
-$StartupScript = Join-Path $InstallDir "start-hibou-worker.ps1"
-$StartupScriptContent = @"
-`$ErrorActionPreference = "SilentlyContinue"
-Invoke-WebRequest -UseBasicParsing -Uri "$WorkerUrl" -OutFile "$Worker"
-Invoke-WebRequest -UseBasicParsing -Uri "$MasterUrl" -OutFile "$RuntimeMaster"
-Invoke-WebRequest -UseBasicParsing -Uri "$VoiceUrl" -OutFile "$RuntimeVoice"
-Start-Process -FilePath "$Node" -ArgumentList '"$Worker"' -WorkingDirectory "$InstallDir" -WindowStyle Hidden
-"@
-Set-Content -Path $StartupScript -Value $StartupScriptContent -Encoding UTF8
+$RuntimeLauncher = Join-Path $InstallDir "start-hibou-video-stack.runtime.ps1"
+$CurrentLauncher = [System.IO.Path]::GetFullPath($PSCommandPath)
+$InstalledLauncher = [System.IO.Path]::GetFullPath($RuntimeLauncher)
+if ($CurrentLauncher -ne $InstalledLauncher) {
+  Copy-Item -LiteralPath $CurrentLauncher -Destination $RuntimeLauncher -Force
+}
 
 $StartupDir = [Environment]::GetFolderPath("Startup")
 $StartupCmd = Join-Path $StartupDir "LeHibouWorker.cmd"
 $CmdContent = @"
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "$StartupScript"
+start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$RuntimeLauncher"
 "@
 Set-Content -Path $StartupCmd -Value $CmdContent -Encoding ASCII
 
@@ -232,6 +242,7 @@ if (-not $health.video_master_script_exists) {
   video_master_script = $health.video_master_script
   video_master_script_exists = $health.video_master_script_exists
   chatterbox_batch_script = $RuntimeVoice
+  runtime_commit = $RuntimeCommit
   startup = $StartupCmd
   queue_jobs_visible = @($queue.jobs).Count
 } | ConvertTo-Json -Depth 4

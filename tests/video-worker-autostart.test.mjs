@@ -39,5 +39,7 @@ test("video launcher never prints the secret token",()=>{
 test("video launcher makes the worker persistent at Windows login",()=>{
   assert.match(launcher,/LeHibouWorker\.cmd/);
   assert.match(launcher,/GetFolderPath\("Startup"\)/);
-  assert.match(launcher,/raw\.githubusercontent\.com\/Lehibouruse\/le-hibou-ruse-site\/main\/scripts\/hibou-github-worker\.mjs/);
+  assert.match(launcher,/start-hibou-video-stack\.runtime\.ps1/);
+  assert.match(launcher,/raw\.githubusercontent\.com\/Lehibouruse\/le-hibou-ruse-site\/\$RuntimeCommit/);
+  assert.doesNotMatch(launcher,/le-hibou-ruse-site\/main\/scripts\/hibou-github-worker\.mjs/);
 });

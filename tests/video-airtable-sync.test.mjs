@@ -58,6 +58,7 @@ test("Airtable export remains FINAL and incremental-off before the prepared migr
  assert.equal(c.production.mode,"final");
  assert.equal(c.production.preview_candidates_per_scene,1);
  assert.equal(c.features.video_incremental_retouch_v1,false);
+ assert.equal(c.features.video_human_candidate_selection_v1,false);
  assert.equal(c.validation.publication_authorized,false);
 });
 
@@ -68,6 +69,7 @@ test("Airtable profile can prepare preview mode without authorizing publication"
  const profile={fields:{
    "Mode production par défaut":"preview",
    "Retouches incrémentales V1":true,
+   "Sélection humaine candidats V1":true,
    "Candidats par scène":3
  }};
  const c=buildStoryboardContract(content,scenes,profile);
@@ -75,5 +77,6 @@ test("Airtable profile can prepare preview mode without authorizing publication"
  assert.equal(c.production.final_candidates_per_scene,3);
  assert.equal(c.production.preview_candidates_per_scene,1);
  assert.equal(c.features.video_incremental_retouch_v1,true);
+ assert.equal(c.features.video_human_candidate_selection_v1,true);
  assert.equal(c.validation.publication_authorized,false);
 });

@@ -336,7 +336,9 @@
             "resume_execution_performed: false",
             "heartbeatUnitProgress",
             "stage_progress: progress.stage_progress",
-            "visual_ready"
+            "visual_ready",
+            "stage_elapsed_seconds",
+            "stage_progress"
           ]
         },
         {
@@ -454,7 +456,9 @@
             "resume_execution_performed: false",
             "heartbeatUnitProgress",
             "stage_progress: progress.stage_progress",
-            "visual_ready"
+            "visual_ready",
+            "stage_elapsed_seconds",
+            "stage_progress"
           ]
         },
         {

@@ -127,10 +127,11 @@ export function buildIterationPlan(previousContract,nextContract){
     addAll(invalidatedSceneIds.render,nextIds);
   }
   if(globalChanges.includes("production")){
+    // Production mode/candidate-count/encode-profile changes are execution-policy
+    // changes, not semantic scene changes. Re-run the relevant stages so each
+    // engine can validate its own request/render fingerprint, but do not mark
+    // every scene image as semantically invalid.
     addAll(invalidatedStages,["images","technical_selection","creative_qc","promotion","render","master_qc","registry"]);
-    addAll(invalidatedSceneIds.images,nextIds);
-    addAll(invalidatedSceneIds.creative_qc,nextIds);
-    addAll(invalidatedSceneIds.render,nextIds);
   }
   if(globalChanges.includes("features")){
     addAll(invalidatedStages,["prosody","voice","audio_master","music_mix","audio_attach","subtitles","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry"]);
@@ -228,6 +229,7 @@ export function buildIterationPlan(previousContract,nextContract){
       image_only_change_does_not_invalidate_voice:true,
       narration_change_does_not_invalidate_images_unless_visual_brief_changes:true,
       structural_change_is_conservative:true,
+      production_profile_changes_use_engine_fingerprints:true,
       human_review_required:true,
       publication_authorized:false
     }

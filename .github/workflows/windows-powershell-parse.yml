@@ -44,6 +44,20 @@ jobs:
               Write-Host ("Parser errors in {0}:" -f $script.FullName) -ForegroundColor Red
               foreach ($err in $errors) {
                 Write-Host ("  Line {0}, Column {1}: {2}" -f $err.Extent.StartLineNumber, $err.Extent.StartColumnNumber, $err.Message) -ForegroundColor Red
+                Write-Host ("    ErrorId={0}; Extent={1}" -f $err.ErrorId, ($err.Extent.Text -replace "[`r`n]+", " ")) -ForegroundColor DarkRed
+              }
+
+              Write-Host "  Nearby parser tokens:" -ForegroundColor Yellow
+              $errorLines = @($errors | ForEach-Object { $_.Extent.StartLineNumber })
+              $minLine = [Math]::Max(1, (($errorLines | Measure-Object -Minimum).Minimum - 8))
+              $maxLine = (($errorLines | Measure-Object -Maximum).Maximum + 8)
+              foreach ($token in $tokens) {
+                $line = $token.Extent.StartLineNumber
+                if ($line -ge $minLine -and $line -le $maxLine) {
+                  $text = ($token.Text -replace "[`r`n]+", "\\n")
+                  if ($text.Length -gt 180) { $text = $text.Substring(0, 180) + "..." }
+                  Write-Host ("    {0}:{1}-{2}:{3} {4} [{5}]" -f $token.Extent.StartLineNumber, $token.Extent.StartColumnNumber, $token.Extent.EndLineNumber, $token.Extent.EndColumnNumber, $token.Kind, $text)
+                }
               }
             } else {
               Write-Host ("PASS {0}" -f $script.FullName) -ForegroundColor Green

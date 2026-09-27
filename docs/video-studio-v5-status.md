@@ -27,7 +27,8 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Diagnostic worker de reprise | yes | yes statique (plan commit-pinné joint aux erreurs, aucune reprise automatique) | no | no | no |
 | Audit local de run V1 | yes | yes CPU (stages, voix, images, caches, reprise; lecture seule) | no | no | no |
 | Audit état reprise préparée | yes | yes CPU (receipt + marker local + second démarrage explicite) | no | no | no |
-| Reprise distante après erreur | yes | yes statique/CPU (double gate, plan/state SHA, receipt local, préparation → Paused, second ordre obligatoire) | no | no | no |
+| Audit démarrage réparation | yes | yes CPU (phase execution_started + validation reçu de start) | no | no | no |
+| Reprise distante après erreur | yes | yes statique/CPU (double gate, préparation → Paused, second consentement + 4 hashes, reçu de start, one-shot) | no | no | no |
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
 | Plan stockage durable V1 | yes | yes (plan content-addressed, aucun transfert) | no | no | no |

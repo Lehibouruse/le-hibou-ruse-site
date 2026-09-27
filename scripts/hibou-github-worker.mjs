@@ -165,6 +165,35 @@ function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
 
+function stableStoryboard(value) {
+  const clone = JSON.parse(JSON.stringify(value || {}));
+  if (clone.content && typeof clone.content === "object") {
+    delete clone.content.exported_at;
+  }
+  return clone;
+}
+
+function jsonEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function pipelineFailureDetail(dir) {
+  const statePath = path.join(dir, "pipeline-run.json");
+  if (!existsSync(statePath)) return "";
+  try {
+    const pipeline = JSON.parse(readFileSync(statePath, "utf8"));
+    const failed = Object.entries(pipeline?.stages || {})
+      .filter(([, info]) => info?.status === "ERROR")
+      .at(-1);
+    if (!failed) return "";
+    const [stageName, info] = failed;
+    const message = String(info?.error || "unknown stage error").slice(0, 1800);
+    return ` stage=${stageName}; error=${message}`;
+  } catch {
+    return "";
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -593,13 +622,69 @@ async function processVideoRender(job, processed) {
   mkdirSync(dir, { recursive: true });
 
   const storyboardPath = path.join(dir, "storyboard.json");
+  const pipelineStatePath = path.join(dir, "pipeline-run.json");
   const masterPath = path.join(dir, "master.mp4");
+
+  const incomingStoryboard = stableStoryboard(job.storyboard);
+  let existingStoryboard = null;
+
+  if (existsSync(storyboardPath)) {
+    try {
+      existingStoryboard = stableStoryboard(
+        JSON.parse(readFileSync(storyboardPath, "utf8")),
+      );
+    } catch {
+      existingStoryboard = null;
+    }
+  }
+
+  if (
+    existingStoryboard &&
+    !jsonEqual(existingStoryboard, incomingStoryboard)
+  ) {
+    throw new Error(
+      "VIDEO_RENDER storyboard changed for an existing job id; create a new queue job",
+    );
+  }
 
   writeFileSync(
     storyboardPath,
-    JSON.stringify(job.storyboard, null, 2) + "\n",
+    JSON.stringify(incomingStoryboard, null, 2) + "\n",
     "utf8",
   );
+
+  if (existsSync(pipelineStatePath) && existingStoryboard) {
+    try {
+      const pipeline = JSON.parse(
+        readFileSync(pipelineStatePath, "utf8"),
+      );
+      const source = pipeline?.inputs?.source;
+      const samePath =
+        source?.type === "file" &&
+        path.resolve(String(source.path || "")) === path.resolve(storyboardPath);
+
+      if (samePath && source.sha256 !== sha256(storyboardPath)) {
+        source.sha256 = sha256(storyboardPath);
+        pipeline.retry_migration = {
+          reason: "volatile_storyboard_export_timestamp_removed",
+          migrated_at: new Date().toISOString(),
+        };
+        writeFileSync(
+          pipelineStatePath,
+          JSON.stringify(pipeline, null, 2) + "\n",
+          "utf8",
+        );
+        log("VIDEO_RENDER retry state migrated", {
+          job: job.id,
+          pipeline_state: pipelineStatePath,
+        });
+      }
+    } catch (error) {
+      throw new Error(
+        `Cannot migrate VIDEO_RENDER retry state: ${error?.message || error}`,
+      );
+    }
+  }
 
   state.current_job = job.id;
 
@@ -682,8 +767,9 @@ async function processVideoRender(job, processed) {
   );
 
   if (render.status !== 0) {
+    const detail = pipelineFailureDetail(dir);
     throw new Error(
-      `video-master failed with status ${render.status}`,
+      `video-master failed with status ${render.status};${detail || " stage=unknown"}`,
     );
   }
 

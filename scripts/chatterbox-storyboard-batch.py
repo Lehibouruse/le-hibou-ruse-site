@@ -2,6 +2,7 @@
 import copy
 import gc
 import hashlib
+import inspect
 import json
 import os
 import random
@@ -117,6 +118,7 @@ for scene in scenes:
         "cfg_weight": cfg_weight,
         "seed": seed,
         "model_variant": model_variant,
+        "model_variant_native": None,
         "audio_prompt_path": audio_prompt,
         "audio_prompt_sha256": audio_prompt_hash,
     }
@@ -185,12 +187,19 @@ if needs_generation:
         fail("CUDA requested but unavailable; no silent CPU/cloud fallback")
     clear_cuda_cache()
     try:
-        model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model=model_variant)
+        signature = inspect.signature(ChatterboxMultilingualTTS.from_pretrained)
+        load_kwargs = {"device": device}
+        if "t3_model" in signature.parameters:
+            load_kwargs["t3_model"] = model_variant
+        model = ChatterboxMultilingualTTS.from_pretrained(**load_kwargs)
     except Exception as exc:
         fail(f"Chatterbox model load failed on {device}: {exc}")
     if audio_prompt:
         model.prepare_conditionals(audio_prompt, exaggeration=default_exaggeration)
     sample_rate = int(model.sr)
+    model_variant_native = "t3_model" in signature.parameters
+    for item in descriptors:
+        item["native"]["model_variant_native"] = model_variant if model_variant_native else None
 
 master_parts = []
 scene_meta = []

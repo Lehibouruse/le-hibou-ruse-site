@@ -98,7 +98,7 @@
 2. **Resume après revue** : fingerprint anti-stale codé ; reste à valider sur médias réels.
 3. **Diff de revue incrémentale** : montrer automatiquement ce qui a changé depuis le dernier PREVIEW pour concentrer la revue sur les scènes modifiées tout en gardant un contrôle global minimal.
 4. **Coverage audit méthodologie** : contrôle statique que chaque étape Airtable importante dispose d'un artefact/code/test attendu.
-5. **Durabilité des artefacts** : préparer la stratégie de stockage durable sans uploader ni déplacer le master actif.
+5. **Durabilité des artefacts** : plan content-addressed codé, images sélectionnées incluses dans le registre ; reste à choisir/valider un backend durable et son uploader séparé après les E2E.
 
 ## E2E à ne lancer qu'après fin du rendu/téléchargement local actuel
 

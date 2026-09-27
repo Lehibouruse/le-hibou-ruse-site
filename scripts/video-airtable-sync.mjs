@@ -48,7 +48,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
     const order=Number(f.Ordre);
     if(order!==index+1) fail("scene order must be contiguous");
     const duration=Number(f["Durée secondes"]);
-    if(!Number.isFinite(duration)||duration<2.5||duration>5.5) fail(`${f.Scène||record.id}: duration must be 2.5..5.5 s`);
+    if(!Number.isFinite(duration)||duration<1.5||duration>5.5) fail(`${f.Scène||record.id}: duration must be 1.5..5.5 s`);
     total+=duration;
     const candidates=parseJsonArray(f["Candidats JSON"]);
     return {

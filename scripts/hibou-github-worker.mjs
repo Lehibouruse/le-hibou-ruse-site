@@ -508,6 +508,8 @@ async function fetchVideoQueue() {
         headers: {
           "User-Agent": "Le-Hibou-ROG-Worker/1.0",
           Authorization: `Bearer ${REPORT_TOKEN}`,
+          "X-Hibou-Worker": WORKER_ID,
+          "X-Hibou-Worker-Session": state.worker_session,
         },
         signal: controller.signal,
       },

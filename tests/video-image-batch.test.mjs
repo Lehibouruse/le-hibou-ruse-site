@@ -96,3 +96,23 @@ test("non-OOM image failures never trigger the fallback request",async()=>{
  assert.equal(isCudaOom(new Error("workflow node missing")),false);
  assert.equal(isCudaOom(new Error("torch.OutOfMemoryError: CUDA out of memory")),true);
 });
+
+
+test("preview-sized plans prune stale extra candidate cache entries without deleting files",async()=>{
+ const root=mkdtempSync(resolve(tmpdir(),"hibou-img-prune-"));
+ const manifest=resolve(root,"manifest.json"), selections=resolve(root,"selections.json");
+ let calls=0;
+ const runner=async req=>{
+   calls+=1; const p=resolve(root,`candidate-${req.a}.png`); writeFileSync(p,`img-${req.a}`);
+   return {job_id:`job-${req.a}`,request_sha256:`h-${req.a}`,attempts:1,outputs:[{path:p}]};
+ };
+ const full={...plan,requests:plan.requests.slice(0,3)};
+ await executeImagePlan(full,{runner,manifestPath:manifest,selectionTemplatePath:selections});
+ assert.equal(calls,3);
+ const preview={...plan,requests:[plan.requests[0]]};
+ const second=await executeImagePlan(preview,{runner,manifestPath:manifest,selectionTemplatePath:selections});
+ assert.equal(second.cache_hits,1);
+ assert.equal(second.cache_pruned_entries,2);
+ assert.equal(Object.keys(JSON.parse(readFileSync(manifest,"utf8")).results).length,1);
+ assert.equal(readFileSync(resolve(root,"candidate-2.png"),"utf8"),"img-2");
+});

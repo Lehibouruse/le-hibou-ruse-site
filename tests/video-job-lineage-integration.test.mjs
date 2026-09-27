@@ -14,7 +14,9 @@ const worker = readFileSync(
 test("queue validates reuse lineage before dispatching a VIDEO_RENDER job", () => {
   assert.match(route, /validateReuseLineage/);
   assert.match(route, /TABLES\.localWorkerQueue/);
+  assert.match(route, /reuseValidationReason/);
   assert.match(route, /reuse_parent_lookup_failed/);
+  assert.match(route, /\^reuse_\[a-z0-9_\]\+\$/i);
   assert.match(route, /ancestorJobIds/);
   assert.match(route, /reuse_lineage_too_deep/);
   assert.match(route, /reuse_lineage_cycle_detected/);

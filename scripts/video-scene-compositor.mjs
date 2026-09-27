@@ -59,6 +59,10 @@ function normalizeImageLayer(layer,kind,defaults={}){
     offset_y:num(layer.offset_y,0),
     opacity:Math.min(1,Math.max(0,num(layer.opacity,1))),
     fade_ms:Math.max(0,Math.min(250,num(layer.fade_ms,defaults.fade_ms??80))),
+    remove_background:Boolean(layer.remove_background??defaults.remove_background??false),
+    chroma_key_color:String(layer.chroma_key_color||defaults.chroma_key_color||"0xFBF6EE"),
+    chroma_key_similarity:Math.min(1,Math.max(0,num(layer.chroma_key_similarity,defaults.chroma_key_similarity??0.11))),
+    chroma_key_blend:Math.min(1,Math.max(0,num(layer.chroma_key_blend,defaults.chroma_key_blend??0.07))),
   };
 }
 
@@ -183,10 +187,13 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     const fade=Math.min(d/2,layer.fade_ms/1000);
     const fadeOutStart=Math.max(0,d-fade);
     const opacity=layer.opacity<1?`,colorchannelmixer=aa=${layer.opacity.toFixed(3)}`:"";
+    const keyFilter=layer.remove_background
+      ? `,colorkey=${layer.chroma_key_color}:${layer.chroma_key_similarity.toFixed(3)}:${layer.chroma_key_blend.toFixed(3)}`
+      :"";
     const fadeFilter=fade>0
       ? `,fade=t=in:st=0:d=${fade.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fade.toFixed(3)}:alpha=1`
       :"";
-    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${opacity}${fadeFilter}[${overlay}]`);
+    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity}${fadeFilter}[${overlay}]`);
     const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
     filters.push(`[${base}][${overlay}]overlay=x='${p.x}':y='${p.y}':format=auto[${next}]`);
     base=next;

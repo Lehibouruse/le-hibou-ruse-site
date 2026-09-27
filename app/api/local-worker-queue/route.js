@@ -138,6 +138,14 @@ function isHumanSelectionPause(record) {
     || result.status === "WAITING_HUMAN_SELECTION";
 }
 
+function isRepairResumePreparedPause(record) {
+  const result = parseJsonObject(record?.fields?.["Résultat JSON"]);
+  return result.schema === "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1"
+    && result.requires_separate_render_start === true
+    && result.execution_started === false
+    && result.publication_authorized === false;
+}
+
 function humanSelectionResumePayload(record) {
   if (!isHumanSelectionPause(record)) {
     return { eligible: false, reason: "not_human_selection_pause" };
@@ -605,7 +613,10 @@ async function autoActivateWhenWorkerReady(request) {
   });
 
   const eligible = paused.filter((record) => {
-    if (isHumanSelectionPause(record)) return false;
+    if (
+      isHumanSelectionPause(record) ||
+      isRepairResumePreparedPause(record)
+    ) return false;
     const options = parseOptions(record.fields?.["Options JSON"]);
     return options.auto_start_when_worker_ready === true;
   });
@@ -656,7 +667,10 @@ async function autoChainAfterSuccess(completedRecordId) {
   });
 
   const eligible = paused.filter((record) => {
-    if (isHumanSelectionPause(record)) return false;
+    if (
+      isHumanSelectionPause(record) ||
+      isRepairResumePreparedPause(record)
+    ) return false;
     const options = parseOptions(record.fields?.["Options JSON"]);
     return options.auto_start_after_success === true
       && String(options.auto_start_after_job_id || "") === completedRecordId;
@@ -1115,6 +1129,37 @@ export async function POST(request) {
       Erreur: cut(body.error, 10000),
     };
 
+    const repairPrepared =
+      status === "Paused" &&
+      body.result &&
+      typeof body.result === "object" &&
+      !Array.isArray(body.result) &&
+      body.result.schema === "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1" &&
+      body.result.requires_separate_render_start === true &&
+      body.result.execution_started === false &&
+      body.result.publication_authorized === false;
+
+    if (repairPrepared) {
+      if (!REMOTE_REPAIR_RESUME_ENABLED) {
+        return NextResponse.json(
+          { ok: false, error: "remote_repair_resume_disabled" },
+          { status: 409 },
+        );
+      }
+      const options = parseOptions(current.fields?.["Options JSON"]);
+      fields["Options JSON"] = JSON.stringify({
+        ...options,
+        repair_resume_request: null,
+        repair_resume_prepared_at: now,
+        repair_resume_prepared_plan_sha256:
+          cut(body.result.resume_plan_sha256 || "", 128) || null,
+        repair_resume_prepared_source_state_sha256:
+          cut(body.result.source_state_sha256 || "", 128) || null,
+        repair_resume_prepared_stage:
+          cut(body.result.resume_stage || "", 80) || null,
+      });
+    }
+
     if (retry.retry) {
       fields["R\u00e9sultat JSON"] = JSON.stringify({
         schema: "HIBOU_VIDEO_RENDER_TRANSIENT_RETRY_V1",
@@ -1252,6 +1297,8 @@ export async function POST(request) {
       status: retry.retry ? "Pending" : status,
       retry,
       success_chain,
+      repair_resume_prepared: repairPrepared,
+      requires_separate_render_start: repairPrepared,
     });
   } catch (error) {
     return NextResponse.json(

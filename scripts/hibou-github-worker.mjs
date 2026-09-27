@@ -864,6 +864,35 @@ function pipelineHeartbeatSnapshot(dir) {
   }
 }
 
+function progressIdentity(progress) {
+  const stageProgress = progress?.stage_progress || null;
+  return JSON.stringify({
+    current_stage: progress?.current_stage || null,
+    completed_stages: Array.isArray(progress?.completed_stages)
+      ? progress.completed_stages
+      : [],
+    failed_stages: Array.isArray(progress?.failed_stages)
+      ? progress.failed_stages
+      : [],
+    stage_progress: stageProgress
+      ? {
+          unit: stageProgress.unit || null,
+          completed_units: Number(stageProgress.completed_units || 0),
+          failed_units: Number(stageProgress.failed_units || 0),
+          visual_ready: stageProgress.visual_ready === true,
+        }
+      : null,
+  });
+}
+
+function stagnationThresholdSeconds(stage) {
+  const normalized = String(stage || "").trim().toLowerCase();
+  if (normalized === "images") return 12 * 60;
+  if (normalized === "voice") return 10 * 60;
+  if (normalized === "render") return 8 * 60;
+  return 10 * 60;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -879,7 +908,47 @@ function comfyEndpointFromBinding() {
   return url.toString().replace(/\/$/, "");
 }
 
-async function comfyReady(endpoint) {
+function assessComfySystemStats(stats) {
+  const devices = Array.isArray(stats?.devices) ? stats.devices : [];
+  const cuda = devices.find((device) => {
+    const type = String(device?.type || "").trim().toLowerCase();
+    const name = String(device?.name || "").trim().toLowerCase();
+    return type === "cuda" || name.startsWith("cuda:");
+  }) || null;
+
+  if (!cuda) {
+    return {
+      ready: false,
+      reason: "cuda_device_missing",
+      device: null,
+      vram_total_bytes: null,
+      vram_free_bytes: null,
+    };
+  }
+
+  const total = Number(cuda.vram_total);
+  const free = Number(cuda.vram_free);
+  const minimum = 4 * 1024 ** 3;
+  if (Number.isFinite(total) && total > 0 && total < minimum) {
+    return {
+      ready: false,
+      reason: "cuda_vram_below_project_floor",
+      device: String(cuda.name || "cuda"),
+      vram_total_bytes: total,
+      vram_free_bytes: Number.isFinite(free) ? free : null,
+    };
+  }
+
+  return {
+    ready: true,
+    reason: "cuda_ready",
+    device: String(cuda.name || "cuda"),
+    vram_total_bytes: Number.isFinite(total) ? total : null,
+    vram_free_bytes: Number.isFinite(free) ? free : null,
+  };
+}
+
+async function comfyHealth(endpoint) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
   try {
@@ -887,19 +956,56 @@ async function comfyReady(endpoint) {
       signal: controller.signal,
       headers: { "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
     });
-    return response.ok;
-  } catch {
-    return false;
+    if (!response.ok) {
+      return {
+        ready: false,
+        reason: "system_stats_http_" + response.status,
+        http_status: response.status,
+      };
+    }
+
+    let stats;
+    try {
+      stats = await response.json();
+    } catch (error) {
+      return {
+        ready: false,
+        reason: "system_stats_invalid_json",
+        error: String(error?.message || error).slice(0, 500),
+      };
+    }
+
+    return { http_status: response.status, ...assessComfySystemStats(stats) };
+  } catch (error) {
+    return {
+      ready: false,
+      reason: error?.name === "AbortError"
+        ? "system_stats_timeout"
+        : "system_stats_unreachable",
+      error: String(error?.message || error).slice(0, 500),
+    };
   } finally {
     clearTimeout(timeout);
   }
 }
 
+async function comfyReady(endpoint) {
+  return (await comfyHealth(endpoint)).ready;
+}
+
 async function ensureComfyUIReady() {
   const endpoint = comfyEndpointFromBinding();
-  if (await comfyReady(endpoint)) {
-    return { endpoint, started: false };
+  const initialHealth = await comfyHealth(endpoint);
+  if (initialHealth.ready) {
+    return { endpoint, started: false, health: initialHealth };
   }
+
+  log("ComfyUI health gate not ready", {
+    endpoint,
+    reason: initialHealth.reason || "unknown",
+    device: initialHealth.device || null,
+    vram_total_bytes: initialHealth.vram_total_bytes || null,
+  });
 
   if (!VIDEO_AUTOSTART_COMFYUI) {
     throw new Error(
@@ -965,13 +1071,24 @@ async function ensureComfyUIReady() {
   } catch {}
 
   const deadline = Date.now() + 180_000;
+  let lastHealth = initialHealth;
   while (Date.now() < deadline) {
-    if (await comfyReady(endpoint)) {
-      log("ComfyUI ready", { endpoint, pid: startedPid });
-      return { endpoint, started: true };
+    lastHealth = await comfyHealth(endpoint);
+    if (lastHealth.ready) {
+      log("ComfyUI ready", {
+        endpoint,
+        pid: startedPid,
+        device: lastHealth.device || null,
+        vram_total_bytes: lastHealth.vram_total_bytes || null,
+      });
+      return { endpoint, started: true, health: lastHealth };
     }
     if (startedPid && !pidAlive(startedPid)) {
-      log("ComfyUI child exited before readiness", { endpoint, pid: startedPid });
+      log("ComfyUI child exited before readiness", {
+        endpoint,
+        pid: startedPid,
+        health_reason: lastHealth.reason || "unknown",
+      });
       break;
     }
     await sleep(2000);
@@ -986,7 +1103,7 @@ async function ensureComfyUIReady() {
   const stderrTail = tail(stderrPath);
   const stdoutTail = tail(stdoutPath);
   throw new Error(
-    `ComfyUI did not become ready within 180 seconds: ${endpoint}` +
+    `ComfyUI did not become CUDA-ready within 180 seconds: ${endpoint}` +\n    `\\nHealth gate: ${JSON.stringify(lastHealth || { ready: false, reason: "unknown" })}` +
     (startedPid ? `\nComfyUI child pid: ${startedPid}; alive=${pidAlive(startedPid)}` : "\nComfyUI child pid: unavailable") +
     (starterResult?.stderr ? `\n--- starter stderr ---\n${String(starterResult.stderr).slice(-3000)}` : "") +
     (starterResult?.stdout ? `\n--- starter stdout ---\n${String(starterResult.stdout).slice(-3000)}` : "") +
@@ -2075,11 +2192,19 @@ async function processVideoRender(job, processed) {
     "scripts",
     "video-local-preflight.mjs",
   );
+  const readinessScript = path.join(
+    PROJECT_ROOT,
+    "scripts",
+    "video-v5-readiness.mjs",
+  );
   if (!existsSync(masterScript)) {
     throw new Error(`video-master missing: ${masterScript}`);
   }
   if (!existsSync(preflightScript)) {
     throw new Error(`video preflight missing: ${preflightScript}`);
+  }
+  if (!existsSync(readinessScript)) {
+    throw new Error(`video V5 readiness gate missing: ${readinessScript}`);
   }
 
   if (existsSync(pipelineStatePath) && existingStoryboard) {
@@ -2237,6 +2362,32 @@ async function processVideoRender(job, processed) {
       `video preflight failed with status ${preflight.status}`,
     );
   }
+
+  const readinessPath = path.join(dir, "v5-readiness.json");
+  const readiness = spawnSync(
+    process.execPath,
+    [readinessScript, storyboardPath, readinessPath],
+    {
+      cwd: PROJECT_ROOT,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
+  if (readiness.status !== 0) {
+    const detail = String(readiness.stderr || readiness.stdout || "").slice(-6000);
+    throw new Error(
+      `video V5 readiness gate failed with status ${readiness.status}`
+      + (detail ? `\n${detail}` : ""),
+    );
+  }
+  log("VIDEO_RENDER V5 readiness gate passed", {
+    job: job.id,
+    content_id: contentId,
+    report: readinessPath,
+  });
 
   if (!humanSelectionResume) {
     await ensureComfyUIReady();
@@ -2441,10 +2592,27 @@ async function processVideoRender(job, processed) {
     state.render_client_id = renderClientId;
     state.render_started_at = new Date().toISOString();
     state.last_video_heartbeat_at = state.render_started_at;
+    let lastProgressIdentity = null;
+    let lastProgressChangedAtMs = Date.now();
 
     const heartbeat = setInterval(() => {
       const progress = pipelineHeartbeatSnapshot(dir);
       const heartbeatAt = new Date().toISOString();
+      const heartbeatMs = Date.now();
+      const identity = progressIdentity(progress);
+      if (identity !== lastProgressIdentity) {
+        lastProgressIdentity = identity;
+        lastProgressChangedAtMs = heartbeatMs;
+      }
+      const noProgressSeconds = Math.max(
+        0,
+        Math.round((heartbeatMs - lastProgressChangedAtMs) / 100) / 10,
+      );
+      const stagnationThreshold = stagnationThresholdSeconds(progress.current_stage);
+      const stageKnown = !["", "starting", "unknown"].includes(
+        String(progress.current_stage || "").trim().toLowerCase(),
+      );
+      const stagnationWarning = stageKnown && noProgressSeconds >= stagnationThreshold;
       state.last_video_heartbeat_at = heartbeatAt;
       reportVideoProgress(job, "Running", {
         local_path: dir,
@@ -2463,6 +2631,9 @@ async function processVideoRender(job, processed) {
           stage_started_at: progress.stage_started_at,
           stage_elapsed_seconds: progress.stage_elapsed_seconds,
           stage_progress: progress.stage_progress,
+          stagnation_warning: stagnationWarning,
+          no_progress_seconds: noProgressSeconds,
+          stagnation_threshold_seconds: stagnationThreshold,
         },
       }).catch((error) => {
         log("VIDEO_RENDER heartbeat failed", {

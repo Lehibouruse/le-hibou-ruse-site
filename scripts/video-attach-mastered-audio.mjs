@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 function fail(m){throw new Error(m);}
@@ -31,7 +32,7 @@ export function attachMasteredAudio(contractPath,audioPath,outPath,{tolerance=0.
  writeFileSync(resolve(outPath),JSON.stringify(contract,null,2));
  return {output:resolve(outPath),sha256:h,duration_s:newD};
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [c,a,o]=process.argv.slice(2); if(!c||!a||!o) fail("usage: video-attach-mastered-audio.mjs contract-audio-ready.json mastered.wav contract-mastered.json");
  process.stdout.write(JSON.stringify(attachMasteredAudio(c,a,o))+"\n");
 }

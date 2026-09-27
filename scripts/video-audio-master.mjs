@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 
@@ -35,7 +36,7 @@ export function masterAudio(input,output,{I=-16,TP=-1.5,LRA=7}={}){
  writeFileSync(`${resolve(output)}.manifest.json`,JSON.stringify(result,null,2));
  return result;
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [input,output,...rest]=process.argv.slice(2); if(!input||!output) fail("usage: video-audio-master.mjs input.wav output.wav [--I=-16 --TP=-1.5 --LRA=7]");
  const opts={}; for(const a of rest){if(a.startsWith("--I="))opts.I=Number(a.slice(4)); if(a.startsWith("--TP="))opts.TP=Number(a.slice(5)); if(a.startsWith("--LRA="))opts.LRA=Number(a.slice(6));}
  process.stdout.write(JSON.stringify(masterAudio(input,output,opts))+"\n");

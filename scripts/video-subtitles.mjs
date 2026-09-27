@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 function fail(m){throw new Error(m);}
@@ -34,7 +35,7 @@ export function buildAss(contract,{font="DejaVu Sans",fontSize=54,marginV=150}={
     ...events,""
   ].join("\n");
 }
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,outPath]=process.argv.slice(2);
   if(!contractPath||!outPath) fail("usage: video-subtitles.mjs contract-audio-ready.json subtitles.ass");
   const contract=JSON.parse(readFileSync(resolve(contractPath),"utf8"));

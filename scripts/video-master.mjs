@@ -41,6 +41,46 @@ function chatterboxBatchScript(){
   return explicit?resolve(explicit):resolve("scripts/chatterbox-storyboard-batch.py");
 }
 
+const PRE_IMAGE_RUNTIME_FILES=[
+  ["video-audio-master.mjs","masterAudio"],
+  ["video-attach-mastered-audio.mjs","attachMasteredAudio"],
+  ["video-subtitles.mjs","buildAss"],
+  ["video-attach-subtitles.mjs","attachSubtitles"],
+  ["video-style-apply.mjs","applyStyleProfile"],
+  ["video-asset-resolve.mjs","applyAssetResolution"],
+  ["video-asset-graph.mjs","planSceneAssetReuse"]
+];
+
+async function ensurePreImageRuntimeBundle(commit){
+  const normalized=String(commit||"").trim().toLowerCase();
+  if(!/^[0-9a-f]{40}$/.test(normalized)) fail("storyboard runtime_commit missing or invalid");
+  const localBase=resolve(
+    process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
+    "LeHibou","pre-image-runtime",normalized
+  );
+  mkdirSync(localBase,{recursive:true});
+  for(const [name,marker] of PRE_IMAGE_RUNTIME_FILES){
+    const target=resolve(localBase,name);
+    let source=existsSync(target)?readFileSync(target,"utf8"):"";
+    if(!source.includes(marker)){
+      const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/scripts/${name}`;
+      const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+      if(!response.ok) fail(`pre-image runtime download failed HTTP ${response.status}: ${name}@${normalized}`);
+      source=await response.text();
+      if(!source.includes(marker)) fail(`pre-image runtime marker missing: ${name}@${normalized}`);
+      writeFileSync(target,source,"utf8");
+    }
+  }
+  return {
+    audioMaster:resolve(localBase,"video-audio-master.mjs"),
+    attachAudio:resolve(localBase,"video-attach-mastered-audio.mjs"),
+    subtitles:resolve(localBase,"video-subtitles.mjs"),
+    attachSubtitles:resolve(localBase,"video-attach-subtitles.mjs"),
+    style:resolve(localBase,"video-style-apply.mjs"),
+    assetResolve:resolve(localBase,"video-asset-resolve.mjs")
+  };
+}
+
 const IMAGE_RUNTIME_FILES=[
   ["video-image-factory.mjs","executeImagePlan"],
   ["video-image-batch.mjs","runImageGen"],
@@ -229,6 +269,9 @@ async function main(){
     if((sb.scenes||[]).length>policy.max_scenes) fail("storyboard exceeds --max-scenes policy");
   });
 
+  const runtimeCommit=String(json(storyboard).runtime_commit||"").trim();
+  const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
+
   const voiceDir=resolve(root,"voice");
   const voiceReady=resolve(voiceDir,"contract-audio-ready.json");
   const rawVoice=resolve(voiceDir,"voice-master.wav");
@@ -243,27 +286,27 @@ async function main(){
   const mastered=resolve(voiceDir,"voice-mastered.wav");
   const masteredContract=resolve(root,"contract-mastered.json");
   stage(state,"audio_master",()=>{
-    run(process.execPath,[resolve("scripts/video-audio-master.mjs"),rawVoice,mastered]);
-    run(process.execPath,[resolve("scripts/video-attach-mastered-audio.mjs"),voiceReady,mastered,masteredContract]);
+    run(process.execPath,[preRuntime.audioMaster,rawVoice,mastered]);
+    run(process.execPath,[preRuntime.attachAudio,voiceReady,mastered,masteredContract]);
   });
 
   const ass=resolve(root,"subtitles.ass");
   const captioned=resolve(root,"contract-captioned.json");
   stage(state,"subtitles",()=>{
-    run(process.execPath,[resolve("scripts/video-subtitles.mjs"),masteredContract,ass]);
-    run(process.execPath,[resolve("scripts/video-attach-subtitles.mjs"),masteredContract,ass,captioned]);
+    run(process.execPath,[preRuntime.subtitles,masteredContract,ass]);
+    run(process.execPath,[preRuntime.attachSubtitles,masteredContract,ass,captioned]);
   });
 
   const styled=resolve(root,"contract-styled.json");
   stage(state,"style",()=>{
-    if(styleArg) run(process.execPath,[resolve("scripts/video-style-apply.mjs"),captioned,resolve(styleArg),styled]);
+    if(styleArg) run(process.execPath,[preRuntime.style,captioned,resolve(styleArg),styled]);
     else writeJson(styled,json(captioned));
   });
 
   const assetResolved=resolve(root,"contract-assets-resolved.json");
   stage(state,"asset_resolution",()=>{
     if(assetGraphArg){
-      run(process.execPath,[resolve("scripts/video-asset-resolve.mjs"),styled,resolve(assetGraphArg),assetResolved]);
+      run(process.execPath,[preRuntime.assetResolve,styled,resolve(assetGraphArg),assetResolved]);
     }else{
       writeJson(assetResolved,json(styled));
     }
@@ -277,7 +320,6 @@ async function main(){
     writeJson(statePath,state);
   });
 
-  const runtimeCommit=String(json(storyboard).runtime_commit||"").trim();
   const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
   const postRuntime=await ensurePostRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");

@@ -12,12 +12,16 @@ function parent({
   type = "VIDEO_RENDER",
   parentContentId = contentId,
   reuseFrom = "",
+  worker = "ROG-TEST",
+  resultSha256 = "a".repeat(64),
 } = {}) {
   return {
     id,
     fields: {
       Statut: status,
       Type: type,
+      Worker: worker,
+      "Hash résultat": resultSha256,
       "Options JSON": JSON.stringify({
         content_id: parentContentId,
         reuse_from_job_id: reuseFrom || undefined,
@@ -39,6 +43,8 @@ test("reuse lineage accepts a completed VIDEO_RENDER parent for the same content
   assert.equal(result.reason, "reuse_parent_valid");
   assert.equal(result.lineage.parent_job_id, parentJob);
   assert.equal(result.lineage.parent_content_id, contentId);
+  assert.equal(result.lineage.parent_worker, "ROG-TEST");
+  assert.equal(result.lineage.parent_result_sha256, "a".repeat(64));
   assert.equal(result.lineage.publication_authorized, false);
 });
 

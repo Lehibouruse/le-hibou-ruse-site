@@ -12,7 +12,8 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |
 | Musique/mix FFmpeg V1 | yes | yes (plan/policy; audio E2E pending) | no | no | no |
 | Cancel / supersede distant V1 | yes | yes (control protocol/static regression; Windows process E2E pending) | no | no | no |
-| Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile CPU tests; real media reuse E2E pending) | no | no | no |
+| Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile/lineage CPU tests; real media reuse E2E pending) | no | no | no |
+| Verrou PREVIEW / publication | yes | yes (contract + registry tests; publish E2E intentionally disabled) | no | no | no |
 
 ## Feature gates
 
@@ -45,6 +46,7 @@ Apply schema changes only when the local production render is idle. Do not rewri
 6. Cancel: on Windows with a disposable test job, request cancel during Chatterbox and during ComfyUI generation; verify only the matching child tree/client_id prompts stop, terminal status is correct, no retry occurs, GPU activity returns to idle, then verify supersede.
 7. Resume/cache regression: cancel/restart a separate disposable job and confirm manifests/hashes/cache remain valid.
 8. Incremental preview: create a disposable PREVIEW from a completed test run with `--reuse-from`; verify unchanged Chatterbox scenes, unchanged image requests and unchanged FFmpeg scene clips are cache hits, while one edited caption/image/voice unit invalidates only its expected dependency path.
+   Also verify same-content lineage, same-worker ownership when present, and parent master SHA-256 integrity before any cache is seeded.
 9. Full human review: render one complete V5 video with publication still disabled.
 
 ## Recommended activation order
@@ -58,4 +60,4 @@ Apply schema changes only when the local production render is idle. Do not rewri
 7. Creative QC blocking only after fixture calibration.
 8. Preview + incremental retouch after cache-reuse E2E; keep the GLOBAL flag false until then.
 9. Remote cancel/supersede last, after the dedicated Windows E2E.
-10. Keep automatic publication disabled throughout; production activation requires explicit separate validation.
+10. Keep automatic publication disabled throughout; PREVIEW is always `preview_only`, and even FINAL artifact registries remain non-publishable until an explicit separate human publication step is designed and validated.

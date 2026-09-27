@@ -40,7 +40,8 @@ const VIDEO_CANCEL_GRACE_MS = Math.max(
   Math.min(30000, Number(process.env.HIBOU_VIDEO_CANCEL_GRACE_MS || 5000)),
 );
 
-const WORKER_SELF_UPDATE_SCHEMA = "HIBOU_GITHUB_WORKER_SELF_UPDATE_V1";
+const WORKER_SELF_UPDATE_SCHEMA = "HIBOU_GITHUB_WORKER_SELF_UPDATE_V2";
+const WORKER_BUILD_MARKER = "HIBOU_WORKER_BUILD_20260927_V2";
 const WORKER_SELF_UPDATE_ENABLED =
   String(process.env.HIBOU_WORKER_SELF_UPDATE_ENABLED || "true")
     .trim()
@@ -355,8 +356,18 @@ async function ensureWorkerSelfUpdate(commit) {
       throw new Error("Worker self-update candidate hash mismatch");
     }
 
-    renameSync(temp, target);
-    state.worker_source_sha256 = remoteHash;
+    // Windows can keep the currently executed .mjs file open in ways that make
+    // replace-by-rename unreliable. Overwrite the managed source explicitly,
+    // then verify the exact installed bytes before requesting a restart.
+    writeFileSync(target, source, "utf8");
+    const installedHash = sha256(target);
+    try { unlinkSync(temp); } catch {}
+
+    if (installedHash !== remoteHash) {
+      throw new Error("Worker self-update installed hash mismatch");
+    }
+
+    state.worker_source_sha256 = installedHash;
     state.worker_self_update_pending = true;
 
     log("Hibou worker self-update installed", {
@@ -705,6 +716,7 @@ async function fetchVideoQueue() {
           Authorization: `Bearer ${REPORT_TOKEN}`,
           "X-Hibou-Worker": WORKER_ID,
           "X-Hibou-Worker-Session": state.worker_session,
+          "X-Hibou-Worker-Build": WORKER_BUILD_MARKER,
         },
         signal: controller.signal,
       },

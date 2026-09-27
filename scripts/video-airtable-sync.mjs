@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { TABLES, getRecord, updateRecord } from "../lib/airtable.js";
+import { TABLES, getRecord, queryRecords, updateRecord } from "../lib/airtable.js";
 
 function fail(message){ throw new Error(message); }
 function sha(text){ return createHash("sha256").update(String(text)).digest("hex"); }
@@ -15,6 +15,20 @@ function parseJsonArray(value){
   if(Array.isArray(value)) return value;
   if(!String(value||"").trim()) return [];
   try{ const parsed=JSON.parse(value); return Array.isArray(parsed)?parsed:[]; }catch{return [];}
+}
+
+export async function resolveCanonicalVideoProfile(contentRecord){
+  const linked=linkedIds(contentRecord?.fields?.["Profil vidéo"]);
+  if(linked.length) return getRecord(TABLES.videoProfiles,linked[0]);
+
+  const active=await queryRecords(TABLES.videoProfiles,{
+    filterByFormula:"AND({Actif}=1,{Profil}='HIBOU_VIRAL_V1')",
+    pageSize:5
+  });
+  if(active.length!==1){
+    fail(`expected exactly one active canonical HIBOU_VIRAL_V1 profile, got ${active.length}`);
+  }
+  return active[0];
 }
 
 export function buildStoryboardContract(contentRecord, sceneRecords, profileRecord=null){
@@ -69,8 +83,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       content_id:contentRecord.id,
       title:String(content.Sujet||""),
       script_version:Number(content["Version script"]||1),
-      profile_version:String(profile.Version||"HIBOU_VIRAL_V1@2.3-V4.1"),
-      method_version:"VIDEO_METHOD_V4",
+      profile_version:String(profile.Version||"HIBOU_VIRAL_V1@2.4-V4.2"),
+      method_version:"VIDEO_METHOD_V4.2",
       source:"airtable",
       exported_at:new Date().toISOString()
     },
@@ -93,9 +107,19 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
         source:"post-production"
       },
       pacing:{
-        scene_duration_target_s:[2.5,4.5],
+        scene_duration_target_s:[Number(profile["Durée min scène"]||2.8),Number(profile["Durée max scène"]||5)],
         scene_duration_allowed_s:[2.5,5.5],
-        cadence:"intonation-adaptive"
+        cadence:"intonation-adaptive",
+        perceptible_beat_s:[2,3],
+        full_composition_change_s:[3,5]
+      },
+      production_defaults:{
+        plans_min:Number(profile["Plans min"]||10),
+        plans_max:Number(profile["Plans max"]||16),
+        candidates_per_scene:Number(profile["Candidats par scène"]||2),
+        image_qc_threshold:Number(profile["Seuil QC image"]||85),
+        zoom_min_pct:Number(profile["Zoom min %"]||1.5),
+        zoom_max_pct:Number(profile["Zoom max %"]||3.5)
       }
     },
     engine:{renderer:"ffmpeg",renderer_version:"video-local-render-v1",fps:30,width:1080,height:1920,preset:"medium"},
@@ -154,8 +178,7 @@ export async function exportFromAirtable(contentId, outputPath){
   if(!ids.length) fail("Content Pipeline record has no linked Scènes vidéo");
   const scenes=[];
   for(const id of ids) scenes.push(await getRecord(TABLES.videoScenes,id));
-  const profileIds=linkedIds(content.fields?.["Profil vidéo"]);
-  const profile=profileIds.length?await getRecord(TABLES.videoProfiles,profileIds[0]):null;
+  const profile=await resolveCanonicalVideoProfile(content);
   const contract=buildStoryboardContract(content,scenes,profile);
   mkdirSync(dirname(resolve(outputPath)),{recursive:true});
   writeFileSync(resolve(outputPath),JSON.stringify(contract,null,2));

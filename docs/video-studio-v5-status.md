@@ -18,6 +18,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Reprise humaine distante | yes | yes statique (Airtable pause → fingerprint → worker local) | no | no | no |
 | Ranking image ambiguïté-aware | yes | yes (ties/near-ties => aucun faux winner machine) | no | no | no |
 | Plan de reprise après échec V1 | yes | yes CPU (diagnostic + invalidations + caches conservés, aucune exécution) | no | no | no |
+| Diagnostic worker de reprise | yes | yes statique (plan commit-pinné joint aux erreurs, aucune reprise automatique) | no | no | no |
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
 | Plan stockage durable V1 | yes | yes (plan content-addressed, aucun transfert) | no | no | no |

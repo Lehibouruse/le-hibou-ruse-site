@@ -22,6 +22,7 @@ function contract() {
       video_prosody_v1: true,
       video_music_mix_v1: true,
       video_incremental_retouch_v1: true,
+      video_human_candidate_selection_v1: true,
     },
     music: {
       reference: "music.wav",
@@ -35,6 +36,7 @@ test("readiness activates only features with both GLOBAL and runtime gates", () 
     HIBOU_VIDEO_PROSODY_V1: "false",
     HIBOU_VIDEO_MUSIC_V1: "true",
     HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1: "true",
+    HIBOU_VIDEO_HUMAN_SELECTION_V1: "true",
     HIBOU_VIDEO_CREATIVE_QC_V1: "true",
   });
 
@@ -47,6 +49,7 @@ test("readiness activates only features with both GLOBAL and runtime gates", () 
   assert.equal(report.features.video_prosody_v1.active, false);
   assert.equal(report.features.video_music_mix_v1.active, true);
   assert.equal(report.features.video_incremental_retouch_v1.active, true);
+  assert.equal(report.features.video_human_candidate_selection_v1.active, true);
   assert.equal(report.features.video_creative_qc_v1.active, false);
   assert.equal(report.warnings.some((x) =>
     x.code === "runtime_enabled_global_disabled"
@@ -106,5 +109,32 @@ test("readiness rejects unsupported contracts", () => {
   assert.throws(
     () => buildV5Readiness({ contract_version: "OTHER" }, {}),
     /HIBOU_VIDEO_CONTRACT_V1 required/,
+  );
+});
+
+
+test("human candidate selection double gate stays inactive without runtime opt-in", () => {
+  const report = buildV5Readiness(contract(), {
+    HIBOU_VIDEO_HUMAN_SELECTION_V1: "false",
+  });
+  assert.equal(
+    report.features.video_human_candidate_selection_v1.global_enabled,
+    true,
+  );
+  assert.equal(
+    report.features.video_human_candidate_selection_v1.runtime_enabled,
+    false,
+  );
+  assert.equal(
+    report.features.video_human_candidate_selection_v1.active,
+    false,
+  );
+  assert.equal(
+    report.warnings.some(
+      (x) =>
+        x.code === "global_enabled_runtime_disabled"
+        && x.feature === "video_human_candidate_selection_v1",
+    ),
+    true,
   );
 });

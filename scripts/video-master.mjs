@@ -860,6 +860,21 @@ async function main(){
   const registrySpec=resolve(root,"registry-spec.json");
   const registry=resolve(root,"artifact-registry.json");
   stage(state,"registry",()=>{
+    const selectedImageEntries=[];
+    const selectedData=existsSync(selections)?json(selections):{};
+    for(const [sceneId,pick] of Object.entries(selectedData||{})){
+      const selectedPath=String(pick?.selected||"").trim();
+      if(!selectedPath) continue;
+      const absoluteSelected=resolve(selectedPath);
+      if(!existsSync(absoluteSelected)) continue;
+      selectedImageEntries.push({
+        kind:"selected_image",
+        path:absoluteSelected,
+        scene_id:sceneId,
+        selected_candidate_id:String(pick?.selected_candidate_id||"")||null,
+        human_selected:pick?.human_selected===true
+      });
+    }
     writeJson(registrySpec,{
       schema:"HIBOU_VIDEO_ARTIFACT_REGISTRY_SPEC_V2",
       production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
@@ -873,9 +888,11 @@ async function main(){
       {kind:"contract",path:renderReady},
       {kind:"master",path:master},
       {kind:"qc",path:masterQc},
+      ...selectedImageEntries,
       ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.json"))?[{kind:"candidate_review",path:resolve(imageDir,"candidate-review.json")}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.html"))?[{kind:"candidate_review_html",path:resolve(imageDir,"candidate-review.html")}]:[]),
+      ...(existsSync(humanSelectionManifest)?[{kind:"human_selection_manifest",path:humanSelectionManifest}]:[]),
       ...(existsSync(humanReview)?[{kind:"human_review",path:humanReview}]:[]),
       ...(existsSync(reviewDiff)?[{kind:"review_diff",path:reviewDiff}]:[]),
       ...(musicEnabled&&existsSync(mastered+".manifest.json")?[{kind:"audio_mix_manifest",path:mastered+".manifest.json"}]:[]),

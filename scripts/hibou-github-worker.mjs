@@ -68,6 +68,10 @@ const CHATTERBOX_BATCH_SCRIPT =
   String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT || "").trim() ||
   path.join(PROJECT_ROOT, "scripts", "chatterbox-storyboard-batch.py");
 
+const VIDEO_PREFLIGHT_SCRIPT =
+  String(process.env.HIBOU_VIDEO_PREFLIGHT_SCRIPT || "").trim() ||
+  path.join(LOG_DIR, "video-local-preflight.runtime.mjs");
+
 const RUNTIME_REPO =
   "Lehibouruse/le-hibou-ruse-site";
 const ALLOWED_HOSTS = new Set([
@@ -432,15 +436,27 @@ async function ensureCanonicalVideoRuntimes(job) {
   if (
     state.runtime_commit === commit &&
     existsSync(VIDEO_MASTER_SCRIPT) &&
-    existsSync(CHATTERBOX_BATCH_SCRIPT)
+    existsSync(CHATTERBOX_BATCH_SCRIPT) &&
+    existsSync(VIDEO_PREFLIGHT_SCRIPT)
   ) {
     return {
       commit,
       master: VIDEO_MASTER_SCRIPT,
       voice: CHATTERBOX_BATCH_SCRIPT,
+      preflight: VIDEO_PREFLIGHT_SCRIPT,
       refreshed: false,
     };
   }
+
+  const preflight = await installPinnedRuntime(
+    commit,
+    "scripts/video-local-preflight.mjs",
+    VIDEO_PREFLIGHT_SCRIPT,
+    [
+      "HIBOU_LOCAL_PREFLIGHT_V1",
+      "pathToFileURL(resolve(process.argv[1])).href",
+    ],
+  );
 
   const master = await installPinnedRuntime(
     commit,
@@ -463,11 +479,14 @@ async function ensureCanonicalVideoRuntimes(job) {
   );
 
   state.runtime_commit = commit;
+  state.runtime_preflight_sha256 = preflight.sha256;
   state.runtime_master_sha256 = master.sha256;
   state.runtime_voice_sha256 = voice.sha256;
 
   log("VIDEO_RENDER runtimes refreshed", {
     commit,
+    preflight: preflight.path,
+    preflight_sha256: preflight.sha256,
     master: master.path,
     master_sha256: master.sha256,
     voice: voice.path,
@@ -476,6 +495,7 @@ async function ensureCanonicalVideoRuntimes(job) {
 
   return {
     commit,
+    preflight: preflight.path,
     master: master.path,
     voice: voice.path,
     refreshed: true,
@@ -948,22 +968,13 @@ async function processVideoRender(job, processed) {
     throw new Error("Invalid VIDEO_RENDER content_id");
   }
 
-  if (!existsSync(PROJECT_ROOT)) {
-    throw new Error(`HIBOU project root missing: ${PROJECT_ROOT}`);
-  }
-
   if (!existsSync(VIDEO_BINDING)) {
     throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
   }
 
   const runtime = await ensureCanonicalVideoRuntimes(job);
-  const masterScript = VIDEO_MASTER_SCRIPT;
-
-  const preflightScript = path.join(
-    PROJECT_ROOT,
-    "scripts",
-    "video-local-preflight.mjs",
-  );
+  const masterScript = runtime.master;
+  const preflightScript = runtime.preflight;
 
   if (!existsSync(masterScript)) {
     throw new Error(`video-master missing: ${masterScript}`);
@@ -1064,7 +1075,7 @@ async function processVideoRender(job, processed) {
     process.execPath,
     [preflightScript, "--require-ready"],
     {
-      cwd: PROJECT_ROOT,
+      cwd: LOG_DIR,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
@@ -1117,7 +1128,7 @@ async function processVideoRender(job, processed) {
 
   const renderStatus = await new Promise((resolveRender, rejectRender) => {
     const child = spawn(process.execPath, args, {
-      cwd: PROJECT_ROOT,
+      cwd: LOG_DIR,
       stdio: "inherit",
       windowsHide: true,
       shell: false,

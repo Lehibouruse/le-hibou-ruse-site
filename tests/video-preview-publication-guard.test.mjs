@@ -53,3 +53,31 @@ test("master result and registry spec propagate preview-only state", () => {
   assert.match(masterSource, /preview_only:String\(storyboardData\.production\?\.mode\|\|"final"\)\.toLowerCase\(\)==="preview"/);
   assert.match(masterSource, /publication_authorized:false/);
 });
+
+
+test("artifact registry preserves selected-image metadata without enabling publication", () => {
+  const root = mkdtempSync(join(tmpdir(), "hibou-registry-meta-"));
+  try {
+    const artifact = join(root, "scene.png");
+    writeFileSync(artifact, "image-bytes");
+    const registry = buildRegistry(
+      [{
+        kind: "selected_image",
+        path: artifact,
+        metadata: {
+          scene_id: "S01",
+          human_selected: true,
+          selected_candidate_id: "S01-C2",
+        },
+      }],
+      { production_mode: "final" },
+    );
+
+    assert.equal(registry.entries[0].metadata.scene_id, "S01");
+    assert.equal(registry.entries[0].metadata.human_selected, true);
+    assert.equal(registry.entries[0].publication_authorized, false);
+    assert.equal(registry.publication_authorized, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

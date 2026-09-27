@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -56,6 +56,13 @@ const VIDEO_OUTPUT_ROOT =
 const VIDEO_MASTER_SCRIPT =
   String(process.env.HIBOU_VIDEO_MASTER_SCRIPT || "").trim() ||
   path.join(PROJECT_ROOT, "scripts", "video-master.mjs");
+
+const CHATTERBOX_BATCH_SCRIPT =
+  String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT || "").trim() ||
+  path.join(PROJECT_ROOT, "scripts", "chatterbox-storyboard-batch.py");
+
+const RUNTIME_REPO =
+  "Lehibouruse/le-hibou-ruse-site";
 const ALLOWED_HOSTS = new Set([
   "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
   "instagram.com", "www.instagram.com",
@@ -167,6 +174,123 @@ function walk(dir) {
 
 function sha256(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+function normalizeRuntimeCommit(value) {
+  const commit = String(value || "").trim().toLowerCase();
+  return /^[0-9a-f]{40}$/.test(commit) ? commit : null;
+}
+
+function assertRuntimeTarget(target, label) {
+  const root = path.resolve(LOG_DIR) + path.sep;
+  const resolved = path.resolve(target);
+  if (!resolved.startsWith(root)) {
+    throw new Error(
+      `${label} runtime target must stay inside ${LOG_DIR}: ${resolved}`,
+    );
+  }
+  return resolved;
+}
+
+async function installPinnedRuntime(commit, repoPath, target, markers) {
+  const resolved = assertRuntimeTarget(target, repoPath);
+  const url =
+    `https://raw.githubusercontent.com/${RUNTIME_REPO}/${commit}/${repoPath}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Runtime download HTTP ${response.status}: ${repoPath}@${commit}`,
+      );
+    }
+
+    const source = await response.text();
+    for (const marker of markers) {
+      if (!source.includes(marker)) {
+        throw new Error(
+          `Runtime marker missing for ${repoPath}@${commit}: ${marker}`,
+        );
+      }
+    }
+
+    mkdirSync(path.dirname(resolved), { recursive: true });
+    const temp = `${resolved}.tmp-${process.pid}`;
+    writeFileSync(temp, source, "utf8");
+    renameSync(temp, resolved);
+    return { path: resolved, sha256: sha256(resolved) };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function ensureCanonicalVideoRuntimes(job) {
+  const commit = normalizeRuntimeCommit(job?.runtime_commit);
+  if (!commit) {
+    throw new Error("VIDEO_RENDER runtime_commit missing or invalid");
+  }
+
+  if (
+    state.runtime_commit === commit &&
+    existsSync(VIDEO_MASTER_SCRIPT) &&
+    existsSync(CHATTERBOX_BATCH_SCRIPT)
+  ) {
+    return {
+      commit,
+      master: VIDEO_MASTER_SCRIPT,
+      voice: CHATTERBOX_BATCH_SCRIPT,
+      refreshed: false,
+    };
+  }
+
+  const master = await installPinnedRuntime(
+    commit,
+    "scripts/video-master.mjs",
+    VIDEO_MASTER_SCRIPT,
+    [
+      "pathToFileURL(resolve(process.argv[1])).href",
+      "--- error tail ---",
+    ],
+  );
+
+  const voice = await installPinnedRuntime(
+    commit,
+    "scripts/chatterbox-storyboard-batch.py",
+    CHATTERBOX_BATCH_SCRIPT,
+    [
+      "inspect.signature(ChatterboxMultilingualTTS.from_pretrained)",
+      "HIBOU_CHATTERBOX_LOAD_ROOT_CAUSE",
+    ],
+  );
+
+  state.runtime_commit = commit;
+  state.runtime_master_sha256 = master.sha256;
+  state.runtime_voice_sha256 = voice.sha256;
+
+  log("VIDEO_RENDER runtimes refreshed", {
+    commit,
+    master: master.path,
+    master_sha256: master.sha256,
+    voice: voice.path,
+    voice_sha256: voice.sha256,
+  });
+
+  return {
+    commit,
+    master: master.path,
+    voice: voice.path,
+    refreshed: true,
+  };
 }
 
 function stableStoryboard(value) {
@@ -601,6 +725,7 @@ async function processVideoRender(job, processed) {
     throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
   }
 
+  const runtime = await ensureCanonicalVideoRuntimes(job);
   const masterScript = VIDEO_MASTER_SCRIPT;
 
   const preflightScript = path.join(
@@ -696,6 +821,8 @@ async function processVideoRender(job, processed) {
     content_id: contentId,
     dir,
     binding: VIDEO_BINDING,
+    runtime_commit: runtime.commit,
+    runtime_refreshed: runtime.refreshed,
   });
 
   await reportVideoProgress(job, "Running", {
@@ -801,6 +928,9 @@ async function processVideoRender(job, processed) {
     master_bytes: masterStat.size,
     human_review_required: true,
     publication_authorized: false,
+    runtime_commit: runtime.commit,
+    runtime_master_sha256: state.runtime_master_sha256 || "",
+    runtime_voice_sha256: state.runtime_voice_sha256 || "",
     completed_at: new Date().toISOString(),
   };
 
@@ -1042,6 +1172,11 @@ function healthServer() {
       video_output_root: VIDEO_OUTPUT_ROOT,
       video_master_script: VIDEO_MASTER_SCRIPT,
       video_master_script_exists: existsSync(VIDEO_MASTER_SCRIPT),
+      chatterbox_batch_script: CHATTERBOX_BATCH_SCRIPT,
+      chatterbox_batch_script_exists: existsSync(CHATTERBOX_BATCH_SCRIPT),
+      runtime_commit: state.runtime_commit || null,
+      runtime_master_sha256: state.runtime_master_sha256 || null,
+      runtime_voice_sha256: state.runtime_voice_sha256 || null,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

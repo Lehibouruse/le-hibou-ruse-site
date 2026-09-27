@@ -7,12 +7,14 @@ const promote=readFileSync(new URL("../scripts/video-storyboard-promote.mjs",imp
 
 test("V5 execution needs both GLOBAL contract feature and local runtime gate",()=>{
  assert.match(master,/contract\?\.features\?\.\[name\]===true && envFlag\(envName\)/);
- for(const name of ["HIBOU_VIDEO_TIMELINE_V1","HIBOU_VIDEO_PROSODY_V1","HIBOU_VIDEO_MUSIC_V1","HIBOU_VIDEO_CREATIVE_QC_V1","HIBOU_VIDEO_POSE_REGISTRY_V1"]) assert.match(master,new RegExp(name));
+ for(const name of ["HIBOU_VIDEO_TIMELINE_V1","HIBOU_VIDEO_PROSODY_V1","HIBOU_VIDEO_MUSIC_V1","HIBOU_VIDEO_CREATIVE_QC_V1","HIBOU_VIDEO_POSE_REGISTRY_V1","HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1"]) assert.match(master,new RegExp(name));
 });
 
 test("Airtable export separates GLOBAL feature/music configuration from scene-specific events",()=>{
  assert.match(sync,/features:\{/);
  assert.match(sync,/video_pose_registry_v1/);
+ assert.match(sync,/video_incremental_retouch_v1/);
+ assert.match(sync,/Mode production par défaut/);
  assert.match(sync,/Timeline JSON/);
  assert.match(sync,/Prosodie JSON/);
  assert.match(sync,/Pose Hibou/);
@@ -36,4 +38,12 @@ test("scene timeline cannot override a disabled GLOBAL timeline feature",()=>{
  assert.match(master,/delete scene\.timeline/);
  assert.match(master,/video_timeline_v1","HIBOU_VIDEO_TIMELINE_V1/);
  assert.match(master,/stripped_scene_count/);
+});
+
+
+test("incremental reuse is opt-in, commit-pinned and never authorizes publication",()=>{
+ assert.match(master,/video-iteration-plan\.mjs/);
+ assert.match(master,/--reuse-from requires GLOBAL video_incremental_retouch_v1/);
+ assert.match(master,/seedIncrementalCaches/);
+ assert.match(master,/publication_authorized:false/);
 });

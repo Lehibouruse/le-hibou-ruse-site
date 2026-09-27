@@ -35,6 +35,10 @@ function pythonCommand(){
   if(process.platform==="win32") return {cmd:"py",prefix:["-3.11"]};
   return {cmd:"python3.11",prefix:[]};
 }
+function chatterboxBatchScript(){
+  const explicit=String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT||"").trim();
+  return explicit?resolve(explicit):resolve("scripts/chatterbox-storyboard-batch.py");
+}
 function ensureSameRun(statePath,inputs){
   if(!existsSync(statePath)) return;
   const old=json(statePath);
@@ -152,7 +156,9 @@ async function main(){
   const rawVoice=resolve(voiceDir,"voice-master.wav");
   stage(state,"voice",()=>{
     const py=pythonCommand();
-    run(py.cmd,[...py.prefix,resolve("scripts/chatterbox-storyboard-batch.py"),storyboard,voiceDir]);
+    const voiceScript=chatterboxBatchScript();
+    if(!existsSync(voiceScript)) fail("chatterbox batch script missing: "+voiceScript);
+    run(py.cmd,[...py.prefix,voiceScript,storyboard,voiceDir]);
     if(!existsSync(voiceReady)||!existsSync(rawVoice)) fail("voice outputs missing");
   });
 

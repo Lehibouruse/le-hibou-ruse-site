@@ -90,6 +90,18 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         selected_sha256:sha256(target),
       };
     }
+    scene.composition={
+      ...(scene.composition||{}),
+      brand_signature:{
+        text:String(contract?.creative?.branding?.text||"Le Hibou Rusé"),
+        anchor:String(contract?.creative?.branding?.position||"bottom-center"),
+        font_size:28,
+        font_color:"#172331",
+        offset_y:150,
+        z:95
+      }
+    };
+
     const canonicalCharacter=String(contract?.creative?.reference_image_local||"").trim();
     if(canonicalCharacter && scene?.framing?.hibou){
       scene.composition={

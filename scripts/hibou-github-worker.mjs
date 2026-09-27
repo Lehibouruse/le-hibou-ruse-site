@@ -31,6 +31,15 @@ const VIDEO_RENDER_ENABLED =
     .trim()
     .toLowerCase() === "true";
 
+const VIDEO_REMOTE_CANCEL_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_CANCEL_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
+const VIDEO_CANCEL_GRACE_MS = Math.max(
+  1000,
+  Math.min(30000, Number(process.env.HIBOU_VIDEO_CANCEL_GRACE_MS || 5000)),
+);
+
 const WORKER_SELF_UPDATE_SCHEMA = "HIBOU_GITHUB_WORKER_SELF_UPDATE_V1";
 const WORKER_SELF_UPDATE_ENABLED =
   String(process.env.HIBOU_WORKER_SELF_UPDATE_ENABLED || "true")
@@ -699,6 +708,101 @@ async function fetchVideoQueue() {
   }
 }
 
+async function fetchVideoControl(jobId) {
+  if (!VIDEO_REMOTE_CANCEL_ENABLED || !REPORT_TOKEN) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const separator = VIDEO_QUEUE_URL.includes("?") ? "&" : "?";
+    const response = await fetch(
+      `${VIDEO_QUEUE_URL}${separator}control_job_id=${encodeURIComponent(jobId)}&t=${Date.now()}`,
+      {
+        headers: {
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+          Authorization: `Bearer ${REPORT_TOKEN}`,
+          "X-Hibou-Worker": WORKER_ID,
+          "X-Hibou-Worker-Session": state.worker_session,
+        },
+        signal: controller.signal,
+      },
+    );
+    if (!response.ok) throw new Error(`Video control HTTP ${response.status}`);
+    const data = await response.json();
+    const controls = Array.isArray(data?.controls) ? data.controls : [];
+    return controls.find((control) =>
+      control?.job_id === jobId
+      && ["cancel_requested", "supersede_requested"].includes(control?.state)
+    ) || null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function cancellationMatchesOwnedChild(job, child, control) {
+  if (!VIDEO_REMOTE_CANCEL_ENABLED || !job?.id || !child?.pid || !control) return false;
+  if (String(control.job_id || "") !== String(job.id)) return false;
+  if (state.current_job !== job.id || Number(state.render_pid) !== Number(child.pid)) return false;
+  const expectedSession = String(control.expected_worker_session || "").trim();
+  if (expectedSession && expectedSession !== state.worker_session) return false;
+  const expectedWorker = String(control.expected_worker || "").trim();
+  if (expectedWorker && expectedWorker !== WORKER_ID) return false;
+  return child.exitCode === null;
+}
+
+async function terminateOwnedRender(job, child, control) {
+  if (!cancellationMatchesOwnedChild(job, child, control)) {
+    return { terminated: false, reason: "scope_mismatch" };
+  }
+  const pid = Number(child.pid);
+  state.cancel_request = {
+    job_id: job.id,
+    request_id: String(control.request_id || ""),
+    state: control.state,
+    render_pid: pid,
+    requested_at: control.requested_at || null,
+  };
+  log("VIDEO_RENDER cancellation accepted", state.cancel_request);
+
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(pid), "/T"], {
+      encoding: "utf8", windowsHide: true, shell: false,
+    });
+  } else {
+    try { child.kill("SIGTERM"); } catch {}
+  }
+
+  const deadline = Date.now() + VIDEO_CANCEL_GRACE_MS;
+  while (Date.now() < deadline && child.exitCode === null && pidAlive(pid)) {
+    await sleep(200);
+  }
+
+  let forced = false;
+  if (
+    child.exitCode === null
+    && pidAlive(pid)
+    && state.current_job === job.id
+    && Number(state.render_pid) === pid
+  ) {
+    forced = true;
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+        encoding: "utf8", windowsHide: true, shell: false,
+      });
+    } else {
+      try { child.kill("SIGKILL"); } catch {}
+    }
+  }
+
+  return {
+    terminated: true,
+    forced,
+    job_id: job.id,
+    render_pid: pid,
+    request_id: String(control.request_id || ""),
+    state: control.state,
+  };
+}
+
 async function reportVideoProgress(job, status, data = {}) {
   if (!REPORT_TOKEN) {
     throw new Error("HIBOU_LOCAL_REPORT_TOKEN missing for VIDEO_RENDER report");
@@ -1111,7 +1215,7 @@ async function processVideoRender(job, processed) {
     args.push(`--asset-graph=${assetGraphPath}`);
   }
 
-  const renderStatus = await new Promise((resolveRender, rejectRender) => {
+  const renderOutcome = await new Promise((resolveRender, rejectRender) => {
     const child = spawn(process.execPath, args, {
       cwd: PROJECT_ROOT,
       stdio: "inherit",
@@ -1138,7 +1242,7 @@ async function processVideoRender(job, processed) {
           worker_session: state.worker_session,
           worker_pid: process.pid,
           render_pid: child.pid || null,
-          current_stage: progress.current_stage,
+          current_stage: state.cancel_request ? "cancelling" : progress.current_stage,
           completed_stages: progress.completed_stages,
           failed_stages: progress.failed_stages,
         },
@@ -1150,24 +1254,93 @@ async function processVideoRender(job, processed) {
       });
     }, 30000);
 
+    let cancellation = null;
+    let cancellationCheckInFlight = false;
+    const controls = setInterval(async () => {
+      if (!VIDEO_REMOTE_CANCEL_ENABLED || cancellation || cancellationCheckInFlight) return;
+      cancellationCheckInFlight = true;
+      try {
+        const control = await fetchVideoControl(job.id);
+        if (control && cancellationMatchesOwnedChild(job, child, control)) {
+          cancellation = {
+            control,
+            termination: await terminateOwnedRender(job, child, control),
+          };
+        }
+      } catch (error) {
+        log("VIDEO_RENDER control check failed", {
+          job: job.id,
+          error: String(error?.message || error).slice(0, 1000),
+        });
+      } finally {
+        cancellationCheckInFlight = false;
+      }
+    }, 5000);
+
     child.once("error", (error) => {
       clearInterval(heartbeat);
+      clearInterval(controls);
       state.render_pid = null;
       state.render_started_at = null;
       rejectRender(error);
     });
     child.once("exit", (code, signal) => {
       clearInterval(heartbeat);
+      clearInterval(controls);
       state.render_pid = null;
       state.render_started_at = null;
+      if (cancellation) {
+        resolveRender({ code: Number(code ?? 1), signal: signal || null, cancellation });
+        return;
+      }
       if (signal) {
         rejectRender(new Error(`video-master terminated by signal ${signal}`));
         return;
       }
-      resolveRender(Number(code ?? 1));
+      resolveRender({ code: Number(code ?? 1), signal: null, cancellation: null });
     });
   });
 
+  if (renderOutcome.cancellation) {
+    const control = renderOutcome.cancellation.control;
+    const finalStatus = control.state === "supersede_requested" ? "Superseded" : "Cancelled";
+    const result = {
+      schema: "HIBOU_VIDEO_RENDER_CANCELLATION_V1",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      request_id: String(control.request_id || ""),
+      requested_state: control.state,
+      termination: renderOutcome.cancellation.termination,
+      cancelled_at: new Date().toISOString(),
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    };
+    writeFileSync(
+      path.join(dir, "_hibou_video_cancelled.json"),
+      JSON.stringify(result, null, 2) + "\n",
+      "utf8",
+    );
+    await reportVideoProgress(job, finalStatus, { local_path: dir, result });
+    processed.add(job.id);
+    saveProcessed(processed);
+    const failedJobs = loadFailedJobs();
+    delete failedJobs[job.id];
+    saveFailedJobs(failedJobs);
+    state.current_job = null;
+    state.cancel_request = null;
+    log("VIDEO_RENDER cancellation completed", {
+      job: job.id,
+      status: finalStatus,
+      request_id: result.request_id,
+      forced: Boolean(result.termination?.forced),
+    });
+    return;
+  }
+
+  const renderStatus = Number(renderOutcome.code ?? 1);
   if (renderStatus !== 0) {
     const detail = pipelineFailureDetail(dir);
     throw new Error(
@@ -1437,6 +1610,9 @@ function healthServer() {
       report_token_present: Boolean(REPORT_TOKEN),
       video_queue_url: VIDEO_QUEUE_URL,
       video_render_enabled: VIDEO_RENDER_ENABLED,
+      video_remote_cancel_enabled: VIDEO_REMOTE_CANCEL_ENABLED,
+      video_cancel_grace_ms: VIDEO_CANCEL_GRACE_MS,
+      cancel_request: state.cancel_request || null,
       video_autostart_comfyui: VIDEO_AUTOSTART_COMFYUI,
       video_project_root: PROJECT_ROOT,
       video_binding: VIDEO_BINDING,

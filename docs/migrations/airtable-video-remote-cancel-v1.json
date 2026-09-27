@@ -1,0 +1,40 @@
+{
+  "schema": "HIBOU_AIRTABLE_MIGRATION_PLAN_V1",
+  "id": "video-remote-cancel-v1",
+  "applied": false,
+  "table": "Jobs/Commandes / Local Worker Queue (TABLES.localWorkerQueue)",
+  "changes": [
+    {
+      "field": "Statut",
+      "type": "singleSelect",
+      "add_choices": [
+        "Cancel requested",
+        "Cancelled",
+        "Superseded"
+      ],
+      "required_for_full_ui": true
+    },
+    {
+      "field": "Options JSON",
+      "type": "longText",
+      "existing": true,
+      "control_keys": {
+        "control_state": [
+          "cancel_requested",
+          "supersede_requested"
+        ],
+        "control_request_id": "unique idempotency token",
+        "control_requested_at": "ISO-8601",
+        "control_reason": "optional human reason",
+        "superseded_by": "optional replacement job record id"
+      }
+    }
+  ],
+  "feature_flag": "HIBOU_VIDEO_REMOTE_CANCEL_ENABLED",
+  "rollout": "Do not apply while a production render is active. Add select choices first, deploy code with flag false, then enable only after idle E2E.",
+  "notes": [
+    "No existing record must be rewritten by this migration.",
+    "Result JSON heartbeat already supplies worker_session and render_pid for ownership checks.",
+    "Publication authorization remains false."
+  ]
+}

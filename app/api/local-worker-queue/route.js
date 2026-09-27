@@ -17,7 +17,11 @@ const RUNTIME_COMMIT = /^[0-9a-f]{40}$/i.test(
   ? String(process.env.VERCEL_GIT_COMMIT_SHA).toLowerCase()
   : null;
 
-const ALLOWED_STATUS = new Set(["Running", "Completed", "Error"]);
+const ALLOWED_STATUS = new Set(["Running", "Completed", "Error", "Cancelled", "Superseded"]);
+const REMOTE_CANCEL_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_CANCEL_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
 const MAX_BODY_BYTES = 20_000;
 
 function safeEqual(a, b) {
@@ -124,7 +128,7 @@ function parseJsonObject(value) {
 }
 
 async function activeVideoJobs() {
-  const [pending, running] = await Promise.all([
+  const requests = [
     queryRecords(TABLES.localWorkerQueue, {
       filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
       pageSize: 10,
@@ -133,8 +137,50 @@ async function activeVideoJobs() {
       filterByFormula: "AND({Statut}='Running',{Type}='VIDEO_RENDER')",
       pageSize: 10,
     }),
-  ]);
-  return [...pending, ...running];
+  ];
+  if (REMOTE_CANCEL_ENABLED) {
+    requests.push(queryRecords(TABLES.localWorkerQueue, {
+      filterByFormula: "AND(OR({Statut}='Cancel requested',{Statut}='Superseded'),{Type}='VIDEO_RENDER')",
+      pageSize: 10,
+    }));
+  }
+  const groups = await Promise.all(requests);
+  return groups.flat();
+}
+
+async function videoControls() {
+  if (!REMOTE_CANCEL_ENABLED) return [];
+  const records = await queryRecords(TABLES.localWorkerQueue, {
+    filterByFormula: "AND(OR({Statut}='Running',{Statut}='Cancel requested',{Statut}='Superseded'),{Type}='VIDEO_RENDER')",
+    pageSize: 50,
+  });
+  const controls = [];
+  for (const record of records) {
+    const status = selectName(record.fields?.Statut);
+    const options = parseOptions(record.fields?.["Options JSON"]);
+    const controlState = String(options.control_state || "").toLowerCase();
+    let state = null;
+    if (status === "Cancel requested" || controlState === "cancel_requested") {
+      state = "cancel_requested";
+    } else if (status === "Superseded" || controlState === "supersede_requested") {
+      state = "supersede_requested";
+    }
+    if (!state) continue;
+    const heartbeat = parseJsonObject(record.fields?.["Résultat JSON"]);
+    controls.push({
+      schema: "HIBOU_VIDEO_RENDER_CONTROL_V1",
+      job_id: record.id,
+      state,
+      request_id: cut(options.control_request_id || `${record.id}:${state}`, 240),
+      requested_at: cut(options.control_requested_at || "", 80) || null,
+      reason: cut(options.control_reason || "", 1000),
+      superseded_by: cut(options.superseded_by || "", 120) || null,
+      expected_worker: cut(heartbeat.worker || record.fields?.Worker || "", 180),
+      expected_worker_session: cut(heartbeat.worker_session || "", 240),
+      publication_authorized: false,
+    });
+  }
+  return controls;
 }
 
 function workerSession(request) {
@@ -401,6 +447,8 @@ export async function GET(request) {
     const reconciliation = await reconcileStaleRunning(request);
     const auto_activation = await autoActivateWhenWorkerReady(request);
 
+    const controls = await videoControls();
+
     const pendingRecords = await queryRecords(TABLES.localWorkerQueue, {
       filterByFormula: "AND({Statut}='Pending',{Type}='VIDEO_RENDER')",
       pageSize: 50,
@@ -531,6 +579,8 @@ export async function GET(request) {
       ok: true,
       schema: "HIBOU_VIDEO_RENDER_QUEUE_V2",
       jobs,
+      controls,
+      remote_cancel_enabled: REMOTE_CANCEL_ENABLED,
       runtime_commit: RUNTIME_COMMIT,
       reconciliation,
       auto_activation,
@@ -589,6 +639,16 @@ export async function POST(request) {
       return NextResponse.json(
         { ok: false, error: "status_not_allowed" },
         { status: 400 },
+      );
+    }
+
+    if (
+      ["Cancelled", "Superseded"].includes(status)
+      && !REMOTE_CANCEL_ENABLED
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "remote_cancel_disabled" },
+        { status: 409 },
       );
     }
 
@@ -660,6 +720,8 @@ export async function POST(request) {
 
     if (
       status === "Completed"
+      || status === "Cancelled"
+      || status === "Superseded"
       || (status === "Error" && !retry.retry)
     ) {
       fields["Termin\u00e9 le"] = now;

@@ -247,3 +247,25 @@ test("explicit repair start is auditable and still preserves caches/publication 
   assert.match(worker, /human_review_required: true/);
   assert.match(worker, /publication_authorized: false/);
 });
+
+
+test("explicit repair start request is consumed only after hash-bound Running proof", () => {
+  assert.match(worker, /repairStartApplied\s*\? \{ result: repairStartApplied \}/);
+  assert.match(route, /const repairStartAccepted =/);
+  assert.match(route, /status === "Running"/);
+  assert.match(route, /body\.heartbeat !== true/);
+  assert.match(route, /HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1/);
+  assert.match(route, /repair_start_request_missing_at_acceptance/);
+  assert.match(route, /repair_start_acceptance_hash_mismatch:/);
+  assert.match(route, /repair_start_request: null/);
+  assert.match(route, /repair_start_consumed_at: now/);
+  assert.match(route, /repair_start_accepted: repairStartAccepted/);
+});
+
+test("repair start acceptance revalidates all four immutable proofs", () => {
+  assert.match(route, /\["plan_sha256", "plan_sha256"\]/);
+  assert.match(route, /\["source_state_sha256", "source_state_sha256"\]/);
+  assert.match(route, /\["receipt_sha256", "receipt_sha256"\]/);
+  assert.match(route, /\["state_file_sha256", "prepared_state_sha256"\]/);
+  assert.match(route, /expected !== actual/);
+});

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -43,6 +43,7 @@ function chatterboxBatchScript(){
 
 const PRE_IMAGE_RUNTIME_FILES=[
   ["video-audio-master.mjs","masterAudio"],
+  ["video-audio-qc.mjs","HIBOU_AUDIO_QC_V1"],
   ["video-attach-mastered-audio.mjs","attachMasteredAudio"],
   ["video-subtitles.mjs","buildAss"],
   ["video-attach-subtitles.mjs","attachSubtitles"],
@@ -73,6 +74,7 @@ async function ensurePreImageRuntimeBundle(commit){
   }
   return {
     audioMaster:resolve(localBase,"video-audio-master.mjs"),
+    audioQc:resolve(localBase,"video-audio-qc.mjs"),
     attachAudio:resolve(localBase,"video-attach-mastered-audio.mjs"),
     subtitles:resolve(localBase,"video-subtitles.mjs"),
     attachSubtitles:resolve(localBase,"video-attach-subtitles.mjs"),
@@ -185,24 +187,62 @@ export function buildTechnicalSelections(provisional){
   if(!Object.keys(out).length) fail("no technical selections available");
   return out;
 }
+function healthyFile(path){
+  try{return existsSync(resolve(path))&&statSync(resolve(path)).isFile()&&statSync(resolve(path)).size>0;}
+  catch{return false;}
+}
+function invalidatePassIfMissing(state,name,paths){
+  if(state.stages[name]?.status!=="PASS") return false;
+  const missing=(paths||[]).filter(path=>!healthyFile(path));
+  if(!missing.length) return false;
+  state.stages[name]={
+    status:"STALE",
+    invalidated_at:new Date().toISOString(),
+    reason:"expected_artifact_missing_or_empty",
+    missing
+  };
+  state.updated_at=new Date().toISOString();
+  writeJson(state.path,state);
+  return true;
+}
 function stage(state,name,fn){
   if(state.stages[name]?.status==="PASS") return false;
-  state.stages[name]={status:"RUNNING",started_at:new Date().toISOString()};
+  const previous=state.stages[name]||{};
+  const attempt=Number(previous.attempt||0)+1;
+  const startedAt=new Date().toISOString();
+  state.stages[name]={status:"RUNNING",started_at:startedAt,attempt};
+  state.current_stage=name;
+  state.updated_at=startedAt;
   writeJson(state.path,state);
   try{
     fn();
-    state.stages[name]={status:"PASS",finished_at:new Date().toISOString()};
+    const finishedAt=new Date().toISOString();
+    state.stages[name]={
+      status:"PASS",
+      started_at:startedAt,
+      finished_at:finishedAt,
+      attempt,
+      duration_ms:Date.parse(finishedAt)-Date.parse(startedAt)
+    };
+    state.current_stage=null;
+    state.updated_at=finishedAt;
     writeJson(state.path,state);
     return true;
   }catch(error){
     const fullError=String(error?.stack||error?.message||error);
     const head=fullError.slice(0,1200);
     const tail=fullError.length>1200?fullError.slice(-6800):"";
+    const finishedAt=new Date().toISOString();
     state.stages[name]={
       status:"ERROR",
-      finished_at:new Date().toISOString(),
+      started_at:startedAt,
+      finished_at:finishedAt,
+      attempt,
+      duration_ms:Date.parse(finishedAt)-Date.parse(startedAt),
       error:tail?head+"\n--- error tail ---\n"+tail:head
     };
+    state.current_stage=name;
+    state.updated_at=finishedAt;
     writeJson(state.path,state);
     throw error;
   }
@@ -252,11 +292,12 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","voice","audio_master","subtitles","style","asset_resolution","images","technical_selection","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","voice","audio_master","audio_qc","subtitles","style","asset_resolution","images","technical_selection","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
 
+  invalidatePassIfMissing(state,"storyboard",[storyboard]);
   stage(state,"storyboard",()=>{
     if(contentId){
       run(process.execPath,[resolve("scripts/video-airtable-sync.mjs"),"export",contentId,storyboard]);
@@ -276,6 +317,7 @@ async function main(){
   const voiceDir=resolve(root,"voice");
   const voiceReady=resolve(voiceDir,"contract-audio-ready.json");
   const rawVoice=resolve(voiceDir,"voice-master.wav");
+  invalidatePassIfMissing(state,"voice",[voiceReady,rawVoice]);
   stage(state,"voice",()=>{
     const py=pythonCommand();
     const voiceScript=chatterboxBatchScript();
@@ -286,25 +328,45 @@ async function main(){
 
   const mastered=resolve(voiceDir,"voice-mastered.wav");
   const masteredContract=resolve(root,"contract-mastered.json");
+  invalidatePassIfMissing(state,"audio_master",[mastered,masteredContract]);
   stage(state,"audio_master",()=>{
     run(process.execPath,[preRuntime.audioMaster,rawVoice,mastered]);
     run(process.execPath,[preRuntime.attachAudio,voiceReady,mastered,masteredContract]);
   });
 
+  const audioQc=resolve(voiceDir,"audio-qc.json");
+  invalidatePassIfMissing(state,"audio_qc",[audioQc]);
+  stage(state,"audio_qc",()=>{
+    run(process.execPath,[preRuntime.audioQc,mastered,audioQc,masteredContract]);
+    const qc=json(audioQc);
+    state.audio_qc_status=qc.status;
+    state.audio_qc_summary={
+      words_per_minute:qc.words_per_minute??null,
+      integrated_lufs:qc.loudness?.input_i??null,
+      true_peak_dbtp:qc.loudness?.input_tp??null,
+      max_silence_s:qc.max_silence_s??null,
+      warnings:qc.warnings||[]
+    };
+    writeJson(statePath,state);
+  });
+
   const ass=resolve(root,"subtitles.ass");
   const captioned=resolve(root,"contract-captioned.json");
+  invalidatePassIfMissing(state,"subtitles",[ass,captioned]);
   stage(state,"subtitles",()=>{
     run(process.execPath,[preRuntime.subtitles,masteredContract,ass]);
     run(process.execPath,[preRuntime.attachSubtitles,masteredContract,ass,captioned]);
   });
 
   const styled=resolve(root,"contract-styled.json");
+  invalidatePassIfMissing(state,"style",[styled]);
   stage(state,"style",()=>{
     if(styleArg) run(process.execPath,[preRuntime.style,captioned,resolve(styleArg),styled]);
     else writeJson(styled,json(captioned));
   });
 
   const assetResolved=resolve(root,"contract-assets-resolved.json");
+  invalidatePassIfMissing(state,"asset_resolution",[assetResolved]);
   stage(state,"asset_resolution",()=>{
     if(assetGraphArg){
       run(process.execPath,[preRuntime.assetResolve,styled,resolve(assetGraphArg),assetResolved]);
@@ -324,6 +386,7 @@ async function main(){
   const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
   const postRuntime=await ensurePostRuntimeBundle(runtimeCommit);
   const imageDir=resolve(root,"images");
+  invalidatePassIfMissing(state,"images",[resolve(imageDir,"factory-run.json"),resolve(imageDir,"selections.provisional.json")]);
   stage(state,"images",()=>{
     run(process.execPath,[
       imageFactoryScript,
@@ -342,6 +405,7 @@ async function main(){
   });
 
   const selections=resolve(imageDir,"selections.json");
+  invalidatePassIfMissing(state,"technical_selection",[selections]);
   stage(state,"technical_selection",()=>{
     const provisional=json(resolve(imageDir,"selections.provisional.json"));
     if(Object.keys(provisional||{}).length===0){
@@ -352,16 +416,19 @@ async function main(){
   });
 
   const renderReady=resolve(root,"render-ready.json");
+  invalidatePassIfMissing(state,"promotion",[renderReady]);
   stage(state,"promotion",()=>{
     run(process.execPath,[postRuntime.promote,assetResolved,selections,renderReady]);
   });
 
   const master=resolve(root,"master.mp4");
+  invalidatePassIfMissing(state,"render",[master,master+".manifest.json"]);
   stage(state,"render",()=>{
     run(process.execPath,[postRuntime.render,renderReady,master]);
   });
 
   const masterQc=resolve(root,"master-qc.json");
+  invalidatePassIfMissing(state,"master_qc",[masterQc]);
   stage(state,"master_qc",()=>{
     run(process.execPath,[postRuntime.masterQc,master,masterQc]);
     const qc=json(masterQc);
@@ -373,10 +440,22 @@ async function main(){
 
   const registrySpec=resolve(root,"registry-spec.json");
   const registry=resolve(root,"artifact-registry.json");
+  invalidatePassIfMissing(state,"registry",[registry]);
   stage(state,"registry",()=>{
-    writeJson(registrySpec,{entries:[
+    writeJson(registrySpec,{
+      metadata:{
+        schema:"HIBOU_VIDEO_RENDER_PROVENANCE_V1",
+        runtime_commit:runtimeCommit,
+        pipeline_schema:state.schema,
+        audio_qc_status:state.audio_qc_status||null,
+        master_qc_status:state.master_qc_status||null,
+        publication_authorized:false,
+        human_master_review_required:true
+      },
+      entries:[
       {kind:"storyboard",path:storyboard},
       {kind:"audio",path:mastered},
+      {kind:"audio_qc",path:audioQc},
       {kind:"subtitles",path:ass},
       {kind:"asset_resolved_contract",path:assetResolved},
       {kind:"contract",path:renderReady},

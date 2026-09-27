@@ -31,7 +31,10 @@ test("queue API exposes explicit controls only behind the feature flag",()=>{
   assert.match(route,/HIBOU_VIDEO_REMOTE_CANCEL_ENABLED/);
   assert.match(route,/HIBOU_VIDEO_RENDER_CONTROL_V1/);
   assert.match(route,/Cancel requested/);
+  assert.match(route,/Supersede requested/);
   assert.match(route,/cancel_requested/);
+  assert.match(route,/supersede_requested/);
+  assert.doesNotMatch(route,/OR\(\{Statut\}='Cancel requested',\{Statut\}='Superseded'\)/);
   assert.match(route,/remote_cancel_enabled/);
   assert.match(route,/remote_cancel_disabled/);
 });

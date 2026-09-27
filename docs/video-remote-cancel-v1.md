@@ -2,7 +2,7 @@
 
 Feature flag : `HIBOU_VIDEO_REMOTE_CANCEL_ENABLED=true`, **désactivé par défaut**.
 
-Le protocole accepte soit un statut Airtable `Cancel requested` / `Superseded`, soit `Options JSON.control_state=cancel_requested|supersede_requested`. L'API expose un contrôle signé par les informations du heartbeat courant.
+Le protocole accepte soit un statut Airtable `Cancel requested` / `Supersede requested`, soit `Options JSON.control_state=cancel_requested|supersede_requested`. L'API expose un contrôle signé par les informations du heartbeat courant.
 
 Le worker n'agit que si quatre éléments concordent : `job_id`, `worker`, `worker_session` et PID enfant actuellement détenu. Il n'exécute jamais un kill générique par nom de processus.
 

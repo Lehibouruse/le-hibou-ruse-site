@@ -9,6 +9,7 @@
       "type": "singleSelect",
       "add_choices": [
         "Cancel requested",
+        "Supersede requested",
         "Cancelled",
         "Superseded"
       ],

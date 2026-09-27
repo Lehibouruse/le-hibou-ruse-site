@@ -140,7 +140,7 @@ async function activeVideoJobs() {
   ];
   if (REMOTE_CANCEL_ENABLED) {
     requests.push(queryRecords(TABLES.localWorkerQueue, {
-      filterByFormula: "AND(OR({Statut}='Cancel requested',{Statut}='Superseded'),{Type}='VIDEO_RENDER')",
+      filterByFormula: "AND(OR({Statut}='Cancel requested',{Statut}='Supersede requested'),{Type}='VIDEO_RENDER')",
       pageSize: 10,
     }));
   }
@@ -151,7 +151,7 @@ async function activeVideoJobs() {
 async function videoControls() {
   if (!REMOTE_CANCEL_ENABLED) return [];
   const records = await queryRecords(TABLES.localWorkerQueue, {
-    filterByFormula: "AND(OR({Statut}='Running',{Statut}='Cancel requested',{Statut}='Superseded'),{Type}='VIDEO_RENDER')",
+    filterByFormula: "AND(OR({Statut}='Running',{Statut}='Cancel requested',{Statut}='Supersede requested'),{Type}='VIDEO_RENDER')",
     pageSize: 50,
   });
   const controls = [];
@@ -162,7 +162,7 @@ async function videoControls() {
     let state = null;
     if (status === "Cancel requested" || controlState === "cancel_requested") {
       state = "cancel_requested";
-    } else if (status === "Superseded" || controlState === "supersede_requested") {
+    } else if (status === "Supersede requested" || controlState === "supersede_requested") {
       state = "supersede_requested";
     }
     if (!state) continue;

@@ -35,7 +35,7 @@ No active Airtable profile or running job is modified by this code. The Airtable
 
 The authenticated Airtable video queue can request a lightweight run with `preview_mode=true`. The queue forces one candidate per scene in preview and the worker forwards the bounded execution policy to the local master as `--production-mode=preview --candidates-per-scene=1`. This changes rendering/generation policy only; it does not override GLOBAL style, character, branding, music policy or QC policy.
 
-A follow-up queue job may set `reuse_from_job_id` to the Airtable record ID of an earlier VIDEO_RENDER job. Arbitrary filesystem paths are not accepted. The queue validates the record-ID shape, the worker derives the previous root under its configured `VIDEO_OUTPUT_ROOT`, and the master still enforces the incremental double gate plus same-content contract checks.
+A follow-up queue job may set `reuse_from_job_id` to the Airtable record ID of an earlier VIDEO_RENDER job. Arbitrary filesystem paths are not accepted. Before dispatch, the queue requires that the parent is a completed VIDEO_RENDER job for the exact same content and rejects self-reuse or a direct cycle. The worker derives the previous root under its configured `VIDEO_OUTPUT_ROOT`, refuses a parent owned by another worker when worker ownership is known, and verifies the previous local master SHA-256 against the hash recorded by Airtable when that hash is available. The master then enforces the incremental double gate plus explicit matching `content_id` on both contracts.
 
 This makes the intended 10.5 loop possible without editing the active GLOBAL profile:
 
@@ -44,3 +44,8 @@ This makes the intended 10.5 loop possible without editing the active GLOBAL pro
 3. reuse fingerprint-valid voice/image/render caches;
 4. regenerate only invalidated artifacts;
 5. keep human review and publication lock unchanged.
+
+
+## Delivery and publication lock
+
+PREVIEW artifacts are explicitly tagged `preview_only=true` in the render-ready contract, master result and artifact registry. The artifact registry never authorizes publication, even for FINAL artifacts; publication approval remains a separate human action outside this production pipeline. FINAL means full-quality candidate, not automatically publishable.

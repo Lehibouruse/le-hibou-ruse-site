@@ -81,6 +81,8 @@
 ### Itérations
 
 - `HIBOU_VIDEO_RESUME_PLAN_V1` analyse un run interrompu sans rien exécuter ;
+- le worker futur écrit `_hibou_video_resume_plan.json` et `_hibou_video_failure_diagnostic.json` sur échec, et remonte le résumé à Airtable ;
+- ce diagnostic n'active jamais `Pending` et n'exécute jamais la reprise ;
 - détecte un ancien PASS devenu invalide (ex. durée voix), un artefact PASS manquant et les erreurs de rendu connues ;
 - choisit le point de reprise conservateur le plus précoce ;
 - conserve les caches voix/images/render et laisse les fingerprints décider de la réutilisation ;

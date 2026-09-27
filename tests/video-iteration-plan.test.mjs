@@ -81,3 +81,16 @@ test("scene structure change is conservative and publication remains locked",()=
   assert.equal(plan.policy.publication_authorized,false);
   assert.equal(plan.policy.human_review_required,true);
 });
+
+
+test("production profile changes rerun cache-validation stages without semantic image invalidation",()=>{
+  const before=base(), after=structuredClone(before);
+  before.production={mode:"final",candidates_per_scene:3};
+  after.production={mode:"preview",candidates_per_scene:1};
+  const plan=buildIterationPlan(before,after);
+  assert.equal(plan.global_changes.includes("production"),true);
+  assert.equal(plan.invalidated_stages.includes("images"),true);
+  assert.deepEqual(plan.invalidated_scene_ids.images,[]);
+  assert.deepEqual(plan.reusable_scene_ids.images,["S01","S02"]);
+  assert.equal(plan.policy.production_profile_changes_use_engine_fingerprints,true);
+});

@@ -18,7 +18,7 @@ const queueRoute = readFileSync(
 
 test("storyboard accepts slower editorial pacing and injects Airtable profile", () => {
   assert.match(airtableSync, /scene_count must be 8\.\.18/);
-  assert.match(airtableSync, /duration must be 1\.5\.\.5\.5 s/);
+  assert.match(airtableSync, /duration must be 1\.5\.\.12 s/);
   assert.match(airtableSync, /Style lock/);
   assert.match(airtableSync, /Negative prompt/);
   assert.match(airtableSync, /Character lock Hibou/);

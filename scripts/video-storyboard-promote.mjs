@@ -90,6 +90,25 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         selected_sha256:sha256(target),
       };
     }
+    const canonicalCharacter=String(contract?.creative?.reference_image_local||"").trim();
+    if(canonicalCharacter && scene?.framing?.hibou){
+      scene.composition={
+        ...(scene.composition||{}),
+        character_pose:copyCompositionAsset(sceneId,"character-pose",{
+          path:canonicalCharacter,
+          z:20,
+          width:560,
+          anchor:"bottom-center",
+          offset_y:10,
+          opacity:1,
+          remove_background:true,
+          chroma_key_color:"0xFBF6EE",
+          chroma_key_similarity:0.11,
+          chroma_key_blend:0.07
+        })
+      };
+    }
+
     if(scene.narration_exact?.mode!=="audio_reference") fail(`${sceneId}: audio_reference required before promotion`);
     if(scene.narration_exact.sha256!==contract.audio.sha256) fail(`${sceneId}: narration/audio hash mismatch`);
     scene.narration_exact.source_audio=audioRel;

@@ -42,7 +42,37 @@ def set_seed(seed, np, torch, device):
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
 
-def load_cache(manifest_path, scene_path, fingerprint):
+def speech_word_count(text):
+    return len(re.findall(r"[0-9A-Za-zÀ-ÖØ-öø-ÿ]+(?:[’'][0-9A-Za-zÀ-ÖØ-öø-ÿ]+)*", str(text or "")))
+
+def duration_bounds(text, target_wpm):
+    words = speech_word_count(text)
+    try:
+        wpm = float(target_wpm or 170)
+    except Exception:
+        wpm = 170.0
+    wpm = max(80.0, min(240.0, wpm))
+    expected = (words * 60.0 / wpm) if words else 0.0
+    return {
+        "word_count": words,
+        "target_wpm": wpm,
+        "expected_duration_s": expected,
+        "min_duration_s": max(0.45, expected * 0.42),
+        "max_duration_s": max(3.5, expected * 2.6 + 2.0),
+    }
+
+def duration_is_plausible(duration_s, bounds):
+    try:
+        value = float(duration_s)
+    except Exception:
+        return False
+    return (
+        value > 0
+        and value >= float(bounds["min_duration_s"])
+        and value <= float(bounds["max_duration_s"])
+    )
+
+def load_cache(manifest_path, scene_path, fingerprint, bounds):
     if not manifest_path.exists() or not scene_path.exists():
         return None
     try:
@@ -50,6 +80,8 @@ def load_cache(manifest_path, scene_path, fingerprint):
         if data.get("fingerprint") != fingerprint:
             return None
         if data.get("wav_sha256") != sha256_file(scene_path):
+            return None
+        if not duration_is_plausible(data.get("voice_duration_s"), bounds):
             return None
         return data
     except Exception:
@@ -140,11 +172,14 @@ for scene in scenes:
     })
     scene_path = scene_dir / f"{scene_id}.wav"
     manifest_path = scene_dir / f"{scene_id}.manifest.json"
-    cache = load_cache(manifest_path, scene_path, fingerprint)
+    target_wpm = (scene.get("voice") or {}).get("target_wpm", 170)
+    scene_duration_bounds = duration_bounds(text, target_wpm)
+    cache = load_cache(manifest_path, scene_path, fingerprint, scene_duration_bounds)
     descriptors.append({
         "scene": scene, "scene_id": scene_id, "text": text, "native": native_used,
         "prosody_units": prosody_units,
         "fingerprint": fingerprint, "scene_path": scene_path, "manifest_path": manifest_path, "cache": cache,
+        "duration_bounds": scene_duration_bounds,
     })
 
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -407,6 +442,8 @@ for item in descriptors:
     scene = item["scene"]
     scene_id = item["scene_id"]
     prosody_units_used = []
+    duration_retry_applied = False
+    duration_retry_seed_offset = 0
     if item["cache"] is not None:
         wav, cached_sr = ta.load(str(item["scene_path"]))
         cached_sr = int(cached_sr)
@@ -416,6 +453,8 @@ for item in descriptors:
             fail(f"{scene_id}: cached sample rate mismatch")
         cache_hits += 1
         cache_state = "hit"
+        duration_retry_applied = bool(item["cache"].get("duration_retry_applied"))
+        duration_retry_seed_offset = int(item["cache"].get("duration_retry_seed_offset") or 0)
     else:
         native = item["native"]
         wav, prosody_units_used = generate_prosody_scene(model, item, np, torch, sample_rate)
@@ -425,6 +464,37 @@ for item in descriptors:
             wav = wav.unsqueeze(0)
         if wav.ndim != 2:
             fail(f"{scene_id}: unexpected waveform shape {tuple(wav.shape)}")
+
+        first_duration_s = wav.shape[-1] / sample_rate
+        if not duration_is_plausible(first_duration_s, item["duration_bounds"]):
+            duration_retry_applied = True
+            duration_retry_seed_offset = 100000
+            retry_item = copy.deepcopy(item)
+            retry_item["native"] = dict(item["native"])
+            retry_item["native"]["seed"] = int(item["native"]["seed"]) + duration_retry_seed_offset
+            print(
+                f"HIBOU_VOICE_DURATION_RETRY scene={scene_id} first_duration_s={first_duration_s:.3f} "
+                f"expected_s={item['duration_bounds']['expected_duration_s']:.3f} "
+                f"max_s={item['duration_bounds']['max_duration_s']:.3f}",
+                file=sys.stderr,
+                flush=True,
+            )
+            wav, prosody_units_used = generate_prosody_scene(model, retry_item, np, torch, sample_rate)
+            wav = wav.detach().cpu()
+            clear_cuda_cache()
+            if wav.ndim == 1:
+                wav = wav.unsqueeze(0)
+            if wav.ndim != 2:
+                fail(f"{scene_id}: unexpected retry waveform shape {tuple(wav.shape)}")
+
+        final_duration_s = wav.shape[-1] / sample_rate
+        if not duration_is_plausible(final_duration_s, item["duration_bounds"]):
+            fail(
+                f"{scene_id}: voice duration remained implausible after one deterministic retry "
+                f"(duration={final_duration_s:.3f}s expected={item['duration_bounds']['expected_duration_s']:.3f}s "
+                f"allowed={item['duration_bounds']['min_duration_s']:.3f}..{item['duration_bounds']['max_duration_s']:.3f}s)"
+            )
+
         ta.save(str(item["scene_path"]), wav, sample_rate)
         scene_manifest = {
             "schema": "HIBOU_CHATTERBOX_SCENE_CACHE_V1",
@@ -435,6 +505,10 @@ for item in descriptors:
             "sample_rate": sample_rate,
             "native": item["native"],
             "text": item["text"],
+            "voice_duration_s": final_duration_s,
+            "duration_bounds": item["duration_bounds"],
+            "duration_retry_applied": duration_retry_applied,
+            "duration_retry_seed_offset": duration_retry_seed_offset,
             "prosody_units_used": prosody_units_used,
         }
         item["manifest_path"].write_text(json.dumps(scene_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -459,6 +533,9 @@ for item in descriptors:
         "wav": str(item["scene_path"]),
         "wav_sha256": sha256_file(item["scene_path"]),
         "voice_duration_s": wav.shape[-1] / sample_rate,
+        "duration_bounds": item["duration_bounds"],
+        "duration_retry_applied": duration_retry_applied,
+        "duration_retry_seed_offset": duration_retry_seed_offset,
         "pause_after_ms": pause_ms,
         "span_start_s": start_samples / sample_rate,
         "span_end_s": end_samples / sample_rate,

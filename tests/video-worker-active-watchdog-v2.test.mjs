@@ -29,7 +29,8 @@ test("watchdog probes local health and restarts only after sustained failure", (
 
 test("watchdog cleans Hibou render children but not ComfyUI", () => {
   const start = launcher.indexOf("function Stop-HibouRenderChildren");
-  const end = launcher.indexOf("while (\`$true)", start);
+  const end = launcher.indexOf("while ($true)", start);
+  assert.ok(start >= 0 && end > start);
   const block = launcher.slice(start, end);
   assert.match(block, /video-master\.runtime\.mjs/);
   assert.match(block, /\\LeHibou\\image-runtime\\/);

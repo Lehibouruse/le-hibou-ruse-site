@@ -104,7 +104,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       video_creative_qc_v1:Boolean(profile["QC créatif V1"]),
       video_pose_registry_v1:Boolean(profile["Registry poses V1"]),
       video_prosody_v1:Boolean(profile["Prosodie V1"]),
-      video_music_mix_v1:Boolean(profile["Mix musique V1"])
+      video_music_mix_v1:Boolean(profile["Mix musique V1"]),
+      video_incremental_retouch_v1:Boolean(profile["Retouches incrémentales V1"])
     },
     creative:{
       profile_name:String(profile.Profil||"HIBOU_VIRAL_V1"),
@@ -146,7 +147,22 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
         zoom_max_pct:Number(profile["Zoom max %"]||3.5)
       }
     },
-    engine:{renderer:"ffmpeg",renderer_version:"video-local-render-v1",fps:30,width:1080,height:1920,preset:"medium"},
+    engine:{
+      renderer:"ffmpeg",
+      renderer_version:"video-local-render-v1",
+      fps:30,
+      width:1080,
+      height:1920,
+      preset:"medium",
+      preview_preset:"veryfast",
+      crf:18,
+      preview_crf:23
+    },
+    production:{
+      mode:String(profile["Mode production par défaut"]?.name||profile["Mode production par défaut"]||"final").trim().toLowerCase(),
+      final_candidates_per_scene:Number(profile["Candidats par scène"]||3),
+      preview_candidates_per_scene:1
+    },
     scenes,
     audio:{status:"pending",engine:"chatterbox_multilingual",reference:null},
     music:{

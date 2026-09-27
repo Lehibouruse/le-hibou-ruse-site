@@ -72,6 +72,10 @@ export function validateReuseLineage({
 
   const parentOptions = parseOptions(fields["Options JSON"]);
   const parentContentId = String(parentOptions.content_id || "").trim();
+  const parentWorker = String(fields.Worker || "").trim() || null;
+  const parentResultSha256 = /^[0-9a-f]{64}$/i.test(String(fields["Hash résultat"] || "").trim())
+    ? String(fields["Hash résultat"]).trim().toLowerCase()
+    : null;
   if (!isRecordId(parentContentId) || parentContentId !== currentContentId) {
     return {
       ok: false,
@@ -108,6 +112,8 @@ export function validateReuseLineage({
       parent_job_id: reuseFromJobId,
       parent_status: status,
       parent_content_id: parentContentId,
+      parent_worker: parentWorker,
+      parent_result_sha256: parentResultSha256,
       grandparent_job_id: isRecordId(parentReuse) ? parentReuse : null,
       human_review_required: true,
       publication_authorized: false,

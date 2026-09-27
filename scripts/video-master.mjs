@@ -84,6 +84,7 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-audio-master.mjs","masterAudio"],
   ["video-audio-mix.mjs","HIBOU_AUDIO_MIX_V1"],
   ["video-prosody-plan.mjs","HIBOU_PROSODY_PLAN_V1"],
+  ["video-voice-duration-qc.mjs","HIBOU_VOICE_DURATION_QC_V1"],
   ["video-hibou-pose-registry.mjs","HIBOU_POSE_REGISTRY_V1"],
   ["video-layer-guard.mjs","HIBOU_GLOBAL_SPECIFIC_GUARD_V1"],
   ["hibou-poses.registry.v1.json","HIBOU_POSE_REGISTRY_V1","video/assets/hibou-poses.registry.v1.json"],
@@ -121,6 +122,7 @@ async function ensurePreImageRuntimeBundle(commit){
     audioMaster:resolve(localBase,"video-audio-master.mjs"),
     audioMix:resolve(localBase,"video-audio-mix.mjs"),
     prosody:resolve(localBase,"video-prosody-plan.mjs"),
+    voiceDurationQc:resolve(localBase,"video-voice-duration-qc.mjs"),
     poseRegistryScript:resolve(localBase,"video-hibou-pose-registry.mjs"),
     layerGuard:resolve(localBase,"video-layer-guard.mjs"),
     poseRegistry:resolve(localBase,"hibou-poses.registry.v1.json"),
@@ -400,7 +402,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","prosody","voice","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -527,6 +529,24 @@ async function main(){
     if(!existsSync(voiceScript)) fail("chatterbox batch script missing: "+voiceScript);
     run(py.cmd,[...py.prefix,voiceScript,voiceInput,voiceDir]);
     if(!existsSync(voiceReady)||!existsSync(rawVoice)) fail("voice outputs missing");
+  });
+
+  const voiceBatchManifest=resolve(voiceDir,"voice-batch-manifest.json");
+  const voiceDurationQc=resolve(voiceDir,"voice-duration-qc.json");
+  stage(state,"voice_duration_qc",()=>{
+    if(!existsSync(voiceBatchManifest)) fail("voice batch manifest missing");
+    run(process.execPath,[preRuntime.voiceDurationQc,voiceBatchManifest,voiceDurationQc]);
+    const report=json(voiceDurationQc);
+    state.voice_duration_qc={
+      status:String(report.status||""),
+      rejected_scene_ids:Array.isArray(report.rejected_scene_ids)?report.rejected_scene_ids:[],
+      rejected_scene_count:Number(report.rejected_scene_count||0),
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+    if(report.status!=="PASS"){
+      fail("voice duration QC rejected scenes: "+state.voice_duration_qc.rejected_scene_ids.join(","));
+    }
   });
 
   const voiceMastered=resolve(voiceDir,"voice-mastered.wav");

@@ -4,6 +4,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const ROOT = process.env.HIBOU_MEDIA_ROOT || path.join(os.homedir(), "HibouMedia");
 const POLL_MS = Math.max(5000, Number(process.env.HIBOU_WORKER_POLL_MS || 15000));
@@ -15,6 +16,11 @@ const STATE_FILE = path.join(LOG_DIR, "processed-jobs.json");
 const APPROVAL_FILE = path.join(LOG_DIR, "approved-jobs.json");
 const FAILED_FILE = path.join(LOG_DIR, "failed-jobs.json");
 const WORKER_LOCK_FILE = path.join(LOG_DIR, "hibou-github-worker.lock");
+const CURRENT_WORKER_PATH = fileURLToPath(import.meta.url);
+const WORKER_SELF_UPDATE_ENABLED =
+  String(process.env.HIBOU_WORKER_SELF_UPDATE || "true")
+    .trim()
+    .toLowerCase() !== "false";
 const QUEUE_URL = process.env.HIBOU_QUEUE_URL || "https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/main/config/local-worker-queue.json";
 const REPORT_URL = process.env.HIBOU_REPORT_URL || "https://d4d5d6.com/api/local-worker-status";
 const REPORT_TOKEN = String(process.env.HIBOU_LOCAL_REPORT_TOKEN || "").trim();
@@ -62,6 +68,10 @@ const CHATTERBOX_BATCH_SCRIPT =
   String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT || "").trim() ||
   path.join(PROJECT_ROOT, "scripts", "chatterbox-storyboard-batch.py");
 
+const VIDEO_PREFLIGHT_SCRIPT =
+  String(process.env.HIBOU_VIDEO_PREFLIGHT_SCRIPT || "").trim() ||
+  path.join(LOG_DIR, "video-local-preflight.runtime.mjs");
+
 const RUNTIME_REPO =
   "Lehibouruse/le-hibou-ruse-site";
 const ALLOWED_HOSTS = new Set([
@@ -87,6 +97,7 @@ let state = {
   render_pid: null,
   render_started_at: null,
   last_video_heartbeat_at: null,
+  runtime_commit: null,
   last_error: null,
   processed: 0,
 };
@@ -95,6 +106,126 @@ function log(message, data = null) {
   const line = `[${new Date().toISOString()}] ${message}${data ? " " + JSON.stringify(data) : ""}`;
   console.log(line);
   appendFileSync(LOG_FILE, line + "\n", "utf8");
+}
+
+function textSha256(value) {
+  return createHash("sha256").update(String(value), "utf8").digest("hex");
+}
+
+async function maybeSelfUpdateWorker(runtimeCommit) {
+  if (!WORKER_SELF_UPDATE_ENABLED) return false;
+
+  const normalized = String(runtimeCommit || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(normalized)) {
+    throw new Error("VIDEO_RENDER queue runtime_commit missing or invalid");
+  }
+
+  state.runtime_commit = normalized;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const url =
+      `https://raw.githubusercontent.com/${RUNTIME_REPO}/${normalized}/scripts/hibou-github-worker.mjs`;
+
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Le-Hibou-ROG-Worker-SelfUpdate/1.0",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Worker self-update HTTP ${response.status} for ${normalized}`,
+      );
+    }
+
+    const source = await response.text();
+    const requiredMarkers = [
+      "async function fetchVideoQueue",
+      "function acquireWorkerLock",
+      "HIBOU_VIDEO_RENDER_HEARTBEAT_V1",
+    ];
+
+    for (const marker of requiredMarkers) {
+      if (!source.includes(marker)) {
+        throw new Error(
+          `Worker self-update candidate missing marker: ${marker}`,
+        );
+      }
+    }
+
+    const current = readFileSync(CURRENT_WORKER_PATH, "utf8");
+    const currentHash = textSha256(current);
+    const candidateHash = textSha256(source);
+
+    if (currentHash === candidateHash) {
+      return false;
+    }
+
+    const candidatePath = path.join(
+      LOG_DIR,
+      "hibou-github-worker.candidate.mjs",
+    );
+    const backupPath = path.join(
+      LOG_DIR,
+      "hibou-github-worker.previous.mjs",
+    );
+
+    writeFileSync(candidatePath, source, "utf8");
+
+    const check = spawnSync(
+      process.execPath,
+      ["--check", candidatePath],
+      {
+        encoding: "utf8",
+        windowsHide: true,
+        shell: false,
+      },
+    );
+
+    if (check.status !== 0) {
+      try { unlinkSync(candidatePath); } catch {}
+      throw new Error(
+        "Worker self-update candidate failed node --check: "
+        + String(check.stderr || check.stdout || "").slice(-4000),
+      );
+    }
+
+    writeFileSync(backupPath, current, "utf8");
+
+    try {
+      writeFileSync(CURRENT_WORKER_PATH, source, "utf8");
+    } catch (error) {
+      try {
+        writeFileSync(CURRENT_WORKER_PATH, current, "utf8");
+      } catch {}
+      throw error;
+    } finally {
+      try { unlinkSync(candidatePath); } catch {}
+    }
+
+    state.status = "self_update_restart";
+
+    log("Worker self-update installed", {
+      runtime_commit: normalized,
+      previous_sha256: currentHash,
+      candidate_sha256: candidateHash,
+      worker_path: CURRENT_WORKER_PATH,
+    });
+
+    setTimeout(() => {
+      process.exit(75);
+    }, 50);
+
+    return true;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function pidAlive(pid) {
@@ -289,6 +420,48 @@ async function installPinnedRuntime(commit, repoPath, target, markers) {
     mkdirSync(path.dirname(resolved), { recursive: true });
     const temp = `${resolved}.tmp-${process.pid}`;
     writeFileSync(temp, source, "utf8");
+
+    if (repoPath.endsWith(".mjs")) {
+      const check = spawnSync(
+        process.execPath,
+        ["--check", temp],
+        {
+          encoding: "utf8",
+          windowsHide: true,
+          shell: false,
+        },
+      );
+      if (check.status !== 0) {
+        try { unlinkSync(temp); } catch {}
+        throw new Error(
+          `Runtime node --check failed for ${repoPath}@${commit}: `
+          + String(check.stderr || check.stdout || "").slice(-4000),
+        );
+      }
+    }
+
+    if (repoPath.endsWith(".py")) {
+      const python = String(process.env.HIBOU_PYTHON || "").trim();
+      if (python && existsSync(python)) {
+        const check = spawnSync(
+          python,
+          ["-m", "py_compile", temp],
+          {
+            encoding: "utf8",
+            windowsHide: true,
+            shell: false,
+          },
+        );
+        if (check.status !== 0) {
+          try { unlinkSync(temp); } catch {}
+          throw new Error(
+            `Runtime py_compile failed for ${repoPath}@${commit}: `
+            + String(check.stderr || check.stdout || "").slice(-4000),
+          );
+        }
+      }
+    }
+
     renameSync(temp, resolved);
     return { path: resolved, sha256: sha256(resolved) };
   } finally {
@@ -305,15 +478,27 @@ async function ensureCanonicalVideoRuntimes(job) {
   if (
     state.runtime_commit === commit &&
     existsSync(VIDEO_MASTER_SCRIPT) &&
-    existsSync(CHATTERBOX_BATCH_SCRIPT)
+    existsSync(CHATTERBOX_BATCH_SCRIPT) &&
+    existsSync(VIDEO_PREFLIGHT_SCRIPT)
   ) {
     return {
       commit,
       master: VIDEO_MASTER_SCRIPT,
       voice: CHATTERBOX_BATCH_SCRIPT,
+      preflight: VIDEO_PREFLIGHT_SCRIPT,
       refreshed: false,
     };
   }
+
+  const preflight = await installPinnedRuntime(
+    commit,
+    "scripts/video-local-preflight.mjs",
+    VIDEO_PREFLIGHT_SCRIPT,
+    [
+      "HIBOU_LOCAL_PREFLIGHT_V1",
+      "pathToFileURL(resolve(process.argv[1])).href",
+    ],
+  );
 
   const master = await installPinnedRuntime(
     commit,
@@ -336,11 +521,14 @@ async function ensureCanonicalVideoRuntimes(job) {
   );
 
   state.runtime_commit = commit;
+  state.runtime_preflight_sha256 = preflight.sha256;
   state.runtime_master_sha256 = master.sha256;
   state.runtime_voice_sha256 = voice.sha256;
 
   log("VIDEO_RENDER runtimes refreshed", {
     commit,
+    preflight: preflight.path,
+    preflight_sha256: preflight.sha256,
     master: master.path,
     master_sha256: master.sha256,
     voice: voice.path,
@@ -349,6 +537,7 @@ async function ensureCanonicalVideoRuntimes(job) {
 
   return {
     commit,
+    preflight: preflight.path,
     master: master.path,
     voice: voice.path,
     refreshed: true,
@@ -559,6 +748,11 @@ async function fetchVideoQueue() {
     if (!data || !Array.isArray(data.jobs)) {
       throw new Error("Invalid VIDEO_RENDER queue format");
     }
+
+    const selfUpdated = await maybeSelfUpdateWorker(
+      data.runtime_commit,
+    );
+    if (selfUpdated) return [];
 
     return data.jobs.filter(
       (job) =>
@@ -816,22 +1010,13 @@ async function processVideoRender(job, processed) {
     throw new Error("Invalid VIDEO_RENDER content_id");
   }
 
-  if (!existsSync(PROJECT_ROOT)) {
-    throw new Error(`HIBOU project root missing: ${PROJECT_ROOT}`);
-  }
-
   if (!existsSync(VIDEO_BINDING)) {
     throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
   }
 
   const runtime = await ensureCanonicalVideoRuntimes(job);
-  const masterScript = VIDEO_MASTER_SCRIPT;
-
-  const preflightScript = path.join(
-    PROJECT_ROOT,
-    "scripts",
-    "video-local-preflight.mjs",
-  );
+  const masterScript = runtime.master;
+  const preflightScript = runtime.preflight;
 
   if (!existsSync(masterScript)) {
     throw new Error(`video-master missing: ${masterScript}`);
@@ -932,7 +1117,7 @@ async function processVideoRender(job, processed) {
     process.execPath,
     [preflightScript, "--require-ready"],
     {
-      cwd: PROJECT_ROOT,
+      cwd: LOG_DIR,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
@@ -985,7 +1170,7 @@ async function processVideoRender(job, processed) {
 
   const renderStatus = await new Promise((resolveRender, rejectRender) => {
     const child = spawn(process.execPath, args, {
-      cwd: PROJECT_ROOT,
+      cwd: LOG_DIR,
       stdio: "inherit",
       windowsHide: true,
       shell: false,

@@ -1345,6 +1345,34 @@ async function processVideoRender(job, processed) {
     args.push(`--asset-graph=${assetGraphPath}`);
   }
 
+  const reuseFromJobId = String(
+    job.options?.reuse_from_job_id || "",
+  ).trim();
+  if (reuseFromJobId) {
+    if (
+      !/^rec[A-Za-z0-9]{14}$/.test(reuseFromJobId) ||
+      reuseFromJobId === String(job.id)
+    ) {
+      throw new Error("Invalid VIDEO_RENDER reuse_from_job_id");
+    }
+    const previousRoot = path.join(
+      VIDEO_OUTPUT_ROOT,
+      safePart(reuseFromJobId),
+    );
+    if (!existsSync(previousRoot)) {
+      throw new Error(
+        `VIDEO_RENDER reuse-from output missing: ${previousRoot}`,
+      );
+    }
+    args.push(`--reuse-from=${previousRoot}`);
+    log("VIDEO_RENDER incremental reuse requested", {
+      job: job.id,
+      reuse_from_job_id: reuseFromJobId,
+      previous_root: previousRoot,
+      production_mode: productionMode,
+    });
+  }
+
   const renderOutcome = await new Promise((resolveRender, rejectRender) => {
     const renderClientId = `hibou:${job.id}:${state.worker_session}`;
     const child = spawn(process.execPath, args, {

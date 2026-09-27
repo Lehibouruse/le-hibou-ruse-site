@@ -241,10 +241,16 @@ print(json.dumps(report))
 
   $importStdout = Join-Path $LogDir "comfy-kitchen-import.stdout.log"
   $importStderr = Join-Path $LogDir "comfy-kitchen-import.stderr.log"
+  $importProbe = Join-Path $LogDir "comfy-kitchen-import-probe.py"
   Remove-Item -LiteralPath $importStdout -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $importStderr -Force -ErrorAction SilentlyContinue
 
-  $importProcess = Start-Process -FilePath $Python -ArgumentList @("-s", "-c", "import comfy_kitchen; print('comfy_kitchen_import_ok')") -WorkingDirectory $Portable -RedirectStandardOutput $importStdout -RedirectStandardError $importStderr -WindowStyle Hidden -Wait -PassThru
+  @'
+import comfy_kitchen
+print("comfy_kitchen_import_ok")
+'@ | Set-Content -LiteralPath $importProbe -Encoding UTF8
+
+  $importProcess = Start-Process -FilePath $Python -ArgumentList @("-s", $importProbe) -WorkingDirectory $Portable -RedirectStandardOutput $importStdout -RedirectStandardError $importStderr -WindowStyle Hidden -Wait -PassThru
   if ($importProcess.ExitCode -ne 0) {
     $stderrRaw = if (Test-Path -LiteralPath $importStderr) { Get-Content -LiteralPath $importStderr -Raw } else { "" }
     $stderrText = if ($null -eq $stderrRaw) { "" } else { ([string]$stderrRaw).Trim() }

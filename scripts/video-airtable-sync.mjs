@@ -81,6 +81,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       negative_prompt:String(profile["Negative prompt"]||""),
       character_lock:String(profile["Character lock Hibou"]||""),
       content_brief:String(content["Prompt / consignes"]||""),
+      reference_image_url:String(process.env.HIBOU_REFERENCE_IMAGE_URL||"https://le-hibou-ruse-site.vercel.app/hibou-monocle.webp"),
+      reference_mode:"deterministic_character_overlay",
       language:"fr",
       text_in_generated_images:false,
       branding:{

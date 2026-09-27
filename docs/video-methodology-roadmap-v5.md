@@ -24,7 +24,7 @@
 | 2 | BREATH_UNIT_FIRST + storyboard + ATTENTION_BEATS | codé | oui | vidéo complète avec continuité visuelle |
 | 3 | Préflight machine / modèles | codé | oui | validation Windows/ROG hors rendu actif |
 | 4 | Carte prosodique / unités de souffle | codé | oui | écoute Chatterbox réelle |
-| 5 | Voix + mastering + contrôle verbatim | codé | oui partiel | écoute, continuité de timbre, Whisper optionnel |
+| 5 | Voix + mastering + contrôle verbatim | codé + QC durée + cache durée-aware + retry unique | oui CPU/statique | écoute, continuité de timbre, validation réelle du retry |
 | 6 | Image plan ComfyUI / FLUX | codé | oui | GPU E2E |
 | 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, template, fingerprint anti-stale, validateur, pause/reprise feature-gatée | oui statique | E2E réel pause → décision → reprise + GPU réel |
 | 8 | Captions + texte écran + timeline | codé | oui | lisibilité vidéo réelle |
@@ -61,6 +61,10 @@
 - `HIBOU_HUMAN_IMAGE_SELECTION_V1` pour enregistrer un choix humain explicite.
 
 ### Voix / audio
+
+- garde-fou contre les anomalies de durée Chatterbox basé sur nombre de mots / WPM ;
+- cache voix invalidé si la durée stockée est aberrante ;
+- une seule régénération déterministe de la scène, puis blocage avec diagnostic ;
 
 - prosody plan ;
 - segmentation par unités de souffle ;

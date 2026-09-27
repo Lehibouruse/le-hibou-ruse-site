@@ -333,7 +333,10 @@
           "markers": [
             "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
             "_hibou_video_resume_plan.json",
-            "resume_execution_performed: false"
+            "resume_execution_performed: false",
+            "heartbeatUnitProgress",
+            "stage_progress: progress.stage_progress",
+            "visual_ready"
           ]
         },
         {
@@ -357,6 +360,14 @@
             "duration_ms",
             "event:\"ERROR\""
           ]
+        },
+        {
+          "path": "app/api/local-worker-queue/route.js",
+          "markers": [
+            "rawStageProgress",
+            "stage_progress: stageProgress",
+            "stage_elapsed_seconds"
+          ]
         }
       ],
       "tests": [
@@ -367,7 +378,8 @@
         "tests/video-worker-failure-resume-diagnostic.test.mjs",
         "tests/video-image-batch.test.mjs",
         "tests/video-image-factory.test.mjs",
-        "tests/video-pipeline-stage-history.test.mjs"
+        "tests/video-pipeline-stage-history.test.mjs",
+        "tests/video-worker-heartbeat-progress.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -439,7 +451,10 @@
           "markers": [
             "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
             "_hibou_video_resume_plan.json",
-            "resume_execution_performed: false"
+            "resume_execution_performed: false",
+            "heartbeatUnitProgress",
+            "stage_progress: progress.stage_progress",
+            "visual_ready"
           ]
         },
         {
@@ -449,6 +464,14 @@
             "duration_ms",
             "event:\"ERROR\""
           ]
+        },
+        {
+          "path": "app/api/local-worker-queue/route.js",
+          "markers": [
+            "rawStageProgress",
+            "stage_progress: stageProgress",
+            "stage_elapsed_seconds"
+          ]
         }
       ],
       "tests": [
@@ -457,7 +480,8 @@
         "tests/video-durable-storage-plan.test.mjs",
         "tests/video-resume-plan.test.mjs",
         "tests/video-worker-failure-resume-diagnostic.test.mjs",
-        "tests/video-pipeline-stage-history.test.mjs"
+        "tests/video-pipeline-stage-history.test.mjs",
+        "tests/video-worker-heartbeat-progress.test.mjs"
       ],
       "e2e_pending": true
     },

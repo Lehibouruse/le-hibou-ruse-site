@@ -84,6 +84,9 @@ let state = {
   status: "starting",
   queue_mode: "github-public-readonly+authenticated-video-render",
   current_job: null,
+  render_pid: null,
+  render_started_at: null,
+  last_video_heartbeat_at: null,
   last_error: null,
   processed: 0,
 };
@@ -990,15 +993,19 @@ async function processVideoRender(job, processed) {
     });
 
     state.render_pid = child.pid || null;
+    state.render_started_at = new Date().toISOString();
+    state.last_video_heartbeat_at = state.render_started_at;
 
     const heartbeat = setInterval(() => {
       const progress = pipelineHeartbeatSnapshot(dir);
+      const heartbeatAt = new Date().toISOString();
+      state.last_video_heartbeat_at = heartbeatAt;
       reportVideoProgress(job, "Running", {
         local_path: dir,
         heartbeat: true,
         result: {
           schema: "HIBOU_VIDEO_RENDER_HEARTBEAT_V1",
-          heartbeat_at: new Date().toISOString(),
+          heartbeat_at: heartbeatAt,
           worker: WORKER_ID,
           worker_session: state.worker_session,
           worker_pid: process.pid,
@@ -1018,11 +1025,13 @@ async function processVideoRender(job, processed) {
     child.once("error", (error) => {
       clearInterval(heartbeat);
       state.render_pid = null;
+      state.render_started_at = null;
       rejectRender(error);
     });
     child.once("exit", (code, signal) => {
       clearInterval(heartbeat);
       state.render_pid = null;
+      state.render_started_at = null;
       if (signal) {
         rejectRender(new Error(`video-master terminated by signal ${signal}`));
         return;

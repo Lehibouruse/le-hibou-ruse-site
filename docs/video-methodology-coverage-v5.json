@@ -6,7 +6,9 @@
     "coverage_is_static_evidence_only": true,
     "e2e_status_is_separate": true,
     "code_presence_does_not_activate_feature": true,
-    "publication_authorized": false
+    "publication_authorized": false,
+    "activation_status_is_explicit_per_step": true,
+    "e2e_links_must_reference_audited_plan": true
   },
   "steps": [
     {
@@ -31,7 +33,13 @@
         "tests/video-layer-guard.test.mjs",
         "tests/video-airtable-sync.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "1",
@@ -48,7 +56,11 @@
       "tests": [
         "tests/video-airtable-sync.test.mjs"
       ],
-      "e2e_pending": false
+      "e2e_pending": false,
+      "e2e_step_ids": [],
+      "e2e_status": "not_required",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "2",
@@ -72,7 +84,14 @@
         "tests/video-scene-timeline-v1.test.mjs",
         "tests/video-scene-compositor.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-01",
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "3",
@@ -96,7 +115,13 @@
         "tests/video-hardware-profile.test.mjs",
         "tests/video-e2e-plan-audit.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-00"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "4",
@@ -119,7 +144,13 @@
       "tests": [
         "tests/video-prosody-plan.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-04"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "5",
@@ -149,7 +180,14 @@
         "tests/video-voice-duration-qc.test.mjs",
         "tests/video-voice-duration-retry.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-04",
+        "E2E-05"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "6",
@@ -182,7 +220,14 @@
         "tests/comfy-prompt-id.test.mjs",
         "tests/video-image-factory.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-02",
+        "E2E-06"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "7",
@@ -226,7 +271,13 @@
         "tests/video-queue-auto-activation-chain.test.mjs",
         "tests/video-studio-v5-orchestration.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-08"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "8",
@@ -254,7 +305,14 @@
         "tests/video-local-render.test.mjs",
         "tests/video-subtitles-font.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-01",
+        "E2E-07"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "9",
@@ -272,7 +330,13 @@
         "tests/video-storyboard-promote.test.mjs",
         "tests/video-preview-publication-guard.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "10",
@@ -312,7 +376,14 @@
         "tests/video-scene-timeline-v1.test.mjs",
         "tests/video-subtitles-font.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-01",
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "10.5",
@@ -439,7 +510,13 @@
         "tests/video-remote-repair-resume.test.mjs",
         "tests/video-run-audit.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-07"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "11",
@@ -456,7 +533,14 @@
         "tests/video-master.test.mjs",
         "tests/video-smoke-one-scene.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-11",
+        "E2E-12"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "12",
@@ -488,7 +572,14 @@
         "tests/video-studio-v5-orchestration.test.mjs",
         "tests/video-review-diff.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-08",
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "13",
@@ -603,7 +694,13 @@
         "tests/video-remote-repair-resume.test.mjs",
         "tests/video-run-audit.test.mjs"
       ],
-      "e2e_pending": true
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-12"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     },
     {
       "id": "14",
@@ -647,7 +744,13 @@
         "tests/video-e2e-plan-audit.test.mjs"
       ],
       "e2e_pending": true,
-      "activation_policy": "publication remains intentionally outside automatic production"
+      "activation_policy": "publication remains intentionally outside automatic production",
+      "e2e_step_ids": [
+        "E2E-12"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
     }
   ]
 }

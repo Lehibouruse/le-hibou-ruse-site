@@ -317,7 +317,11 @@
         {
           "path": "scripts/video-review-diff.mjs",
           "markers": [
-            "HIBOU_INCREMENTAL_REVIEW_DIFF_V1"
+            "HIBOU_INCREMENTAL_REVIEW_DIFF_V1",
+            "execution_summary",
+            "forced_regeneration_counts",
+            "cache_reuse_subject_to_fingerprint",
+            "reason_codes"
           ]
         },
         {
@@ -454,11 +458,21 @@
             "HIBOU_HUMAN_REVIEW_PACKAGE_V1",
             "PENDING_HUMAN_REVIEW"
           ]
+        },
+        {
+          "path": "scripts/video-review-diff.mjs",
+          "markers": [
+            "execution_summary",
+            "forced_regeneration_counts",
+            "cache_reuse_subject_to_fingerprint",
+            "reason_codes"
+          ]
         }
       ],
       "tests": [
         "tests/video-human-review-package.test.mjs",
-        "tests/video-studio-v5-orchestration.test.mjs"
+        "tests/video-studio-v5-orchestration.test.mjs",
+        "tests/video-review-diff.test.mjs"
       ],
       "e2e_pending": true
     },

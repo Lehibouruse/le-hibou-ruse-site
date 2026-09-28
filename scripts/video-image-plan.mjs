@@ -62,18 +62,31 @@ function imageStylePrompt(styleLock){
 function removeTextRiskSentences(text){
   const source=String(text||"").trim();
   if(!source) return "";
-  return source
+  const withoutTextInstructions=source
     .split(/(?<=[.!?])\s+/u)
     .filter(sentence=>!/(?:\btexte\b|\btext\b|\bletter(?:s|ing)?\b|\blogo\b|\bsign(?:age)?\b|\bécriture\b|\binscription\b)/iu.test(sentence))
     .join(" ")
+    .trim();
+  return withoutTextInstructions
+    .replace(/\b20\d{2}\b/g,"abstract timeline milestone")
+    .replace(/[+-]?\d+(?:[.,]\d+)?\s*%/g,"abstract percentage marker")
+    .replace(/\b\d[\d\s.,]*\s*€\b/g,"abstract currency marker")
+    .replace(/\s{2,}/g," ")
     .trim();
 }
 
 function framingPrompt(scene){
   const type=String(scene?.framing?.type||"").trim().toLowerCase();
-  const anchor=String(scene?.framing?.anchor||"").trim().toLowerCase();
+  const rawAnchor=String(scene?.framing?.anchor||"").trim().toLowerCase();
+  const anchor=rawAnchor==="centre"?"center":rawAnchor;
   let base="";
-  if(/macro|close|gros/.test(type)){
+  if(/split/.test(type)){
+    base="FRAMING_LOCK: strict two-panel split-screen composition with a clean central divider; left and right panels must remain visually distinct, balanced and immediately comparable.";
+  }else if(/sch[eé]ma|diagram/.test(type)){
+    base="FRAMING_LOCK: flat diagrammatic editorial composition; simplified blocks, arrows and icons on a shallow graphic plane; generous whitespace; avoid room-like perspective.";
+  }else if(/narrative|sc[eè]ne/.test(type)){
+    base="FRAMING_LOCK: narrative editorial composition with a clear left-to-right visual action path, one dominant focal action and simplified supporting environment.";
+  }else if(/macro|close|gros/.test(type)){
     base="FRAMING_LOCK: tight macro close-up; the primary object must fill most of the frame; avoid room-wide establishing compositions; background stays secondary and simplified.";
   }else if(/medium|moyen/.test(type)){
     base="FRAMING_LOCK: medium editorial framing; one clear focal environment/prop composition; avoid extreme wide-angle views.";

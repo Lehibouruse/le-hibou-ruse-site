@@ -974,6 +974,7 @@ async function main(){
       entries:[
       {kind:"storyboard",path:storyboard},
       {kind:"audio",path:mastered},
+      {kind:"voice_silence_qc",path:voiceSilenceQc},
       {kind:"subtitles",path:ass},
       {kind:"asset_resolved_contract",path:assetResolved},
       {kind:"contract",path:renderReady},

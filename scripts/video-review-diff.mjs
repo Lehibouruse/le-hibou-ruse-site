@@ -87,6 +87,7 @@ function stringSet(values) {
 function sceneExecutionImpact(iterationPlan, sceneId, status) {
   const invalidated = iterationPlan?.invalidated_scene_ids || {};
   const reusable = iterationPlan?.reusable_scene_ids || {};
+  const invalidatedStages = stringSet(iterationPlan?.invalidated_stages);
   const id = String(sceneId || "");
   const removed = status === "removed";
 
@@ -97,16 +98,22 @@ function sceneExecutionImpact(iterationPlan, sceneId, status) {
 
   return {
     scene_present_in_next_contract: !removed,
-    voice_regeneration_required: voiceInvalidated,
-    image_regeneration_required: imageInvalidated,
-    creative_qc_rerun_required: creativeQcInvalidated,
-    scene_rerender_required: renderInvalidated,
+    voice_stage_revalidation_required: invalidatedStages.has("voice"),
+    image_stage_revalidation_required: invalidatedStages.has("images"),
+    creative_qc_stage_revalidation_required:
+      invalidatedStages.has("creative_qc"),
+    render_stage_revalidation_required: invalidatedStages.has("render"),
+    voice_regeneration_forced_by_planner: voiceInvalidated,
+    image_regeneration_forced_by_planner: imageInvalidated,
+    creative_qc_forced_by_planner: creativeQcInvalidated,
+    scene_rerender_forced_by_planner: renderInvalidated,
     voice_cache_reusable:
       !removed && stringSet(reusable.voice).has(id),
     image_cache_reusable:
       !removed && stringSet(reusable.images).has(id),
     render_cache_reusable:
       !removed && stringSet(reusable.render).has(id),
+    cache_reuse_subject_to_fingerprint: !removed,
   };
 }
 
@@ -115,11 +122,33 @@ function impactReasonCodes(status, domains, impact) {
     `scene_status_${String(status || "modified")}`,
     ...domains.map((domain) => `changed_domain_${domain}`),
   ];
-  if (impact.voice_regeneration_required) codes.push("voice_regeneration_required");
-  if (impact.image_regeneration_required) codes.push("image_regeneration_required");
-  if (impact.creative_qc_rerun_required) codes.push("creative_qc_rerun_required");
-  if (impact.scene_rerender_required) codes.push("scene_rerender_required");
-  if (!impact.scene_present_in_next_contract) codes.push("scene_removed_from_next_contract");
+  if (impact.voice_stage_revalidation_required) {
+    codes.push("voice_stage_revalidation_required");
+  }
+  if (impact.image_stage_revalidation_required) {
+    codes.push("image_stage_revalidation_required");
+  }
+  if (impact.creative_qc_stage_revalidation_required) {
+    codes.push("creative_qc_stage_revalidation_required");
+  }
+  if (impact.render_stage_revalidation_required) {
+    codes.push("render_stage_revalidation_required");
+  }
+  if (impact.voice_regeneration_forced_by_planner) {
+    codes.push("voice_regeneration_forced_by_planner");
+  }
+  if (impact.image_regeneration_forced_by_planner) {
+    codes.push("image_regeneration_forced_by_planner");
+  }
+  if (impact.creative_qc_forced_by_planner) {
+    codes.push("creative_qc_forced_by_planner");
+  }
+  if (impact.scene_rerender_forced_by_planner) {
+    codes.push("scene_rerender_forced_by_planner");
+  }
+  if (!impact.scene_present_in_next_contract) {
+    codes.push("scene_removed_from_next_contract");
+  }
   return unique(codes);
 }
 
@@ -222,7 +251,7 @@ export function buildIncrementalReviewDiff(iterationPlan) {
     invalidated_stages: unique(asArray(iterationPlan.invalidated_stages).map(String)),
     invalidated_scene_ids: invalidatedSceneIds,
     reusable_scene_ids: reusableSceneIds,
-    regeneration_counts: {
+    forced_regeneration_counts: {
       voice: invalidatedSceneIds.voice.length,
       images: invalidatedSceneIds.images.length,
       creative_qc: invalidatedSceneIds.creative_qc.length,
@@ -287,7 +316,8 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
       schema: diff.schema,
       review_scope: diff.review_scope,
       changed_scenes: diff.changed_scene_ids.length,
-      rerender_scenes: diff.execution_summary.regeneration_counts.render,
+      rerender_scenes_forced_by_planner:
+        diff.execution_summary.forced_regeneration_counts.render,
       reusable_render_scenes: diff.execution_summary.reusable_counts.render,
       full_review_required: diff.full_review_required,
       human_review_required: true,

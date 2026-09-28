@@ -113,9 +113,11 @@ const BEAT_KINDS=new Set([
 
 function defaultBeatKind(event,type){
   if(type==="object"||type==="pose"){
+    const hasMoveX=event?.move_to_offset_x!==undefined && event?.move_to_offset_x!==null;
+    const hasMoveY=event?.move_to_offset_y!==undefined && event?.move_to_offset_y!==null;
     const moved=
-      Number(event?.move_to_offset_x)!==Number(event?.offset_x||0) ||
-      Number(event?.move_to_offset_y)!==Number(event?.offset_y||0);
+      (hasMoveX && Number(event.move_to_offset_x)!==Number(event?.offset_x||0)) ||
+      (hasMoveY && Number(event.move_to_offset_y)!==Number(event?.offset_y||0));
     if(moved) return "LAYER_MOTION";
   }
   if(type==="text") return "CAPTION_CHANGE";

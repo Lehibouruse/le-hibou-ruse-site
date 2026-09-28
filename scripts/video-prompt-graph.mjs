@@ -50,10 +50,19 @@ function semanticBeatKind(event) {
   const explicit = nonEmpty(event?.beat_kind).toUpperCase();
   if (explicit) return explicit;
   const type = nonEmpty(event?.type).toLowerCase();
-  if ((type === "object" || type === "pose") &&
-      (Number(event?.move_to_offset_x) !== Number(event?.offset_x || 0) ||
-       Number(event?.move_to_offset_y) !== Number(event?.offset_y || 0))) {
-    return "LAYER_MOTION";
+  if (type === "object" || type === "pose") {
+    const hasMoveX =
+      event?.move_to_offset_x !== undefined && event?.move_to_offset_x !== null;
+    const hasMoveY =
+      event?.move_to_offset_y !== undefined && event?.move_to_offset_y !== null;
+    if (
+      (hasMoveX &&
+        Number(event.move_to_offset_x) !== Number(event?.offset_x || 0)) ||
+      (hasMoveY &&
+        Number(event.move_to_offset_y) !== Number(event?.offset_y || 0))
+    ) {
+      return "LAYER_MOTION";
+    }
   }
   if (type === "text") return "CAPTION_CHANGE";
   if (type === "callout") return "NUMBER_CALLOUT";

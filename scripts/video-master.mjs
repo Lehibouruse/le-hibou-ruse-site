@@ -287,6 +287,7 @@ export function masterPolicy({maxScenes=20,regenAttempts=1}={}){
     max_scenes:scenes,
     regeneration_attempts:retries,
     technical_selection_allowed:true,
+    prompt_propagation:state.prompt_propagation||null,
     human_master_review_required:true,
     publication_authorized:false,
     paid_fallback:false
@@ -517,12 +518,22 @@ async function main(){
 
   const runtimeCommit=String(storyboardData.runtime_commit||"").trim();
   const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
+  const promptPropagationPath=resolve(root,"prompt-propagation.json");
   {
     const guardModule=await import(pathToFileURL(preRuntime.layerGuard).href+"?v="+Date.now());
     const separation=guardModule.validateGlobalSpecificSeparation(storyboardData);
     const propagation=guardModule.validatePromptPropagation(storyboardData);
+    writeJson(promptPropagationPath,{
+      ...propagation,
+      runtime_commit:runtimeCommit,
+      audited_at:new Date().toISOString(),
+      publication_authorized:false
+    });
     state.global_specific_guard=separation;
-    state.prompt_propagation=propagation;
+    state.prompt_propagation={
+      ...propagation,
+      path:promptPropagationPath
+    };
     writeJson(statePath,state);
   }
 
@@ -970,6 +981,7 @@ async function main(){
       publication_authorized:false,
       entries:[
       {kind:"storyboard",path:storyboard},
+      {kind:"prompt_propagation",path:promptPropagationPath},
       {kind:"audio",path:mastered},
       {kind:"subtitles",path:ass},
       {kind:"asset_resolved_contract",path:assetResolved},

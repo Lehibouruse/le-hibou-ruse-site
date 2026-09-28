@@ -520,7 +520,9 @@ async function main(){
   {
     const guardModule=await import(pathToFileURL(preRuntime.layerGuard).href+"?v="+Date.now());
     const separation=guardModule.validateGlobalSpecificSeparation(storyboardData);
+    const propagation=guardModule.validatePromptPropagation(storyboardData);
     state.global_specific_guard=separation;
+    state.prompt_propagation=propagation;
     writeJson(statePath,state);
   }
 

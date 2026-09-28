@@ -183,6 +183,27 @@ export function buildImagePlan(contract,binding){
   const styleLock=String(creative.style_lock||"").trim();
   const negativeLock=String(creative.negative_prompt||"").trim();
   const contentBrief=String(creative.content_brief||"").trim();
+  const airtableCreativeContract=String(contract?.content?.source||"").trim().toLowerCase()==="airtable";
+  if(airtableCreativeContract){
+    const methodVersion=String(contract?.content?.method_version||"").trim();
+    const profileVersion=String(contract?.content?.profile_version||"").trim();
+    const missing=[];
+    if(methodVersion!=="VIDEO_METHOD_V4.3") missing.push("content.method_version=VIDEO_METHOD_V4.3");
+    if(!profileVersion.includes("V4.3")) missing.push("content.profile_version containing V4.3");
+    if(!styleLock) missing.push("creative.style_lock");
+    if(!characterLock) missing.push("creative.character_lock");
+    if(!negativeLock) missing.push("creative.negative_prompt");
+    if(!contentBrief) missing.push("creative.content_brief");
+    if(String(creative.reference_mode||"")!=="deterministic_character_overlay"){
+      missing.push("creative.reference_mode=deterministic_character_overlay");
+    }
+    if(creative.text_in_generated_images!==false){
+      missing.push("creative.text_in_generated_images=false");
+    }
+    if(missing.length){
+      fail("Airtable creative contract incomplete; refusing generic render: "+missing.join(", "));
+    }
+  }
   const creativeLockEnabled=Boolean(
     Object.keys(creative||{}).length
     && (
@@ -300,7 +321,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,creative_contract_enforced:airtableCreativeContract,scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

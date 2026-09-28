@@ -13,6 +13,7 @@ const ALLOWED_SCENE_KEYS=new Set([
   "scene_id","order","narration_exact","visual_idea","image_prompt","screen_text",
   "planned_duration_s","measured_duration_s","zoom_percent","framing","image",
   "breath_unit","voice","timeline","pose_request","music_cue","composition",
+  "visual_group","asset_requirements","asset_resolution",
   "render_artifact","pose_registry","pose_registry_resolution"
 ]);
 

@@ -114,6 +114,9 @@ for index, scene in enumerate(scenes, start=1):
 device = os.getenv("HIBOU_CHATTERBOX_DEVICE", "cuda")
 model_variant = os.getenv("HIBOU_CHATTERBOX_MODEL", "v3")
 audio_prompt = os.getenv("HIBOU_VOICE_REFERENCE") or None
+voice_contract = contract.get("audio") or {}
+voice_profile_id = str(voice_contract.get("voice_profile_id") or "VOICE_V4_ORIGINAL").strip()
+voice_profile_text = str(voice_contract.get("voice_profile_text") or "").strip()
 seed_base = int(os.getenv("HIBOU_VOICE_SEED_BASE", "42000"))
 default_exaggeration = float(os.getenv("HIBOU_CHATTERBOX_EXAGGERATION", "0.5"))
 default_temperature = float(os.getenv("HIBOU_CHATTERBOX_TEMPERATURE", "0.8"))
@@ -559,6 +562,7 @@ master_hash = sha256_file(master_path)
 updated = copy.deepcopy(contract)
 updated["contract_state"] = "storyboard"
 updated["audio"] = {
+    **(contract.get("audio") or {}),
     "state": "ready",
     "engine": "chatterbox_multilingual",
     "reference": "voice-master.wav",
@@ -567,6 +571,19 @@ updated["audio"] = {
     "device": device,
     "model_variant": model_variant,
     "paid_fallback": False,
+    "voice_profile_id": voice_profile_id,
+    "voice_profile_text": voice_profile_text,
+    "voice_profile_runtime": {
+        "profile_id": voice_profile_id,
+        "profile_text_present": bool(voice_profile_text),
+        "audio_reference_present": bool(audio_prompt),
+        "baseline_controls": {
+            "exaggeration": default_exaggeration,
+            "temperature": default_temperature,
+            "cfg_weight": default_cfg_weight,
+        },
+        "scene_prosody_overrides_supported": True,
+    },
 }
 for scene, meta in zip(updated["scenes"], scene_meta):
     scene["narration_text"] = meta["text"]
@@ -608,6 +625,9 @@ manifest = {
     "model_variant": model_variant,
     "audio_prompt_path": audio_prompt,
     "audio_prompt_sha256": audio_prompt_hash,
+    "voice_profile_id": voice_profile_id,
+    "voice_profile_text": voice_profile_text,
+    "voice_profile_runtime": updated["audio"].get("voice_profile_runtime"),
     "paid_fallback": False,
     "scene_cache_hits": cache_hits,
     "scene_cache_misses": cache_misses,

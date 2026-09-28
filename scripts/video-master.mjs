@@ -85,6 +85,7 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-audio-mix.mjs","HIBOU_AUDIO_MIX_V1"],
   ["video-prosody-plan.mjs","HIBOU_PROSODY_PLAN_V1"],
   ["video-voice-duration-qc.mjs","HIBOU_VOICE_DURATION_QC_V1"],
+  ["video-voice-silence-qc.mjs","HIBOU_VOICE_SILENCE_QC_V1"],
   ["video-hibou-pose-registry.mjs","HIBOU_POSE_REGISTRY_V1"],
   ["video-layer-guard.mjs","HIBOU_GLOBAL_SPECIFIC_GUARD_V1"],
   ["hibou-poses.registry.v1.json","HIBOU_POSE_REGISTRY_V1","video/assets/hibou-poses.registry.v1.json"],
@@ -123,6 +124,7 @@ async function ensurePreImageRuntimeBundle(commit){
     audioMix:resolve(localBase,"video-audio-mix.mjs"),
     prosody:resolve(localBase,"video-prosody-plan.mjs"),
     voiceDurationQc:resolve(localBase,"video-voice-duration-qc.mjs"),
+    voiceSilenceQc:resolve(localBase,"video-voice-silence-qc.mjs"),
     poseRegistryScript:resolve(localBase,"video-hibou-pose-registry.mjs"),
     layerGuard:resolve(localBase,"video-layer-guard.mjs"),
     poseRegistry:resolve(localBase,"hibou-poses.registry.v1.json"),
@@ -450,7 +452,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","prosody","voice","voice_duration_qc","audio_master","voice_silence_qc","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -599,6 +601,23 @@ async function main(){
 
   const voiceMastered=resolve(voiceDir,"voice-mastered.wav");
   stage(state,"audio_master",()=>run(process.execPath,[preRuntime.audioMaster,rawVoice,voiceMastered]));
+
+  const voiceSilenceQc=resolve(voiceDir,"voice-silence-qc.json");
+  stage(state,"voice_silence_qc",()=>{
+    run(process.execPath,[preRuntime.voiceSilenceQc,voiceMastered,voiceSilenceQc]);
+    const report=json(voiceSilenceQc);
+    state.voice_silence_qc={
+      status:String(report.status||""),
+      longest_silence_s:Number(report.longest_silence_s||0),
+      rejected_interval_count:Number(report.rejected_interval_count||0),
+      max_silence_s:Number(report.max_silence_s||0.8),
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+    if(report.status!=="PASS"){
+      fail("voice silence QC rejected mastered voice before image generation");
+    }
+  });
 
   const musicEnabled=contractFeature(storyboardData,"video_music_mix_v1","HIBOU_VIDEO_MUSIC_V1");
   const musicMixed=resolve(voiceDir,"voice-music-mixed.wav");

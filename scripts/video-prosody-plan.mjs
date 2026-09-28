@@ -48,13 +48,18 @@ function normalizeCue(cue){
 function nativeFromCue(cue,base={}){
   const emphasis=String(cue.emphasis||"normal").toLowerCase();
   const intent=String(cue.intent||"neutral").toLowerCase();
+  const energeticIntent=/attaque|iron|reveal|révél|punchline|ferme|fort|énerg|energ/.test(intent);
+  const restrainedIntent=/calm|calme|posé|pose|lent|pédagog|pedagog/.test(intent);
   const exaggeration=base.exaggeration!=null?Number(base.exaggeration):
-    emphasis==="strong"||emphasis==="appuye"?0.72:
-    emphasis==="subtle"||emphasis==="leger"?0.42:0.5;
+    emphasis==="strong"||emphasis==="appuye"||emphasis==="appuyé"?0.72:
+    emphasis==="subtle"||emphasis==="leger"||emphasis==="léger"?0.42:
+    energeticIntent?0.62:
+    restrainedIntent?0.46:0.5;
   const cfgWeight=base.cfg_weight!=null?Number(base.cfg_weight):
-    intent.includes("alerte")||intent.includes("reveal")||intent.includes("revel")?0.58:0.5;
+    /alerte|reveal|révél|attaque|punchline|ferme/.test(intent)?0.58:0.5;
   const temperature=base.temperature!=null?Number(base.temperature):
-    intent.includes("calm")||intent.includes("lent")?0.72:0.8;
+    restrainedIntent?0.72:
+    /rapide|accél|accel|attaque|énerg|energ/.test(intent)?0.86:0.8;
   return {
     exaggeration:clamp(exaggeration,0.25,2),
     temperature:clamp(temperature,0.05,5),
@@ -63,7 +68,7 @@ function nativeFromCue(cue,base={}){
 }
 
 function findCueForUnit(unit,cues){
-  const exact=cues.find(c=>c.phrase&&unit.tts_text.includes(c.phrase));
+  const exact=cues.find(c=>String(c?.phrase||"")&&unit.tts_text.includes(String(c.phrase)));
   return exact||null;
 }
 
@@ -75,10 +80,18 @@ export function buildProsodyPlan(scene){
   const voice=scene.voice||{};
   const verbatim=voice.verbatim!==false;
   if(!verbatim) fail("PROSODY_V1 currently requires verbatim narration");
-  const cues=(Array.isArray(voice.prosody_cues)?voice.prosody_cues:[]).map(normalizeCue);
+  const rawCues=Array.isArray(voice.prosody_cues)?voice.prosody_cues:[];
+  const baseCue=normalizeCue({
+    pause_before_ms:voice.pause_before_ms,
+    pause_after_ms:voice.pause_after_ms,
+    relative_speed_pct:voice.relative_speed_pct,
+    emphasis:voice.emphasis,
+    intent:voice.intent
+  });
   const baseNative=voice.native||{};
   const units=splitVerbatim(source).map((unit,index)=>{
-    const cue=findCueForUnit(unit,cues)||normalizeCue({});
+    const specific=findCueForUnit(unit,rawCues);
+    const cue=normalizeCue(specific?{...baseCue,...specific}:baseCue);
     return {
       id:`${scene.scene_id||"scene"}-U${String(index+1).padStart(2,"0")}`,
       ...unit,
@@ -98,6 +111,8 @@ export function buildProsodyPlan(scene){
     source_sha256:sha256Text(source),
     lexical_transform:false,
     tts_punctuation_preserved:true,
+    base_scene_cue:baseCue,
+    specific_cue_count:rawCues.length,
     units
   };
 }

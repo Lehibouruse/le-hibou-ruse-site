@@ -9,6 +9,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Timeline intra-scène V1 | yes | yes | no | no | no |
 | Semantic attention beats V1 | yes | yes CPU (catalogue explicite + variation advisory + aucune réécriture automatique) | no | no | no |
 | Visual Event Rate V1 | yes | yes CPU (hard cuts vs événements subtils + beats planifiés + tiers; même définition forensic/QC master) | no | no | no |
+| Style Profile visual cadence V1 | yes | yes CPU (hard/subtle/total events + courbe par tiers alimentent le profil) | no | no | no |
 | Motion / cadence planner V1 | yes | yes CPU (profils globaux, zones hook/body/CTA, STATIC/ANIMATED advisory; aucune mutation timeline) | no | no | no |
 | Prompt Graph V1 | yes | yes CPU (GLOBAL refs, scene delta, attention beats, primitives éditoriales, fingerprint déterministe; runtime non branché) | no | no | no |
 | Primitives éditoriales Roadmap V1 | yes | yes CPU (persona/qualify/disqualify/condition/risk/source/juridiction/date transportés; migration live non appliquée) | no | no | no |

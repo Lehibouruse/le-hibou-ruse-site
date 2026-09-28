@@ -69,6 +69,7 @@ jobs:
           node --test \
             tests/video-scene-timeline-v1.test.mjs \
             tests/video-visual-event-metrics.test.mjs \
+            tests/video-style-profile.test.mjs \
             tests/video-creative-qc.test.mjs \
             tests/video-hibou-pose-registry.test.mjs \
             tests/video-layer-guard.test.mjs \

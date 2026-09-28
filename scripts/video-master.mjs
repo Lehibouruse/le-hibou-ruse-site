@@ -188,6 +188,7 @@ const POST_RUNTIME_FILES=[
   ["video-local-render.mjs","renderVideoContract"],
   ["video-scene-compositor.mjs","buildSceneCompositePlan"],
   ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
+  ["video-visual-event-metrics.mjs","HIBOU_VISUAL_EVENT_RATE_V1"],
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
   ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
   ["video-review-diff.mjs","HIBOU_INCREMENTAL_REVIEW_DIFF_V1"],
@@ -1005,7 +1006,7 @@ async function main(){
 
   const masterQc=resolve(root,"master-qc.json");
   stage(state,"master_qc",()=>{
-    run(process.execPath,[postRuntime.masterQc,master,masterQc]);
+    run(process.execPath,[postRuntime.masterQc,master,masterQc,renderReady]);
     const qc=json(masterQc);
     if(!["PASS","REVIEW"].includes(qc.status)) fail("unexpected master QC status");
     state.master_qc_status=qc.status;

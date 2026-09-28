@@ -124,6 +124,9 @@
 
 ### Revue / sécurité
 
+- le diff incrémental expose `review_summary` et `execution_summary` : scènes modifiées/inchangées, stages invalidés, `forced_regeneration_counts`, caches réutilisables et reason codes par scène ;
+- une revalidation de stage n'est pas confondue avec une régénération forcée : les fingerprints restent l'autorité de cache ;
+
 - PREVIEW marqué `preview_only` ;
 - registre d'artefacts toujours `publication_authorized:false` ;
 - manifeste de revue humaine V4 ;
@@ -136,7 +139,7 @@
 
 1. **Checkpoint de sélection humaine** : codé statiquement ; reste l'E2E réel `WAITING_HUMAN_SELECTION` → décision fingerprintée → reprise sans refaire FLUX.
 2. **Resume après revue** : fingerprint anti-stale codé ; reste à valider sur médias réels.
-3. **Diff de revue incrémentale** : montrer automatiquement ce qui a changé depuis le dernier PREVIEW pour concentrer la revue sur les scènes modifiées tout en gardant un contrôle global minimal.
+3. **Diff de revue incrémentale** : codé et enrichi avec domaines changés, stages à revalider, régénérations forcées vs cache fingerprinté et scènes réutilisables ; reste l’E2E PREVIEW → retouche → revue humaine réelle.
 4. **Coverage audit méthodologie** : contrôle statique que chaque étape Airtable importante dispose d'un artefact/code/test attendu.
 5. **Durabilité des artefacts** : plan content-addressed codé, images sélectionnées incluses dans le registre ; reste à choisir/valider un backend durable et son uploader séparé après les E2E.
 

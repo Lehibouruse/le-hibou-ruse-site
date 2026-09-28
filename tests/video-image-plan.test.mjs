@@ -175,9 +175,10 @@ test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free charact
  assert.match(promptWithHibou,/SCENE_IMAGE_PROMPT: prompt one/);
  assert.doesNotMatch(promptWithHibou,/SCENE_VISUAL_IDEA/);
  assert.doesNotMatch(promptWithHibou,/ABSOLUTELY AVOID/);
- assert.match(promptWithHibou,/TEXT_FREE_IMAGE_LOCK/);
+ assert.match(promptWithHibou,/CLEAN_SURFACE_LOCK/);
  assert.equal(p.creative_routing.global_negative_policy_present,true);
  assert.equal(p.creative_routing.global_negative_policy_injected_as_literal_tokens,false);
+ assert.match(promptWithHibou,/FRAMING_LOCK/);
  const promptWithoutHibou=p.requests.find(x=>x.scene_id==="S02").request.overrides["6"].text;
  assert.match(promptWithoutHibou,/OBJECTS_AND_ENVIRONMENT_COMPOSITION/);
 });
@@ -224,4 +225,23 @@ test("preview never selects a vertical profile below the technical QC floor",()=
  assert.ok(p.profile.height>=896);
  assert.equal(p.profile.width,640);
  assert.equal(p.profile.height,1136);
+});
+
+
+test("macro framing is routed into the FLUX prompt",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes[0].framing={hibou:true,type:"macro",anchor:"left"};
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.match(prompt,/FRAMING_LOCK: tight macro close-up/);
+ assert.match(prompt,/overlay-safe area toward left/);
 });

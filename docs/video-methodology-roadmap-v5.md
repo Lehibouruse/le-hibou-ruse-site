@@ -125,6 +125,8 @@
 ### Revue / sécurité
 
 - le diff incrémental expose `review_summary` et `execution_summary` : scènes modifiées/inchangées, stages invalidés, `forced_regeneration_counts`, caches réutilisables et reason codes par scène ;
+- le manifeste humain V4 embarque une `scene_review_queue` actionnable avec checks ciblés, impacts d’exécution et décision humaine toujours `PENDING` ;
+- si le diff est absent ou de schéma invalide, le manifeste retombe automatiquement en revue `FULL` avec warning ;
 - une revalidation de stage n'est pas confondue avec une régénération forcée : les fingerprints restent l'autorité de cache ;
 
 - PREVIEW marqué `preview_only` ;

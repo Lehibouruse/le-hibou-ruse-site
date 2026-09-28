@@ -127,3 +127,68 @@ test("FINAL keeps the premium local profile and multi-candidate policy",()=>{
 test("unknown production modes fail closed",()=>{
  assert.throws(()=>normalizeProductionMode("turbo"),/preview or final/);
 });
+
+
+test("Airtable renders fail closed when the GLOBAL + SPECIFIC creative contract is missing",()=>{
+ const bad=structuredClone(contract);
+ bad.content={
+   ...bad.content,
+   source:"airtable",
+   method_version:"VIDEO_METHOD_V4.3",
+   profile_version:"2.5-V4.3"
+ };
+ assert.throws(
+   ()=>buildImagePlan(bad,binding),
+   /Airtable creative contract incomplete; refusing generic render/
+ );
+});
+
+test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free character-overlay rules into FLUX",()=>{
+ const good=structuredClone(contract);
+ good.content={
+   ...good.content,
+   source:"airtable",
+   method_version:"VIDEO_METHOD_V4.3",
+   profile_version:"2.5-V4.3"
+ };
+ good.creative={
+   style_lock:"GLOBAL_STYLE_LOCK premium editorial cartoon",
+   negative_prompt:"NO humans, no photorealism, no identity drift",
+   character_lock:"CHARACTER_BIBLE canonical dandy owl with yellow eyes and gold monocle",
+   content_brief:"SPECIFIC_BRIEF Lombard vs Box Spread",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes[0].framing={hibou:true};
+ good.scenes[1].framing={hibou:false};
+ const p=buildImagePlan(good,binding);
+ assert.equal(p.creative_contract_enforced,true);
+ const promptWithHibou=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.match(promptWithHibou,/BACKGROUND_ONLY_LOCK/);
+ assert.match(promptWithHibou,/GLOBAL_STYLE_LOCK premium editorial cartoon/);
+ assert.match(promptWithHibou,/SPECIFIC_BRIEF Lombard vs Box Spread/);
+ assert.match(promptWithHibou,/prompt one/);
+ assert.match(promptWithHibou,/ABSOLUTELY AVOID: NO humans/);
+ assert.match(promptWithHibou,/TEXT_FREE_IMAGE_LOCK/);
+ const promptWithoutHibou=p.requests.find(x=>x.scene_id==="S02").request.overrides["6"].text;
+ assert.match(promptWithoutHibou,/NO_CHARACTER_LOCK/);
+});
+
+test("Airtable renders reject a legacy VIDEO_METHOD_V3 storyboard even when scene prompts exist",()=>{
+ const bad=structuredClone(contract);
+ bad.content={
+   ...bad.content,
+   source:"airtable",
+   method_version:"VIDEO_METHOD_V3",
+   profile_version:"HIBOU_VIRAL_V1@2.0"
+ };
+ bad.creative={
+   style_lock:"style",
+   negative_prompt:"negative",
+   character_lock:"character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ assert.throws(()=>buildImagePlan(bad,binding),/VIDEO_METHOD_V4\.3/);
+});

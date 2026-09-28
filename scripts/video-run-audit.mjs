@@ -66,6 +66,7 @@ function voiceSummary(root) {
       scene_count: 0,
       total_voice_duration_s: null,
       duration_qc: null,
+      silence_qc: null,
     };
   }
 
@@ -108,6 +109,7 @@ function voiceSummary(root) {
     cache_hits: Number(manifest.cache_hits || 0),
     cache_misses: Number(manifest.cache_misses || 0),
     duration_qc: qc,
+    silence_qc: readJsonIf(join(root, "voice", "voice-silence-qc.json")),
   };
 }
 
@@ -316,6 +318,13 @@ export function auditVideoRun(rootArg, { platform = process.platform } = {}) {
     attention.push({
       code: "voice_duration_anomaly",
       scene_ids: voice.duration_qc.rejected_scene_ids,
+    });
+  }
+  if (voice.silence_qc?.status === "REJECT") {
+    attention.push({
+      code: "voice_long_silence",
+      longest_silence_s: Number(voice.silence_qc.longest_silence_s || 0),
+      rejected_interval_count: Number(voice.silence_qc.rejected_interval_count || 0),
     });
   }
   if (images.failed_candidate_count > 0) {

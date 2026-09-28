@@ -139,20 +139,53 @@ test("incremental review scope is exposed without auto-reusing human approval", 
   input.incrementalPlan = {
     schema: "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1",
     changed_scene_ids: ["S02"],
+    unchanged_scene_ids: ["S01", "S03"],
     invalidated_stages: ["subtitles", "render"],
   };
   input.reviewDiff = {
     schema: "HIBOU_INCREMENTAL_REVIEW_DIFF_V1",
     review_scope: "FOCUSED_PLUS_GLOBAL_SANITY",
     full_review_required: false,
+    review_summary: {
+      changed_scene_count: 1,
+      unchanged_scene_count: 2,
+      focused_scene_count: 1,
+    },
+    execution_summary: {
+      invalidated_stages: ["subtitles", "render"],
+      forced_regeneration_counts: {
+        voice: 0,
+        images: 0,
+        creative_qc: 0,
+        render: 0,
+      },
+      reusable_counts: {
+        voice: 3,
+        images: 3,
+        render: 3,
+      },
+    },
     focused_scene_review: [
       {
         scene_id: "S02",
+        status: "modified",
+        changed_domains: ["captions"],
+        reason_codes: [
+          "scene_status_modified",
+          "changed_domain_captions",
+          "render_stage_revalidation_required",
+        ],
         focused_human_checks: ["captions_mobile_readable"],
+        execution_impact: {
+          render_stage_revalidation_required: true,
+          scene_rerender_forced_by_planner: false,
+          render_cache_reusable: true,
+        },
       },
     ],
     global_focused_checks: [],
     always_required_global_checks: ["full_video_sanity"],
+    unchanged_scenes_may_reference_previous_review: true,
   };
 
   const review = buildHumanReviewPackage(input);
@@ -162,12 +195,100 @@ test("incremental review scope is exposed without auto-reusing human approval", 
     "FOCUSED_PLUS_GLOBAL_SANITY",
   );
   assert.equal(review.incremental_context.full_review_required, false);
+  assert.equal(review.incremental_context.review_diff_available, true);
   assert.equal(
     review.incremental_context.previous_human_approval_auto_reused,
     false,
+  );
+  assert.equal(review.incremental_context.unchanged_scenes_auto_approved, false);
+  assert.equal(
+    review.incremental_context.unchanged_scenes_may_reference_previous_review,
+    true,
   );
   assert.deepEqual(
     review.incremental_context.always_required_global_checks,
     ["full_video_sanity"],
   );
+  assert.equal(review.incremental_context.scene_review_queue.length, 1);
+  assert.deepEqual(
+    review.incremental_context.scene_review_queue[0].reason_codes,
+    [
+      "scene_status_modified",
+      "changed_domain_captions",
+      "render_stage_revalidation_required",
+    ],
+  );
+  assert.equal(
+    review.incremental_context.scene_review_queue[0].execution_impact
+      .render_cache_reusable,
+    true,
+  );
+  assert.equal(
+    review.incremental_context.scene_review_queue[0].human_decision,
+    "PENDING",
+  );
+  assert.equal(
+    review.incremental_context.review_summary.changed_scene_count,
+    1,
+  );
+  assert.equal(
+    review.incremental_context.execution_summary.reusable_counts.render,
+    3,
+  );
+});
+
+
+test("missing incremental review diff falls back to full review with warning", () => {
+  const input = base();
+  input.incrementalPlan = {
+    schema: "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1",
+    changed_scene_ids: ["S02"],
+    unchanged_scene_ids: ["S01"],
+    invalidated_stages: ["render"],
+  };
+  input.reviewDiff = null;
+
+  const review = buildHumanReviewPackage(input);
+
+  assert.equal(review.incremental_context.review_diff_available, false);
+  assert.equal(review.incremental_context.review_scope, "FULL");
+  assert.equal(review.incremental_context.full_review_required, true);
+  assert.deepEqual(review.incremental_context.scene_review_queue, []);
+  assert.equal(
+    review.machine_warnings.some(
+      (item) => item.code === "incremental_review_diff_not_available",
+    ),
+    true,
+  );
+  assert.equal(review.human_approved, false);
+  assert.equal(review.publication_authorized, false);
+});
+
+test("invalid incremental review diff schema never narrows review scope", () => {
+  const input = base();
+  input.incrementalPlan = {
+    schema: "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1",
+    changed_scene_ids: ["S02"],
+    invalidated_stages: ["render"],
+  };
+  input.reviewDiff = {
+    schema: "OTHER",
+    review_scope: "FOCUSED_PLUS_GLOBAL_SANITY",
+    full_review_required: false,
+    focused_scene_review: [{ scene_id: "S02" }],
+  };
+
+  const review = buildHumanReviewPackage(input);
+
+  assert.equal(review.incremental_context.review_diff_available, false);
+  assert.equal(review.incremental_context.review_scope, "FULL");
+  assert.equal(review.incremental_context.full_review_required, true);
+  assert.equal(
+    review.machine_warnings.some(
+      (item) => item.code === "incremental_review_diff_invalid_schema",
+    ),
+    true,
+  );
+  assert.equal(review.previous_human_approval_auto_reused, undefined);
+  assert.equal(review.human_approved, false);
 });

@@ -58,6 +58,33 @@ function imageStylePrompt(styleLock){
   return base?("IMAGE_STYLE_LOCK: "+base):"";
 }
 
+function removeTextRiskSentences(text){
+  const source=String(text||"").trim();
+  if(!source) return "";
+  return source
+    .split(/(?<=[.!?])\s+/u)
+    .filter(sentence=>!/(?:\btexte\b|\btext\b|\bletter(?:s|ing)?\b|\blogo\b|\bsign(?:age)?\b|\bécriture\b|\binscription\b)/iu.test(sentence))
+    .join(" ")
+    .trim();
+}
+
+function framingPrompt(scene){
+  const type=String(scene?.framing?.type||"").trim().toLowerCase();
+  const anchor=String(scene?.framing?.anchor||"").trim().toLowerCase();
+  let base="";
+  if(/macro|close|gros/.test(type)){
+    base="FRAMING_LOCK: tight macro close-up; the primary object must fill most of the frame; avoid room-wide establishing compositions; background stays secondary and simplified.";
+  }else if(/medium|moyen/.test(type)){
+    base="FRAMING_LOCK: medium editorial framing; one clear focal environment/prop composition; avoid extreme wide-angle views.";
+  }else if(/wide|large|ensemble/.test(type)){
+    base="FRAMING_LOCK: controlled wide editorial framing with one dominant focal subject and simplified background.";
+  }else{
+    base="FRAMING_LOCK: clear editorial composition with one dominant focal subject and simplified background.";
+  }
+  if(anchor) base+=" Preserve an open overlay-safe area toward "+anchor+".";
+  return base;
+}
+
 function verifiedHardwareProfiles(){
   const candidates=[
     resolve(PLAN_DIR,VERIFIED_HARDWARE_PROFILE),
@@ -248,9 +275,9 @@ export function buildImagePlan(contract,binding){
     )
   );
   const textFreeLock=creativeLockEnabled?[
-    "TEXT_FREE_IMAGE_LOCK:",
-    "Create a clean illustration with zero readable lettering, numbers, logos or signage.",
-    "All useful typography and branding are added later in post-production."
+    "CLEAN_SURFACE_LOCK:",
+    "Keep plaques, paper surfaces, walls, screens and decorative panels blank and unmarked.",
+    "Use clean geometric shapes and simple material details only."
   ].join(" "):"";
   const modeCandidates=productionMode==="preview"
     ?Number(production.preview_candidates_per_scene??1)
@@ -283,14 +310,18 @@ export function buildImagePlan(contract,binding){
       && Boolean(scene?.framing?.hibou);
     const sceneWantsHibou=Boolean(scene?.framing?.hibou);
     const rawSpecificVisual=sceneImagePrompt||sceneVisualIdea;
-    const compiledSpecificVisual=deterministicCharacterOverlay
+    const characterSafeVisual=deterministicCharacterOverlay
       ? removeOverlayCharacterSentences(rawSpecificVisual)
       : rawSpecificVisual;
+    const compiledSpecificVisual=creativeLockEnabled
+      ? removeTextRiskSentences(characterSafeVisual)
+      : characterSafeVisual;
     if(!compiledSpecificVisual) fail(`${scene.scene_id}: compiled scene image prompt is empty`);
     const specificVisual=(sceneImagePrompt?"SCENE_IMAGE_PROMPT: ":"SCENE_VISUAL_FALLBACK: ")+compiledSpecificVisual;
     const styleForImage=imageStylePrompt(styleLock);
-    const compiledPrefix=deterministicCharacterOverlay?removeOverlayCharacterSentences(prefix):prefix;
-    const compiledSuffix=deterministicCharacterOverlay?removeOverlayCharacterSentences(suffix):suffix;
+    const framingLock=framingPrompt(scene);
+    const compiledPrefix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(prefix)):removeTextRiskSentences(prefix);
+    const compiledSuffix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(suffix)):removeTextRiskSentences(suffix);
     const compositionLock=deterministicCharacterOverlay
       ? [
           "ENVIRONMENT_ONLY_COMPOSITION:",
@@ -310,6 +341,7 @@ export function buildImagePlan(contract,binding){
           compiledPrefix,
           specificVisual,
           styleForImage,
+          framingLock,
           compositionLock,
           textFreeLock,
           compiledSuffix

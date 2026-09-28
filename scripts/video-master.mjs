@@ -548,6 +548,26 @@ async function main(){
     writeJson(statePath,state);
   }
 
+  const promptGraphPath=resolve(root,"prompt-graph.json");
+  {
+    const promptGraphModule=await import(pathToFileURL(preRuntime.promptGraph).href+"?v="+Date.now());
+    const promptGraph=promptGraphModule.buildPromptGraph(storyboardData);
+    writeJson(promptGraphPath,{
+      ...promptGraph,
+      runtime_commit:runtimeCommit,
+      publication_authorized:false
+    });
+    state.prompt_graph={
+      path:promptGraphPath,
+      schema:promptGraph.schema,
+      prompt_graph_sha256:promptGraph.prompt_graph_sha256,
+      scene_count:promptGraph.scene_count,
+      attention_beat_count:promptGraph.attention_beat_count,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+  }
+
   const planningAuditEnabled=contractFeature(
     storyboardData,
     "video_planning_audit_v1",
@@ -1075,6 +1095,7 @@ async function main(){
       entries:[
       {kind:"storyboard",path:storyboard},
       {kind:"prompt_propagation",path:promptPropagationPath},
+      {kind:"prompt_graph",path:promptGraphPath},
       {kind:"audio",path:mastered},
       {kind:"subtitles",path:ass},
       {kind:"asset_resolved_contract",path:assetResolved},
@@ -1173,6 +1194,7 @@ async function main(){
     preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     prompt_propagation:state.prompt_propagation||null,
+    prompt_graph:state.prompt_graph||null,
     human_master_review_required:true,
     publication_authorized:false
   };

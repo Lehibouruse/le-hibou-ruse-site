@@ -17,7 +17,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Audit global verrou publication | yes | yes CPU (scan artefacts, fail-closed sur publication/auto-publish/PREVIEW full master) | no | no | no |
 | Plan E2E machine-readable sécurisé | yes | yes CPU (dépendances, idle, run jetable, démarrage manuel, publication false) | no | no | no |
 | Chaîne preuve code → E2E → activation | yes | yes CPU (liens E2E vérifiés, activation inactive par étape, activation prématurée rejetée) | no | no | no |
-| Sélection humaine candidats V1 | yes | yes (review package, contact sheet, stale-decision fingerprint, pause/resume orchestration statique) | no | no | no |
+| Sélection humaine candidats V1 | yes | yes (review package, contact sheet, stale-decision fingerprint, pause/resume + worker local propriétaire) | no | no | no |
 | Reprise humaine distante | yes | yes statique (Airtable pause → fingerprint → worker local) | no | no | no |
 | Ranking image ambiguïté-aware | yes | yes (ties/near-ties => aucun faux winner machine) | no | no | no |
 | Télémétrie débit images | yes | yes (durée/candidat + estimations 1/2/3 candidats par scène) | no | no | no |
@@ -31,7 +31,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Audit local de run V1 | yes | yes CPU (stages, voix, images, caches, reprise; lecture seule) | no | no | no |
 | Audit état reprise préparée | yes | yes CPU (receipt + marker local + second démarrage explicite) | no | no | no |
 | Audit démarrage réparation | yes | yes CPU (phase execution_started + validation reçu de start) | no | no | no |
-| Reprise distante après erreur | yes | yes statique/CPU (double gate, préparation → Paused, second consentement + 4 hashes, reçu de start, one-shot) | no | no | no |
+| Reprise distante après erreur | yes | yes statique/CPU (double gate, 2 consentements + 4 hashes, reçu one-shot, reprise épinglée au worker propriétaire des artefacts locaux) | no | no | no |
 | Readiness réparation distante 2 phases | yes | yes CPU (START sans RESUME bloqué, prepare-only signalé, double consentement explicite) | no | no | no |
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |

@@ -1473,6 +1473,13 @@ async function processVideoRender(job, processed) {
     throw new Error(`Queue rejected storyboard: ${job.queue_error}`);
   }
 
+  const targetWorker = String(job.options?.target_worker || "").trim();
+  if (targetWorker && targetWorker !== WORKER_ID) {
+    throw new Error(
+      `VIDEO_RENDER target worker mismatch: expected ${targetWorker}; current ${WORKER_ID}`,
+    );
+  }
+
   if (!job.storyboard || typeof job.storyboard !== "object") {
     throw new Error("VIDEO_RENDER storyboard missing");
   }

@@ -142,3 +142,11 @@ test("remote human resume remains a human gate and never authorizes publication"
  assert.match(queueRoute,/human_review_required: true/);
  assert.match(queueRoute,/publication_authorized: false/);
 });
+
+test("stateful resumes remain pinned to the worker that owns local artifacts",()=>{
+ assert.match(queueRoute,/function workerOwnsLocalState/);
+ assert.match(queueRoute,/human_selection_local_state/);
+ assert.match(queueRoute,/targetWorker && targetWorker !== pollWorker/);
+ assert.match(queueRoute,/target_worker_reason/);
+ assert.match(worker,/VIDEO_RENDER target worker mismatch/);
+});

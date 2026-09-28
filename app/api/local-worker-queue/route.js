@@ -440,7 +440,11 @@ async function autoStartPreparedRepair(request) {
   });
   const eligible = paused
     .map((record) => ({ record, start: repairStartPayload(record) }))
-    .filter((item) => item.start.eligible);
+    .filter(
+      (item) =>
+        item.start.eligible &&
+        workerOwnsLocalState(item.record, worker),
+    );
 
   if (eligible.length !== 1) {
     return {
@@ -456,7 +460,11 @@ async function autoStartPreparedRepair(request) {
   const startedAt = new Date().toISOString();
   await updateRecord(TABLES.localWorkerQueue, record.id, {
     Statut: "Pending",
-    "Options JSON": JSON.stringify(start.normalized_options),
+    "Options JSON": JSON.stringify({
+      ...start.normalized_options,
+      target_worker: worker,
+      target_worker_reason: "repair_start_local_state",
+    }),
     "Résultat JSON": JSON.stringify({
       schema: "HIBOU_VIDEO_RENDER_REPAIR_START_SCHEDULED_V1",
       status: "REPAIR_START_SCHEDULED",
@@ -511,7 +519,11 @@ async function autoResumeFailedRepair(request) {
 
   const eligible = errored
     .map((record) => ({ record, repair: repairResumePayload(record) }))
-    .filter((item) => item.repair.eligible);
+    .filter(
+      (item) =>
+        item.repair.eligible &&
+        workerOwnsLocalState(item.record, worker),
+    );
 
   if (eligible.length !== 1) {
     return {
@@ -527,7 +539,11 @@ async function autoResumeFailedRepair(request) {
   const resumedAt = new Date().toISOString();
   await updateRecord(TABLES.localWorkerQueue, record.id, {
     Statut: "Pending",
-    "Options JSON": JSON.stringify(repair.normalized_options),
+    "Options JSON": JSON.stringify({
+      ...repair.normalized_options,
+      target_worker: worker,
+      target_worker_reason: "repair_resume_local_state",
+    }),
     "Résultat JSON": JSON.stringify({
       schema: "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1",
       status: "REPAIR_RESUME_SCHEDULED",
@@ -576,7 +592,11 @@ async function autoResumeHumanSelection(request) {
 
   const eligible = paused
     .map((record) => ({ record, decision: humanSelectionResumePayload(record) }))
-    .filter((item) => item.decision.eligible);
+    .filter(
+      (item) =>
+        item.decision.eligible &&
+        workerOwnsLocalState(item.record, worker),
+    );
 
   if (eligible.length !== 1) {
     return {
@@ -592,7 +612,11 @@ async function autoResumeHumanSelection(request) {
   const resumedAt = new Date().toISOString();
   await updateRecord(TABLES.localWorkerQueue, record.id, {
     Statut: "Pending",
-    "Options JSON": JSON.stringify(decision.normalized_options),
+    "Options JSON": JSON.stringify({
+      ...decision.normalized_options,
+      target_worker: worker,
+      target_worker_reason: "human_selection_local_state",
+    }),
     "Résultat JSON": JSON.stringify({
       schema: "HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1",
       status: "HUMAN_SELECTION_RESUME_SCHEDULED",
@@ -717,6 +741,15 @@ function workerSession(request) {
     session: cut(request.headers.get("x-hibou-worker-session"), 240),
     worker: cut(request.headers.get("x-hibou-worker"), 180),
   };
+}
+
+function localStateWorker(record) {
+  return cut(record?.fields?.Worker || "", 180).trim();
+}
+
+function workerOwnsLocalState(record, worker) {
+  const owner = localStateWorker(record);
+  return Boolean(owner) && owner === String(worker || "").trim();
 }
 
 function isTransientVideoError(error) {
@@ -1013,6 +1046,11 @@ export async function GET(request) {
       const options = parseOptions(record.fields?.["Options JSON"]);
       const contentId = String(options.content_id || "").trim();
       const reuseFromJobId = String(options.reuse_from_job_id || "").trim();
+      const targetWorker = cut(options.target_worker || "", 180).trim();
+
+      if (targetWorker && targetWorker !== pollWorker) {
+        continue;
+      }
 
       const job = {
         id: record.id,
@@ -1036,6 +1074,9 @@ export async function GET(request) {
             ? 1
             : Math.max(1, Math.min(3, Number(options.candidates_per_scene || 3))),
           reuse_from_job_id: reuseFromJobId || null,
+          target_worker: targetWorker || null,
+          target_worker_reason:
+            cut(options.target_worker_reason || "", 120) || null,
           human_candidate_decisions:
             parseJsonObject(record.fields?.["Résultat JSON"]).schema ===
               "HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1"

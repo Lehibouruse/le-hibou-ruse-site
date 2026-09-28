@@ -42,6 +42,9 @@ test("API resumes at most one failed repair job and keeps ordinary auto-start se
       route.indexOf("autoActivateWhenWorkerReady(request)"),
   );
   assert.match(route, /remote_repair_resume_enabled: REMOTE_REPAIR_RESUME_ENABLED/);
+  assert.match(route, /workerOwnsLocalState\(item\.record, worker\)/);
+  assert.match(route, /target_worker: worker/);
+  assert.match(route, /repair_resume_local_state/);
 });
 
 test("scheduled repair request is forwarded to worker only under the server gate", () => {
@@ -211,6 +214,7 @@ test("API starts at most one prepared repair and ordinary auto-start still exclu
   assert.match(route, /const repair_start = await autoStartPreparedRepair\(request\)/);
   assert.match(route, /isRepairResumePreparedPause\(record\)/);
   assert.match(route, /remote_repair_start_enabled: REMOTE_REPAIR_START_ENABLED/);
+  assert.match(route, /repair_start_local_state/);
 });
 
 test("scheduled start request reaches worker only behind start gate", () => {

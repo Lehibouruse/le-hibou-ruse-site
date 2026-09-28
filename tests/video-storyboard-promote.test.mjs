@@ -80,3 +80,47 @@ test("promotion accepts FULL_REUSE layered scene without generated scene image",
   assert.match(promoted.scenes[0].image.selection_reason,/reusable asset graph/);
   assert.equal(promoted.validation.publication_authorized,false);
 });
+
+
+test("promotion applies sand GLOBAL branding exactly once",()=>{
+  const root=mkdtempSync(resolve(tmpdir(),"hibou-promote-brand-"));
+  const source=resolve(root,"source"); const picks=resolve(root,"picks"); const out=resolve(root,"out");
+  mkdirSync(source,{recursive:true}); mkdirSync(picks,{recursive:true}); mkdirSync(out,{recursive:true});
+  const audio=Buffer.from("audio-brand"); writeFileSync(resolve(source,"voice.wav"),audio);
+  const image=Buffer.from("image-brand"); writeFileSync(resolve(picks,"s1.png"),image);
+  const h=hash(audio);
+  writeFileSync(resolve(source,"contract.json"),JSON.stringify({
+    contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",
+    content:{content_id:"x",script_version:1,profile_version:"2.5-V4.3",method_version:"VIDEO_METHOD_V4.3"},
+    creative:{branding:{text:"Le Hibou Rusé",position:"bottom-center",color:"sand"}},
+    engine:{renderer:"ffmpeg",renderer_version:"1",fps:30,width:1080,height:1920},
+    scenes:[{scene_id:"s1",order:1,narration_exact:{mode:"audio_reference",source_audio:"voice.wav",start_s:0,end_s:1,sha256:h},visual_idea:"x",screen_text:"AUTRE TEXTE",planned_duration_s:1,image:{candidates:[],selected:null,selection_reason:null},breath_unit:"x",voice:{target_wpm:200,relative_speed_pct:100,pause_after_ms:0,emphasis:"x",intent:"x"}}],
+    audio:{state:"ready",reference:"voice.wav",sha256:h},music:{},subtitles:{},qc:{},validation:{}
+  }));
+  writeFileSync(resolve(picks,"selections.json"),JSON.stringify({s1:{selected:"s1.png",candidates:["s1.png"],selection_reason:"QC pass"}}));
+  promoteStoryboard(resolve(source,"contract.json"),resolve(picks,"selections.json"),resolve(out,"render-ready.json"));
+  const promoted=JSON.parse(readFileSync(resolve(out,"render-ready.json"),"utf8"));
+  assert.equal(promoted.scenes[0].composition.brand_signature.text,"Le Hibou Rusé");
+  assert.equal(promoted.scenes[0].composition.brand_signature.font_color,"#C7A65A");
+});
+
+test("CTA scene does not duplicate the Le Hibou Rusé brand signature",()=>{
+  const root=mkdtempSync(resolve(tmpdir(),"hibou-promote-cta-"));
+  const source=resolve(root,"source"); const picks=resolve(root,"picks"); const out=resolve(root,"out");
+  mkdirSync(source,{recursive:true}); mkdirSync(picks,{recursive:true}); mkdirSync(out,{recursive:true});
+  const audio=Buffer.from("audio-cta"); writeFileSync(resolve(source,"voice.wav"),audio);
+  const image=Buffer.from("image-cta"); writeFileSync(resolve(picks,"s1.png"),image);
+  const h=hash(audio);
+  writeFileSync(resolve(source,"contract.json"),JSON.stringify({
+    contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",
+    content:{content_id:"x",script_version:1,profile_version:"2.5-V4.3",method_version:"VIDEO_METHOD_V4.3"},
+    creative:{branding:{text:"Le Hibou Rusé",position:"bottom-center",color:"sand"}},
+    engine:{renderer:"ffmpeg",renderer_version:"1",fps:30,width:1080,height:1920},
+    scenes:[{scene_id:"s1",order:1,narration_exact:{mode:"audio_reference",source_audio:"voice.wav",start_s:0,end_s:1,sha256:h},visual_idea:"x",screen_text:"LE HIBOU RUSÉ / ABONNE-TOI",planned_duration_s:1,image:{candidates:[],selected:null,selection_reason:null},breath_unit:"x",voice:{target_wpm:200,relative_speed_pct:100,pause_after_ms:0,emphasis:"x",intent:"x"}}],
+    audio:{state:"ready",reference:"voice.wav",sha256:h},music:{},subtitles:{},qc:{},validation:{}
+  }));
+  writeFileSync(resolve(picks,"selections.json"),JSON.stringify({s1:{selected:"s1.png",candidates:["s1.png"],selection_reason:"QC pass"}}));
+  promoteStoryboard(resolve(source,"contract.json"),resolve(picks,"selections.json"),resolve(out,"render-ready.json"));
+  const promoted=JSON.parse(readFileSync(resolve(out,"render-ready.json"),"utf8"));
+  assert.equal(promoted.scenes[0].composition.brand_signature,undefined);
+});

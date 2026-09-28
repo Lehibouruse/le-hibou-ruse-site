@@ -11,6 +11,13 @@ function safeId(value) {
   if(!/^[A-Za-z0-9._-]+$/.test(text)) fail(`unsafe scene id: ${text}`);
   return text;
 }
+function brandColor(value){
+  const raw=String(value||"sand").trim().toLowerCase();
+  if(raw==="sand"||raw==="sable"||raw==="gold") return "#C7A65A";
+  if(raw==="ink"||raw==="encre") return "#172331";
+  if(/^#[0-9a-f]{6}$/i.test(raw)) return raw;
+  return "#C7A65A";
+}
 
 export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPathArg) {
   const contractPath=resolve(contractPathArg);
@@ -99,16 +106,21 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         return {...event,...copied};
       });
     }
+    const brandText=String(contract?.creative?.branding?.text||"Le Hibou Rusé");
+    const screenText=String(scene.screen_text||"");
+    const alreadyBrandsScene=screenText.toLowerCase().includes(brandText.toLowerCase());
     scene.composition={
       ...(scene.composition||{}),
-      brand_signature:{
-        text:String(contract?.creative?.branding?.text||"Le Hibou Rusé"),
-        anchor:String(contract?.creative?.branding?.position||"bottom-center"),
-        font_size:28,
-        font_color:"#172331",
-        offset_y:150,
-        z:95
-      }
+      ...(alreadyBrandsScene?{}:{
+        brand_signature:{
+          text:brandText,
+          anchor:String(contract?.creative?.branding?.position||"bottom-center"),
+          font_size:28,
+          font_color:brandColor(contract?.creative?.branding?.color),
+          offset_y:150,
+          z:95
+        }
+      })
     };
 
     const canonicalCharacter=String(contract?.creative?.reference_image_local||"").trim();

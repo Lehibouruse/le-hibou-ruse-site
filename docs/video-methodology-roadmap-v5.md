@@ -122,6 +122,14 @@
 - vérification résultat parent + vrai `master.mp4` + hash Airtable quand disponible ;
 - `reuse_from_job_id` au lieu d'un chemin arbitraire.
 
+### Stockage durable
+
+- le plan sépare désormais `objects` immuables par SHA256 des références logiques du run ;
+- les doublons de contenu sont dédupliqués sans perdre les références ni métadonnées ;
+- un emplacement durable existant est `VERIFY_EXISTING_ELSE_COPY`, jamais réputé valide sur simple présence ;
+- les chemins locaux et `file://` sont refusés comme URL durable ;
+- aucune copie réseau n'est effectuée par le planner ; l'uploader reste une brique séparée et inactive.
+
 ### Revue / sécurité
 
 - le diff incrémental expose `review_summary` et `execution_summary` : scènes modifiées/inchangées, stages invalidés, `forced_regeneration_counts`, caches réutilisables et reason codes par scène ;
@@ -143,7 +151,7 @@
 2. **Resume après revue** : fingerprint anti-stale codé ; reste à valider sur médias réels.
 3. **Diff de revue incrémentale** : codé et enrichi avec domaines changés, stages à revalider, régénérations forcées vs cache fingerprinté et scènes réutilisables ; reste l’E2E PREVIEW → retouche → revue humaine réelle.
 4. **Coverage audit méthodologie** : contrôle statique que chaque étape Airtable importante dispose d'un artefact/code/test attendu.
-5. **Durabilité des artefacts** : plan content-addressed codé, images sélectionnées incluses dans le registre ; reste à choisir/valider un backend durable et son uploader séparé après les E2E.
+5. **Durabilité des artefacts** : manifeste backend-agnostic codé avec objets immuables SHA256 dédupliqués, références logiques de run, priorités de rétention et vérification d’emplacements existants ; reste à choisir/valider un backend durable et son uploader séparé après les E2E.
 
 ## Desktop Commander
 

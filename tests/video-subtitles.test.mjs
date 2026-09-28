@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAss } from "../scripts/video-subtitles.mjs";
+import { buildAss, splitSubtitleGroups } from "../scripts/video-subtitles.mjs";
 
 function contract(screenText,timeline=null){
   return {
@@ -36,4 +36,24 @@ test("structured timeline text suppresses fallback whole-scene screen text",()=>
   assert.equal(screen.length,0);
   assert.doesNotMatch(ass,/FALLBACK/);
   assert.match(ass,/Texte narration\./);
+});
+
+
+test("narration subtitles are split into short mobile-safe groups",()=>{
+  const groups=splitSubtitleGroups(
+    "Sauf que la banque te finance au taux de marché plus sa marge et tu repayes cette marge chaque année.",
+    {maxWords:6}
+  );
+  assert.ok(groups.length>=3);
+  assert.ok(groups.every(group=>group.split(/\s+/u).length<=6));
+  assert.equal(groups.join(" "),"Sauf que la banque te finance au taux de marché plus sa marge et tu repayes cette marge chaque année.");
+});
+
+test("ASS output no longer keeps a long narration scene in one subtitle event",()=>{
+  const c=contract("");
+  c.scenes[0].narration_text="Tu as cent mille euros investis en Bourse et tu veux du cash sans vendre tes actifs.";
+  const ass=buildAss(c);
+  const narration=ass.split("\n").filter(line=>line.includes(",Narration,"));
+  assert.ok(narration.length>=3);
+  assert.ok(narration.every(line=>line.split(",,").at(-1).split(/\s+/u).length<=6));
 });

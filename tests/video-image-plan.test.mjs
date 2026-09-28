@@ -166,17 +166,20 @@ test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free charact
  const p=buildImagePlan(good,binding);
  assert.equal(p.creative_contract_enforced,true);
  const promptWithHibou=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
- assert.match(promptWithHibou,/BACKGROUND_ONLY_LOCK/);
+ assert.match(promptWithHibou,/ENVIRONMENT_ONLY_COMPOSITION/);
  assert.match(promptWithHibou,/GLOBAL_STYLE_LOCK premium editorial cartoon/);
+ assert.doesNotMatch(promptWithHibou,/\b(?:hibou|owl|bird|animal|mascot|mascotte)\b/i);
  assert.doesNotMatch(promptWithHibou,/SPECIFIC_BRIEF Lombard vs Box Spread/);
  assert.equal(p.creative_routing.specific_content_brief_present,true);
  assert.equal(p.creative_routing.specific_content_brief_copied_into_each_image_prompt,false);
  assert.match(promptWithHibou,/SCENE_IMAGE_PROMPT: prompt one/);
  assert.doesNotMatch(promptWithHibou,/SCENE_VISUAL_IDEA/);
- assert.match(promptWithHibou,/ABSOLUTELY AVOID: NO humans/);
+ assert.doesNotMatch(promptWithHibou,/ABSOLUTELY AVOID/);
  assert.match(promptWithHibou,/TEXT_FREE_IMAGE_LOCK/);
+ assert.equal(p.creative_routing.global_negative_policy_present,true);
+ assert.equal(p.creative_routing.global_negative_policy_injected_as_literal_tokens,false);
  const promptWithoutHibou=p.requests.find(x=>x.scene_id==="S02").request.overrides["6"].text;
- assert.match(promptWithoutHibou,/NO_CHARACTER_LOCK/);
+ assert.match(promptWithoutHibou,/OBJECTS_AND_ENVIRONMENT_COMPOSITION/);
 });
 
 test("Airtable renders reject a legacy VIDEO_METHOD_V3 storyboard even when scene prompts exist",()=>{
@@ -207,4 +210,18 @@ test("visual idea is used only as a fallback when no dedicated image prompt exis
  assert.match(prompt,/SCENE_VISUAL_FALLBACK: v1/);
  assert.equal(p.creative_routing.scene_image_prompt_preferred,true);
  assert.equal(p.creative_routing.visual_idea_used_only_as_fallback,true);
+});
+
+
+test("preview never selects a vertical profile below the technical QC floor",()=>{
+ const tiny=structuredClone(binding);
+ tiny.profile={width:384,height:640,batch_size:1};
+ tiny.fallback_profile={width:384,height:640,batch_size:1};
+ const preview=structuredClone(contract);
+ preview.production={mode:"preview"};
+ const p=buildImagePlan(preview,tiny);
+ assert.ok(p.profile.width>=512);
+ assert.ok(p.profile.height>=896);
+ assert.equal(p.profile.width,640);
+ assert.equal(p.profile.height,1136);
 });

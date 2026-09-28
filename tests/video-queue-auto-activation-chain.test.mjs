@@ -77,7 +77,9 @@ test("resume normalizes human decisions before forwarding them", () => {
   assert.match(route, /note: cut\(decision\.note \|\| "", 1000\)/);
   assert.match(route, /publication_authorized: false/);
   assert.match(route, /normalized_options:/);
-  assert.match(route, /"Options JSON": JSON\.stringify\(decision\.normalized_options\)/);
+  assert.match(route, /\.\.\.decision\.normalized_options/);
+  assert.match(route, /target_worker: worker/);
+  assert.match(route, /human_selection_local_state/);
 });
 
 

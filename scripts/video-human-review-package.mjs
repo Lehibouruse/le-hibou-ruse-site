@@ -162,6 +162,40 @@ export function buildHumanReviewPackage({
     ? incrementalPlan.changed_scene_ids
     : [];
 
+  const reviewDiffValid =
+    reviewDiff?.schema === "HIBOU_INCREMENTAL_REVIEW_DIFF_V1";
+  if (incrementalPlan && !reviewDiff) {
+    add(warnings, "incremental_review_diff_not_available");
+  } else if (incrementalPlan && reviewDiff && !reviewDiffValid) {
+    add(warnings, "incremental_review_diff_invalid_schema");
+  }
+
+  const focusedSceneReview =
+    reviewDiffValid && Array.isArray(reviewDiff?.focused_scene_review)
+      ? reviewDiff.focused_scene_review
+      : [];
+  const sceneReviewQueue = focusedSceneReview.map((scene) => ({
+    scene_id: String(scene?.scene_id || ""),
+    status: String(scene?.status || "modified"),
+    changed_domains: Array.isArray(scene?.changed_domains)
+      ? scene.changed_domains.map(String)
+      : [],
+    reason_codes: Array.isArray(scene?.reason_codes)
+      ? scene.reason_codes.map(String)
+      : [],
+    focused_human_checks: Array.isArray(scene?.focused_human_checks)
+      ? scene.focused_human_checks.map(String)
+      : [],
+    execution_impact:
+      scene?.execution_impact &&
+      typeof scene.execution_impact === "object" &&
+      !Array.isArray(scene.execution_impact)
+        ? scene.execution_impact
+        : null,
+    human_decision: "PENDING",
+    human_note: null,
+  }));
+
   return {
     schema: HUMAN_REVIEW_SCHEMA,
     production_mode: productionMode,
@@ -178,24 +212,52 @@ export function buildHumanReviewPackage({
     incremental_context: incrementalPlan
       ? {
           changed_scene_ids: changedScenes,
+          unchanged_scene_ids: Array.isArray(incrementalPlan.unchanged_scene_ids)
+            ? incrementalPlan.unchanged_scene_ids
+            : [],
           invalidated_stages: Array.isArray(incrementalPlan.invalidated_stages)
             ? incrementalPlan.invalidated_stages
             : [],
-          human_should_focus_changed_scenes: changedScenes.length > 0,
-          review_scope:reviewDiff?.review_scope||"FULL",
-          full_review_required:reviewDiff
+          review_diff_available: reviewDiffValid,
+          review_scope: reviewDiffValid
+            ? reviewDiff.review_scope || "FULL"
+            : "FULL",
+          full_review_required: reviewDiffValid
             ? Boolean(reviewDiff.full_review_required)
             : true,
-          focused_scene_review:Array.isArray(reviewDiff?.focused_scene_review)
-            ? reviewDiff.focused_scene_review
-            : [],
-          global_focused_checks:Array.isArray(reviewDiff?.global_focused_checks)
-            ? reviewDiff.global_focused_checks
-            : [],
-          always_required_global_checks:Array.isArray(reviewDiff?.always_required_global_checks)
-            ? reviewDiff.always_required_global_checks
-            : [],
-          previous_human_approval_auto_reused:false,
+          human_should_focus_changed_scenes:
+            reviewDiffValid
+              ? sceneReviewQueue.length > 0
+              : changedScenes.length > 0,
+          review_summary:
+            reviewDiffValid &&
+            reviewDiff?.review_summary &&
+            typeof reviewDiff.review_summary === "object"
+              ? reviewDiff.review_summary
+              : null,
+          execution_summary:
+            reviewDiffValid &&
+            reviewDiff?.execution_summary &&
+            typeof reviewDiff.execution_summary === "object"
+              ? reviewDiff.execution_summary
+              : null,
+          scene_review_queue: sceneReviewQueue,
+          focused_scene_review: focusedSceneReview,
+          global_focused_checks:
+            reviewDiffValid && Array.isArray(reviewDiff?.global_focused_checks)
+              ? reviewDiff.global_focused_checks
+              : [],
+          always_required_global_checks:
+            reviewDiffValid &&
+            Array.isArray(reviewDiff?.always_required_global_checks)
+              ? reviewDiff.always_required_global_checks
+              : [],
+          unchanged_scenes_may_reference_previous_review:
+            reviewDiffValid
+              ? Boolean(reviewDiff.unchanged_scenes_may_reference_previous_review)
+              : false,
+          unchanged_scenes_auto_approved: false,
+          previous_human_approval_auto_reused: false,
         }
       : null,
     checklist,

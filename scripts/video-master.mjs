@@ -785,6 +785,9 @@ async function main(){
         generation_requested:false
       };
       writeJson(statePath,state);
+      if(state.pose_registry.unresolved_scenes>0){
+        fail("pose registry enabled but one or more requested Hibou poses are unresolved");
+      }
     });
   }else{
     if(!existsSync(posed)) writeJson(posed,json(styled));

@@ -8,6 +8,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | --- | --- | --- | --- | --- | --- |
 | Timeline intra-scène V1 | yes | yes | no | no | no |
 | Semantic attention beats V1 | yes | yes CPU (catalogue explicite + variation advisory + aucune réécriture automatique) | no | no | no |
+| Motion / cadence planner V1 | yes | yes CPU (profils globaux, zones hook/body/CTA, STATIC/ANIMATED advisory; aucune mutation timeline) | no | no | no |
 | Prompt Graph V1 | yes | yes CPU (GLOBAL refs, scene delta, attention beats, primitives éditoriales, fingerprint déterministe; runtime non branché) | no | no | no |
 | Asset Continuity V1 | yes | yes CPU (groupes visuels explicites, génération base + réutilisation planifiée, slots uniques; aucun GPU) | no | no | no |
 | Asset Graph readiness V1 | yes | yes CPU (existence, fichier, SHA-256, statut validated, couverture slots; lecture seule) | no | no | no |

@@ -402,12 +402,25 @@
           "markers": [
             "font_family"
           ]
+        },
+        {
+          "path": "scripts/video-motion-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_MOTION_PLAN_V1",
+            "CUT_DOMINANT",
+            "HYBRID_BEATS",
+            "INTRA_SCENE_MOTION",
+            "STATIC_SCENE",
+            "ANIMATED_SCENE",
+            "automatic_timeline_mutation:false"
+          ]
         }
       ],
       "tests": [
         "tests/video-local-render.test.mjs",
         "tests/video-scene-timeline-v1.test.mjs",
-        "tests/video-subtitles-font.test.mjs"
+        "tests/video-subtitles-font.test.mjs",
+        "tests/video-motion-plan.test.mjs"
       ],
       "e2e_pending": true,
       "e2e_step_ids": [

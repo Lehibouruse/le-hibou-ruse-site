@@ -332,6 +332,17 @@
               },
               "additionalProperties": true
             }
+          },
+          "motion_mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "STATIC_SCENE",
+              "ANIMATED_SCENE",
+              null
+            ]
           }
         }
       }

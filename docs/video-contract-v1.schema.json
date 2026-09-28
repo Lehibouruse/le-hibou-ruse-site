@@ -287,6 +287,51 @@
           },
           "pose_request": {
             "type": "string"
+          },
+          "visual_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset_requirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "slot",
+                "kind"
+              ],
+              "properties": {
+                "slot": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "optional_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "scene_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
           }
         }
       }
@@ -336,6 +381,9 @@
           "type": "boolean"
         },
         "video_human_candidate_selection_v1": {
+          "type": "boolean"
+        },
+        "video_prompt_graph_v1": {
           "type": "boolean"
         }
       },

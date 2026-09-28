@@ -246,3 +246,53 @@ test("macro framing is routed into the FLUX prompt",()=>{
  assert.match(prompt,/FRAMING_LOCK: tight macro close-up/);
  assert.match(prompt,/overlay-safe area toward left/);
 });
+
+
+test("split-screen framing is routed and literal years are abstracted",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[{
+   scene_id:"SPLIT",
+   image_prompt:"Split screen timeline 2026 2027 2028 2029 with +1.5 % marker",
+   visual_idea:"",
+   framing:{hibou:false,type:"split-screen",anchor:"centre"}
+ }];
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.match(prompt,/strict two-panel split-screen composition/);
+ assert.doesNotMatch(prompt,/2026|2027|2028|2029/);
+ assert.doesNotMatch(prompt,/1\.5\s*%/);
+ assert.match(prompt,/abstract timeline milestone/);
+ assert.match(prompt,/abstract percentage marker/);
+});
+
+test("diagram framing compiles to flat diagrammatic composition",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[{
+   scene_id:"DIAG",
+   image_prompt:"Four abstract finance blocks and arrows",
+   visual_idea:"",
+   framing:{hibou:false,type:"schéma",anchor:"center"}
+ }];
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.match(prompt,/flat diagrammatic editorial composition/);
+ assert.match(prompt,/simplified blocks, arrows and icons/);
+});

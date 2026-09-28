@@ -5,6 +5,9 @@ on:
     branches:
       - feat/video-studio-v5
       - 'feat/video-studio-v5-*'
+  pull_request:
+    branches:
+      - feat/video-studio-v5
 
 permissions:
   contents: read

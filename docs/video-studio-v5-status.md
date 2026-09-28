@@ -34,6 +34,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Diff revue incrémentale actionnable | yes | yes CPU (domaines changés, stages à revalider, régénérations forcées, caches réutilisables) | no | no | no |
 | File de revue incrémentale intégrée | yes | yes CPU (scene_review_queue + fallback FULL si diff absent/invalide) | no | no | no |
 | Plan stockage durable V1 | yes | yes (plan content-addressed, aucun transfert) | no | no | no |
+| Manifeste stockage durable dédupliqué | yes | yes CPU (objets SHA256 immuables, références de run, verify-existing, priorité rétention) | no | no | no |
 | Rendu ASS Windows autonome | yes | yes CPU (Fontconfig privé + Windows Fonts) | no | no | no |
 | Police ASS Windows native | yes | yes (Arial Windows + métadonnée contrat) | no | no | no |
 

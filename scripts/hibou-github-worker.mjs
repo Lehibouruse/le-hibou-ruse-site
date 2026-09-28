@@ -1100,7 +1100,8 @@ async function ensureComfyUIReady() {
   const stderrTail = tail(stderrPath);
   const stdoutTail = tail(stdoutPath);
   throw new Error(
-    `ComfyUI did not become CUDA-ready within 180 seconds: ${endpoint}` +\n    `\\nHealth gate: ${JSON.stringify(lastHealth || { ready: false, reason: "unknown" })}` +
+    `ComfyUI did not become CUDA-ready within 180 seconds: ${endpoint}` +
+    `\nHealth gate: ${JSON.stringify(lastHealth || { ready: false, reason: "unknown" })}` +
     (startedPid ? `\nComfyUI child pid: ${startedPid}; alive=${pidAlive(startedPid)}` : "\nComfyUI child pid: unavailable") +
     (starterResult?.stderr ? `\n--- starter stderr ---\n${String(starterResult.stderr).slice(-3000)}` : "") +
     (starterResult?.stdout ? `\n--- starter stdout ---\n${String(starterResult.stdout).slice(-3000)}` : "") +

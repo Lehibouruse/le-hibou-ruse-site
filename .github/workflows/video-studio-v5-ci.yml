@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/video-studio-v5
+      - 'feat/video-studio-v5-*'
 
 permissions:
   contents: read
@@ -29,6 +30,7 @@ jobs:
           node --check scripts/video-hibou-pose-registry.mjs
           node --check scripts/video-prosody-plan.mjs
           node --check scripts/video-voice-duration-qc.mjs
+          node --check scripts/video-voice-silence-qc.mjs
           node --check scripts/video-audio-mix.mjs
           node --check scripts/video-iteration-plan.mjs
           node --check scripts/video-job-lineage.mjs
@@ -66,6 +68,7 @@ jobs:
             tests/video-layer-guard.test.mjs \
             tests/video-prosody-plan.test.mjs \
             tests/video-voice-duration-qc.test.mjs \
+            tests/video-voice-silence-qc.test.mjs \
             tests/video-voice-duration-retry.test.mjs \
             tests/video-audio-mix.test.mjs \
             tests/video-iteration-plan.test.mjs \

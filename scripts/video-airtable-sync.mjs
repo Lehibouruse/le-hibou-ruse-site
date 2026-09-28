@@ -161,7 +161,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
         text:"Le Hibou Rusé",
         position:"bottom-center",
         size:"small",
-        color:"ink",
+        color:"sand",
         source:"post-production"
       },
       pacing:{
@@ -206,6 +206,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       status:"pending",
       engine:"chatterbox_multilingual",
       reference:null,
+      voice_profile_id:String(profile["Voix"]||"").split("—")[0].trim()||"VOICE_V4_ORIGINAL",
+      voice_profile_text:String(profile["Voix"]||""),
       density_profile:selectText(profile["Profil densité voix"])||null,
       density_profile_runtime_applied:false
     },

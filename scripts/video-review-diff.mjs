@@ -80,6 +80,49 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function stringSet(values) {
+  return new Set(asArray(values).map((value) => String(value || "")).filter(Boolean));
+}
+
+function sceneExecutionImpact(iterationPlan, sceneId, status) {
+  const invalidated = iterationPlan?.invalidated_scene_ids || {};
+  const reusable = iterationPlan?.reusable_scene_ids || {};
+  const id = String(sceneId || "");
+  const removed = status === "removed";
+
+  const voiceInvalidated = stringSet(invalidated.voice).has(id);
+  const imageInvalidated = stringSet(invalidated.images).has(id);
+  const creativeQcInvalidated = stringSet(invalidated.creative_qc).has(id);
+  const renderInvalidated = stringSet(invalidated.render).has(id);
+
+  return {
+    scene_present_in_next_contract: !removed,
+    voice_regeneration_required: voiceInvalidated,
+    image_regeneration_required: imageInvalidated,
+    creative_qc_rerun_required: creativeQcInvalidated,
+    scene_rerender_required: renderInvalidated,
+    voice_cache_reusable:
+      !removed && stringSet(reusable.voice).has(id),
+    image_cache_reusable:
+      !removed && stringSet(reusable.images).has(id),
+    render_cache_reusable:
+      !removed && stringSet(reusable.render).has(id),
+  };
+}
+
+function impactReasonCodes(status, domains, impact) {
+  const codes = [
+    `scene_status_${String(status || "modified")}`,
+    ...domains.map((domain) => `changed_domain_${domain}`),
+  ];
+  if (impact.voice_regeneration_required) codes.push("voice_regeneration_required");
+  if (impact.image_regeneration_required) codes.push("image_regeneration_required");
+  if (impact.creative_qc_rerun_required) codes.push("creative_qc_rerun_required");
+  if (impact.scene_rerender_required) codes.push("scene_rerender_required");
+  if (!impact.scene_present_in_next_contract) codes.push("scene_removed_from_next_contract");
+  return unique(codes);
+}
+
 export function buildIncrementalReviewDiff(iterationPlan) {
   if (iterationPlan?.schema !== "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1") {
     fail("HIBOU_INCREMENTAL_RETOUCH_PLAN_V1 required");
@@ -102,11 +145,25 @@ export function buildIncrementalReviewDiff(iterationPlan) {
         checks.push("hero_opening");
       }
 
+      const sceneId = String(scene?.scene_id || "");
+      const status = String(scene?.status || "modified");
+      const executionImpact = sceneExecutionImpact(
+        iterationPlan,
+        sceneId,
+        status,
+      );
+
       return {
-        scene_id: String(scene?.scene_id || ""),
-        status: String(scene?.status || "modified"),
+        scene_id: sceneId,
+        status,
         changed_domains: domains,
         focused_human_checks: unique(checks),
+        execution_impact: executionImpact,
+        reason_codes: impactReasonCodes(
+          status,
+          domains,
+          executionImpact,
+        ),
         previous_approval_auto_reused: false,
         human_review_required: true,
       };
@@ -133,6 +190,51 @@ export function buildIncrementalReviewDiff(iterationPlan) {
     || globalChanges.includes("features")
     || sceneReview.length === 0;
 
+  const invalidatedSceneIds = {
+    voice: unique(asArray(iterationPlan?.invalidated_scene_ids?.voice).map(String)),
+    images: unique(asArray(iterationPlan?.invalidated_scene_ids?.images).map(String)),
+    creative_qc: unique(
+      asArray(iterationPlan?.invalidated_scene_ids?.creative_qc).map(String),
+    ),
+    render: unique(asArray(iterationPlan?.invalidated_scene_ids?.render).map(String)),
+  };
+  const reusableSceneIds = {
+    voice: unique(asArray(iterationPlan?.reusable_scene_ids?.voice).map(String)),
+    images: unique(asArray(iterationPlan?.reusable_scene_ids?.images).map(String)),
+    render: unique(asArray(iterationPlan?.reusable_scene_ids?.render).map(String)),
+  };
+  const changedSceneIds = asArray(iterationPlan.changed_scene_ids).map(String);
+  const unchangedSceneIds = asArray(iterationPlan.unchanged_scene_ids).map(String);
+
+  const reviewSummary = {
+    changed_scene_count: changedSceneIds.length,
+    unchanged_scene_count: unchangedSceneIds.length,
+    focused_scene_count: sceneReview.length,
+    modified_scene_count: sceneReview.filter((scene) => scene.status === "modified").length,
+    added_scene_count: sceneReview.filter((scene) => scene.status === "added").length,
+    removed_scene_count: sceneReview.filter((scene) => scene.status === "removed").length,
+    global_change_count: globalChanges.length,
+    full_review_required: fullReviewRequired,
+    focused_review_allowed: !fullReviewRequired,
+  };
+
+  const executionSummary = {
+    invalidated_stages: unique(asArray(iterationPlan.invalidated_stages).map(String)),
+    invalidated_scene_ids: invalidatedSceneIds,
+    reusable_scene_ids: reusableSceneIds,
+    regeneration_counts: {
+      voice: invalidatedSceneIds.voice.length,
+      images: invalidatedSceneIds.images.length,
+      creative_qc: invalidatedSceneIds.creative_qc.length,
+      render: invalidatedSceneIds.render.length,
+    },
+    reusable_counts: {
+      voice: reusableSceneIds.voice.length,
+      images: reusableSceneIds.images.length,
+      render: reusableSceneIds.render.length,
+    },
+  };
+
   return {
     schema: REVIEW_DIFF_SCHEMA,
     content_id: iterationPlan.content_id || null,
@@ -143,9 +245,11 @@ export function buildIncrementalReviewDiff(iterationPlan) {
       iterationPlan.next_contract_sha256 || null,
     structural_change: Boolean(iterationPlan.structural_change),
     global_changes: globalChanges,
-    changed_scene_ids: asArray(iterationPlan.changed_scene_ids),
-    unchanged_scene_ids: asArray(iterationPlan.unchanged_scene_ids),
+    changed_scene_ids: changedSceneIds,
+    unchanged_scene_ids: unchangedSceneIds,
     focused_scene_review: sceneReview,
+    review_summary: reviewSummary,
+    execution_summary: executionSummary,
     global_focused_checks: globalFocusedChecks,
     always_required_global_checks: alwaysRequiredChecks,
     review_scope: fullReviewRequired ? "FULL" : "FOCUSED_PLUS_GLOBAL_SANITY",
@@ -183,6 +287,8 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
       schema: diff.schema,
       review_scope: diff.review_scope,
       changed_scenes: diff.changed_scene_ids.length,
+      rerender_scenes: diff.execution_summary.regeneration_counts.render,
+      reusable_render_scenes: diff.execution_summary.reusable_counts.render,
       full_review_required: diff.full_review_required,
       human_review_required: true,
       publication_authorized: false,

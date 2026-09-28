@@ -15,6 +15,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile/lineage CPU tests; real media reuse E2E pending) | no | no | no |
 | Verrou PREVIEW / publication | yes | yes (contract + registry tests; publish E2E intentionally disabled) | no | no | no |
 | Audit global verrou publication | yes | yes CPU (scan artefacts, fail-closed sur publication/auto-publish/PREVIEW full master) | no | no | no |
+| Plan E2E machine-readable sécurisé | yes | yes CPU (dépendances, idle, run jetable, démarrage manuel, publication false) | no | no | no |
 | Sélection humaine candidats V1 | yes | yes (review package, contact sheet, stale-decision fingerprint, pause/resume orchestration statique) | no | no | no |
 | Reprise humaine distante | yes | yes statique (Airtable pause → fingerprint → worker local) | no | no | no |
 | Ranking image ambiguïté-aware | yes | yes (ties/near-ties => aucun faux winner machine) | no | no | no |

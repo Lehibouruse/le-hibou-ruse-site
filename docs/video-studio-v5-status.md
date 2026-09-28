@@ -29,6 +29,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Audit état reprise préparée | yes | yes CPU (receipt + marker local + second démarrage explicite) | no | no | no |
 | Audit démarrage réparation | yes | yes CPU (phase execution_started + validation reçu de start) | no | no | no |
 | Reprise distante après erreur | yes | yes statique/CPU (double gate, préparation → Paused, second consentement + 4 hashes, reçu de start, one-shot) | no | no | no |
+| Readiness réparation distante 2 phases | yes | yes CPU (START sans RESUME bloqué, prepare-only signalé, double consentement explicite) | no | no | no |
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
 | Diff revue incrémentale actionnable | yes | yes CPU (domaines changés, stages à revalider, régénérations forcées, caches réutilisables) | no | no | no |
@@ -48,6 +49,8 @@ All V5 execution remains opt-in. Relevant runtime gates:
 - `HIBOU_VIDEO_PROSODY_V1`
 - `HIBOU_VIDEO_MUSIC_V1`
 - `HIBOU_VIDEO_REMOTE_CANCEL_ENABLED`
+- `HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED`
+- `HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED`
 - `HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1`
 - `HIBOU_VIDEO_HUMAN_SELECTION_V1`
 

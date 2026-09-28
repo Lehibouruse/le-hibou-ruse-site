@@ -95,6 +95,14 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       framing:{type:f["Type de plan"]?.name||f["Type de plan"]||"",anchor:f.Ancrage?.name||f.Ancrage||"",hibou:Boolean(f.Hibou)},
       image:{candidates,selected:null,selection_reason:null},
       visual_group:String(f["Groupe visuel"]||"").trim()||null,
+      persona_case:String(f["Persona case"]||"").trim()||null,
+      qualify:String(f.Qualify||"").trim()||null,
+      disqualify:String(f.Disqualify||"").trim()||null,
+      condition:String(f.Condition||"").trim()||null,
+      risk:String(f.Risk||"").trim()||null,
+      source_label:String(f["Source label"]||"").trim()||null,
+      jurisdiction:String(f.Jurisdiction||"").trim()||null,
+      as_of_date:String(f["As of date"]||"").trim()||null,
       asset_requirements:parseJsonArrayStrict(
         f["Exigences assets JSON"],
         `${f.Scène||record.id}: Exigences assets JSON`
@@ -141,7 +149,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       video_music_mix_v1:Boolean(profile["Mix musique V1"]),
       video_incremental_retouch_v1:Boolean(profile["Retouches incrémentales V1"]),
       video_human_candidate_selection_v1:Boolean(profile["Sélection humaine candidats V1"]),
-      video_prompt_graph_v1:Boolean(profile["Prompt Graph V1"])
+      video_prompt_graph_v1:Boolean(profile["Prompt Graph V1"]),
+      video_planning_audit_v1:Boolean(profile["Planning audit V1"])
     },
     creative:{
       profile_name:String(profile.Profil||"HIBOU_VIRAL_V1"),

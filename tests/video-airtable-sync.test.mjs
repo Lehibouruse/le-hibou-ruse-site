@@ -144,3 +144,32 @@ test("GLOBAL voice profile and sand branding are exported from Airtable into the
  assert.match(c.audio.voice_profile_text,/warm natural/);
  assert.equal(c.creative.content_brief,"specific brief");
 });
+
+
+test("editorial primitives flow from Airtable scenes into the Prompt Graph-ready contract",()=>{
+ const parts=Array.from({length:8},(_,i)=>`fact${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ Object.assign(scenes[0].fields,{
+   "Persona case":"Paul, dirigeant de PME",
+   Qualify:"Pertinent si la société dégage une trésorerie récurrente",
+   Disqualify:"Pas pour une activité sans trésorerie",
+   Condition:"Respecter les conditions légales applicables",
+   Risk:"Risque d'abus si le montage est artificiel",
+   "Source label":"CGI",
+   Jurisdiction:"FR",
+   "As of date":"2026-09-28"
+ });
+ const c=buildStoryboardContract(content,scenes,{fields:{"Planning audit V1":false}});
+ const s=c.scenes[0];
+ assert.equal(s.persona_case,"Paul, dirigeant de PME");
+ assert.match(s.qualify,/trésorerie/);
+ assert.match(s.disqualify,/Pas pour/);
+ assert.match(s.condition,/conditions légales/);
+ assert.match(s.risk,/abus/);
+ assert.equal(s.source_label,"CGI");
+ assert.equal(s.jurisdiction,"FR");
+ assert.equal(s.as_of_date,"2026-09-28");
+ assert.equal(c.features.video_planning_audit_v1,false);
+ assert.equal(c.validation.publication_authorized,false);
+});

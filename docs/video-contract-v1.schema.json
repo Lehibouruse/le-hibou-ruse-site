@@ -343,6 +343,54 @@
               "ANIMATED_SCENE",
               null
             ]
+          },
+          "persona_case": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualify": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disqualify": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "risk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jurisdiction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of_date": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }

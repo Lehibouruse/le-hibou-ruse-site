@@ -8,6 +8,7 @@ import {
 } from "../../../lib/airtable";
 import { buildStoryboardContract, resolveCanonicalVideoProfile } from "../../../scripts/video-airtable-sync.mjs";
 import { validateReuseLineage } from "../../../scripts/video-job-lineage.mjs";
+import { scopeStoryboardForJob } from "../../../scripts/video-storyboard-scope.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1253,6 +1254,10 @@ export async function GET(request) {
           ? 0
           : Math.max(0, Math.min(2, Number(options.regen_attempts || 1)));
 
+        job.storyboard = scopeStoryboardForJob(job.storyboard,{
+          maxScenes:job.options.max_scenes,
+          mode:preview ? "preview" : "final"
+        });
         job.storyboard.production = {
           mode: preview ? "preview" : "final",
           candidates_per_scene: job.options.candidates_per_scene,
@@ -1263,7 +1268,7 @@ export async function GET(request) {
             Number(defaults.zoom_min_pct || 1.5),
             Number(defaults.zoom_max_pct || 3.5),
           ],
-          full_master_allowed: !preview,
+          full_master_allowed: !preview && job.storyboard.render_scope?.partial!==true,
           human_review_required: true,
           publication_authorized: false
         };

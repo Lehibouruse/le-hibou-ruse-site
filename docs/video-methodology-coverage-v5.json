@@ -456,7 +456,11 @@
           "path": "scripts/video-human-review-package.mjs",
           "markers": [
             "HIBOU_HUMAN_REVIEW_PACKAGE_V1",
-            "PENDING_HUMAN_REVIEW"
+            "PENDING_HUMAN_REVIEW",
+            "scene_review_queue",
+            "review_diff_available",
+            "incremental_review_diff_not_available",
+            "unchanged_scenes_auto_approved: false"
           ]
         },
         {

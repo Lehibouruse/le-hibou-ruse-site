@@ -82,6 +82,20 @@ function state() {
   };
 }
 
+function markVoiceQcsPassed(root,s){
+  write(root, "voice/voice-duration-qc.json", {
+    schema: "HIBOU_VOICE_DURATION_QC_V1",
+    status: "PASS",
+  });
+  write(root, "voice/voice-silence-qc.json", {
+    schema: "HIBOU_VOICE_SILENCE_QC_V1",
+    status: "PASS",
+  });
+  s.stages.voice_duration_qc = { status: "PASS" };
+  s.stages.voice_silence_qc = { status: "PASS" };
+}
+
+
 test("actual-like legacy run resumes from voice while preserving image caches", () => {
   const root = actualLikeRoot({ badVoice: true });
   try {
@@ -158,7 +172,7 @@ test("good legacy voice requires the new duration QC before downstream reuse", (
   }
 });
 
-test("once voice duration QC is already passed, Windows Fontconfig failure resumes from subtitles", () => {
+test("voice silence QC is the next conservative gate on legacy mastered audio", () => {
   const root = actualLikeRoot({ badVoice: false });
   try {
     write(root, "voice/voice-duration-qc.json", {
@@ -167,6 +181,30 @@ test("once voice duration QC is already passed, Windows Fontconfig failure resum
     });
     const s = state();
     s.stages.voice_duration_qc = { status: "PASS" };
+
+    const plan = buildResumePlan({
+      root,
+      state: s,
+      platform: "linux",
+    });
+
+    assert.equal(plan.resume_stage, "voice_silence_qc");
+    assert.equal(
+      plan.inferred_invalidations.some(
+        (x) => x.code === "voice_silence_qc_missing_on_legacy_run",
+      ),
+      true,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("once voice duration QC is already passed, Windows Fontconfig failure resumes from subtitles", () => {
+  const root = actualLikeRoot({ badVoice: false });
+  try {
+    const s = state();
+    markVoiceQcsPassed(root,s);
 
     const plan = buildResumePlan({
       root,
@@ -195,13 +233,9 @@ test("once voice duration QC is already passed, Windows Fontconfig failure resum
 test("PASS stage with missing artifact is invalidated instead of blindly reused", () => {
   const root = actualLikeRoot({ badVoice: false });
   try {
-    write(root, "voice/voice-duration-qc.json", {
-      schema: "HIBOU_VOICE_DURATION_QC_V1",
-      status: "PASS",
-    });
     rmSync(join(root, "contract-styled.json"), { force: true });
     const s = state();
-    s.stages.voice_duration_qc = { status: "PASS" };
+    markVoiceQcsPassed(root,s);
     s.stages.render = { status: "NOT_STARTED" };
 
     const plan = buildResumePlan({
@@ -224,12 +258,8 @@ test("PASS stage with missing artifact is invalidated instead of blindly reused"
 test("explicit invalidation is conservative and preserves caches", () => {
   const root = actualLikeRoot({ badVoice: false });
   try {
-    write(root, "voice/voice-duration-qc.json", {
-      schema: "HIBOU_VOICE_DURATION_QC_V1",
-      status: "PASS",
-    });
     const s = state();
-    s.stages.voice_duration_qc = { status: "PASS" };
+    markVoiceQcsPassed(root,s);
     s.stages.render = { status: "PASS" };
     write(root, "master.mp4", "mp4");
 

@@ -191,6 +191,7 @@ const POST_RUNTIME_FILES=[
   ["video-visual-event-metrics.mjs","HIBOU_VISUAL_EVENT_RATE_V1"],
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
   ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
+  ["video-factual-gate.mjs","HIBOU_VIDEO_FACTUAL_GATE_V1"],
   ["video-review-diff.mjs","HIBOU_INCREMENTAL_REVIEW_DIFF_V1"],
   ["video-durable-storage-plan.mjs","HIBOU_DURABLE_STORAGE_PLAN_V1"],
   ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1"]
@@ -222,6 +223,7 @@ async function ensurePostRuntimeBundle(commit){
     masterQc:resolve(localBase,"video-master-qc.mjs"),
     registry:resolve(localBase,"video-artifact-registry.mjs"),
     humanReview:resolve(localBase,"video-human-review-package.mjs"),
+    factualGate:resolve(localBase,"video-factual-gate.mjs"),
     reviewDiff:resolve(localBase,"video-review-diff.mjs"),
     storagePlan:resolve(localBase,"video-durable-storage-plan.mjs"),
     creativeQc:resolve(localBase,"video-creative-qc.py")
@@ -997,6 +999,33 @@ async function main(){
     writeJson(statePath,state);
   }
 
+  const factualGateEnabled=contractFeature(
+    storyboardData,
+    "video_factual_gate_v1",
+    "HIBOU_VIDEO_FACTUAL_GATE_V1"
+  );
+  const factualGateReport=resolve(root,"factual-gate.json");
+  if(factualGateEnabled){
+    stage(state,"factual_gate",()=>{
+      run(process.execPath,[postRuntime.factualGate,assetResolved,factualGateReport]);
+      const report=json(factualGateReport);
+      state.factual_gate={
+        enabled:true,
+        path:factualGateReport,
+        status:String(report.status||""),
+        in_scope_scene_count:Number(report.in_scope_scene_count||0),
+        blocker_count:Array.isArray(report.blockers)?report.blockers.length:0,
+        publication_authorized:false
+      };
+      writeJson(statePath,state);
+      if(report.status!=="PASS") fail("factual gate rejected storyboard before promotion");
+    });
+  }else{
+    state.factual_gate={enabled:false,reason:"GLOBAL contract + runtime gate required",publication_authorized:false};
+    if(!state.stages.factual_gate) state.stages.factual_gate={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+    writeJson(statePath,state);
+  }
+
   const renderReady=resolve(root,"render-ready.json");
   stage(state,"promotion",()=>{
     run(process.execPath,[postRuntime.promote,assetResolved,selections,renderReady]);
@@ -1108,6 +1137,7 @@ async function main(){
       {kind:"qc",path:masterQc},
       ...selectedImageEntries,
       ...(creativeQcEnabled&&existsSync(creativeQcReport)?[{kind:"creative_qc",path:creativeQcReport}]:[]),
+      ...(factualGateEnabled&&existsSync(factualGateReport)?[{kind:"factual_gate",path:factualGateReport}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.json"))?[{kind:"candidate_review",path:resolve(imageDir,"candidate-review.json")}]:[]),
       ...(existsSync(resolve(imageDir,"candidate-review.html"))?[{kind:"candidate_review_html",path:resolve(imageDir,"candidate-review.html")}]:[]),
       ...(existsSync(humanSelectionManifest)?[{kind:"human_selection_manifest",path:humanSelectionManifest}]:[]),

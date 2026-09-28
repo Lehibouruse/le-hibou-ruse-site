@@ -391,6 +391,9 @@
               "string",
               "null"
             ]
+          },
+          "factual_required": {
+            "type": "boolean"
           }
         }
       }
@@ -447,6 +450,9 @@
         },
         "video_planning_audit_v1": {
           "type": "boolean"
+        },
+        "video_factual_gate_v1": {
+          "type": "boolean"
         }
       },
       "additionalProperties": true
@@ -475,6 +481,19 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 3
+        }
+      },
+      "additionalProperties": true
+    },
+    "factual_gate": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "declared_only",
+            "all_scenes"
+          ]
         }
       },
       "additionalProperties": true

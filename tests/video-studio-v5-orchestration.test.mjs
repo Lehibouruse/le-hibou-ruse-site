@@ -165,3 +165,12 @@ test("planning audit is double-gated, commit-pinned and read-only",()=>{
  assert.match(master,/render_execution_performed:false/);
  assert.match(master,/publication_authorized:false/);
 });
+
+test("factual gate is double-gated and blocks before promotion without inferring narration semantics",()=>{
+ assert.match(master,/video_factual_gate_v1/);
+ assert.match(master,/HIBOU_VIDEO_FACTUAL_GATE_V1/);
+ assert.match(master,/video-factual-gate\.mjs/);
+ assert.match(master,/stage\(state,"factual_gate"/);
+ assert.ok(master.indexOf('stage(state,"factual_gate"') < master.indexOf('stage(state,"promotion"'));
+ assert.match(master,/publication_authorized:false/);
+});

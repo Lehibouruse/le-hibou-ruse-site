@@ -1,0 +1,47 @@
+{
+  "schema": "HIBOU_AIRTABLE_MIGRATION_V1",
+  "name": "video-factual-gate-v1",
+  "prepared_at": "2026-09-28",
+  "applied": false,
+  "activation_applied": false,
+  "purpose": "Prepare explicit factual-source gating for source-sensitive video scenes without changing active production.",
+  "operations": [
+    {
+      "table": "Profils vidéo",
+      "operation": "add_field",
+      "field": "Gate factuel V1",
+      "type": "checkbox",
+      "default": false
+    },
+    {
+      "table": "Profils vidéo",
+      "operation": "add_field",
+      "field": "Portée gate factuel",
+      "type": "singleSelect",
+      "choices": [
+        "declared_only",
+        "all_scenes"
+      ],
+      "default": "declared_only"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Factual required",
+      "type": "checkbox",
+      "default": false
+    }
+  ],
+  "contract_mapping": {
+    "Gate factuel V1": "features.video_factual_gate_v1",
+    "Portée gate factuel": "factual_gate.mode",
+    "Factual required": "scenes[].factual_required"
+  },
+  "safety": [
+    "Prepared only; do not apply during active renders.",
+    "Do not enable the active profile during migration.",
+    "Runtime additionally requires HIBOU_VIDEO_FACTUAL_GATE_V1=true.",
+    "No source truthfulness is inferred or auto-approved.",
+    "Publication remains human-gated."
+  ]
+}

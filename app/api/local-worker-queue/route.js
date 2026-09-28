@@ -1422,11 +1422,45 @@ export async function POST(request) {
 
     const retry = retryDecision(current, status, body.error);
 
+    if (retry.retry) {
+      const retryWorker = cut(body.worker, 180).trim();
+      const retrySession = cut(body.worker_session, 240).trim();
+      const activeWorker = String(currentOptions.active_worker || "").trim();
+      const activeSession = String(
+        currentOptions.active_worker_session || "",
+      ).trim();
+
+      if (
+        !retryWorker ||
+        !retrySession ||
+        !activeWorker ||
+        !activeSession ||
+        retryWorker !== activeWorker ||
+        retrySession !== activeSession
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "transient_retry_worker_provenance_mismatch" },
+          { status: 409 },
+        );
+      }
+    }
+
     const fields = {
       Statut: retry.retry ? "Pending" : status,
       Worker: cut(body.worker, 180),
       Erreur: cut(body.error, 10000),
     };
+
+    if (retry.retry) {
+      fields["Options JSON"] = JSON.stringify({
+        ...currentOptions,
+        target_worker: cut(body.worker, 180).trim(),
+        target_worker_reason: "transient_retry_local_state",
+        transient_retry_worker_session:
+          cut(body.worker_session, 240).trim(),
+        transient_retry_scheduled_at: now,
+      });
+    }
 
     if (terminalControlReceipt) {
       fields["Options JSON"] = JSON.stringify({
@@ -1592,6 +1626,8 @@ export async function POST(request) {
         attempts: retry.attempts,
         retry_limit: retry.limit,
         local_backoff_seconds: retry.local_backoff_seconds,
+        target_worker: cut(body.worker, 180).trim(),
+        worker_session: cut(body.worker_session, 240).trim(),
         last_error: cut(body.error, 12000),
         publication_authorized: false,
         paid_fallback: false,

@@ -28,6 +28,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Reprise contrôlée avec reçu | yes | yes CPU + CLI temp (suffixe canonique, double opt-in, backup, reçu SHA256) | no | no | no |
 | Reset état de reprise | yes | yes CPU (dry-run, plan SHA + state SHA + env gate, caches préservés) | no | no | no |
 | Diagnostic worker de reprise | yes | yes statique (plan commit-pinné joint aux erreurs, aucune reprise automatique) | no | no | no |
+| Retry transitoire local V1 | yes | yes CPU (opt-in, ≤2, provenance worker/session, retry épinglé au worker propriétaire) | no | no | no |
 | Audit local de run V1 | yes | yes CPU (stages, voix, images, caches, reprise; lecture seule) | no | no | no |
 | Audit état reprise préparée | yes | yes CPU (receipt + marker local + second démarrage explicite) | no | no | no |
 | Audit démarrage réparation | yes | yes CPU (phase execution_started + validation reçu de start) | no | no | no |

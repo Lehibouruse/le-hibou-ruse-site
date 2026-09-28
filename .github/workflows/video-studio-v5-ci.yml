@@ -67,6 +67,7 @@ jobs:
             tests/video-prosody-plan.test.mjs \
             tests/video-voice-duration-qc.test.mjs \
             tests/video-voice-duration-retry.test.mjs \
+            tests/video-queue-transient-auto-retry.test.mjs \
             tests/video-audio-mix.test.mjs \
             tests/video-iteration-plan.test.mjs \
             tests/video-image-plan.test.mjs \

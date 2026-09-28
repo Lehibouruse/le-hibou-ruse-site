@@ -610,11 +610,21 @@
           "markers": [
             "publication_authorized: false"
           ]
+        },
+        {
+          "path": "scripts/video-publication-lock-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_PUBLICATION_LOCK_AUDIT_V1",
+            "publication_authorized_true",
+            "automatic_publication_signal_true",
+            "preview_full_master_allowed"
+          ]
         }
       ],
       "tests": [
         "tests/video-preview-publication-guard.test.mjs",
-        "tests/video-human-review-package.test.mjs"
+        "tests/video-human-review-package.test.mjs",
+        "tests/video-publication-lock-audit.test.mjs"
       ],
       "e2e_pending": true,
       "activation_policy": "publication remains intentionally outside automatic production"

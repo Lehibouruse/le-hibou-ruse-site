@@ -11,6 +11,11 @@ test("remote cancel is feature-flagged off by default and scoped to current owne
   assert.match(worker,/state\.current_job !== job\.id/);
   assert.match(worker,/state\.render_pid\) !== Number\(child\.pid/);
   assert.match(worker,/expected_worker_session/);
+  assert.match(worker,/control\.schema !== "HIBOU_VIDEO_RENDER_CONTROL_V1"/);
+  assert.match(worker,/!expectedSession \|\| expectedSession !== state\.worker_session/);
+  assert.match(worker,/!expectedWorker \|\| expectedWorker !== WORKER_ID/);
+  assert.match(worker,/requestId\.length > 240/);
+  assert.match(worker,/renderStartedAtMs/);
 });
 
 test("Windows cancellation terminates only the selected PID tree and forces only after grace",()=>{
@@ -37,6 +42,11 @@ test("queue API exposes explicit controls only behind the feature flag",()=>{
   assert.doesNotMatch(route,/OR\(\{Statut\}='Cancel requested',\{Statut\}='Superseded'\)/);
   assert.match(route,/remote_cancel_enabled/);
   assert.match(route,/remote_cancel_disabled/);
+  assert.match(route,/control_consumed_request_id/);
+  assert.match(route,/active_worker_session/);
+  assert.match(route,/cancel_terminal_provenance_mismatch/);
+  assert.match(route,/requestId === consumedRequestId/);
+  assert.match(route,/expectedWorkerSession/);
 });
 
 test("ComfyUI cancel is scoped by unique queue client id and never clears unrelated prompts",()=>{

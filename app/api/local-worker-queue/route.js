@@ -661,17 +661,51 @@ async function videoControls() {
       state = "supersede_requested";
     }
     if (!state) continue;
+
     const heartbeat = parseJsonObject(record.fields?.["Résultat JSON"]);
+    const requestId = cut(options.control_request_id || "", 240).trim();
+    const requestedAt = cut(options.control_requested_at || "", 80).trim();
+    const requestedAtMs = Date.parse(requestedAt);
+    const consumedRequestId = cut(
+      options.control_consumed_request_id || "",
+      240,
+    ).trim();
+    const expectedWorker = cut(
+      options.control_expected_worker ||
+        heartbeat.worker ||
+        options.active_worker ||
+        record.fields?.Worker ||
+        "",
+      180,
+    ).trim();
+    const expectedWorkerSession = cut(
+      options.control_expected_worker_session ||
+        heartbeat.worker_session ||
+        options.active_worker_session ||
+        "",
+      240,
+    ).trim();
+
+    if (
+      !requestId ||
+      requestId === consumedRequestId ||
+      !Number.isFinite(requestedAtMs) ||
+      !expectedWorker ||
+      !expectedWorkerSession
+    ) {
+      continue;
+    }
+
     controls.push({
       schema: "HIBOU_VIDEO_RENDER_CONTROL_V1",
       job_id: record.id,
       state,
-      request_id: cut(options.control_request_id || `${record.id}:${state}`, 240),
-      requested_at: cut(options.control_requested_at || "", 80) || null,
+      request_id: requestId,
+      requested_at: requestedAt,
       reason: cut(options.control_reason || "", 1000),
       superseded_by: cut(options.superseded_by || "", 120) || null,
-      expected_worker: cut(heartbeat.worker || record.fields?.Worker || "", 180),
-      expected_worker_session: cut(heartbeat.worker_session || "", 240),
+      expected_worker: expectedWorker,
+      expected_worker_session: expectedWorkerSession,
       publication_authorized: false,
     });
   }
@@ -1284,6 +1318,50 @@ export async function POST(request) {
     }
 
     const now = new Date().toISOString();
+    const currentStatus = selectName(current.fields?.Statut);
+    const currentOptions = parseOptions(current.fields?.["Options JSON"]);
+    let terminalControlReceipt = null;
+
+    if (["Cancelled", "Superseded"].includes(status)) {
+      const expectedRequestedStatus =
+        status === "Superseded" ? "Supersede requested" : "Cancel requested";
+      const expectedRequestedState =
+        status === "Superseded" ? "supersede_requested" : "cancel_requested";
+      const result =
+        body.result && typeof body.result === "object" && !Array.isArray(body.result)
+          ? body.result
+          : null;
+      const requestId = String(result?.request_id || "").trim();
+      const activeWorker = String(currentOptions.active_worker || "").trim();
+      const activeSession = String(
+        currentOptions.active_worker_session || "",
+      ).trim();
+
+      if (
+        currentStatus !== expectedRequestedStatus ||
+        result?.schema !== "HIBOU_VIDEO_RENDER_CANCELLATION_V1" ||
+        result?.requested_state !== expectedRequestedState ||
+        !requestId ||
+        requestId !== String(currentOptions.control_request_id || "").trim() ||
+        !activeWorker ||
+        activeWorker !== String(body.worker || "").trim() ||
+        activeWorker !== String(result?.worker || "").trim() ||
+        !activeSession ||
+        activeSession !== String(body.worker_session || "").trim() ||
+        activeSession !== String(result?.worker_session || "").trim()
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "cancel_terminal_provenance_mismatch" },
+          { status: 409 },
+        );
+      }
+
+      terminalControlReceipt = {
+        request_id: requestId,
+        requested_state: expectedRequestedState,
+      };
+    }
+
     const retry = retryDecision(current, status, body.error);
 
     const fields = {
@@ -1291,6 +1369,18 @@ export async function POST(request) {
       Worker: cut(body.worker, 180),
       Erreur: cut(body.error, 10000),
     };
+
+    if (terminalControlReceipt) {
+      fields["Options JSON"] = JSON.stringify({
+        ...currentOptions,
+        control_consumed_request_id: terminalControlReceipt.request_id,
+        control_consumed_state: terminalControlReceipt.requested_state,
+        control_consumed_at: now,
+        control_consumed_terminal_status: status,
+        active_worker: null,
+        active_worker_session: null,
+      });
+    }
 
     const repairStartAccepted =
       status === "Running" &&
@@ -1407,6 +1497,32 @@ export async function POST(request) {
         repair_start_state_file_sha256: null,
         repair_start_request: null,
       });
+    }
+
+    if (status === "Running") {
+      const activeWorker = cut(body.worker, 180).trim();
+      const activeSession = cut(body.worker_session, 240).trim();
+      if (!activeWorker || !activeSession) {
+        return NextResponse.json(
+          { ok: false, error: "worker_session_required" },
+          { status: 400 },
+        );
+      }
+
+      const activeOptions = parseOptions(
+        fields["Options JSON"] || current.fields?.["Options JSON"],
+      );
+      if (
+        String(activeOptions.active_worker || "") !== activeWorker ||
+        String(activeOptions.active_worker_session || "") !== activeSession
+      ) {
+        fields["Options JSON"] = JSON.stringify({
+          ...activeOptions,
+          active_worker: activeWorker,
+          active_worker_session: activeSession,
+          active_run_started_at: now,
+        });
+      }
     }
 
     if (retry.retry) {

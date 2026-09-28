@@ -1088,12 +1088,25 @@ async function fetchVideoControl(jobId) {
 
 function cancellationMatchesOwnedChild(job, child, control) {
   if (!VIDEO_REMOTE_CANCEL_ENABLED || !job?.id || !child?.pid || !control) return false;
+  if (control.schema !== "HIBOU_VIDEO_RENDER_CONTROL_V1") return false;
   if (String(control.job_id || "") !== String(job.id)) return false;
   if (state.current_job !== job.id || Number(state.render_pid) !== Number(child.pid)) return false;
+
+  const requestId = String(control.request_id || "").trim();
+  const requestedAt = String(control.requested_at || "").trim();
+  const requestedAtMs = Date.parse(requestedAt);
+  if (!requestId || requestId.length > 240 || !Number.isFinite(requestedAtMs)) return false;
+
   const expectedSession = String(control.expected_worker_session || "").trim();
-  if (expectedSession && expectedSession !== state.worker_session) return false;
+  if (!expectedSession || expectedSession !== state.worker_session) return false;
   const expectedWorker = String(control.expected_worker || "").trim();
-  if (expectedWorker && expectedWorker !== WORKER_ID) return false;
+  if (!expectedWorker || expectedWorker !== WORKER_ID) return false;
+
+  const renderStartedAtMs = Date.parse(String(state.render_started_at || ""));
+  if (!Number.isFinite(renderStartedAtMs)) return false;
+  if (requestedAtMs < renderStartedAtMs - (10 * 60 * 1000)) return false;
+  if (requestedAtMs > Date.now() + (5 * 60 * 1000)) return false;
+
   return child.exitCode === null;
 }
 

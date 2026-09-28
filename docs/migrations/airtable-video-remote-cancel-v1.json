@@ -28,14 +28,27 @@
         "control_requested_at": "ISO-8601",
         "control_reason": "optional human reason",
         "superseded_by": "optional replacement job record id"
+      },
+      "runtime_binding_keys": {
+        "active_worker": "pinned automatically from authenticated Running report",
+        "active_worker_session": "pinned automatically from authenticated Running report",
+        "active_run_started_at": "ISO-8601 pinned by API",
+        "control_consumed_request_id": "last terminally consumed control id",
+        "control_consumed_at": "ISO-8601 terminal consumption time",
+        "control_consumed_terminal_status": [
+          "Cancelled",
+          "Superseded"
+        ]
       }
     }
   ],
   "feature_flag": "HIBOU_VIDEO_REMOTE_CANCEL_ENABLED",
   "rollout": "Do not apply while a production render is active. Add select choices first, deploy code with flag false, then enable only after idle E2E.",
   "notes": [
+    "control_request_id and control_requested_at are mandatory for execution; no synthetic fallback token is accepted.",
+    "A control is emitted only when bound to a concrete active worker and worker_session.",
     "No existing record must be rewritten by this migration.",
-    "Result JSON heartbeat already supplies worker_session and render_pid for ownership checks.",
+    "Result JSON heartbeat remains a secondary source of worker_session/render_pid ownership evidence.",
     "Publication authorization remains false."
   ]
 }

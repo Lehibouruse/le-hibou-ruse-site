@@ -497,7 +497,11 @@
           "path": "scripts/video-durable-storage-plan.mjs",
           "markers": [
             "HIBOU_DURABLE_STORAGE_PLAN_V1",
-            "upload_performed:false"
+            "upload_performed:false",
+            "immutableObjectKey",
+            "transfer_summary",
+            "VERIFY_EXISTING_ELSE_COPY",
+            "local_paths_cannot_be_declared_durable"
           ]
         },
         {

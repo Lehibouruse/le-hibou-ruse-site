@@ -179,6 +179,7 @@ test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free charact
  assert.equal(p.creative_routing.global_negative_policy_present,true);
  assert.equal(p.creative_routing.global_negative_policy_injected_as_literal_tokens,false);
  assert.match(promptWithHibou,/FRAMING_LOCK/);
+ assert.match(promptWithHibou,/STYLE_RENDERING_GUIDE: flat vector-like 2D editorial illustration/);
  const promptWithoutHibou=p.requests.find(x=>x.scene_id==="S02").request.overrides["6"].text;
  assert.match(promptWithoutHibou,/OBJECTS_AND_ENVIRONMENT_COMPOSITION/);
 });

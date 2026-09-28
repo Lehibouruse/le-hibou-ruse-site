@@ -170,7 +170,9 @@ function resumePreparationSummary(root, state) {
     join(root, "_hibou_video_remote_repair_started.json"),
   );
   const prepared =
-    state?.pipeline_status === "RESUME_PREPARED" &&
+    ["RESUME_PREPARED", "REPAIR_EXECUTION_STARTED"].includes(
+      String(state?.pipeline_status || ""),
+    ) &&
     state?.resume_prepared &&
     typeof state.resume_prepared === "object";
 

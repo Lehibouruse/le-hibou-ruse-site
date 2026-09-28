@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/video-studio-v5
+      - 'feat/video-studio-v5-*'
 
 permissions:
   contents: read
@@ -33,6 +34,8 @@ jobs:
           node --check scripts/video-iteration-plan.mjs
           node --check scripts/video-job-lineage.mjs
           node --check scripts/video-v5-readiness.mjs
+          node --check scripts/video-asset-readiness.mjs
+          node --check scripts/video-continuity-plan.mjs
           node --check scripts/video-artifact-registry.mjs
           node --check scripts/video-human-review-package.mjs
           node --check scripts/video-review-diff.mjs
@@ -76,6 +79,8 @@ jobs:
             tests/video-job-lineage-integration.test.mjs \
             tests/video-preview-publication-guard.test.mjs \
             tests/video-v5-readiness.test.mjs \
+            tests/video-asset-readiness.test.mjs \
+            tests/video-continuity-plan.test.mjs \
             tests/video-candidate-review.test.mjs \
             tests/video-candidate-selection-apply.test.mjs \
             tests/video-human-review-package.test.mjs \

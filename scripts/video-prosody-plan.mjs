@@ -81,9 +81,10 @@ export function buildProsodyPlan(scene){
   const verbatim=voice.verbatim!==false;
   if(!verbatim) fail("PROSODY_V1 currently requires verbatim narration");
   const rawCues=Array.isArray(voice.prosody_cues)?voice.prosody_cues:[];
+  const scenePauseAfterMs=Math.max(0,Math.round(Number(voice.pause_after_ms||0)));
   const baseCue=normalizeCue({
     pause_before_ms:voice.pause_before_ms,
-    pause_after_ms:voice.pause_after_ms,
+    pause_after_ms:0,
     relative_speed_pct:voice.relative_speed_pct,
     emphasis:voice.emphasis,
     intent:voice.intent
@@ -112,6 +113,7 @@ export function buildProsodyPlan(scene){
     lexical_transform:false,
     tts_punctuation_preserved:true,
     base_scene_cue:baseCue,
+    scene_pause_after_ms:scenePauseAfterMs,
     specific_cue_count:rawCues.length,
     units
   };

@@ -181,6 +181,14 @@ Remote Desktop Commander est désormais disponible comme couche optionnelle d'in
 - master V5 complet ;
 - revue humaine V4 complète.
 
+## Chaîne de preuve avant activation
+
+- chaque étape de `docs/video-methodology-coverage-v5.json` porte désormais `e2e_step_ids`, `e2e_status` et `activation_status:"inactive"` ;
+- l'audit vérifie que les IDs E2E référencés existent réellement dans le plan machine-readable ;
+- une étape `e2e_pending:true` sans test lié fait échouer la couverture ;
+- une future tentative `activation_status:"active"` avec E2E encore `pending` est rejetée ;
+- l'action humaine explicite reste obligatoire même après E2E validé.
+
 ## Activation
 
 Aucune nouvelle brique de cette feuille n'est considérée **active** parce qu'elle est codée. L'activation se fera brique par brique après E2E, avec les flags GLOBAL/runtime correspondants, publication toujours désactivée.

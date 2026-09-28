@@ -10,6 +10,23 @@ function assTime(seconds){
   return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(c).padStart(2,"0")}`;
 }
 function esc(text){return String(text||"").replaceAll("\\","\\\\").replaceAll("{","\\{").replaceAll("}","\\}").replace(/\r?\n/g,"\\N");}
+export function splitSubtitleGroups(text,{maxWords=6}={}){
+  const words=String(text||"").trim().split(/\s+/u).filter(Boolean);
+  if(!words.length) return [];
+  const size=Math.max(2,Math.min(8,Math.round(Number(maxWords)||6)));
+  const groups=[];
+  let current=[];
+  for(const word of words){
+    current.push(word);
+    const sentenceEnd=/[.!?…]$/u.test(word);
+    if(current.length>=size||sentenceEnd){
+      groups.push(current.join(" "));
+      current=[];
+    }
+  }
+  if(current.length) groups.push(current.join(" "));
+  return groups;
+}
 export function defaultSubtitleFont(platform=process.platform){ return platform==="win32"?"Arial":"DejaVu Sans"; }
 export function buildAss(contract,{font=defaultSubtitleFont(),fontSize=54,marginV=150}={}){
   if(contract?.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract");
@@ -32,7 +49,17 @@ export function buildAss(contract,{font=defaultSubtitleFont(),fontSize=54,margin
         events.push(`Dialogue: 1,${assTime(beatStart)},${assTime(beatEnd)},ScreenText,,0,0,0,,${esc(beat)}`);
       });
     }
-    events.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Narration,,0,0,0,,${esc(text)}`);
+    const narrationGroups=splitSubtitleGroups(text,{maxWords:6});
+    const weights=narrationGroups.map(group=>Math.max(1,group.split(/\s+/u).filter(Boolean).length));
+    const totalWeight=weights.reduce((sum,value)=>sum+value,0)||1;
+    let cursor=start;
+    narrationGroups.forEach((group,index)=>{
+      const groupEnd=index===narrationGroups.length-1
+        ? end
+        : cursor+((end-start)*weights[index]/totalWeight);
+      events.push(`Dialogue: 0,${assTime(cursor)},${assTime(groupEnd)},Narration,,0,0,0,,${esc(group)}`);
+      cursor=groupEnd;
+    });
   }
   return [
     "[Script Info]","ScriptType: v4.00+","PlayResX: 1080","PlayResY: 1920","WrapStyle: 2","ScaledBorderAndShadow: yes","",

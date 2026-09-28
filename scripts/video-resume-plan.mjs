@@ -13,6 +13,7 @@ export const VIDEO_STAGE_ORDER = [
   "voice",
   "voice_duration_qc",
   "audio_master",
+  "voice_silence_qc",
   "music_mix",
   "audio_attach",
   "subtitles",
@@ -42,6 +43,7 @@ const ARTIFACTS = {
   ],
   voice_duration_qc: ["voice/voice-duration-qc.json"],
   audio_master: ["voice/voice-mastered.wav"],
+  voice_silence_qc: ["voice/voice-silence-qc.json"],
   music_mix: ["voice/voice-music-mixed.wav"],
   audio_attach: ["contract-mastered.json"],
   subtitles: ["subtitles.ass", "contract-captioned.json"],
@@ -173,6 +175,20 @@ function inferVoiceInvalidation(root, state) {
     };
   }
 
+  return null;
+}
+
+function inferVoiceSilenceQcInvalidation(state) {
+  if (
+    stageStatus(state, "voice_duration_qc") === "PASS"
+    && stageStatus(state, "audio_master") === "PASS"
+    && stageStatus(state, "voice_silence_qc") === "NOT_STARTED"
+  ) {
+    return {
+      stage: "voice_silence_qc",
+      code: "voice_silence_qc_missing_on_legacy_run",
+    };
+  }
   return null;
 }
 

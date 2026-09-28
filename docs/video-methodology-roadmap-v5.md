@@ -100,6 +100,7 @@
 - le worker écrit `HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1`, repasse le job en `Paused` et retourne avant préflight/ComfyUI/master ;
 - la requête de préparation est consommée en one-shot et les auto-start/auto-chain ignorent ce `Paused` : un second ordre explicite est obligatoire pour relancer le rendu ;
 - le second ordre possède son propre feature flag, exige une seconde confirmation humaine et quatre preuves SHA256 (plan, état source, receipt, état préparé) ;
+- le readiness audit bloque désormais `START=true` avec `RESUME=false`, autorise le mode prepare-only avec warning et expose explicitement les deux confirmations humaines ;
 - le worker écrit `HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1`, revalide les octets du receipt et de l'état préparé, puis seulement ensuite autorise préflight/ComfyUI/master ;
 - le premier `Running` porte ce reçu et consomme `repair_start_request` côté API pour rendre l'ordre one-shot ;
 - `_hibou_video_remote_repair_prepared.json` permet à `HIBOU_VIDEO_RUN_AUDIT_V1` de distinguer un état réparé en attente d'un échec non traité ;

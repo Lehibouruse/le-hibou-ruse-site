@@ -1,7 +1,7 @@
 {
   "schema": "HIBOU_AIRTABLE_MIGRATION_PLAN_V1",
   "id": "video-studio-v5-profile-fields",
-  "applied": false,
+  "applied": true,
   "tables": [
     {
       "logical_table": "Video Global Profile",
@@ -85,6 +85,22 @@
         [
           "Mode production par défaut",
           "singleSelect"
+        ],
+        [
+          "Profil densité voix",
+          "singleSelect"
+        ],
+        [
+          "Profil mouvement",
+          "singleSelect"
+        ],
+        [
+          "Courbe cadence",
+          "singleSelect"
+        ],
+        [
+          "Prompt Graph V1",
+          "checkbox"
         ]
       ],
       "defaults": "all feature checkboxes false; do not modify the active profile"
@@ -103,9 +119,26 @@
         [
           "Pose Hibou",
           "singleLineText"
+        ],
+        [
+          "Groupe visuel",
+          "singleLineText"
+        ],
+        [
+          "Exigences assets JSON",
+          "longText"
         ]
       ]
     }
   ],
-  "rollout": "Prepared only. Apply after the active render finishes and before enabling V5 flags. Keep Retouches incrémentales V1 and Sélection humaine candidats V1 false, and Mode production par défaut=final, until dedicated preview/reuse/human-selection E2E passes."
+  "rollout": "Schema applied only. All new fields remain opt-in/blank on the active profile. Activate feature-by-feature only after dedicated CPU/Windows/GPU E2E and human review; publication remains separate.",
+  "applied_scope": "schema_only",
+  "activation_applied": false,
+  "applied_at": "2026-09-28",
+  "applied_notes": [
+    "Airtable fields were created while Local Worker Queue had zero Running jobs.",
+    "Existing records were not rewritten.",
+    "Active HIBOU_VIRAL_V1 feature checkboxes remain false/blank.",
+    "No V5 runtime feature was activated by the schema migration."
+  ]
 }

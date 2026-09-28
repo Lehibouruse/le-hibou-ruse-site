@@ -34,14 +34,15 @@ test("queue passes video profile and preview production mode", () => {
 });
 
 test("image generation receives creative lock and never generates useful text", () => {
-  assert.match(imagePlan, /TEXT_FREE_IMAGE_LOCK/);
+  assert.match(imagePlan, /CLEAN_SURFACE_LOCK/);
   assert.match(imagePlan, /characterLock/);
   assert.match(imagePlan, /styleLock/);
   assert.match(imagePlan, /global_negative_policy_injected_as_literal_tokens:false/);
-  assert.match(imagePlan, /zero readable lettering/);
+  assert.match(imagePlan, /blank and unmarked/);
   assert.match(imagePlan, /ENVIRONMENT_ONLY_COMPOSITION/);
   assert.match(imagePlan, /deterministic background prompt leaked character tokens/);
   assert.match(imagePlan, /OBJECTS_AND_ENVIRONMENT_COMPOSITION/);
+  assert.match(imagePlan, /FRAMING_LOCK/);
 });
 
 test("brand signature is deterministic post-production sand text", () => {

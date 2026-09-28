@@ -98,6 +98,22 @@
             "type": "number",
             "minimum": 0,
             "maximum": 120
+          },
+          "beat_kind": {
+            "type": "string",
+            "enum": [
+              "CAPTION_CHANGE",
+              "NUMBER_CALLOUT",
+              "PROP_SWAP",
+              "POSE_CHANGE",
+              "MINI_DIAGRAM",
+              "BEFORE_AFTER",
+              "CONDITION_BADGE",
+              "RISK_BADGE",
+              "MICRO_ZOOM",
+              "LAYER_MOTION",
+              "VISUAL_ACCENT"
+            ]
           }
         },
         "allOf": [

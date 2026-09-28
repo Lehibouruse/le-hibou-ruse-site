@@ -46,7 +46,32 @@ function sceneNarration(scene) {
   return nonEmpty(scene?.narration_exact?.text);
 }
 
-function beatFamily(type) {
+function semanticBeatKind(event) {
+  const explicit = nonEmpty(event?.beat_kind).toUpperCase();
+  if (explicit) return explicit;
+  const type = nonEmpty(event?.type).toLowerCase();
+  if ((type === "object" || type === "pose") &&
+      (Number(event?.move_to_offset_x) !== Number(event?.offset_x || 0) ||
+       Number(event?.move_to_offset_y) !== Number(event?.offset_y || 0))) {
+    return "LAYER_MOTION";
+  }
+  if (type === "text") return "CAPTION_CHANGE";
+  if (type === "callout") return "NUMBER_CALLOUT";
+  if (type === "object") return "PROP_SWAP";
+  if (type === "pose") return "POSE_CHANGE";
+  if (type === "camera") return "MICRO_ZOOM";
+  if (type === "accent") return "VISUAL_ACCENT";
+  return "UNKNOWN";
+}
+
+function beatFamily(type, beatKind = "") {
+  const kind = nonEmpty(beatKind).toUpperCase();
+  if (["CAPTION_CHANGE","NUMBER_CALLOUT","CONDITION_BADGE","RISK_BADGE"].includes(kind)) return "caption";
+  if (["PROP_SWAP","MINI_DIAGRAM","BEFORE_AFTER"].includes(kind)) return "prop";
+  if (kind === "POSE_CHANGE") return "pose";
+  if (kind === "MICRO_ZOOM") return "camera";
+  if (kind === "LAYER_MOTION") return "motion";
+  if (kind === "VISUAL_ACCENT") return "accent";
   const normalized = nonEmpty(type).toLowerCase();
   if (normalized === "text" || normalized === "callout") return "caption";
   if (normalized === "object") return "prop";
@@ -108,13 +133,15 @@ function timelineBeats(scene) {
     : [];
   return events.map((event, index) => {
     const type = nonEmpty(event?.type) || "attention_event";
+    const beatKind = semanticBeatKind(event);
     const start = Number(event?.start_s);
     const end = Number(event?.end_s);
     return {
       beat_id: `${scene.scene_id}-B${String(index + 1).padStart(2, "0")}`,
       source_event_id: nonEmpty(event?.id) || null,
       type,
-      family: beatFamily(type),
+      beat_kind: beatKind,
+      family: beatFamily(type, beatKind),
       start_s: Number.isFinite(start) ? start : null,
       end_s: Number.isFinite(end) ? end : null,
       semantic_payload: {

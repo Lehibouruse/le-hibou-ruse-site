@@ -97,6 +97,47 @@ function timelineEnable({start_s,end_s}){
   return `between(t,${start_s.toFixed(3)},${end_s.toFixed(3)})`;
 }
 
+const BEAT_KINDS=new Set([
+  "CAPTION_CHANGE",
+  "NUMBER_CALLOUT",
+  "PROP_SWAP",
+  "POSE_CHANGE",
+  "MINI_DIAGRAM",
+  "BEFORE_AFTER",
+  "CONDITION_BADGE",
+  "RISK_BADGE",
+  "MICRO_ZOOM",
+  "LAYER_MOTION",
+  "VISUAL_ACCENT"
+]);
+
+function defaultBeatKind(event,type){
+  if(type==="object"||type==="pose"){
+    const moved=
+      Number(event?.move_to_offset_x)!==Number(event?.offset_x||0) ||
+      Number(event?.move_to_offset_y)!==Number(event?.offset_y||0);
+    if(moved) return "LAYER_MOTION";
+  }
+  if(type==="text") return "CAPTION_CHANGE";
+  if(type==="callout") return "NUMBER_CALLOUT";
+  if(type==="object") return "PROP_SWAP";
+  if(type==="pose") return "POSE_CHANGE";
+  if(type==="camera") return "MICRO_ZOOM";
+  if(type==="accent") return "VISUAL_ACCENT";
+  return null;
+}
+
+function normalizedBeatKind(event,type){
+  const explicit=String(event?.beat_kind||"").trim().toUpperCase();
+  if(explicit){
+    if(!BEAT_KINDS.has(explicit)){
+      fail(`timeline event ${event?.id||"?"}: unsupported beat_kind ${explicit}`);
+    }
+    return explicit;
+  }
+  return defaultBeatKind(event,type);
+}
+
 export function normalizeSceneTimeline(scene,{duration}={}){
   const d=Number(duration??scene?.planned_duration_s??scene?.measured_duration_s);
   if(!Number.isFinite(d)||d<=0) return {schema:"HIBOU_SCENE_TIMELINE_V1",events:[]};
@@ -113,6 +154,7 @@ export function normalizeSceneTimeline(scene,{duration}={}){
       end_s:window.end_s,
       z:num(event?.z,type==="text"||type==="callout"?75:35),
       accent:String(event?.accent||""),
+      beat_kind:normalizedBeatKind(event,type),
     };
     if(type==="text"||type==="callout"){
       if(!String(event?.text||"").trim()) fail(`timeline event ${base.id}: text required`);
@@ -152,6 +194,13 @@ export function normalizeSceneTimeline(scene,{duration}={}){
 }
 
 function beatFamily(event){
+  const kind=String(event?.beat_kind||"").trim().toUpperCase();
+  if(["CAPTION_CHANGE","NUMBER_CALLOUT","CONDITION_BADGE","RISK_BADGE"].includes(kind)) return "caption";
+  if(["PROP_SWAP","MINI_DIAGRAM","BEFORE_AFTER"].includes(kind)) return "prop";
+  if(kind==="POSE_CHANGE") return "pose";
+  if(kind==="MICRO_ZOOM") return "camera";
+  if(kind==="LAYER_MOTION") return "motion";
+  if(kind==="VISUAL_ACCENT") return "accent";
   const type=String(event?.type||"").trim().toLowerCase();
   if(type==="text"||type==="callout") return "caption";
   if(type==="object") return "prop";
@@ -168,9 +217,11 @@ export function analyzeBeatVariation(timeline,{maxSameFamily=2}={}){
     id:String(event?.id||`E${String(index+1).padStart(2,"0")}`),
     family:beatFamily(event),
     type:String(event?.type||""),
+    beat_kind:String(event?.beat_kind||defaultBeatKind(event,event?.type)||""),
     start_s:num(event?.start_s,0)
   }));
   const warnings=[];
+  const familyCatalog=["caption","prop","pose","camera","motion","accent"];
   let cursor=0;
   while(cursor<sequence.length){
     let end=cursor+1;
@@ -182,7 +233,8 @@ export function analyzeBeatVariation(timeline,{maxSameFamily=2}={}){
         family:run[0].family,
         count:run.length,
         event_ids:run.map(item=>item.id),
-        recommendation:"vary the next attention beat when a semantically correct alternative exists"
+        recommendation:"vary the next attention beat when a semantically correct alternative exists",
+        suggested_alternative_families:familyCatalog.filter(family=>family!==run[0].family)
       });
     }
     cursor=end;
@@ -194,7 +246,9 @@ export function analyzeBeatVariation(timeline,{maxSameFamily=2}={}){
     warnings,
     review_required:warnings.length>0,
     blocking:false,
-    max_same_family:limit
+    max_same_family:limit,
+    semantic_kind_catalog:[...BEAT_KINDS],
+    automatic_rewrite_performed:false
   };
 }
 

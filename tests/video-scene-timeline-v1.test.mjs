@@ -118,3 +118,44 @@ test("compositor exposes the advisory beat variation report with the render plan
   assert.equal(plan.beat_variation.schema,"HIBOU_BEAT_VARIATION_POLICY_V1");
   assert.equal(plan.beat_variation.review_required,true);
 });
+
+
+test("semantic beat kinds are explicit while technical render types stay unchanged",()=>{
+  const timeline=normalizeSceneTimeline({
+    planned_duration_s:6,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"risk",type:"text",beat_kind:"RISK_BADGE",start_s:0,end_s:2,text:"RISQUE"},
+      {id:"diagram",type:"object",beat_kind:"MINI_DIAGRAM",start_s:2,end_s:4,path:"diagram.png"},
+      {id:"move",type:"object",start_s:4,end_s:6,path:"coin.png",offset_x:0,move_to_offset_x:30}
+    ]}
+  },{duration:6});
+  assert.equal(timeline.events[0].type,"text");
+  assert.equal(timeline.events[0].beat_kind,"RISK_BADGE");
+  assert.equal(timeline.events[1].beat_kind,"MINI_DIAGRAM");
+  assert.equal(timeline.events[2].beat_kind,"LAYER_MOTION");
+});
+
+test("unsupported semantic beat kinds fail closed",()=>{
+  assert.throws(()=>normalizeSceneTimeline({
+    planned_duration_s:2,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {type:"text",beat_kind:"RANDOM_FLASH",start_s:0,end_s:2,text:"X"}
+    ]}
+  },{duration:2}),/unsupported beat_kind RANDOM_FLASH/);
+});
+
+test("beat variation remains advisory and proposes alternatives without rewriting",()=>{
+  const timeline=normalizeSceneTimeline({
+    planned_duration_s:6,
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"a",type:"text",beat_kind:"CONDITION_BADGE",start_s:0,end_s:2,text:"SI"},
+      {id:"b",type:"text",beat_kind:"RISK_BADGE",start_s:2,end_s:4,text:"RISQUE"},
+      {id:"c",type:"callout",beat_kind:"NUMBER_CALLOUT",start_s:4,end_s:6,text:"+20 %"}
+    ]}
+  },{duration:6});
+  const report=analyzeBeatVariation(timeline);
+  assert.equal(report.review_required,true);
+  assert.equal(report.automatic_rewrite_performed,false);
+  assert(report.warnings[0].suggested_alternative_families.includes("prop"));
+  assert(report.semantic_kind_catalog.includes("BEFORE_AFTER"));
+});

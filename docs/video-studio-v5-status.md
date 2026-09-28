@@ -32,6 +32,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
 | Diff revue incrémentale actionnable | yes | yes CPU (domaines changés, stages à revalider, régénérations forcées, caches réutilisables) | no | no | no |
+| File de revue incrémentale intégrée | yes | yes CPU (scene_review_queue + fallback FULL si diff absent/invalide) | no | no | no |
 | Plan stockage durable V1 | yes | yes (plan content-addressed, aucun transfert) | no | no | no |
 | Rendu ASS Windows autonome | yes | yes CPU (Fontconfig privé + Windows Fonts) | no | no | no |
 | Police ASS Windows native | yes | yes (Arial Windows + métadonnée contrat) | no | no | no |

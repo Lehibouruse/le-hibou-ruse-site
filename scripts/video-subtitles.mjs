@@ -22,7 +22,16 @@ export function buildAss(contract,{font=defaultSubtitleFont(),fontSize=54,margin
     const text=scene.narration_text||scene.breath_unit||"";
     if(!String(text).trim()) fail(`${scene.scene_id}: subtitle text missing`);
     const shortText=String(scene.screen_text||"").trim();
-    if(shortText) events.push(`Dialogue: 1,${assTime(start)},${assTime(end)},ScreenText,,0,0,0,,${esc(shortText)}`);
+    const timelineHasText=Array.isArray(scene?.timeline?.events) && scene.timeline.events.some(event=>["text","callout"].includes(String(event?.type||"").toLowerCase()));
+    if(shortText&&!timelineHasText){
+      const beats=shortText.split("/").map(x=>x.trim()).filter(Boolean);
+      const beatCount=Math.max(1,beats.length);
+      beats.forEach((beat,index)=>{
+        const beatStart=start+((end-start)*index/beatCount);
+        const beatEnd=start+((end-start)*(index+1)/beatCount);
+        events.push(`Dialogue: 1,${assTime(beatStart)},${assTime(beatEnd)},ScreenText,,0,0,0,,${esc(beat)}`);
+      });
+    }
     events.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Narration,,0,0,0,,${esc(text)}`);
   }
   return [

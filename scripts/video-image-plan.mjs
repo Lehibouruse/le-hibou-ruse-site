@@ -55,7 +55,8 @@ function removeOverlayCharacterSentences(text){
 function imageStylePrompt(styleLock){
   const extracted=extractStyleSection(styleLock);
   const base=extracted||String(styleLock||"").trim();
-  return base?("IMAGE_STYLE_LOCK: "+base):"";
+  const reinforcement="STYLE_RENDERING_GUIDE: flat vector-like 2D editorial illustration, crisp ink outlines, simplified geometry, controlled cel shading, restrained texture, graphic poster-like composition, consistent ivory/navy/gold accents, shallow illustrative depth.";
+  return [base?("IMAGE_STYLE_LOCK: "+base):"",reinforcement].filter(Boolean).join(" ");
 }
 
 function removeTextRiskSentences(text){

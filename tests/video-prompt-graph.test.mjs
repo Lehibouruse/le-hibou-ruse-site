@@ -26,7 +26,7 @@ function contract() {
         text: "Le Hibou Rusé",
         position: "bottom-center",
         size: "small",
-        color: "ink",
+        color: "sand",
         source: "post-production",
       },
       pacing: {
@@ -115,7 +115,7 @@ test("prompt graph preserves GLOBAL layers and makes every scene reference them"
     master.payload.global_layers.HEAD_IDENTITY_LOCK.reference_mode,
     "deterministic_character_overlay",
   );
-  assert.equal(master.payload.global_layers.BRAND_FIELD.color, "ink");
+  assert.equal(master.payload.global_layers.BRAND_FIELD.color, "sand");
 });
 
 test("attention beats use the current timeline window schema and stay independent from scenes", () => {
@@ -233,4 +233,14 @@ test("unsupported roadmap profiles fail closed rather than becoming hidden defau
     () => buildPromptGraph(badMovement),
     /MOVEMENT_PROFILE must be one of/,
   );
+});
+
+test("canonical branding accepts the current sand field while still rejecting missing brand color",()=>{
+  const current=contract();
+  current.creative.branding.color="sand";
+  const graph=buildPromptGraph(current);
+  assert.equal(graph.nodes.find(n=>n.id==="MASTER_BRIEF").payload.global_layers.BRAND_FIELD.color,"sand");
+  const bad=contract();
+  bad.creative.branding.color="";
+  assert.throws(()=>buildPromptGraph(bad),/BRAND_FIELD does not match/);
 });

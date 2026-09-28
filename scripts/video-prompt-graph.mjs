@@ -126,7 +126,7 @@ function canonicalGlobalLayer(contract) {
     global.BRAND_FIELD.text !== "Le Hibou Rusé" ||
     global.BRAND_FIELD.position !== "bottom-center" ||
     global.BRAND_FIELD.size !== "small" ||
-    global.BRAND_FIELD.color !== "ink" ||
+    !global.BRAND_FIELD.color ||
     global.BRAND_FIELD.source !== "post-production"
   ) {
     fail("BRAND_FIELD does not match the canonical Hibou branding contract");

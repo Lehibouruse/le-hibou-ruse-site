@@ -200,6 +200,7 @@ test("run audit is quiet on a clean completed run", () => {
     const state = JSON.parse(readFileSync(statePath, "utf8"));
     state.stages.render = { status: "PASS" };
     state.stages.voice_duration_qc = { status: "PASS" };
+    state.stages.voice_silence_qc = { status: "PASS" };
     writeFileSync(statePath, JSON.stringify(state, null, 2));
 
     const voicePath = join(root, "voice", "voice-batch-manifest.json");
@@ -210,6 +211,12 @@ test("run audit is quiet on a clean completed run", () => {
       schema: "HIBOU_VOICE_DURATION_QC_V1",
       status: "PASS",
     });
+    write(root, "voice/voice-silence-qc.json", {
+      schema: "HIBOU_VOICE_SILENCE_QC_V1",
+      status: "PASS",
+      longest_silence_s: 0.42,
+      rejected_interval_count: 0,
+    });
     write(root, "master.mp4", "master");
 
     const reviewPath = join(root, "images", "candidate-review.json");
@@ -219,12 +226,32 @@ test("run audit is quiet on a clean completed run", () => {
 
     const audit = auditVideoRun(root, { platform: "linux" });
     assert.equal(audit.voice.duration_qc.status, "PASS");
+    assert.equal(audit.voice.silence_qc.status, "PASS");
     assert.equal(audit.render.master_exists, true);
     assert.equal(audit.images.candidate_review_ambiguous_scene_count, 0);
     assert.equal(
       audit.attention.some((item) => item.code === "voice_duration_anomaly"),
       false,
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("run audit surfaces mastered voice silence rejection", () => {
+  const root = fixture();
+  try {
+    write(root, "voice/voice-silence-qc.json", {
+      schema: "HIBOU_VOICE_SILENCE_QC_V1",
+      status: "REJECT",
+      longest_silence_s: 1.537,
+      rejected_interval_count: 1,
+    });
+    const audit = auditVideoRun(root, { platform: "linux" });
+    assert.equal(audit.voice.silence_qc.status, "REJECT");
+    const issue=audit.attention.find(item=>item.code==="voice_long_silence");
+    assert.equal(issue.longest_silence_s,1.537);
+    assert.equal(issue.rejected_interval_count,1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

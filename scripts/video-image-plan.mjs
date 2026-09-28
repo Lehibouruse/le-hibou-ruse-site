@@ -289,6 +289,8 @@ export function buildImagePlan(contract,binding){
     if(!compiledSpecificVisual) fail(`${scene.scene_id}: compiled scene image prompt is empty`);
     const specificVisual=(sceneImagePrompt?"SCENE_IMAGE_PROMPT: ":"SCENE_VISUAL_FALLBACK: ")+compiledSpecificVisual;
     const styleForImage=imageStylePrompt(styleLock);
+    const compiledPrefix=deterministicCharacterOverlay?removeOverlayCharacterSentences(prefix):prefix;
+    const compiledSuffix=deterministicCharacterOverlay?removeOverlayCharacterSentences(suffix):suffix;
     const compositionLock=deterministicCharacterOverlay
       ? [
           "ENVIRONMENT_ONLY_COMPOSITION:",
@@ -305,12 +307,12 @@ export function buildImagePlan(contract,binding){
           : "";
     const prompt=creativeLockEnabled
       ? [
-          prefix,
+          compiledPrefix,
           specificVisual,
           styleForImage,
           compositionLock,
           textFreeLock,
-          suffix
+          compiledSuffix
         ].filter(Boolean).join("\n")
       : [prefix,specificVisual,suffix].filter(Boolean).join("\n");
     if(deterministicCharacterOverlay&&/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/iu.test(prompt)){

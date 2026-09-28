@@ -108,6 +108,43 @@ export function buildV5Readiness(contract, env = {}) {
     active: remoteCancel,
   };
 
+  const remoteRepairResume = enabled(
+    env.HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED,
+  );
+  const remoteRepairStart = enabled(
+    env.HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED,
+  );
+
+  features.video_remote_repair_resume_v1 = {
+    global_enabled: null,
+    runtime_gate: "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+    runtime_enabled: remoteRepairResume,
+    active: remoteRepairResume,
+    phase: "prepare",
+    human_confirmation_required: true,
+  };
+  features.video_remote_repair_start_v1 = {
+    global_enabled: null,
+    runtime_gate: "HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED",
+    runtime_enabled: remoteRepairStart,
+    active: remoteRepairStart,
+    phase: "start",
+    second_human_confirmation_required: true,
+  };
+
+  if (remoteRepairStart && !remoteRepairResume) {
+    blocking.push({
+      code: "remote_repair_start_requires_resume_gate",
+      start_gate: "HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED",
+      resume_gate: "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+    });
+  } else if (remoteRepairResume && !remoteRepairStart) {
+    warnings.push({
+      code: "remote_repair_prepare_only_mode",
+      detail: "repair preparation is enabled but explicit repair start remains disabled",
+    });
+  }
+
   if (
     features.video_music_mix_v1.active
     && !String(contract?.music?.reference || "").trim()
@@ -130,6 +167,22 @@ export function buildV5Readiness(contract, env = {}) {
     preview_only: mode === "preview",
     features,
     active_features: activeFeatures,
+    activation_guards: {
+      remote_repair: {
+        prepare_enabled: remoteRepairResume,
+        start_enabled: remoteRepairStart,
+        phase_order_valid: !remoteRepairStart || remoteRepairResume,
+        first_human_confirmation_required: true,
+        second_human_confirmation_required: true,
+        one_shot_requests_required: true,
+        publication_authorized: false,
+      },
+      remote_cancel: {
+        enabled: remoteCancel,
+        job_scoped_only: true,
+        publication_authorized: false,
+      },
+    },
     warnings,
     blocking,
     ready_for_cpu_planning: blocking.length === 0,

@@ -131,13 +131,23 @@
             "HIBOU_VOICE_DURATION_QC_V1",
             "duration_far_above_expected_speech_rate"
           ]
+        },
+        {
+          "path": "scripts/video-voice-silence-qc.mjs",
+          "markers": [
+            "HIBOU_VOICE_SILENCE_QC_V1",
+            "block_before_images",
+            "matches_master_qc_long_silence_gate"
+          ]
         }
       ],
       "tests": [
         "tests/video-voice-qc.test.mjs",
         "tests/video-voice-low-vram.test.mjs",
         "tests/video-voice-duration-qc.test.mjs",
-        "tests/video-voice-duration-retry.test.mjs"
+        "tests/video-voice-duration-retry.test.mjs",
+        "tests/video-voice-silence-qc.test.mjs",
+        "tests/video-run-audit.test.mjs"
       ],
       "e2e_pending": true
     },

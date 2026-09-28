@@ -138,3 +138,95 @@ test("human candidate selection double gate stays inactive without runtime opt-i
     true,
   );
 });
+
+
+test("remote repair prepare-only mode is allowed but explicit", () => {
+  const report = buildV5Readiness(contract(), {
+    HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED: "true",
+    HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED: "false",
+  });
+
+  assert.equal(
+    report.features.video_remote_repair_resume_v1.active,
+    true,
+  );
+  assert.equal(
+    report.features.video_remote_repair_start_v1.active,
+    false,
+  );
+  assert.equal(report.ready_for_cpu_planning, true);
+  assert.equal(
+    report.warnings.some(
+      (x) => x.code === "remote_repair_prepare_only_mode",
+    ),
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.phase_order_valid,
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.second_human_confirmation_required,
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.publication_authorized,
+    false,
+  );
+});
+
+test("remote repair start cannot be enabled without prepare gate", () => {
+  const report = buildV5Readiness(contract(), {
+    HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED: "false",
+    HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED: "true",
+  });
+
+  assert.equal(report.ready_for_cpu_planning, false);
+  assert.equal(
+    report.blocking.some(
+      (x) => x.code === "remote_repair_start_requires_resume_gate",
+    ),
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.phase_order_valid,
+    false,
+  );
+});
+
+test("two-phase remote repair is visible as runtime-only and double-confirmed", () => {
+  const report = buildV5Readiness(contract(), {
+    HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED: "true",
+    HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED: "true",
+  });
+
+  assert.equal(report.ready_for_cpu_planning, true);
+  assert.equal(
+    report.features.video_remote_repair_resume_v1.global_enabled,
+    null,
+  );
+  assert.equal(
+    report.features.video_remote_repair_start_v1.global_enabled,
+    null,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.prepare_enabled,
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.start_enabled,
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.first_human_confirmation_required,
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.second_human_confirmation_required,
+    true,
+  );
+  assert.equal(
+    report.activation_guards.remote_repair.one_shot_requests_required,
+    true,
+  );
+});

@@ -77,6 +77,7 @@ jobs:
             tests/video-preview-publication-guard.test.mjs \
             tests/video-v5-readiness.test.mjs \
             tests/video-publication-lock-audit.test.mjs \
+            tests/video-e2e-plan-audit.test.mjs \
             tests/video-candidate-review.test.mjs \
             tests/video-candidate-selection-apply.test.mjs \
             tests/video-human-review-package.test.mjs \

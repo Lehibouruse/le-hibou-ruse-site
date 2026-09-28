@@ -22,6 +22,11 @@ test("queue validates reuse lineage before dispatching a VIDEO_RENDER job", () =
   assert.match(route, /reuse_lineage_cycle_detected/);
   assert.match(route, /lineage_depth: ancestorJobIds\.length/);
   assert.match(route, /lineage_complete: true/);
+  assert.match(route, /reuse_parent_worker_missing/);
+  assert.match(route, /reuse_target_worker_mismatch/);
+  assert.match(route, /lineageWorker !== pollWorker/);
+  assert.match(route, /target_worker = lineageWorker/);
+  assert.match(route, /reuse_parent_local_state/);
 });
 
 test("worker persists production and incremental lineage in the final result", () => {

@@ -12,7 +12,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |
 | Musique/mix FFmpeg V1 | yes | yes (plan/policy; audio E2E pending) | no | no | no |
 | Cancel / supersede distant V1 | yes | yes (job/PID + worker-session binding, explicit request id/time, anti-replay consumed receipt; Windows process E2E pending) | no | no | no |
-| Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile/lineage CPU tests; real media reuse E2E pending) | no | no | no |
+| Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile/lineage + parent-worker ownership CPU tests; real media reuse E2E pending) | no | no | no |
 | Verrou PREVIEW / publication | yes | yes (contract + registry tests; publish E2E intentionally disabled) | no | no | no |
 | Audit global verrou publication | yes | yes CPU (scan artefacts, fail-closed sur publication/auto-publish/PREVIEW full master) | no | no | no |
 | Plan E2E machine-readable sécurisé | yes | yes CPU (dépendances, idle, run jetable, démarrage manuel, publication false) | no | no | no |

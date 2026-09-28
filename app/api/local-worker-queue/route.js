@@ -1183,6 +1183,23 @@ export async function GET(request) {
             lineage_depth: ancestorJobIds.length,
             lineage_complete: true,
           };
+
+          const lineageWorker = cut(
+            job.reuse_lineage?.parent_worker || "",
+            180,
+          ).trim();
+          if (!lineageWorker) {
+            throw new Error("reuse_parent_worker_missing");
+          }
+          if (targetWorker && targetWorker !== lineageWorker) {
+            throw new Error("reuse_target_worker_mismatch");
+          }
+          if (lineageWorker !== pollWorker) {
+            continue;
+          }
+
+          job.options.target_worker = lineageWorker;
+          job.options.target_worker_reason = "reuse_parent_local_state";
         } catch (error) {
           const sanitized = await markQueueValidationError(
             record,

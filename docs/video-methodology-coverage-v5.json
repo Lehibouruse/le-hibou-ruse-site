@@ -161,10 +161,21 @@
             "HIBOU_VOICE_DURATION_QC_V1",
             "duration_far_above_expected_speech_rate"
           ]
+        },
+        {
+          "path": "scripts/video-voice-density-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_VOICE_DENSITY_PLAN_V1",
+            "RELENTLESS",
+            "EXPLAINER_DENSE",
+            "deliberate_pause_soft_limit_ms",
+            "prosody_mutation:false"
+          ]
         }
       ],
       "tests": [
-        "tests/video-prosody-plan.test.mjs"
+        "tests/video-prosody-plan.test.mjs",
+        "tests/video-voice-density-plan.test.mjs"
       ],
       "e2e_pending": true,
       "e2e_step_ids": [

@@ -28,6 +28,7 @@ jobs:
           node --check scripts/video-scene-compositor.mjs
           node --check scripts/video-hibou-pose-registry.mjs
           node --check scripts/video-prosody-plan.mjs
+          node --check scripts/video-voice-density-plan.mjs
           node --check scripts/video-voice-duration-qc.mjs
           node --check scripts/video-audio-mix.mjs
           node --check scripts/video-iteration-plan.mjs
@@ -71,6 +72,7 @@ jobs:
             tests/video-prompt-graph.test.mjs \
             tests/video-motion-plan.test.mjs \
             tests/video-prosody-plan.test.mjs \
+            tests/video-voice-density-plan.test.mjs \
             tests/video-voice-duration-qc.test.mjs \
             tests/video-voice-duration-retry.test.mjs \
             tests/video-queue-transient-auto-retry.test.mjs \

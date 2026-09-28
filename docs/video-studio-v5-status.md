@@ -15,6 +15,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | QC créatif sémantique local | yes | yes (syntax/contract; model inference E2E pending) | no | no | no |
 | Registry poses Hibou | yes | yes | no | no | no |
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |
+| Voice Density Planner V1 | yes | yes CPU (RELENTLESS >250 ms advisory; EXPLAINER_DENSE sans seuil inventé; aucune mutation TTS) | no | no | no |
 | Musique/mix FFmpeg V1 | yes | yes (plan/policy; audio E2E pending) | no | no | no |
 | Cancel / supersede distant V1 | yes | yes (job/PID + worker-session binding, explicit request id/time, anti-replay consumed receipt; Windows process E2E pending) | no | no | no |
 | Preview + retouches incrémentales V1 | yes | yes (planner/cache/profile/lineage + parent-worker ownership CPU tests; real media reuse E2E pending) | no | no | no |

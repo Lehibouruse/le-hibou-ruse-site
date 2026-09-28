@@ -161,6 +161,13 @@
 
 Remote Desktop Commander est désormais disponible comme couche optionnelle d'inspection/E2E du ROG. Il pourra servir après le rendu actif à lire les logs/manifests, vérifier les caches et lancer les tests Windows sans copier-coller PowerShell. Il ne devient pas une dépendance du pipeline et ne doit pas perturber les jobs actifs.
 
+## Planification E2E sécurisée
+
+- `docs/video-studio-v5-e2e-plan.json` formalise l’ordre, les dépendances, ressources, flags temporaires et critères d’acceptation des tests réels ;
+- `HIBOU_VIDEO_V5_E2E_PLAN_AUDIT_V1` refuse toute étape auto-exécutable, publiable, GPU/process-control sans `local_idle`, ou sans run jetable ;
+- le sélecteur de tests « runnable » est purement informatif : même une étape éligible garde `manual_start_required:true` et n’est jamais lancée par l’audit ;
+- Desktop Commander pourra utiliser ce plan après confirmation explicite d’un ROG idle, sans devenir une dépendance du pipeline.
+
 ## E2E à ne lancer qu'après fin du rendu/téléchargement local actuel
 
 - ComfyUI/FLUX PREVIEW 1–2 scènes ;

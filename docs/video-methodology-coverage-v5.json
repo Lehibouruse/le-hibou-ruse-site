@@ -25,11 +25,21 @@
             "VIDEO_METHOD_V4.3",
             "features:{"
           ]
+        },
+        {
+          "path": "scripts/video-prompt-graph.mjs",
+          "markers": [
+            "HIBOU_VIDEO_PROMPT_GRAPH_V1",
+            "GLOBAL_STYLE_BIBLE",
+            "HEAD_IDENTITY_LOCK",
+            "SCENE_DELTA"
+          ]
         }
       ],
       "tests": [
         "tests/video-layer-guard.test.mjs",
-        "tests/video-airtable-sync.test.mjs"
+        "tests/video-airtable-sync.test.mjs",
+        "tests/video-prompt-graph.test.mjs"
       ],
       "e2e_pending": true
     },

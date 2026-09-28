@@ -7,6 +7,7 @@ import { TABLES, getRecord, queryRecords, updateRecord } from "../lib/airtable.j
 function fail(message){ throw new Error(message); }
 function sha(text){ return createHash("sha256").update(String(text)).digest("hex"); }
 function norm(text){ return String(text||"").replace(/\s+/g," ").trim(); }
+function selectText(value){ return String(value?.name??value??"").trim(); }
 function linkedIds(value){
   if(!Array.isArray(value)) return [];
   return value.map(item=>typeof item==="string"?item:item?.id).filter(Boolean);
@@ -22,6 +23,28 @@ function parseJsonObject(value){
     const parsed=JSON.parse(String(value));
     return parsed&&typeof parsed==="object"&&!Array.isArray(parsed)?parsed:null;
   }catch{return null;}
+}
+
+function parseJsonArrayStrict(value,label){
+  if(Array.isArray(value)) return value;
+  const raw=String(value||"").trim();
+  if(!raw) return [];
+  let parsed;
+  try{ parsed=JSON.parse(raw); }
+  catch(error){ fail(`${label} contains invalid JSON: ${error?.message||error}`); }
+  if(!Array.isArray(parsed)) fail(`${label} must be a JSON array`);
+  return parsed;
+}
+
+function parseJsonObjectStrict(value,label){
+  if(value&&typeof value==="object"&&!Array.isArray(value)) return value;
+  const raw=String(value||"").trim();
+  if(!raw) return null;
+  let parsed;
+  try{ parsed=JSON.parse(raw); }
+  catch(error){ fail(`${label} contains invalid JSON: ${error?.message||error}`); }
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)) fail(`${label} must be a JSON object`);
+  return parsed;
 }
 
 export async function resolveCanonicalVideoProfile(contentRecord){
@@ -71,6 +94,11 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       zoom_percent:Number(f["Zoom %"]||3),
       framing:{type:f["Type de plan"]?.name||f["Type de plan"]||"",anchor:f.Ancrage?.name||f.Ancrage||"",hibou:Boolean(f.Hibou)},
       image:{candidates,selected:null,selection_reason:null},
+      visual_group:String(f["Groupe visuel"]||"").trim()||null,
+      asset_requirements:parseJsonArrayStrict(
+        f["Exigences assets JSON"],
+        `${f.Scène||record.id}: Exigences assets JSON`
+      ),
       breath_unit:String(f["Unité de souffle"]||f.Narration||""),
       voice:{
         target_wpm:Number(f["Débit cible voix (mpm)"]||0)||null,
@@ -79,9 +107,15 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
         emphasis:String(f["Accentuation voix"]||""),
         intent:String(f["Intention voix"]||""),
         verbatim:true,
-        prosody_cues:parseJsonArray(f["Prosodie JSON"])
+        prosody_cues:parseJsonArrayStrict(
+          f["Prosodie JSON"],
+          `${f.Scène||record.id}: Prosodie JSON`
+        )
       },
-      timeline:parseJsonObject(f["Timeline JSON"]),
+      timeline:parseJsonObjectStrict(
+        f["Timeline JSON"],
+        `${f.Scène||record.id}: Timeline JSON`
+      ),
       pose_request:String(f["Pose Hibou"]||""),
       music_cue:String(f["Cue musique"]||"")
     };
@@ -106,7 +140,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       video_prosody_v1:Boolean(profile["Prosodie V1"]),
       video_music_mix_v1:Boolean(profile["Mix musique V1"]),
       video_incremental_retouch_v1:Boolean(profile["Retouches incrémentales V1"]),
-      video_human_candidate_selection_v1:Boolean(profile["Sélection humaine candidats V1"])
+      video_human_candidate_selection_v1:Boolean(profile["Sélection humaine candidats V1"]),
+      video_prompt_graph_v1:Boolean(profile["Prompt Graph V1"])
     },
     creative:{
       profile_name:String(profile.Profil||"HIBOU_VIRAL_V1"),
@@ -114,6 +149,8 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       style_lock:String(profile["Style lock"]||""),
       negative_prompt:String(profile["Negative prompt"]||""),
       character_lock:String(profile["Character lock Hibou"]||""),
+      movement_profile:selectText(profile["Profil mouvement"])||null,
+      curve_profile:selectText(profile["Courbe cadence"])||null,
       content_brief:String(content["Prompt / consignes"]||""),
       reference_image_url:String(process.env.HIBOU_REFERENCE_IMAGE_URL||""),
       reference_asset_repo_path:"video/assets/hibou-canonical-512.webp.b64",
@@ -165,7 +202,13 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       preview_candidates_per_scene:1
     },
     scenes,
-    audio:{status:"pending",engine:"chatterbox_multilingual",reference:null},
+    audio:{
+      status:"pending",
+      engine:"chatterbox_multilingual",
+      reference:null,
+      density_profile:selectText(profile["Profil densité voix"])||null,
+      density_profile_runtime_applied:false
+    },
     music:{
       status:Boolean(profile["Musique activée"])?"configured":"none_commercial",
       enabled:Boolean(profile["Musique activée"]),

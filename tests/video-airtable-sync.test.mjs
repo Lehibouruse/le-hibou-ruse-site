@@ -80,3 +80,61 @@ test("Airtable profile can prepare preview mode without authorizing publication"
  assert.equal(c.features.video_human_candidate_selection_v1,true);
  assert.equal(c.validation.publication_authorized,false);
 });
+
+
+test("Airtable export carries explicit continuity and roadmap metadata without activating runtime behavior",()=>{
+ const parts=Array.from({length:8},(_,i)=>`meta${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>{
+   const scene=fakeScene(i+1,p,4);
+   if(i<3) scene.fields["Groupe visuel"]="office-a";
+   if(i===0){
+     scene.fields["Exigences assets JSON"]=JSON.stringify([
+       {slot:"background",kind:"background",required_tags:["office"]}
+     ]);
+     scene.fields["Timeline JSON"]=JSON.stringify({
+       events:[{type:"caption",at_s:0.5}]
+     });
+     scene.fields["Prosodie JSON"]=JSON.stringify([
+       {phrase:p,pause_after_ms:100}
+     ]);
+     scene.fields["Pose Hibou"]="neutral";
+   }
+   return scene;
+ });
+ const profile={fields:{
+   "Profil densité voix":{name:"EXPLAINER_DENSE"},
+   "Profil mouvement":{name:"HYBRID_BEATS"},
+   "Courbe cadence":{name:"HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST"},
+   "Prompt Graph V1":false
+ }};
+ const c=buildStoryboardContract(content,scenes,profile);
+ assert.equal(c.scenes[0].visual_group,"office-a");
+ assert.equal(c.scenes[0].asset_requirements[0].slot,"background");
+ assert.equal(c.scenes[0].timeline.events[0].type,"caption");
+ assert.equal(c.scenes[0].voice.prosody_cues[0].pause_after_ms,100);
+ assert.equal(c.scenes[0].pose_request,"neutral");
+ assert.equal(c.audio.density_profile,"EXPLAINER_DENSE");
+ assert.equal(c.audio.density_profile_runtime_applied,false);
+ assert.equal(c.creative.movement_profile,"HYBRID_BEATS");
+ assert.equal(c.creative.curve_profile,"HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST");
+ assert.equal(c.features.video_prompt_graph_v1,false);
+});
+
+test("malformed V5 JSON fails closed instead of silently disappearing",()=>{
+ const parts=Array.from({length:8},(_,i)=>`json${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ scenes[0].fields["Timeline JSON"]="{bad";
+ assert.throws(
+   ()=>buildStoryboardContract(content,scenes,{fields:{}}),
+   /Timeline JSON contains invalid JSON/
+ );
+
+ scenes[0].fields["Timeline JSON"]="";
+ scenes[0].fields["Exigences assets JSON"]="{not-an-array}";
+ assert.throws(
+   ()=>buildStoryboardContract(content,scenes,{fields:{}}),
+   /Exigences assets JSON/
+ );
+});

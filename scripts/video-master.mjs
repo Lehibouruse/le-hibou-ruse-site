@@ -560,13 +560,27 @@ async function main(){
 
   const prosodyEnabled=contractFeature(storyboardData,"video_prosody_v1","HIBOU_VIDEO_PROSODY_V1");
   const prosodyStoryboard=resolve(root,"storyboard-prosody.json");
-  if(prosodyEnabled){
-    stage(state,"prosody",()=>run(process.execPath,[preRuntime.prosody,storyboard,prosodyStoryboard]));
-  }else if(!state.stages.prosody){
-    state.stages.prosody={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+  const prosodyInput=resolve(root,"storyboard-prosody-input.json");
+  stage(state,"prosody",()=>{
+    const baseline=json(storyboard);
+    if(!prosodyEnabled){
+      for(const scene of baseline.scenes||[]){
+        if(scene?.voice && Object.prototype.hasOwnProperty.call(scene.voice,"prosody_cues")){
+          delete scene.voice.prosody_cues;
+        }
+      }
+    }
+    writeJson(prosodyInput,baseline);
+    run(process.execPath,[preRuntime.prosody,prosodyInput,prosodyStoryboard]);
+    state.prosody_v1={
+      baseline_scene_controls_applied:true,
+      phrase_cues_enabled:prosodyEnabled,
+      phrase_cues_gate:prosodyEnabled?"GLOBAL+runtime":"disabled",
+      publication_authorized:false
+    };
     writeJson(statePath,state);
-  }
-  const voiceInput=prosodyEnabled?prosodyStoryboard:storyboard;
+  });
+  const voiceInput=prosodyStoryboard;
 
   const voiceDir=resolve(root,"voice");
   const voiceReady=resolve(voiceDir,"contract-audio-ready.json");

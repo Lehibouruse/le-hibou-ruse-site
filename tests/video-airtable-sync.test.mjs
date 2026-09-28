@@ -124,3 +124,23 @@ test("malformed V5 JSON fails closed instead of silently disappearing",()=>{
  scenes[0].fields["Exigences assets JSON"]="{not-an-array}";
  assert.throws(()=>buildStoryboardContract(content,scenes,{fields:{}}),/Exigences assets JSON/);
 });
+
+
+test("GLOBAL voice profile and sand branding are exported from Airtable into the storyboard",()=>{
+ const parts=Array.from({length:8},(_,i)=>`voice${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" "),"Prompt / consignes":"specific brief"}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ const profile={fields:{
+   Profil:"HIBOU_VIRAL_V1",
+   Version:"2.5-V4.3",
+   "Style lock":"global style",
+   "Negative prompt":"no humans",
+   "Character lock Hibou":"canonical owl",
+   "Voix":"VOICE_V4_ORIGINAL — warm natural French male voice"
+ }};
+ const c=buildStoryboardContract(content,scenes,profile);
+ assert.equal(c.creative.branding.color,"sand");
+ assert.equal(c.audio.voice_profile_id,"VOICE_V4_ORIGINAL");
+ assert.match(c.audio.voice_profile_text,/warm natural/);
+ assert.equal(c.creative.content_brief,"specific brief");
+});

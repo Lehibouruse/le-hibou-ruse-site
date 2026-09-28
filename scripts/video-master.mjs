@@ -87,6 +87,12 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-voice-duration-qc.mjs","HIBOU_VOICE_DURATION_QC_V1"],
   ["video-hibou-pose-registry.mjs","HIBOU_POSE_REGISTRY_V1"],
   ["video-layer-guard.mjs","HIBOU_GLOBAL_SPECIFIC_GUARD_V1"],
+  ["video-prompt-graph.mjs","HIBOU_VIDEO_PROMPT_GRAPH_V1"],
+  ["video-motion-plan.mjs","HIBOU_VIDEO_MOTION_PLAN_V1"],
+  ["video-voice-density-plan.mjs","HIBOU_VIDEO_VOICE_DENSITY_PLAN_V1"],
+  ["video-continuity-plan.mjs","HIBOU_VISUAL_CONTINUITY_PLAN_V1"],
+  ["video-asset-readiness.mjs","HIBOU_ASSET_GRAPH_READINESS_V1"],
+  ["video-planning-manifest.mjs","HIBOU_VIDEO_PLANNING_MANIFEST_V1"],
   ["hibou-poses.registry.v1.json","HIBOU_POSE_REGISTRY_V1","video/assets/hibou-poses.registry.v1.json"],
   ["video-attach-mastered-audio.mjs","attachMasteredAudio"],
   ["video-subtitles.mjs","buildAss"],
@@ -125,6 +131,12 @@ async function ensurePreImageRuntimeBundle(commit){
     voiceDurationQc:resolve(localBase,"video-voice-duration-qc.mjs"),
     poseRegistryScript:resolve(localBase,"video-hibou-pose-registry.mjs"),
     layerGuard:resolve(localBase,"video-layer-guard.mjs"),
+    promptGraph:resolve(localBase,"video-prompt-graph.mjs"),
+    motionPlan:resolve(localBase,"video-motion-plan.mjs"),
+    voiceDensityPlan:resolve(localBase,"video-voice-density-plan.mjs"),
+    continuityPlan:resolve(localBase,"video-continuity-plan.mjs"),
+    assetReadiness:resolve(localBase,"video-asset-readiness.mjs"),
+    planningManifest:resolve(localBase,"video-planning-manifest.mjs"),
     poseRegistry:resolve(localBase,"hibou-poses.registry.v1.json"),
     attachAudio:resolve(localBase,"video-attach-mastered-audio.mjs"),
     subtitles:resolve(localBase,"video-subtitles.mjs"),
@@ -450,7 +462,7 @@ async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","planning_audit","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -533,6 +545,88 @@ async function main(){
       ...propagation,
       path:promptPropagationPath
     };
+    writeJson(statePath,state);
+  }
+
+  const planningAuditEnabled=contractFeature(
+    storyboardData,
+    "video_planning_audit_v1",
+    "HIBOU_VIDEO_PLANNING_AUDIT_V1"
+  );
+  const planningDir=resolve(root,"planning");
+  if(planningAuditEnabled){
+    mkdirSync(planningDir,{recursive:true});
+    const [
+      promptGraphModule,
+      motionPlanModule,
+      voiceDensityModule,
+      continuityModule,
+      assetReadinessModule,
+      planningManifestModule
+    ]=await Promise.all([
+      import(pathToFileURL(preRuntime.promptGraph).href+"?v="+Date.now()),
+      import(pathToFileURL(preRuntime.motionPlan).href+"?v="+Date.now()),
+      import(pathToFileURL(preRuntime.voiceDensityPlan).href+"?v="+Date.now()),
+      import(pathToFileURL(preRuntime.continuityPlan).href+"?v="+Date.now()),
+      import(pathToFileURL(preRuntime.assetReadiness).href+"?v="+Date.now()),
+      import(pathToFileURL(preRuntime.planningManifest).href+"?v="+Date.now())
+    ]);
+    stage(state,"planning_audit",()=>{
+      const promptGraph=promptGraphModule.buildPromptGraph(storyboardData);
+      const motionPlan=motionPlanModule.buildMotionPlan(storyboardData);
+      const voiceDensityPlan=voiceDensityModule.buildVoiceDensityPlan(storyboardData);
+      const continuityPlan=continuityModule.buildContinuityPlan(storyboardData);
+      let assetReadiness=null;
+      writeJson(resolve(planningDir,"prompt-graph.json"),promptGraph);
+      writeJson(resolve(planningDir,"motion-plan.json"),motionPlan);
+      writeJson(resolve(planningDir,"voice-density-plan.json"),voiceDensityPlan);
+      writeJson(resolve(planningDir,"continuity-plan.json"),continuityPlan);
+      if(assetGraphArg){
+        const graph=json(resolve(assetGraphArg));
+        assetReadiness=assetReadinessModule.assessAssetGraphReadiness(
+          storyboardData,
+          graph,
+          {graphPath:resolve(assetGraphArg)}
+        );
+        writeJson(resolve(planningDir,"asset-readiness.json"),assetReadiness);
+      }
+      const manifest=planningManifestModule.buildPlanningManifest({
+        storyboard:storyboardData,
+        prompt_graph:promptGraph,
+        motion_plan:motionPlan,
+        voice_density_plan:voiceDensityPlan,
+        continuity_plan:continuityPlan,
+        asset_readiness:assetReadiness,
+        runtime_commit:runtimeCommit
+      });
+      writeJson(resolve(planningDir,"planning-manifest.json"),manifest);
+      state.planning_audit={
+        enabled:true,
+        directory:planningDir,
+        planning_manifest_sha256:manifest.planning_manifest_sha256,
+        prompt_graph_sha256:promptGraph.prompt_graph_sha256,
+        motion_plan_sha256:motionPlan.motion_plan_sha256,
+        voice_density_plan_sha256:voiceDensityPlan.voice_density_plan_sha256,
+        continuity_plan_sha256:continuityPlan.continuity_plan_sha256,
+        asset_readiness_included:Boolean(assetReadiness),
+        asset_ready_for_activation:assetReadiness?Boolean(assetReadiness.ready_for_activation):null,
+        storyboard_mutation_performed:false,
+        render_execution_performed:false,
+        publication_authorized:false
+      };
+      writeJson(statePath,state);
+    });
+  }else{
+    state.planning_audit={
+      enabled:false,
+      reason:"GLOBAL contract + runtime gate required",
+      storyboard_mutation_performed:false,
+      render_execution_performed:false,
+      publication_authorized:false
+    };
+    if(!state.stages.planning_audit){
+      state.stages.planning_audit={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
+    }
     writeJson(statePath,state);
   }
 

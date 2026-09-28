@@ -396,6 +396,9 @@
         },
         "video_prompt_graph_v1": {
           "type": "boolean"
+        },
+        "video_planning_audit_v1": {
+          "type": "boolean"
         }
       },
       "additionalProperties": true

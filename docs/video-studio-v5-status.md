@@ -11,6 +11,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Motion / cadence planner V1 | yes | yes CPU (profils globaux, zones hook/body/CTA, STATIC/ANIMATED advisory; aucune mutation timeline) | no | no | no |
 | Prompt Graph V1 | yes | yes CPU (GLOBAL refs, scene delta, attention beats, primitives éditoriales, fingerprint déterministe; runtime non branché) | no | no | no |
 | Planning Manifest V1 | yes | yes CPU (SHA storyboard + planners + reçus SCENE_PROMPT; lecture seule, aucune exécution) | no | no | no |
+| Master planning audit V1 | yes | yes statique/CPU (double gate, planners commit-pinnés, manifeste SHA; aucun effet rendu) | no | no | no |
 | Asset Continuity V1 | yes | yes CPU (groupes visuels explicites, génération base + réutilisation planifiée, slots uniques; aucun GPU) | no | no | no |
 | Asset Graph readiness V1 | yes | yes CPU (existence, fichier, SHA-256, statut validated, couverture slots; lecture seule) | no | no | no |
 | QC créatif sémantique local | yes | yes (syntax/contract; model inference E2E pending) | no | no | no |
@@ -64,6 +65,7 @@ All V5 execution remains opt-in. Relevant runtime gates:
 - `HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED`
 - `HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1`
 - `HIBOU_VIDEO_HUMAN_SELECTION_V1`
+- `HIBOU_VIDEO_PLANNING_AUDIT_V1`
 
 Timeline, creative QC, pose registry, prosody and music additionally require the corresponding GLOBAL contract flag. A scene-specific brief cannot silently enable them.
 

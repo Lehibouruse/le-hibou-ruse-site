@@ -150,3 +150,18 @@ test("stateful resumes remain pinned to the worker that owns local artifacts",()
  assert.match(queueRoute,/target_worker_reason/);
  assert.match(worker,/VIDEO_RENDER target worker mismatch/);
 });
+
+test("planning audit is double-gated, commit-pinned and read-only",()=>{
+ assert.match(master,/video_planning_audit_v1/);
+ assert.match(master,/HIBOU_VIDEO_PLANNING_AUDIT_V1/);
+ assert.match(master,/video-prompt-graph\.mjs/);
+ assert.match(master,/video-motion-plan\.mjs/);
+ assert.match(master,/video-voice-density-plan\.mjs/);
+ assert.match(master,/video-continuity-plan\.mjs/);
+ assert.match(master,/video-asset-readiness\.mjs/);
+ assert.match(master,/video-planning-manifest\.mjs/);
+ assert.match(master,/stage\(state,"planning_audit"/);
+ assert.match(master,/storyboard_mutation_performed:false/);
+ assert.match(master,/render_execution_performed:false/);
+ assert.match(master,/publication_authorized:false/);
+});

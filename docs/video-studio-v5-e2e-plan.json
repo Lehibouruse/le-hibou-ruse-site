@@ -1,0 +1,373 @@
+{
+  "schema": "HIBOU_VIDEO_V5_E2E_PLAN_V1",
+  "version": 1,
+  "branch": "feat/video-studio-v5",
+  "automatic_execution": false,
+  "publication_authorized": false,
+  "desktop_commander_optional": true,
+  "policy": {
+    "active_render_must_not_be_disturbed": true,
+    "explicit_local_idle_confirmation_required_for_media_execution": true,
+    "disposable_run_required_for_gpu_and_process_control": true,
+    "restore_feature_flags_after_each_test": true,
+    "publication_must_remain_disabled": true,
+    "no_paid_fallback": true,
+    "human_review_required": true
+  },
+  "steps": [
+    {
+      "id": "E2E-00",
+      "order": 0,
+      "name": "Read-only machine and runtime preflight",
+      "resource_class": "cpu_readonly",
+      "dependencies": [],
+      "requires_local_idle": false,
+      "disposable_run_required": false,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [],
+      "restore_flags_after": true,
+      "actions": [
+        "Inspect worker health, runtime hashes, bindings, model presence and current active processes",
+        "Run V5 readiness audit and run audit in read-only mode"
+      ],
+      "acceptance": [
+        "No runtime mutation is performed",
+        "Runtime commit and hashes are known",
+        "Publication remains disabled"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-01",
+      "order": 1,
+      "name": "Synthetic intra-scene timeline",
+      "resource_class": "cpu_media",
+      "dependencies": [
+        "E2E-00"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_TIMELINE_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Render a disposable ~9 second scene with timed caption, callout, object movement and accent",
+        "Verify a stable background and exact event windows"
+      ],
+      "acceptance": [
+        "No unnecessary full-image replacement",
+        "Timed events occur in expected windows",
+        "Publication lock audit passes"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-02",
+      "order": 2,
+      "name": "ComfyUI FLUX preview",
+      "resource_class": "gpu",
+      "dependencies": [
+        "E2E-00"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [],
+      "restore_flags_after": true,
+      "actions": [
+        "Generate 1-2 PREVIEW scenes with one candidate per scene",
+        "Measure image throughput and confirm low-VRAM sequential behavior"
+      ],
+      "acceptance": [
+        "PREVIEW uses one candidate per scene",
+        "No unrelated GPU process is interrupted",
+        "Image timing telemetry is populated",
+        "Publication lock audit passes"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-03",
+      "order": 3,
+      "name": "Real Hibou pose registry",
+      "resource_class": "gpu",
+      "dependencies": [
+        "E2E-02"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_POSE_REGISTRY_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Validate one ready pose with SHA256",
+        "Render static reuse and one timed pose event"
+      ],
+      "acceptance": [
+        "Only ready pose assets are reused",
+        "No planned pose is generated implicitly",
+        "Pose identity stays visually consistent"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-04",
+      "order": 4,
+      "name": "Chatterbox prosody and duration",
+      "resource_class": "gpu_audio",
+      "dependencies": [
+        "E2E-00"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_PROSODY_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Synthesize the exact sentence 'Et tu repayes cette marge. Chaque année.'",
+        "Compare prosody plan, waveform duration and verbatim transcript"
+      ],
+      "acceptance": [
+        "Transcript remains verbatim",
+        "Second unit is slower and more appuyé",
+        "Pause is audible",
+        "Duration QC passes or produces bounded deterministic retry"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-05",
+      "order": 5,
+      "name": "Music mix and ducking",
+      "resource_class": "cpu_audio",
+      "dependencies": [
+        "E2E-04"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_MUSIC_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Mix a rights-controlled local test track",
+        "Inspect fades, ducking and loudness, then perform human listening"
+      ],
+      "acceptance": [
+        "Voice remains intelligible",
+        "No clipping or pumping",
+        "No uncontrolled-rights asset is used"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-06",
+      "order": 6,
+      "name": "Local semantic creative QC calibration",
+      "resource_class": "gpu",
+      "dependencies": [
+        "E2E-02"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_CREATIVE_QC_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Run known-good and known-bad local image fixtures through CLIP/SigLIP-compatible QC",
+        "Calibrate advisory thresholds before any blocking mode"
+      ],
+      "acceptance": [
+        "No network or paid fallback is used",
+        "Known-good and known-bad fixtures are separable",
+        "Reasons and scores are persisted",
+        "Blocking remains disabled until calibration is accepted"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-07",
+      "order": 7,
+      "name": "Incremental PREVIEW A to B",
+      "resource_class": "gpu",
+      "dependencies": [
+        "E2E-02",
+        "E2E-04"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Create a disposable PREVIEW A then caption-only, image-only and narration-only variants",
+        "Verify reuse lineage, parent master hash and actual cache hits"
+      ],
+      "acceptance": [
+        "Caption-only keeps voice and image cache reusable",
+        "Image-only keeps voice reusable and regenerates only affected visual path",
+        "Narration-only reuses images",
+        "Parent worker/content/hash integrity checks pass",
+        "Review diff and scene_review_queue match real invalidations"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-08",
+      "order": 8,
+      "name": "Human candidate checkpoint and resume",
+      "resource_class": "gpu_human",
+      "dependencies": [
+        "E2E-02"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_HUMAN_SELECTION_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Run FINAL until WAITING_HUMAN_SELECTION",
+        "Choose candidates against the exact review fingerprint and resume the same job"
+      ],
+      "acceptance": [
+        "Images are not regenerated after human selection",
+        "Stale fingerprint is rejected",
+        "Waiting marker is removed only after valid selection",
+        "Human decision remains distinct from machine recommendation"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-09",
+      "order": 9,
+      "name": "Remote cancel and supersede",
+      "resource_class": "process_control_gpu",
+      "dependencies": [
+        "E2E-02"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_REMOTE_CANCEL_ENABLED"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Cancel a disposable job during Chatterbox and ComfyUI",
+        "Repeat with supersede"
+      ],
+      "acceptance": [
+        "Only matching owned child tree and ComfyUI client prompts stop",
+        "No unrelated process is killed",
+        "No normal retry is scheduled",
+        "Worker proceeds to next job"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-10",
+      "order": 10,
+      "name": "Two-phase remote repair resume",
+      "resource_class": "process_control",
+      "dependencies": [
+        "E2E-07"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+        "HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Fail a disposable job and generate a resume plan",
+        "Perform prepare phase with first human confirmation",
+        "Perform start phase with second human confirmation and immutable hashes"
+      ],
+      "acceptance": [
+        "Prepare ends in Paused without starting master",
+        "Start requires all four immutable proofs",
+        "Requests are one-shot",
+        "Caches and artifacts remain preserved",
+        "Publication remains locked"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-11",
+      "order": 11,
+      "name": "Complete V5 final video",
+      "resource_class": "gpu_human",
+      "dependencies": [
+        "E2E-01",
+        "E2E-03",
+        "E2E-04",
+        "E2E-05",
+        "E2E-06",
+        "E2E-07",
+        "E2E-08"
+      ],
+      "requires_local_idle": true,
+      "disposable_run_required": true,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [
+        "HIBOU_VIDEO_TIMELINE_V1",
+        "HIBOU_VIDEO_POSE_REGISTRY_V1",
+        "HIBOU_VIDEO_PROSODY_V1",
+        "HIBOU_VIDEO_MUSIC_V1",
+        "HIBOU_VIDEO_CREATIVE_QC_V1",
+        "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1",
+        "HIBOU_VIDEO_HUMAN_SELECTION_V1"
+      ],
+      "restore_flags_after": true,
+      "actions": [
+        "Render one complete disposable V5 FINAL",
+        "Perform human review V4 and incremental-aware review manifest inspection"
+      ],
+      "acceptance": [
+        "All selected V5 features behave coherently together",
+        "Human review remains mandatory",
+        "Artifact registry and durable storage plan are complete",
+        "Publication lock audit passes"
+      ],
+      "publication_authorized": false
+    },
+    {
+      "id": "E2E-12",
+      "order": 12,
+      "name": "Final publication lock and artifact audit",
+      "resource_class": "cpu_readonly",
+      "dependencies": [
+        "E2E-11"
+      ],
+      "requires_local_idle": false,
+      "disposable_run_required": false,
+      "manual_start_required": true,
+      "feature_flags_temporarily_enabled": [],
+      "restore_flags_after": true,
+      "actions": [
+        "Run publication lock audit, run audit and durable storage plan audit on the completed disposable run"
+      ],
+      "acceptance": [
+        "No publication or auto-publish signal is true",
+        "All expected hashes and references are present",
+        "No uploader or publication action is performed"
+      ],
+      "publication_authorized": false
+    }
+  ]
+}

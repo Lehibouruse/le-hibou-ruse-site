@@ -28,7 +28,9 @@ test("image plan creates exactly 3 deterministic candidates per scene",()=>{
 test("image plan binds only declared workflow prompt and seed inputs",()=>{
  const p=buildImagePlan(contract,binding);
  const r=p.requests[0].request;
- assert.equal(r.overrides["6"].text,"Hibou prompt one");
+ assert.match(r.overrides["6"].text,/Hibou/);
+ assert.match(r.overrides["6"].text,/SCENE_VISUAL_IDEA: v1/);
+ assert.match(r.overrides["6"].text,/SCENE_IMAGE_PROMPT: prompt one/);
  assert.equal(typeof r.overrides["25"].noise_seed,"number");
  assert.equal(r.endpoint,"http://127.0.0.1:8188");
 });
@@ -166,7 +168,9 @@ test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free charact
  const promptWithHibou=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
  assert.match(promptWithHibou,/BACKGROUND_ONLY_LOCK/);
  assert.match(promptWithHibou,/GLOBAL_STYLE_LOCK premium editorial cartoon/);
- assert.match(promptWithHibou,/SPECIFIC_BRIEF Lombard vs Box Spread/);
+ assert.doesNotMatch(promptWithHibou,/SPECIFIC_BRIEF Lombard vs Box Spread/);
+ assert.equal(p.creative_routing.specific_content_brief_present,true);
+ assert.equal(p.creative_routing.specific_content_brief_copied_into_each_image_prompt,false);
  assert.match(promptWithHibou,/prompt one/);
  assert.match(promptWithHibou,/ABSOLUTELY AVOID: NO humans/);
  assert.match(promptWithHibou,/TEXT_FREE_IMAGE_LOCK/);

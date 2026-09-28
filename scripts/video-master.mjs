@@ -287,7 +287,6 @@ export function masterPolicy({maxScenes=20,regenAttempts=1}={}){
     max_scenes:scenes,
     regeneration_attempts:retries,
     technical_selection_allowed:true,
-    prompt_propagation:state.prompt_propagation||null,
     human_master_review_required:true,
     publication_authorized:false,
     paid_fallback:false
@@ -1079,6 +1078,7 @@ async function main(){
     production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
     preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
+    prompt_propagation:state.prompt_propagation||null,
     human_master_review_required:true,
     publication_authorized:false
   };

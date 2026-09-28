@@ -8,6 +8,8 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | --- | --- | --- | --- | --- | --- |
 | Timeline intra-scène V1 | yes | yes | no | no | no |
 | Prompt Graph V1 | yes | yes CPU (GLOBAL refs, scene delta, attention beats, primitives éditoriales, fingerprint déterministe; runtime non branché) | no | no | no |
+| Asset Continuity V1 | yes | yes CPU (groupes visuels explicites, génération base + réutilisation planifiée, slots uniques; aucun GPU) | no | no | no |
+| Asset Graph readiness V1 | yes | yes CPU (existence, fichier, SHA-256, statut validated, couverture slots; lecture seule) | no | no | no |
 | QC créatif sémantique local | yes | yes (syntax/contract; model inference E2E pending) | no | no | no |
 | Registry poses Hibou | yes | yes | no | no | no |
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |
@@ -82,6 +84,7 @@ Aucun changement de profil global actif n'est réalisé par cette branche.
    Also verify same-content lineage, same-worker ownership when present, and parent master SHA-256 integrity before any cache is seeded.
 9. Human candidate checkpoint: FINAL doit se mettre en pause avec `WAITING_HUMAN_SELECTION`, produire le contact sheet/template, accepter une décision liée au fingerprint exact du lot, reprendre le même job sans régénérer les images, puis supprimer le marqueur d'attente.
 10. Full human review: render one complete V5 video with publication still disabled.
+11. Prompt Graph / continuité: produire `prompt-graph.json` + `continuity-plan.json` depuis un storyboard jetable, vérifier fingerprints et absence totale d'exécution modèle/GPU ; puis exécuter le doctor Asset Graph sur un petit jeu d'assets validés/hashés avant toute activation de réutilisation.
 
 ## Recommended activation order
 

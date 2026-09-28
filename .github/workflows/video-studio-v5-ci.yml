@@ -35,6 +35,8 @@ jobs:
           node --check scripts/video-v5-readiness.mjs
           node --check scripts/video-prompt-graph.mjs
           node --check scripts/video-artifact-registry.mjs
+          node --check scripts/video-continuity-plan.mjs
+          node --check scripts/video-asset-readiness.mjs
           node --check scripts/video-human-review-package.mjs
           node --check scripts/video-review-diff.mjs
           node --check scripts/video-methodology-coverage.mjs
@@ -79,6 +81,9 @@ jobs:
             tests/video-job-lineage-integration.test.mjs \
             tests/video-preview-publication-guard.test.mjs \
             tests/video-v5-readiness.test.mjs \
+            tests/video-airtable-sync.test.mjs \
+            tests/video-continuity-plan.test.mjs \
+            tests/video-asset-readiness.test.mjs \
             tests/video-publication-lock-audit.test.mjs \
             tests/video-e2e-plan-audit.test.mjs \
             tests/video-candidate-review.test.mjs \

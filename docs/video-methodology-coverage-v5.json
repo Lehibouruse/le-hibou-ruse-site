@@ -90,11 +90,21 @@
             "breath_unit",
             "timeline"
           ]
+        },
+        {
+          "path": "scripts/video-continuity-plan.mjs",
+          "markers": [
+            "HIBOU_VISUAL_CONTINUITY_PLAN_V1",
+            "visual_group_must_be_explicit",
+            "no_prompt_text_heuristics",
+            "duplicate asset requirement slot"
+          ]
         }
       ],
       "tests": [
         "tests/video-scene-timeline-v1.test.mjs",
-        "tests/video-scene-compositor.test.mjs"
+        "tests/video-scene-compositor.test.mjs",
+        "tests/video-continuity-plan.test.mjs"
       ],
       "e2e_pending": true,
       "e2e_step_ids": [
@@ -224,13 +234,24 @@
             "HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
             "estimated_generation_seconds"
           ]
+        },
+        {
+          "path": "scripts/video-asset-readiness.mjs",
+          "markers": [
+            "HIBOU_ASSET_GRAPH_READINESS_V1",
+            "ready_for_activation",
+            "reusable_assets_require_sha256",
+            "reusable_asset_sha256_invalid"
+          ]
         }
       ],
       "tests": [
         "tests/video-image-plan.test.mjs",
         "tests/video-image-batch.test.mjs",
         "tests/comfy-prompt-id.test.mjs",
-        "tests/video-image-factory.test.mjs"
+        "tests/video-image-factory.test.mjs",
+        "tests/video-asset-readiness.test.mjs",
+        "tests/video-airtable-sync.test.mjs"
       ],
       "e2e_pending": true,
       "e2e_step_ids": [

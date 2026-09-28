@@ -62,7 +62,8 @@ test("scene-level Airtable voice controls become the prosody baseline even witho
   assert.equal(p.base_scene_cue.relative_speed_pct,103);
   assert.equal(p.units[0].relative_speed_pct,103);
   assert.equal(p.units[0].ffmpeg_atempo,1.03);
-  assert.equal(p.units[0].pause_after_ms,100);
+  assert.equal(p.scene_pause_after_ms,100);
+  assert.equal(p.units[0].pause_after_ms,0);
   assert.match(p.units[0].intent,/attaque forte/);
   assert.ok(p.units[0].chatterbox_native.exaggeration>.5);
 });
@@ -84,6 +85,7 @@ test("phrase-level Prosodie JSON overrides only the requested fields and inherit
   assert.equal(p.units[0].pause_after_ms,120);
   assert.equal(p.units[1].relative_speed_pct,90);
   assert.equal(p.units[1].pause_before_ms,300);
-  assert.equal(p.units[1].pause_after_ms,120);
+  assert.equal(p.scene_pause_after_ms,120);
+  assert.equal(p.units[1].pause_after_ms,0);
   assert.equal(p.units[1].intent,"marteler chaque année");
 });

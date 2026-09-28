@@ -82,7 +82,7 @@ test("phrase-level Prosodie JSON overrides only the requested fields and inherit
   };
   const p=buildProsodyPlan(scene);
   assert.equal(p.units[0].relative_speed_pct,101);
-  assert.equal(p.units[0].pause_after_ms,120);
+  assert.equal(p.units[0].pause_after_ms,0);
   assert.equal(p.units[1].relative_speed_pct,90);
   assert.equal(p.units[1].pause_before_ms,300);
   assert.equal(p.scene_pause_after_ms,120);

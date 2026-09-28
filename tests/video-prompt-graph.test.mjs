@@ -174,7 +174,7 @@ test("graph is planning-only and cannot authorize publication or perform hidden 
 
 test("canonical identity and brand drift are rejected before scene prompt generation", () => {
   const badBrand = contract();
-  badBrand.creative.branding.color = "sand";
+  badBrand.creative.branding.position = "top-left";
   assert.throws(
     () => buildPromptGraph(badBrand),
     /BRAND_FIELD does not match/,

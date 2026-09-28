@@ -33,6 +33,7 @@ jobs:
           node --check scripts/video-iteration-plan.mjs
           node --check scripts/video-job-lineage.mjs
           node --check scripts/video-v5-readiness.mjs
+          node --check scripts/video-prompt-graph.mjs
           node --check scripts/video-artifact-registry.mjs
           node --check scripts/video-human-review-package.mjs
           node --check scripts/video-review-diff.mjs
@@ -64,6 +65,7 @@ jobs:
             tests/video-creative-qc.test.mjs \
             tests/video-hibou-pose-registry.test.mjs \
             tests/video-layer-guard.test.mjs \
+            tests/video-prompt-graph.test.mjs \
             tests/video-prosody-plan.test.mjs \
             tests/video-voice-duration-qc.test.mjs \
             tests/video-voice-duration-retry.test.mjs \

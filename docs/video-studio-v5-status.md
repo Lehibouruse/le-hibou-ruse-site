@@ -7,6 +7,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Brique | Coded | CPU/unit tested | Merged to main | Deployed prod | Active |
 | --- | --- | --- | --- | --- | --- |
 | Timeline intra-scène V1 | yes | yes | no | no | no |
+| Prompt Graph V1 | yes | yes CPU (GLOBAL refs, scene delta, attention beats, primitives éditoriales, fingerprint déterministe; runtime non branché) | no | no | no |
 | QC créatif sémantique local | yes | yes (syntax/contract; model inference E2E pending) | no | no | no |
 | Registry poses Hibou | yes | yes | no | no | no |
 | Prosodie Chatterbox V1 | yes | yes (planner/syntax; audio E2E pending) | no | no | no |
@@ -60,12 +61,13 @@ All V5 execution remains opt-in. Relevant runtime gates:
 
 Timeline, creative QC, pose registry, prosody and music additionally require the corresponding GLOBAL contract flag. A scene-specific brief cannot silently enable them.
 
-## Prepared Airtable migrations — not applied
+## Airtable V5 schema
 
-- `docs/migrations/airtable-video-studio-v5-profile-fields.json`
-- `docs/migrations/airtable-video-remote-cancel-v1.json`
+- La migration structurelle V5 des champs `Profils vidéo` / `Scènes vidéo` est désormais présente dans Airtable, mais les nouveaux flags du profil actif restent non activés.
+- `docs/migrations/airtable-video-studio-v5-profile-fields.json` reste la trace de migration.
+- `docs/migrations/airtable-video-remote-cancel-v1.json` reste préparée et ne doit pas être appliquée pendant un rendu actif.
 
-Apply schema changes only when the local production render is idle. Do not rewrite the active global profile during migration.
+Aucun changement de profil global actif n'est réalisé par cette branche.
 
 ## E2E tests remaining after the active render
 

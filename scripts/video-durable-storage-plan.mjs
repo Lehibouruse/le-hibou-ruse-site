@@ -12,7 +12,7 @@ const CRITICAL = new Set([
 const HIGH = new Set([
   "audio","subtitles","creative_qc","human_selection_manifest",
   "candidate_review","review_diff","incremental_retouch_plan",
-  "asset_resolved_contract","audio_mix_manifest"
+  "asset_resolved_contract","audio_mix_manifest","prompt_propagation"
 ]);
 
 function fail(m){ throw new Error(m); }

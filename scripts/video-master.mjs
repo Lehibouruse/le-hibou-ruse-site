@@ -24,11 +24,18 @@ async function ensureCanonicalReference(storyboardData, root){
     let bytes=null;
     if(repoPath){
       if(!/^[0-9a-f]{40}$/.test(commit)) fail("canonical Hibou asset requires valid runtime_commit");
-      const assetUrl=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${commit}/${repoPath}`;
-      const response=await fetch(assetUrl,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
-      if(!response.ok) fail(`canonical Hibou embedded asset download failed HTTP ${response.status}`);
-      const encoded=(await response.text()).replace(/\\s+/g,"");
-      bytes=Buffer.from(encoded,"base64");
+      const localRepoRoot=String(process.env.HIBOU_LOCAL_REPO_ROOT||"").trim();
+      const localAssetPath=localRepoRoot?resolve(localRepoRoot,repoPath):"";
+      if(localAssetPath&&existsSync(localAssetPath)){
+        const encoded=readFileSync(localAssetPath,"utf8").replace(/\\s+/g,"");
+        bytes=Buffer.from(encoded,"base64");
+      }else{
+        const assetUrl=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${commit}/${repoPath}`;
+        const response=await fetch(assetUrl,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
+        if(!response.ok) fail(`canonical Hibou embedded asset download failed HTTP ${response.status}`);
+        const encoded=(await response.text()).replace(/\\s+/g,"");
+        bytes=Buffer.from(encoded,"base64");
+      }
     }else{
       const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
       if(!response.ok) fail(`canonical Hibou reference download failed HTTP ${response.status}`);

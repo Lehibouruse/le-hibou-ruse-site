@@ -118,7 +118,7 @@ test("incremental review diff is commit-pinned and remains human-only",()=>{
  assert.match(master,/stage\(state,"review_diff"/);
  assert.match(master,/review-diff\.json/);
  assert.match(master,/kind:"review_diff"/);
- assert.match(humanReview,/previous_human_approval_auto_reused:false/);
+ assert.match(humanReview,/previous_human_approval_auto_reused:\s*false/);
  assert.match(humanReview,/always_required_global_checks/);
 });
 

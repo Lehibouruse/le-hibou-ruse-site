@@ -80,11 +80,21 @@
       "code": [
         {
           "path": "scripts/video-local-preflight.mjs"
+        },
+        {
+          "path": "scripts/video-e2e-plan-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_V5_E2E_PLAN_AUDIT_V1",
+            "local_idle_confirmation_required",
+            "manual_start_is_always_required",
+            "audit_never_starts_e2e"
+          ]
         }
       ],
       "tests": [
         "tests/video-local-preflight.test.mjs",
-        "tests/video-hardware-profile.test.mjs"
+        "tests/video-hardware-profile.test.mjs",
+        "tests/video-e2e-plan-audit.test.mjs"
       ],
       "e2e_pending": true
     },
@@ -619,12 +629,22 @@
             "automatic_publication_signal_true",
             "preview_full_master_allowed"
           ]
+        },
+        {
+          "path": "scripts/video-e2e-plan-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_V5_E2E_PLAN_AUDIT_V1",
+            "local_idle_confirmation_required",
+            "manual_start_is_always_required",
+            "audit_never_starts_e2e"
+          ]
         }
       ],
       "tests": [
         "tests/video-preview-publication-guard.test.mjs",
         "tests/video-human-review-package.test.mjs",
-        "tests/video-publication-lock-audit.test.mjs"
+        "tests/video-publication-lock-audit.test.mjs",
+        "tests/video-e2e-plan-audit.test.mjs"
       ],
       "e2e_pending": true,
       "activation_policy": "publication remains intentionally outside automatic production"

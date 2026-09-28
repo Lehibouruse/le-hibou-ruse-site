@@ -34,6 +34,7 @@ This branch is intentionally isolated from production. No Airtable migration in 
 | Reprise distante après erreur | yes | yes statique/CPU (double gate, préparation → Paused, second consentement + 4 hashes, reçu de start, one-shot) | no | no | no |
 | Readiness réparation distante 2 phases | yes | yes CPU (START sans RESUME bloqué, prepare-only signalé, double consentement explicite) | no | no | no |
 | QC durée voix / retry borné | yes | yes (speech-rate plausibility + cache invalidation + single deterministic retry) | no | no | no |
+| QC silence voix pré-images V1 | yes | yes CPU (silencedetect, seuil aligné master QC, reprise dédiée) | no | no | no |
 | Revue éditoriale humaine V4 | yes | yes (checklist/manifeste CPU; décision humaine réelle pending) | no | no | no |
 | Diff revue incrémentale actionnable | yes | yes CPU (domaines changés, stages à revalider, régénérations forcées, caches réutilisables) | no | no | no |
 | File de revue incrémentale intégrée | yes | yes CPU (scene_review_queue + fallback FULL si diff absent/invalide) | no | no | no |

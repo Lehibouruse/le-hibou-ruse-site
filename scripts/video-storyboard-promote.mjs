@@ -124,7 +124,7 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
     };
 
     const canonicalCharacter=String(contract?.creative?.reference_image_local||"").trim();
-    if(canonicalCharacter && scene?.framing?.hibou){
+    if(canonicalCharacter && scene?.framing?.hibou && !scene?.composition?.character_pose){
       scene.composition={
         ...(scene.composition||{}),
         character_pose:copyCompositionAsset(sceneId,"character-pose",{

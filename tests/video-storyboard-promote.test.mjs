@@ -124,3 +124,41 @@ test("CTA scene does not duplicate the Le Hibou Rusé brand signature",()=>{
   const promoted=JSON.parse(readFileSync(resolve(out,"render-ready.json"),"utf8"));
   assert.equal(promoted.scenes[0].composition.brand_signature,undefined);
 });
+
+
+test("promotion preserves a resolved pose instead of replacing it with the generic canonical Hibou",()=>{
+  const root=mkdtempSync(resolve(tmpdir(),"hibou-promote-pose-"));
+  const source=resolve(root,"source"); const picks=resolve(root,"picks"); const out=resolve(root,"out");
+  mkdirSync(source,{recursive:true}); mkdirSync(picks,{recursive:true}); mkdirSync(out,{recursive:true});
+  const audio=Buffer.from("audio-pose"); writeFileSync(resolve(source,"voice.wav"),audio);
+  const image=Buffer.from("image-pose"); writeFileSync(resolve(picks,"s1.png"),image);
+  const canonical=Buffer.from("canonical-owl"); writeFileSync(resolve(source,"canonical.webp"),canonical);
+  const pose=Buffer.from("resolved-pose"); writeFileSync(resolve(source,"contract-pose.webp"),pose);
+  const h=hash(audio);
+  writeFileSync(resolve(source,"contract.json"),JSON.stringify({
+    contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",
+    content:{content_id:"x",script_version:1,profile_version:"2.5-V4.3",method_version:"VIDEO_METHOD_V4.3"},
+    creative:{
+      reference_image_local:resolve(source,"canonical.webp"),
+      branding:{text:"Le Hibou Rusé",position:"bottom-center",color:"sand"}
+    },
+    engine:{renderer:"ffmpeg",renderer_version:"1",fps:30,width:1080,height:1920},
+    scenes:[{
+      scene_id:"s1",order:1,
+      narration_exact:{mode:"audio_reference",source_audio:"voice.wav",start_s:0,end_s:1,sha256:h},
+      visual_idea:"x",screen_text:"CONTRAT",planned_duration_s:1,
+      framing:{hibou:true},
+      composition:{character_pose:{path:resolve(source,"contract-pose.webp"),anchor:"bottom-center",width:430,z:20}},
+      pose_registry_resolution:{status:"READY_REUSE",pose_id:"contrat"},
+      image:{candidates:[],selected:null,selection_reason:null},
+      breath_unit:"x",voice:{target_wpm:200,relative_speed_pct:100,pause_after_ms:0,emphasis:"x",intent:"x"}
+    }],
+    audio:{state:"ready",reference:"voice.wav",sha256:h},music:{},subtitles:{},qc:{},validation:{}
+  }));
+  writeFileSync(resolve(picks,"selections.json"),JSON.stringify({s1:{selected:"s1.png",candidates:["s1.png"],selection_reason:"QC pass"}}));
+  promoteStoryboard(resolve(source,"contract.json"),resolve(picks,"selections.json"),resolve(out,"render-ready.json"));
+  const promoted=JSON.parse(readFileSync(resolve(out,"render-ready.json"),"utf8"));
+  assert.match(promoted.scenes[0].composition.character_pose.path,/contract-pose/);
+  assert.equal(promoted.scenes[0].pose_registry_resolution.pose_id,"contrat");
+  assert.doesNotMatch(promoted.scenes[0].composition.character_pose.path,/canonical/);
+});

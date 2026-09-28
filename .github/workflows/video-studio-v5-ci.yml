@@ -36,6 +36,7 @@ jobs:
           node --check scripts/video-v5-readiness.mjs
           node --check scripts/video-prompt-graph.mjs
           node --check scripts/video-motion-plan.mjs
+          node --check scripts/video-planning-manifest.mjs
           node --check scripts/video-artifact-registry.mjs
           node --check scripts/video-continuity-plan.mjs
           node --check scripts/video-asset-readiness.mjs
@@ -71,6 +72,7 @@ jobs:
             tests/video-layer-guard.test.mjs \
             tests/video-prompt-graph.test.mjs \
             tests/video-motion-plan.test.mjs \
+            tests/video-planning-manifest.test.mjs \
             tests/video-prosody-plan.test.mjs \
             tests/video-voice-density-plan.test.mjs \
             tests/video-voice-duration-qc.test.mjs \

@@ -38,12 +38,22 @@
             "editorial_primitives",
             "roadmap_profiles_require_e2e_before_runtime"
           ]
+        },
+        {
+          "path": "scripts/video-planning-manifest.mjs",
+          "markers": [
+            "HIBOU_VIDEO_PLANNING_MANIFEST_V1",
+            "scene_prompt_receipts",
+            "all_scene_sources_must_match_prompt_graph",
+            "planning_manifest_sha256"
+          ]
         }
       ],
       "tests": [
         "tests/video-layer-guard.test.mjs",
         "tests/video-airtable-sync.test.mjs",
-        "tests/video-prompt-graph.test.mjs"
+        "tests/video-prompt-graph.test.mjs",
+        "tests/video-planning-manifest.test.mjs"
       ],
       "e2e_pending": true,
       "e2e_step_ids": [

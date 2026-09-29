@@ -15,7 +15,10 @@ function run(command, args, { env = {} } = {}) {
     windowsHide: true,
     shell: false,
   });
-  if (result.status !== 0) fail(`${command} failed: ${result.stderr?.slice(-4000) || result.stdout}`);
+  if (result.status !== 0) {
+    const detail = result.error?.message || result.stderr?.slice(-4000) || result.stdout || "no process diagnostics";
+    fail(`${command} failed (status=${result.status}, signal=${result.signal || "none"}): ${detail}`);
+  }
   return result.stdout;
 }
 
@@ -65,6 +68,18 @@ function xmlEscape(value) {
     .replaceAll('"', "&quot;");
 }
 
+export function applyWindowsDrawtextFont(filterComplex, {
+  platform = process.platform,
+  windowsDir = process.env.WINDIR || "C:\\Windows",
+} = {}) {
+  const source = String(filterComplex || "");
+  if (platform !== "win32" || !source.includes("drawtext=")) return source;
+  const fontFile = resolve(windowsDir, "Fonts", "arial.ttf");
+  if (!existsSync(fontFile)) return source;
+  const escapedFont = ffmpegFilterPath(fontFile);
+  return source.replaceAll("drawtext=", `drawtext=fontfile='${escapedFont}':`);
+}
+
 export function buildSubtitleFontRuntime({
   platform = process.platform,
   workDir = process.cwd(),
@@ -101,7 +116,9 @@ export function buildSubtitleFontRuntime({
     fontconfig_cache: fontconfigCache,
     fontconfig_xml: fontconfigXml,
     env: {
-      FONTCONFIG_FILE: fontconfigFile,
+      // Windows Fontconfig resolves FONTCONFIG_FILE relative to FONTCONFIG_PATH more reliably
+      // than an absolute drive-letter path (which some FFmpeg builds parse as a URI scheme).
+      FONTCONFIG_FILE: "fonts.conf",
       FONTCONFIG_PATH: fontconfigDir,
     },
   };
@@ -227,8 +244,9 @@ export function renderVideoContract(contractPathArg, outputArg) {
     } else {
       const args = ["-y", "-loglevel", "error"];
       for (const asset of assetPaths) args.push("-loop", "1", "-i", asset);
+      const sceneFilterComplex = applyWindowsDrawtextFont(plan.filter_complex);
       args.push(
-        "-filter_complex", plan.filter_complex,
+        "-filter_complex", sceneFilterComplex,
         "-map", plan.output_label,
         "-t", duration.toFixed(3),
         "-an",

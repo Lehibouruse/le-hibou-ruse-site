@@ -1193,17 +1193,20 @@ async function main(){
   const candidateReviewData=existsSync(candidateReviewPath)?json(candidateReviewPath):null;
   const generatedCandidateSceneCount=Number(candidateReviewData?.scene_count||0);
 
-  if(humanSelectionFeatureEnabled&&!humanSelectionEnabled){
+  const waitingHumanSelectionPath=resolve(root,"awaiting-human-selection.json");
+  if(!humanSelectionEnabled){
+    if(existsSync(waitingHumanSelectionPath)) unlinkSync(waitingHumanSelectionPath);
     state.human_candidate_selection={
       enabled:false,
-      reason:"preview_mode_does_not_pause_for_human_candidate_selection",
+      reason:humanSelectionFeatureEnabled
+        ?"preview_mode_does_not_pause_for_human_candidate_selection"
+        :"runtime_human_selection_gate_disabled",
       review_path:existsSync(candidateReviewPath)?candidateReviewPath:null,
       publication_authorized:false
     };
+    if(state.pipeline_status==="WAITING_HUMAN_SELECTION") state.pipeline_status="RUNNING_AUTO_SELECTION";
     writeJson(statePath,state);
   }
-
-  const waitingHumanSelectionPath=resolve(root,"awaiting-human-selection.json");
 
   if(
     humanSelectionEnabled &&

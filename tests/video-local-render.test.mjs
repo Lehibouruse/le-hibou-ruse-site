@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSceneRenderFingerprint, buildSubtitleFontRuntime, renderEncodingPolicy, validateVideoContract } from "../scripts/video-local-render.mjs";
+import { applyWindowsDrawtextFont, buildSceneRenderFingerprint, buildSubtitleFontRuntime, renderEncodingPolicy, validateVideoContract } from "../scripts/video-local-render.mjs";
 
 test("un contrat storyboard est refusé explicitement par le renderer", () => {
   const contract = {
@@ -72,8 +72,16 @@ test("windows subtitle runtime is self-contained and points at Windows fonts",()
   assert.match(plan.fontconfig_file,/fontconfig[\\/]fonts\.conf$/);
   assert.match(plan.fontconfig_xml,/<fontconfig>/);
   assert.match(plan.fontconfig_xml,/Windows\/Fonts/);
-  assert.equal(plan.env.FONTCONFIG_FILE,plan.fontconfig_file);
+  assert.equal(plan.env.FONTCONFIG_FILE,"fonts.conf");
   assert.equal(plan.env.FONTCONFIG_PATH,plan.fontconfig_dir);
+});
+
+test("windows scene drawtext uses an explicit font file and avoids Fontconfig lookup",()=> {
+  const filter=applyWindowsDrawtextFont("[v]drawtext=text='Test':fontsize=30[out]",{
+    platform:"win32",
+    windowsDir:"C:\\Windows",
+  });
+  assert.match(filter,/drawtext=fontfile='C\\:\/Windows\/Fonts\/arial\.ttf':/);
 });
 
 test("non-Windows subtitle runtime leaves system font configuration untouched",()=> {

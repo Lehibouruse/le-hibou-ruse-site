@@ -101,20 +101,39 @@ export function applyPoseRegistryToContract(contract, registry, {registryPath=""
     const request=String(scene.pose_request||"").trim();
     if(!request) return scene;
     const result=resolvePose(registry,request);
-    if(!result.found){
-      unresolved+=1;
-      return {
-        ...scene,
-        pose_registry_resolution:{
-          schema:POSE_REGISTRY_SCHEMA,
-          request,
-          status:"UNRESOLVED",
-          reason:result.reason,
-          generation_requested:false
-        }
-      };
+    let resolvedPose=result.found?{...result.pose}:null;
+    let resolutionStatus="READY_REUSE";
+    if(!resolvedPose){
+      const canonical=String(out?.creative?.reference_image_local||"").trim();
+      const deterministicOverlay=String(out?.creative?.reference_mode||"")==="deterministic_character_overlay";
+      const hibouRequired=Boolean(scene?.framing?.hibou);
+      if(deterministicOverlay&&hibouRequired&&canonical){
+        resolvedPose={
+          id:"canonical_fallback",
+          category:"canonical_fallback",
+          status:"ready",
+          asset_ref:canonical,
+          sha256:out?.creative?.reference_image_sha256||null,
+          anchor:"bottom-center",
+          default_width:430,
+          remove_background:true
+        };
+        resolutionStatus="CANONICAL_FALLBACK";
+      }else{
+        unresolved+=1;
+        return {
+          ...scene,
+          pose_registry_resolution:{
+            schema:POSE_REGISTRY_SCHEMA,
+            request,
+            status:"UNRESOLVED",
+            reason:result.reason,
+            generation_requested:false
+          }
+        };
+      }
     }
-    const selected={...result.pose};
+    const selected={...resolvedPose};
     selected.asset_ref=isAbsolute(selected.asset_ref)
       ?selected.asset_ref
       :resolve(root,selected.asset_ref);
@@ -122,7 +141,7 @@ export function applyPoseRegistryToContract(contract, registry, {registryPath=""
     withPose.pose_registry_resolution={
       schema:POSE_REGISTRY_SCHEMA,
       request,
-      status:"READY_REUSE",
+      status:resolutionStatus,
       pose_id:selected.id,
       asset_ref:selected.asset_ref,
       sha256:selected.sha256||null,

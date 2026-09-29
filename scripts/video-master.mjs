@@ -11,6 +11,23 @@ function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
 function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
 function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
+function localRuntimeOverrideSource(repoPath,marker){
+  if(!envFlag("HIBOU_LOCAL_RUNTIME_OVERRIDE")) return null;
+  const root=String(process.env.HIBOU_LOCAL_REPO_ROOT||"").trim();
+  if(!root) fail("HIBOU_LOCAL_RUNTIME_OVERRIDE requires HIBOU_LOCAL_REPO_ROOT");
+  const sourcePath=resolve(root,repoPath);
+  if(!existsSync(sourcePath)) fail("local runtime override source missing: "+sourcePath);
+  const source=readFileSync(sourcePath,"utf8");
+  if(!source.includes(marker)) fail("local runtime override marker missing: "+repoPath);
+  return source;
+}
+function localRuntimeHead(){
+  if(!envFlag("HIBOU_LOCAL_RUNTIME_OVERRIDE")) return null;
+  const root=String(process.env.HIBOU_LOCAL_REPO_ROOT||"").trim();
+  if(!root) return null;
+  const result=spawnSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8",windowsHide:true,shell:false});
+  return result.status===0?String(result.stdout||"").trim():null;
+}
 async function ensureCanonicalReference(storyboardData, root){
   const creative=storyboardData?.creative||{};
   const url=String(creative.reference_image_url||"").trim();
@@ -120,9 +137,14 @@ async function ensurePreImageRuntimeBundle(commit){
   mkdirSync(localBase,{recursive:true});
   for(const [name,marker,sourcePath] of PRE_IMAGE_RUNTIME_FILES){
     const target=resolve(localBase,name);
+    const repoPath=sourcePath||`scripts/${name}`;
+    const override=localRuntimeOverrideSource(repoPath,marker);
+    if(override!==null){
+      writeFileSync(target,override,"utf8");
+      continue;
+    }
     let source=existsSync(target)?readFileSync(target,"utf8"):"";
     if(!source.includes(marker)){
-      const repoPath=sourcePath||`scripts/${name}`;
       const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/${repoPath}`;
       const response=await fetch(url,{headers:{"User-Agent":"Le-Hibou-Video-Master/1.0","Cache-Control":"no-cache",Pragma:"no-cache"}});
       if(!response.ok) fail(`pre-image runtime download failed HTTP ${response.status}: ${name}@${normalized}`);
@@ -177,6 +199,11 @@ async function ensureImageRuntimeBundle(commit){
   mkdirSync(localBase,{recursive:true});
   for(const [name,marker,sourcePath] of IMAGE_RUNTIME_FILES){
     const target=resolve(localBase,name);
+    const override=localRuntimeOverrideSource(sourcePath,marker);
+    if(override!==null){
+      writeFileSync(target,override,"utf8");
+      continue;
+    }
     let source=existsSync(target)?readFileSync(target,"utf8"):"";
     if(!source.includes(marker)){
       const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/${sourcePath}`;
@@ -214,6 +241,12 @@ async function ensurePostRuntimeBundle(commit){
   mkdirSync(localBase,{recursive:true});
   for(const [name,marker] of POST_RUNTIME_FILES){
     const target=resolve(localBase,name);
+    const repoPath=`scripts/${name}`;
+    const override=localRuntimeOverrideSource(repoPath,marker);
+    if(override!==null){
+      writeFileSync(target,override,"utf8");
+      continue;
+    }
     let source=existsSync(target)?readFileSync(target,"utf8"):"";
     if(!source.includes(marker)){
       const url=`https://raw.githubusercontent.com/Lehibouruse/le-hibou-ruse-site/${normalized}/scripts/${name}`;
@@ -329,6 +362,84 @@ export function normalizeExecutionProfileOverride({mode="",candidates=""}={}){
   return {
     production_mode:rawMode||null,
     candidates_per_scene:candidateCount
+  };
+}
+
+function specificMotionCues(scene){
+  const source=String(scene?.visual_idea||"").toLowerCase();
+  if(!source) return [];
+  const rules=[
+    ["disappear",/\bdispara(?:î|i)t|\bdisparaissent?/iu],
+    ["erase_remove",/\beffac(?:e|er)|\bretir(?:e|er)|(?:^|\s)élimin(?:e|er)|\bsupprim(?:e|er)/iu],
+    ["open_passage",/\bouvre?\s+un\s+passage|\bpassage\s+s['’]ouvre/iu],
+    ["appear",/\bappara(?:î|i)t|\bapparaissent?/iu],
+    ["turn_rotate",/\btourne|\btourner|\brotat/iu],
+    ["renew_recreate",/\brecr[eé][eé]|\brenouvel[eé]|\bencha[iî]nement/iu],
+    ["accelerate",/\bacc[eé]l[eé]r/iu],
+  ];
+  return rules.filter(([,re])=>re.test(source)).map(([code])=>code);
+}
+export function materializeSpecificActionTimelines(contract){
+  const scenes=Array.isArray(contract?.scenes)?contract.scenes:[];
+  const compiled=[];
+  for(const [index,scene] of scenes.entries()){
+    const existing=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
+    if(existing.length) continue;
+    const cues=specificMotionCues(scene);
+    if(!cues.length) continue;
+    const duration=Math.max(3,Math.min(12,Number(scene?.planned_duration_s)||5));
+    const reveal=cues.some(cue=>["disappear","open_passage","appear"].includes(cue));
+    const accelerate=cues.includes("accelerate")||cues.includes("renew_recreate");
+    const destructive=cues.includes("erase_remove");
+    const rotate=cues.includes("turn_rotate");
+    const anchor=reveal?"center":destructive?"right":rotate?"left":accelerate?"right":["left","right","center"][index%3];
+    const firstEnd=Number(Math.max(1.2,duration*(accelerate?0.48:0.72)).toFixed(3));
+    const events=[
+      {
+        id:`auto-${scene.order||index+1}-camera-1`,
+        type:"camera",
+        beat_kind:"MICRO_ZOOM",
+        start_s:0.1,
+        end_s:firstEnd,
+        zoom_percent:reveal?4:3.4,
+        anchor
+      },
+      {
+        id:`auto-${scene.order||index+1}-accent-1`,
+        type:"accent",
+        beat_kind:"VISUAL_ACCENT",
+        start_s:Number(Math.max(0.3,duration*0.42).toFixed(3)),
+        end_s:Number(Math.max(1.0,duration*0.78).toFixed(3)),
+        accent:"gold_border"
+      }
+    ];
+    if(accelerate){
+      events.push({
+        id:`auto-${scene.order||index+1}-camera-2`,
+        type:"camera",
+        beat_kind:"MICRO_ZOOM",
+        start_s:Number(Math.max(0.8,duration*0.52).toFixed(3)),
+        end_s:Number(Math.max(1.5,duration-0.15).toFixed(3)),
+        zoom_percent:4,
+        anchor:"right"
+      });
+    }
+    scene.timeline={
+      schema:"HIBOU_SCENE_TIMELINE_V1",
+      source:"compiled_specific_action_cues_v1",
+      derived_from:"visual_idea",
+      action_cues:cues,
+      events
+    };
+    compiled.push({scene_id:String(scene.scene_id||""),action_cues:cues,event_count:events.length});
+  }
+  return {
+    schema:"HIBOU_SPECIFIC_MOTION_COMPILATION_V1",
+    changed_scene_count:compiled.length,
+    changed_scenes:compiled,
+    prompt_text_mutated:false,
+    explicit_timelines_preserved:true,
+    publication_authorized:false
   };
 }
 
@@ -531,13 +642,30 @@ async function main(){
       writeJson(statePath,state);
     }
   }else{
-    state.timeline_v1={enabled:true,stripped_scene_count:0};
+    const specificMotionCompilation=materializeSpecificActionTimelines(storyboardData);
+    state.timeline_v1={
+      enabled:true,
+      stripped_scene_count:0,
+      specific_motion_compilation:specificMotionCompilation
+    };
+    if(specificMotionCompilation.changed_scene_count>0){
+      writeJson(storyboard,storyboardData);
+    }
     writeJson(statePath,state);
   }
   const canonicalReference=await ensureCanonicalReference(storyboardData,root);
   if(canonicalReference) writeJson(storyboard,storyboardData);
 
   const runtimeCommit=String(storyboardData.runtime_commit||"").trim();
+  const localRuntimeOverride=envFlag("HIBOU_LOCAL_RUNTIME_OVERRIDE");
+  state.runtime_source={
+    mode:localRuntimeOverride?"local_override":"immutable_commit",
+    storyboard_runtime_commit:runtimeCommit,
+    local_runtime_head:localRuntimeOverride?localRuntimeHead():null,
+    local_repo_root:localRuntimeOverride?String(process.env.HIBOU_LOCAL_REPO_ROOT||"").trim():null,
+    publication_authorized:false
+  };
+  writeJson(statePath,state);
   const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
   const promptPropagationPath=resolve(root,"prompt-propagation.json");
   const promptContractAuditPath=resolve(root,"prompt-contract-continuity.json");

@@ -39,6 +39,7 @@ export function buildSceneRenderFingerprint({contract, plan, assetHashes, durati
     crf,
     composition: plan.normalized,
     timeline: plan.timeline,
+    filter_complex: plan.filter_complex,
     asset_sha256: assetHashes,
     duration,
   });

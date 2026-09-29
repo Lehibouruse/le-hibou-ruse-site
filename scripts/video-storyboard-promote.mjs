@@ -136,8 +136,8 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
           opacity:1,
           remove_background:true,
           chroma_key_color:"0xFBF6EE",
-          chroma_key_similarity:0.11,
-          chroma_key_blend:0.07
+          chroma_key_similarity:0.025,
+          chroma_key_blend:0.01
         })
       };
     }

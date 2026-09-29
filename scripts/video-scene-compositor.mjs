@@ -351,8 +351,28 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
   const d=Number(duration);
   if(!Number.isFinite(d)||d<=0) fail("duration must be positive");
   const c=normalizeSceneComposition(scene);
+  const timeline=normalizeSceneTimeline(scene,{duration:d});
+  const frames=Math.max(1,Math.round(d*fps));
+  const zoomPercent=c.camera_transform.zoom_percent;
+  const maxZoom=1+zoomPercent/100;
+  const increment=(maxZoom-1)/frames;
+  const pan=zoomAnchorExpressions(c.camera_transform.anchor);
+  let zoomExpr=`if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))`;
+  let panX=pan.x, panY=pan.y;
+  for(const event of timeline.events.filter(x=>x.type==="camera")){
+    const startFrame=Math.max(1,Math.round(event.start_s*fps)+1);
+    const endFrame=Math.max(startFrame,Math.round(event.end_s*fps));
+    const eventZoom=(1+event.zoom_percent/100).toFixed(5);
+    const eventPan=zoomAnchorExpressions(event.anchor);
+    zoomExpr=`if(between(on,${startFrame},${endFrame}),${eventZoom},${zoomExpr})`;
+    panX=`if(between(on,${startFrame},${endFrame}),${eventPan.x},${panX})`;
+    panY=`if(between(on,${startFrame},${endFrame}),${eventPan.y},${panY})`;
+  }
+
   const filters=[];
-  filters.push(`[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},format=rgba[base0]`);
+  filters.push(
+    `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${frames}:s=${width}x${height}:fps=${fps},format=rgba[base0]`
+  );
   let base="base0";
   c.layers.forEach((layer,index)=>{
     const input=index+1;
@@ -373,7 +393,6 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     base=next;
   });
 
-  const timeline=normalizeSceneTimeline(scene,{duration:d});
   const timedImageEvents=timeline.events.filter(event=>event.layer?.ref);
   timedImageEvents.forEach((event,index)=>{
     const input=1+c.layers.length+index;
@@ -447,25 +466,7 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     base=next;
   });
 
-  const frames=Math.max(1,Math.round(d*fps));
-  const zoomPercent=c.camera_transform.zoom_percent;
-  const maxZoom=1+zoomPercent/100;
-  const increment=(maxZoom-1)/frames;
-  const pan=zoomAnchorExpressions(c.camera_transform.anchor);
-  let zoomExpr=`if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))`;
-  let panX=pan.x, panY=pan.y;
-  for(const event of timeline.events.filter(x=>x.type==="camera")){
-    const startFrame=Math.max(1,Math.round(event.start_s*fps)+1);
-    const endFrame=Math.max(startFrame,Math.round(event.end_s*fps));
-    const eventZoom=(1+event.zoom_percent/100).toFixed(5);
-    const eventPan=zoomAnchorExpressions(event.anchor);
-    zoomExpr=`if(between(on,${startFrame},${endFrame}),${eventZoom},${zoomExpr})`;
-    panX=`if(between(on,${startFrame},${endFrame}),${eventPan.x},${panX})`;
-    panY=`if(between(on,${startFrame},${endFrame}),${eventPan.y},${panY})`;
-  }
-  filters.push(
-    `[${base}]zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${frames}:s=${width}x${height}:fps=${fps},format=yuv420p[outv]`
-  );
+  filters.push(`[${base}]format=yuv420p[outv]`);
 
   return {
     schema:"HIBOU_SCENE_COMPOSITOR_PLAN_V1",

@@ -85,3 +85,12 @@ test("non-Windows subtitle runtime leaves system font configuration untouched",(
   assert.deepEqual(plan.env,{});
   assert.equal(plan.fonts_dir,null);
 });
+
+
+test("scene render fingerprint changes when filter graph changes",()=>{
+  const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",engine:{renderer:"ffmpeg",renderer_version:"v1",width:1080,height:1920,fps:30}};
+  const base={normalized:{background:"x.png"},timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[]}};
+  const a=buildSceneRenderFingerprint({contract,plan:{...base,filter_complex:"[a]zoompan[outv]"},assetHashes:["a".repeat(64)],duration:4,preset:"veryfast",crf:23});
+  const b=buildSceneRenderFingerprint({contract,plan:{...base,filter_complex:"[a]overlay[outv]"},assetHashes:["a".repeat(64)],duration:4,preset:"veryfast",crf:23});
+  assert.notEqual(a,b);
+});

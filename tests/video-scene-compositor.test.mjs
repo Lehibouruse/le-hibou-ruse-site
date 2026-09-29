@@ -36,6 +36,31 @@ test("layered composition keeps assets independently replaceable and ordered by 
   assert.equal(c.camera_transform.zoom_percent,2.5);
 });
 
+test("fallback camera motion is visible and alternates pan anchor when no timeline camera event exists",()=>{
+  const scene={
+    scene_id:"S02B",order:2,zoom_percent:1.2,
+    image:{selected:"bg.png"},
+    framing:{anchor:"center"},
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:5,width:1080,height:1920,fps:30});
+  assert.match(plan.filter_complex,/1\.03200/);
+  assert.match(plan.filter_complex,/iw-\(iw\/zoom\)/);
+});
+
+test("explicit camera beat interpolates zoom instead of jumping instantly",()=>{
+  const scene={
+    scene_id:"S02C",order:1,zoom_percent:2,
+    image:{selected:"bg.png"},
+    framing:{anchor:"center"},
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"z",type:"camera",beat_kind:"MICRO_ZOOM",start_s:1,end_s:3,zoom_percent:4,anchor:"center"}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:4,width:1080,height:1920,fps:30});
+  assert.match(plan.filter_complex,/max\(0,min\(1,\(on-/);
+  assert.match(plan.filter_complex,/1\+0\.04000\*/);
+});
+
 test("ffmpeg plan composes transparent layers, text and camera transform before render",()=>{
   const scene={
     scene_id:"S03",
@@ -50,6 +75,7 @@ test("ffmpeg plan composes transparent layers, text and camera transform before 
   };
   const plan=buildSceneCompositePlan(scene,{duration:2.4,width:1080,height:1920,fps:30});
   assert.deepEqual(plan.input_refs,["bg.png","owl.webp","paper.png"]);
+  assert.match(plan.filter_complex,/tpad=stop_mode=clone:stop_duration=2\.400/);
   assert.match(plan.filter_complex,/overlay=/);
   assert.match(plan.filter_complex,/drawtext=/);
   assert.match(plan.filter_complex,/zoompan=/);

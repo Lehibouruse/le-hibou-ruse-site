@@ -358,16 +358,14 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     const input=index+1;
     const overlay=`ov${index}`;
     const next=`base${index+1}`;
-    const fade=Math.min(d/2,layer.fade_ms/1000);
-    const fadeOutStart=Math.max(0,d-fade);
     const opacity=layer.opacity<1?`,colorchannelmixer=aa=${layer.opacity.toFixed(3)}`:"";
     const keyFilter=layer.remove_background
       ? `,colorkey=${layer.chroma_key_color}:${layer.chroma_key_similarity.toFixed(3)}:${layer.chroma_key_blend.toFixed(3)}`
       :"";
-    const fadeFilter=fade>0
-      ? `,fade=t=in:st=0:d=${fade.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fade.toFixed(3)}:alpha=1`
-      :"";
-    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity}${fadeFilter}[${overlay}]`);
+    // Static composition assets are deliberately held at full opacity.
+    // Alpha fades on single-image inputs can freeze the repeated frame at alpha=0
+    // on some Windows FFmpeg builds, which previously made the canonical Hibou disappear.
+    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity},tpad=stop_mode=clone:stop_duration=${d.toFixed(3)}[${overlay}]`);
     const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
     filters.push(`[${base}][${overlay}]overlay=x='${p.x}':y='${p.y}':format=auto[${next}]`);
     base=next;
@@ -384,7 +382,7 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     const keyFilter=layer.remove_background
       ? `,colorkey=${layer.chroma_key_color}:${layer.chroma_key_similarity.toFixed(3)}:${layer.chroma_key_blend.toFixed(3)}`
       :"";
-    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity}[${overlay}]`);
+    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity},tpad=stop_mode=clone:stop_duration=${d.toFixed(3)}[${overlay}]`);
     const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
     const span=Math.max(0.001,event.end_s-event.start_s);
     const dx=num(event.motion?.to_offset_x,layer.offset_x)-layer.offset_x;
@@ -446,18 +444,29 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
   });
 
   const frames=Math.max(1,Math.round(d*fps));
-  const zoomPercent=c.camera_transform.zoom_percent;
+  const cameraEvents=timeline.events.filter(x=>x.type==="camera");
+  const requestedZoomPercent=c.camera_transform.zoom_percent;
+  const zoomPercent=cameraEvents.length?requestedZoomPercent:Math.max(3.2,requestedZoomPercent);
   const maxZoom=1+zoomPercent/100;
   const increment=(maxZoom-1)/frames;
-  const pan=zoomAnchorExpressions(c.camera_transform.anchor);
-  let zoomExpr=`if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))`;
+  const rawAnchor=String(c.camera_transform.anchor||"center").toLowerCase();
+  const fallbackAnchors=["left","right","center"];
+  const fallbackAnchor=!cameraEvents.length&&["center","centre"].includes(rawAnchor)
+    ?fallbackAnchors[(Math.max(1,Number(scene?.order||1))-1)%fallbackAnchors.length]
+    :c.camera_transform.anchor;
+  const pan=zoomAnchorExpressions(fallbackAnchor);
+  const baseZoomExpr=`if(eq(on,1),1.0,min(zoom+${increment.toFixed(8)},${maxZoom.toFixed(5)}))`;
+  let zoomExpr=baseZoomExpr;
   let panX=pan.x, panY=pan.y;
-  for(const event of timeline.events.filter(x=>x.type==="camera")){
+  for(const event of cameraEvents){
     const startFrame=Math.max(1,Math.round(event.start_s*fps)+1);
-    const endFrame=Math.max(startFrame,Math.round(event.end_s*fps));
-    const eventZoom=(1+event.zoom_percent/100).toFixed(5);
+    const endFrame=Math.max(startFrame+1,Math.round(event.end_s*fps));
+    const spanFrames=Math.max(1,endFrame-startFrame);
+    const eventZoomDelta=Math.max(0,Number(event.zoom_percent||0))/100;
+    const progress=`max(0,min(1,(on-${startFrame})/${spanFrames}))`;
+    const eventZoom=`1+${eventZoomDelta.toFixed(5)}*(${progress})`;
     const eventPan=zoomAnchorExpressions(event.anchor);
-    zoomExpr=`if(between(on,${startFrame},${endFrame}),${eventZoom},${zoomExpr})`;
+    zoomExpr=`if(between(on,${startFrame},${endFrame}),max(${baseZoomExpr},${eventZoom}),${zoomExpr})`;
     panX=`if(between(on,${startFrame},${endFrame}),${eventPan.x},${panX})`;
     panY=`if(between(on,${startFrame},${endFrame}),${eventPan.y},${panY})`;
   }

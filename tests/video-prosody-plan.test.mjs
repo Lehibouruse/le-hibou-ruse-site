@@ -40,8 +40,10 @@ test("Chatterbox batch supports prosody units but remains syntactically valid",(
   const r=spawnSync(command,args,{encoding:"utf8"});
   assert.equal(r.status,0,r.stderr||r.stdout);
   const source=readFileSync(new URL("../scripts/chatterbox-storyboard-batch.py",import.meta.url),"utf8");
-  assert.match(source,/HIBOU_CHATTERBOX_BATCH_V3_PROSODY/);
+  assert.match(source,/HIBOU_CHATTERBOX_BATCH_V4_IDENTITY_LOCK/);
   assert.match(source,/HIBOU_PROSODY_PLAN_V1/);
+  assert.match(source,/voice_identity_lock/);
+  assert.match(source,/edge_fade_waveform/);
   assert.match(source,/atempo=/);
   assert.match(source,/verbatim_preserved/);
 });

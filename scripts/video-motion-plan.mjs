@@ -77,11 +77,11 @@ function resolveSceneMode(scene,profile,signals,warnings){
   const sceneId=text(scene?.scene_id)||"scene";
   const explicit=enumOrNull(scene?.motion_mode,SCENE_MODES,`${sceneId} motion_mode`);
   if(explicit){
-    if(explicit==="STATIC_SCENE" && signals.layer_motion_count>0){
-      warnings.push({code:"static_scene_contains_layer_motion",scene_id:sceneId});
+    if(explicit==="STATIC_SCENE" && (signals.layer_motion_count>0||signals.camera_motion_count>0)){
+      warnings.push({code:"static_scene_contains_motion",scene_id:sceneId});
     }
-    if(explicit==="ANIMATED_SCENE" && signals.layer_motion_count===0){
-      warnings.push({code:"animated_scene_has_no_layer_motion",scene_id:sceneId});
+    if(explicit==="ANIMATED_SCENE" && signals.layer_motion_count===0 && signals.camera_motion_count===0){
+      warnings.push({code:"animated_scene_has_no_motion_signal",scene_id:sceneId});
     }
     return {mode:explicit,source:"explicit_scene_contract"};
   }
@@ -89,23 +89,23 @@ function resolveSceneMode(scene,profile,signals,warnings){
   if(!profile) return {mode:null,source:"movement_profile_missing"};
 
   if(profile==="CUT_DOMINANT"){
-    return signals.layer_motion_count>0
-      ? {mode:"ANIMATED_SCENE",source:"explicit_layer_motion_signal"}
+    return (signals.layer_motion_count>0||signals.camera_motion_count>0)
+      ? {mode:"ANIMATED_SCENE",source:signals.layer_motion_count>0?"explicit_layer_motion_signal":"explicit_camera_motion_signal"}
       : {mode:"STATIC_SCENE",source:"cut_dominant_default"};
   }
 
   if(profile==="HYBRID_BEATS"){
-    return signals.layer_motion_count>0
-      ? {mode:"ANIMATED_SCENE",source:"explicit_layer_motion_signal"}
+    return (signals.layer_motion_count>0||signals.camera_motion_count>0)
+      ? {mode:"ANIMATED_SCENE",source:signals.layer_motion_count>0?"explicit_layer_motion_signal":"explicit_camera_motion_signal"}
       : {mode:"STATIC_SCENE",source:"hybrid_static_default"};
   }
 
   if(profile==="INTRA_SCENE_MOTION"){
-    if(signals.layer_motion_count>0){
-      return {mode:"ANIMATED_SCENE",source:"explicit_layer_motion_signal"};
+    if(signals.layer_motion_count>0||signals.camera_motion_count>0){
+      return {mode:"ANIMATED_SCENE",source:signals.layer_motion_count>0?"explicit_layer_motion_signal":"explicit_camera_motion_signal"};
     }
     warnings.push({
-      code:"intra_scene_motion_profile_without_explicit_layer_motion",
+      code:"intra_scene_motion_profile_without_explicit_motion",
       scene_id:sceneId,
     });
     return {mode:null,source:"explicit_motion_signal_required"};
@@ -188,8 +188,9 @@ export function buildMotionPlan(contract){
       gpu_execution_performed:false,
       contract_mutation_performed:false,
       publication_authorized:false,
-      explicit_layer_motion_required_for_intra_scene_animation:true,
-      micro_zoom_does_not_by_itself_reclassify_static_scene:true,
+      explicit_motion_signal_required_for_intra_scene_animation:true,
+      camera_motion_reclassifies_scene:true,
+      micro_zoom_does_not_by_itself_reclassify_static_scene:false,
     },
   };
 

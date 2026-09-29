@@ -12,7 +12,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V3_PROSODY"
+ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V4_IDENTITY_LOCK"
 
 def fail(message):
     raise RuntimeError(message)
@@ -118,8 +118,10 @@ voice_contract = contract.get("audio") or {}
 voice_profile_id = str(voice_contract.get("voice_profile_id") or "VOICE_V4_ORIGINAL").strip()
 voice_profile_text = str(voice_contract.get("voice_profile_text") or "").strip()
 seed_base = int(os.getenv("HIBOU_VOICE_SEED_BASE", "42000"))
+voice_identity_lock = str(os.getenv("HIBOU_VOICE_IDENTITY_LOCK", "true")).strip().lower() not in {"0", "false", "no", "off"}
+bootstrap_voice_reference = voice_identity_lock and not bool(audio_prompt)
 default_exaggeration = float(os.getenv("HIBOU_CHATTERBOX_EXAGGERATION", "0.5"))
-default_temperature = float(os.getenv("HIBOU_CHATTERBOX_TEMPERATURE", "0.8"))
+default_temperature = float(os.getenv("HIBOU_CHATTERBOX_TEMPERATURE", "0.65"))
 default_cfg_weight = float(os.getenv("HIBOU_CHATTERBOX_CFG_WEIGHT", "0.5"))
 
 audio_prompt_hash = None
@@ -141,7 +143,7 @@ for scene in scenes:
     exaggeration = float(native.get("exaggeration", default_exaggeration))
     temperature = float(native.get("temperature", default_temperature))
     cfg_weight = float(native.get("cfg_weight", default_cfg_weight))
-    seed = int(native.get("seed", seed_base + int(scene["order"])))
+    seed = int(native.get("seed", seed_base if voice_identity_lock else seed_base + int(scene["order"])))
     if not 0.25 <= exaggeration <= 2.0:
         fail(f"{scene_id}: exaggeration out of range")
     if not 0.05 <= temperature <= 5.0:
@@ -171,6 +173,7 @@ for scene in scenes:
         "engine_revision": ENGINE_REVISION,
         "text": text,
         "native": native_used,
+        "voice_identity_lock": voice_identity_lock,
         "prosody_units": prosody_units,
     })
     scene_path = scene_dir / f"{scene_id}.wav"
@@ -178,6 +181,8 @@ for scene in scenes:
     target_wpm = (scene.get("voice") or {}).get("target_wpm", 170)
     scene_duration_bounds = duration_bounds(text, target_wpm)
     cache = load_cache(manifest_path, scene_path, fingerprint, scene_duration_bounds)
+    if bootstrap_voice_reference and int(scene["order"]) > 1:
+        cache = None
     descriptors.append({
         "scene": scene, "scene_id": scene_id, "text": text, "native": native_used,
         "prosody_units": prosody_units,
@@ -251,6 +256,19 @@ def atempo_waveform(wav, sample_rate, factor, scene_id, unit_id):
             except Exception:
                 pass
 
+def edge_fade_waveform(wav, sample_rate, fade_ms=6):
+    if wav is None or wav.shape[-1] <= 2:
+        return wav
+    fade_samples = min(wav.shape[-1] // 2, max(1, round(sample_rate * float(fade_ms) / 1000)))
+    if fade_samples <= 1:
+        return wav
+    ramp = torch.linspace(0.0, 1.0, fade_samples, dtype=wav.dtype, device=wav.device)
+    out = wav.clone()
+    out[..., :fade_samples] *= ramp
+    out[..., -fade_samples:] *= torch.flip(ramp, dims=[0])
+    return out
+
+
 def _atempo_chain(factor):
     remaining = max(0.25, min(4.0, float(factor)))
     parts = []
@@ -301,7 +319,10 @@ def generate_prosody_scene(model, item, np, torch, sample_rate):
     units = item.get("prosody_units") or []
     if not units:
         set_seed(item["native"]["seed"], np, torch, device)
-        return generate_scene(model, item["text"], item["native"], item["scene_id"]), []
+        wav = generate_scene(model, item["text"], item["native"], item["scene_id"])
+        if wav.ndim == 1:
+            wav = wav.unsqueeze(0)
+        return edge_fade_waveform(wav.detach().cpu(), sample_rate), []
     parts = []
     unit_meta = []
     for index, unit in enumerate(units, start=1):
@@ -310,10 +331,11 @@ def generate_prosody_scene(model, item, np, torch, sample_rate):
             fail(f"{item['scene_id']}: empty prosody unit")
         native = dict(item["native"])
         mapped = unit.get("chatterbox_native") or {}
-        for key in ("exaggeration", "temperature", "cfg_weight"):
-            if key in mapped:
-                native[key] = float(mapped[key])
-        native["seed"] = int(item["native"]["seed"]) + index - 1
+        if not voice_identity_lock:
+            for key in ("exaggeration", "temperature", "cfg_weight"):
+                if key in mapped:
+                    native[key] = float(mapped[key])
+        native["seed"] = int(item["native"]["seed"]) if voice_identity_lock else int(item["native"]["seed"]) + index - 1
         set_seed(native["seed"], np, torch, device)
         before_ms = max(0, int(unit.get("pause_before_ms") or 0))
         after_ms = max(0, int(unit.get("pause_after_ms") or 0))
@@ -325,6 +347,7 @@ def generate_prosody_scene(model, item, np, torch, sample_rate):
             wav = wav.unsqueeze(0)
         factor = max(0.85, min(1.15, float(unit.get("ffmpeg_atempo") or 1.0)))
         wav = atempo_waveform(wav, sample_rate, factor, item["scene_id"], str(unit.get("id") or index))
+        wav = edge_fade_waveform(wav, sample_rate)
         parts.append(wav)
         if after_ms:
             parts.append(torch.zeros((wav.shape[0], round(sample_rate * after_ms / 1000)), dtype=wav.dtype))
@@ -486,6 +509,8 @@ scene_meta = []
 cursor_samples = 0
 cache_hits = 0
 cache_misses = 0
+bootstrap_reference_path = None
+bootstrap_reference_hash = None
 
 for item in descriptors:
     scene = item["scene"]
@@ -516,31 +541,37 @@ for item in descriptors:
             fail(f"{scene_id}: unexpected waveform shape {tuple(wav.shape)}")
 
         first_duration_s = wav.shape[-1] / sample_rate
+        retry_seed_offsets = (100000, 200000, 300000)
         if not duration_is_plausible(first_duration_s, item["duration_bounds"]):
             duration_retry_applied = True
-            duration_retry_seed_offset = 100000
-            retry_item = copy.deepcopy(item)
-            retry_item["native"] = dict(item["native"])
-            retry_item["native"]["seed"] = int(item["native"]["seed"]) + duration_retry_seed_offset
-            print(
-                f"HIBOU_VOICE_DURATION_RETRY scene={scene_id} first_duration_s={first_duration_s:.3f} "
-                f"expected_s={item['duration_bounds']['expected_duration_s']:.3f} "
-                f"max_s={item['duration_bounds']['max_duration_s']:.3f}",
-                file=sys.stderr,
-                flush=True,
-            )
-            wav, prosody_units_used = generate_prosody_scene(model, retry_item, np, torch, sample_rate)
-            wav = wav.detach().cpu()
-            clear_cuda_cache()
-            if wav.ndim == 1:
-                wav = wav.unsqueeze(0)
-            if wav.ndim != 2:
-                fail(f"{scene_id}: unexpected retry waveform shape {tuple(wav.shape)}")
+            for retry_attempt, seed_offset in enumerate(retry_seed_offsets, start=1):
+                duration_retry_seed_offset = seed_offset
+                retry_item = copy.deepcopy(item)
+                retry_item["native"] = dict(item["native"])
+                retry_item["native"]["seed"] = int(item["native"]["seed"]) + duration_retry_seed_offset
+                current_duration_s = wav.shape[-1] / sample_rate
+                print(
+                    f"HIBOU_VOICE_DURATION_RETRY scene={scene_id} attempt={retry_attempt}/{len(retry_seed_offsets)} "
+                    f"previous_duration_s={current_duration_s:.3f} "
+                    f"expected_s={item['duration_bounds']['expected_duration_s']:.3f} "
+                    f"max_s={item['duration_bounds']['max_duration_s']:.3f}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                wav, prosody_units_used = generate_prosody_scene(model, retry_item, np, torch, sample_rate)
+                wav = wav.detach().cpu()
+                clear_cuda_cache()
+                if wav.ndim == 1:
+                    wav = wav.unsqueeze(0)
+                if wav.ndim != 2:
+                    fail(f"{scene_id}: unexpected retry waveform shape {tuple(wav.shape)}")
+                if duration_is_plausible(wav.shape[-1] / sample_rate, item["duration_bounds"]):
+                    break
 
         final_duration_s = wav.shape[-1] / sample_rate
         if not duration_is_plausible(final_duration_s, item["duration_bounds"]):
             fail(
-                f"{scene_id}: voice duration remained implausible after one deterministic retry "
+                f"{scene_id}: voice duration remained implausible after {len(retry_seed_offsets)} deterministic retries "
                 f"(duration={final_duration_s:.3f}s expected={item['duration_bounds']['expected_duration_s']:.3f}s "
                 f"allowed={item['duration_bounds']['min_duration_s']:.3f}..{item['duration_bounds']['max_duration_s']:.3f}s)"
             )
@@ -601,6 +632,19 @@ for item in descriptors:
     item["manifest_path"].write_text(
         json.dumps(scene_manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+
+    if bootstrap_voice_reference and bootstrap_reference_path is None:
+        bootstrap_reference_path = str(item["scene_path"])
+        bootstrap_reference_hash = sha256_file(item["scene_path"])
+        if model is not None:
+            clear_cuda_cache()
+            model.prepare_conditionals(bootstrap_reference_path, exaggeration=default_exaggeration)
+            clear_cuda_cache()
+        print(
+            f"HIBOU_VOICE_BOOTSTRAP_REFERENCE scene={scene_id} sha256={bootstrap_reference_hash}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     pause_samples = max(0, round(sample_rate * pause_ms / 1000))
     silence = torch.zeros((wav.shape[0], pause_samples), dtype=wav.dtype)
@@ -665,6 +709,13 @@ updated["audio"] = {
             "temperature": default_temperature,
             "cfg_weight": default_cfg_weight,
         },
+        "identity_lock_enabled": voice_identity_lock,
+        "identity_lock_mode": "reference_audio" if audio_prompt else ("bootstrap_first_scene" if bootstrap_voice_reference else ("deterministic_seed_controls" if voice_identity_lock else "unlocked")),
+        "bootstrap_reference_path": bootstrap_reference_path,
+        "bootstrap_reference_sha256": bootstrap_reference_hash,
+        "scene_native_variation_enabled": not voice_identity_lock,
+        "prosody_timing_overrides_supported": True,
+        "edge_fade_ms": 6,
         "scene_prosody_overrides_supported": True,
     },
 }
@@ -708,6 +759,8 @@ manifest = {
     "model_variant": model_variant,
     "audio_prompt_path": audio_prompt,
     "audio_prompt_sha256": audio_prompt_hash,
+    "bootstrap_reference_path": bootstrap_reference_path,
+    "bootstrap_reference_sha256": bootstrap_reference_hash,
     "voice_profile_id": voice_profile_id,
     "voice_profile_text": voice_profile_text,
     "voice_profile_runtime": updated["audio"].get("voice_profile_runtime"),

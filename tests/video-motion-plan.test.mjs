@@ -37,8 +37,9 @@ test("motion planner separates GLOBAL profile from per-scene execution mode",()=
   assert.equal(plan.movement_profile,"HYBRID_BEATS");
   assert.equal(plan.scenes[0].recommended_motion_mode,"STATIC_SCENE");
   assert.equal(plan.scenes[1].recommended_motion_mode,"ANIMATED_SCENE");
-  assert.equal(plan.scenes[2].recommended_motion_mode,"STATIC_SCENE");
-  assert.deepEqual(plan.scene_mode_counts,{STATIC_SCENE:2,ANIMATED_SCENE:1});
+  assert.equal(plan.scenes[2].recommended_motion_mode,"ANIMATED_SCENE");
+  assert.equal(plan.scenes[2].recommendation_source,"explicit_camera_motion_signal");
+  assert.deepEqual(plan.scene_mode_counts,{STATIC_SCENE:1,ANIMATED_SCENE:2});
 });
 
 test("curve zones are driven by explicit voice intent and stay planning metadata",()=>{
@@ -52,14 +53,14 @@ test("curve zones are driven by explicit voice intent and stay planning metadata
   assert.equal(plan.policy.contract_mutation_performed,false);
 });
 
-test("intra-scene motion profile does not invent animation when no layer motion exists",()=>{
+test("intra-scene motion profile accepts explicit camera motion without inventing extra motion",()=>{
   const input=fixture();
   input.creative.movement_profile="INTRA_SCENE_MOTION";
   input.scenes[1].timeline={events:[{type:"camera",start_s:0,end_s:2,zoom_percent:3}]};
   const plan=buildMotionPlan(input);
-  assert.equal(plan.scenes[1].recommended_motion_mode,null);
-  assert.equal(plan.scenes[1].recommendation_source,"explicit_motion_signal_required");
-  assert(plan.warnings.some(w=>w.code==="intra_scene_motion_profile_without_explicit_layer_motion"));
+  assert.equal(plan.scenes[1].recommended_motion_mode,"ANIMATED_SCENE");
+  assert.equal(plan.scenes[1].recommendation_source,"explicit_camera_motion_signal");
+  assert.equal(plan.warnings.some(w=>w.code==="intra_scene_motion_profile_without_explicit_motion"&&w.scene_id==="S02"),false);
 });
 
 test("explicit STATIC_SCENE with layer motion warns but is never silently rewritten",()=>{
@@ -68,17 +69,19 @@ test("explicit STATIC_SCENE with layer motion warns but is never silently rewrit
   const plan=buildMotionPlan(input);
   assert.equal(plan.scenes[1].recommended_motion_mode,"STATIC_SCENE");
   assert.equal(plan.scenes[1].recommendation_source,"explicit_scene_contract");
-  assert(plan.warnings.some(w=>w.code==="static_scene_contains_layer_motion"));
+  assert(plan.warnings.some(w=>w.code==="static_scene_contains_motion"));
   assert.equal(plan.policy.automatic_scene_mode_mutation,false);
 });
 
-test("micro-zoom alone remains compatible with STATIC_SCENE",()=>{
+test("micro-zoom is treated as real camera motion",()=>{
   const plan=buildMotionPlan(fixture());
   const s3=plan.scenes.find(x=>x.scene_id==="S03");
   assert.equal(s3.signals.camera_motion_count,1);
   assert.equal(s3.signals.layer_motion_count,0);
-  assert.equal(s3.recommended_motion_mode,"STATIC_SCENE");
-  assert.equal(plan.policy.micro_zoom_does_not_by_itself_reclassify_static_scene,true);
+  assert.equal(s3.recommended_motion_mode,"ANIMATED_SCENE");
+  assert.equal(s3.recommendation_source,"explicit_camera_motion_signal");
+  assert.equal(plan.policy.camera_motion_reclassifies_scene,true);
+  assert.equal(plan.policy.micro_zoom_does_not_by_itself_reclassify_static_scene,false);
 });
 
 test("unsupported movement profiles fail closed",()=>{

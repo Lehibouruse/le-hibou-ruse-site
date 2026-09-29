@@ -1,6 +1,6 @@
 # Le Hibou Rusé — feuille de route infrastructure vidéo V5
 
-État consolidé au 27/09/2026 à partir de la table Airtable **Méthodologie vidéo** et de la branche `feat/video-studio-v5`.
+État consolidé au 29/09/2026 à partir de la table Airtable **Méthodologie vidéo**, de la roadmap V5 et des validations E2E réelles exécutées sur le ROG. Le run frais de référence est `run-boxspread-production-fresh-20260929-01` sur la branche `local/prompt-contract-v2-stable-20260929`.
 
 ## Principes non négociables
 
@@ -19,22 +19,22 @@
 
 | Étape | Brique | État code | Tests CPU / statiques | E2E réel restant |
 | --- | --- | --- | --- | --- |
-| 0 / 0.4 / 0.5 | Benchmark + séparation GLOBAL / SPÉCIFIQUE | codé | oui | revue de cohérence sur vidéo complète |
-| 1 | Script verrouillé / hash / verbatim | socle existant | oui partiel | validation éditoriale humaine |
-| 2 | BREATH_UNIT_FIRST + storyboard + ATTENTION_BEATS | codé | oui | vidéo complète avec continuité visuelle |
-| 3 | Préflight machine / modèles | codé | oui | validation Windows/ROG hors rendu actif |
-| 4 | Carte prosodique / unités de souffle | codé | oui | écoute Chatterbox réelle |
-| 5 | Voix + mastering + contrôle verbatim | codé + QC durée + cache durée-aware + retry unique | oui CPU/statique | écoute, continuité de timbre, validation réelle du retry |
-| 6 | Image plan ComfyUI / FLUX | codé | oui | GPU E2E |
-| 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, template, fingerprint anti-stale, validateur, pause/reprise feature-gatée | oui statique | E2E réel pause → décision → reprise + GPU réel |
-| 8 | Captions + texte écran + timeline | codé | oui | lisibilité vidéo réelle |
-| 9 | Promotion render-ready / hashes | codé | oui | E2E média |
-| 10 | FFmpeg + BEAT_VARIATION_POLICY | codé | oui | inspection visuelle réelle |
-| 10.5 | PREVIEW + retouches incrémentales | codé | oui | cache hits réels sur médias |
-| 11 | QC technique avancé master | codé | oui | calibration sur master réel |
-| 12 | Revue éditoriale humaine V4 | codé : manifeste consolidé, checklist 10 points | oui | décision humaine réelle |
-| 13 | Registre artefacts + remontée | codé V2 | oui | durabilité/retour Airtable E2E |
-| 14 | Publication + apprentissage | publication verrouillée | oui statique | publication seulement après validation explicite |
+| 0 / 0.4 / 0.5 | Benchmark + séparation GLOBAL / SPÉCIFIQUE | codé + appliqué | oui | **E2E partiellement validé** : contrat strict cohérent sur 13 scènes ; reçus d'exécution voix, musique, sous-titres et 26/26 candidats image ; continuité finale post-master encore à fermer |
+| 1 | Script verrouillé / hash / verbatim | socle existant | oui partiel | validation éditoriale humaine finale |
+| 2 | BREATH_UNIT_FIRST + storyboard + ATTENTION_BEATS | codé + exécuté | oui | **E2E technique validé jusqu'au checkpoint humain** ; inspection du master final restante |
+| 3 | Préflight machine / modèles | codé + exécuté | oui | **Windows/ROG réel validé** sur production locale |
+| 4 | Carte prosodique / unités de souffle | codé + exécuté | oui | **Chatterbox réel exécuté sur 13 scènes** ; écoute qualitative humaine finale restante |
+| 5 | Voix + mastering + contrôle verbatim | codé + QC durée + cache durée-aware + retries déterministes bornés | oui CPU/statique + ciblé | **retry réel validé** sur anomalie de durée scène 10 ; voix, QC durée et mastering PASS ; écoute continuité de timbre restante |
+| 6 | Image plan ComfyUI / FLUX | codé + exécuté | oui | **GPU E2E validé sur le run frais : 26/26 candidats terminés, 0 échec, reçus prompt vérifiés** |
+| 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, template, fingerprint anti-stale, validateur, pause/reprise feature-gatée | oui statique | **checkpoint réel atteint : `WAITING_HUMAN_SELECTION` sur 13 scènes** ; décision fingerprintée → reprise même job sans régénération reste à valider |
+| 8 | Captions + texte écran + timeline | codé + exécuté | oui | sous-titres/contrat PASS ; lisibilité sur master final restante |
+| 9 | Promotion render-ready / hashes | codé | oui | reprise après décision humaine puis E2E média final |
+| 10 | FFmpeg + BEAT_VARIATION_POLICY | codé | oui | précédent master de certification PASS ; inspection du master frais restante |
+| 10.5 | PREVIEW + retouches incrémentales | codé | oui | E2E cache hits sélectifs sur médias réels encore à faire |
+| 11 | QC technique avancé master | codé | oui | master de certification déjà PASS ; revalidation sur le run frais après sélection humaine |
+| 12 | Revue éditoriale humaine V4 | codé : manifeste consolidé, checklist 10 points | oui | décision humaine réelle sur master frais |
+| 13 | Registre artefacts + remontée | codé V2 | oui | fermeture E2E registre + plan durable après master frais |
+| 14 | Publication + apprentissage | publication verrouillée | oui statique | publication séparée et toujours interdite sans validation explicite |
 
 ## Briques V5 déjà intégrées
 
@@ -70,7 +70,7 @@
 
 - garde-fou contre les anomalies de durée Chatterbox basé sur nombre de mots / WPM ;
 - cache voix invalidé si la durée stockée est aberrante ;
-- une seule régénération déterministe de la scène, puis blocage avec diagnostic ;
+- retries déterministes bornés de durée (`+100000`, `+200000`, `+300000`) avec arrêt au premier résultat plausible, puis blocage diagnostiqué ; aucune boucle non bornée ;
 
 - prosody plan ;
 - segmentation par unités de souffle ;
@@ -149,13 +149,33 @@
 - remote cancel/supersede limité au job propriétaire ;
 - publication toujours séparée de la production.
 
-## Prochaines briques faisables sans toucher au ROG
+## Priorités restantes après le run frais du 29/09
 
-1. **Checkpoint de sélection humaine** : codé statiquement ; reste l'E2E réel `WAITING_HUMAN_SELECTION` → décision fingerprintée → reprise sans refaire FLUX.
-2. **Resume après revue** : fingerprint anti-stale codé ; reste à valider sur médias réels.
-3. **Diff de revue incrémentale** : codé et enrichi avec domaines changés, stages à revalider, régénérations forcées vs cache fingerprinté et scènes réutilisables ; reste l’E2E PREVIEW → retouche → revue humaine réelle.
-4. **Coverage audit méthodologie** : contrôle statique que chaque étape Airtable importante dispose d'un artefact/code/test attendu.
-5. **Durabilité des artefacts** : manifeste backend-agnostic codé avec objets immuables SHA256 dédupliqués, références logiques de run, priorités de rétention et vérification d’emplacements existants ; reste à choisir/valider un backend durable et son uploader séparé après les E2E.
+1. **Fermer le checkpoint de sélection humaine** : l'E2E a maintenant atteint `WAITING_HUMAN_SELECTION` sur 13 scènes avec package JSON/HTML et `resume_same_job:true`. Reste : décision fingerprintée réelle → reprise du même job → vérifier que les 26 images ne sont pas régénérées.
+2. **Sortir et inspecter le master frais complet** : promotion → compositing → FFmpeg → Master QC → manifeste de revue humaine V4 → audit final du verrou de publication.
+3. **Valider la retouche incrémentale réelle** : PREVIEW A → B avec changements caption-only / image-only / narration-only et preuve de cache hits sélectifs conformes aux fingerprints.
+4. **Calibrer le QC créatif sémantique** : fixtures connues bonnes/mauvaises, seuils advisory, puis seulement envisager un mode bloquant.
+5. **Tester les scénarios de résilience rares** : cancel/supersede Windows, reprise distante en deux phases et vérification des receipts one-shot sans toucher aux jobs non propriétaires.
+6. **Fermer la durabilité** : registre + plan content-addressed déjà codés ; choisir/valider un backend durable et l'uploader séparé, sans coupler ce choix au pipeline de production.
+7. **Mettre à jour l'état d'activation machine-readable** uniquement quand chaque critère E2E complet est réellement satisfait ; un flag activé ponctuellement sur un run ne vaut pas activation production.
+
+## Feedback visuel du premier run frais — à intégrer avant V2
+
+Le premier run complet met en évidence un problème de direction artistique plutôt qu'un problème de propagation du contrat. À corriger dans les prochains GLOBAL/SPÉCIFIQUE, sans modifier rétroactivement le run de validation en cours :
+
+- **Présence du Hibou** : la mascotte ne doit pas disparaître de la séquence ; planifier explicitement sa présence, sa pose et sa fonction narrative sur les scènes pertinentes, avec contrôle de continuité.
+- **Variété sémantique** : réduire la répétition de bureaux/intérieurs génériques ; mobiliser davantage graphes, schémas, argent, marchés, calendriers, comparaisons, flux et métaphores financières lorsque la narration le justifie.
+- **SPÉCIFIQUE scène par scène** : le générateur de prompt spécifique doit concevoir chacune des 13 images individuellement, à partir du rôle précis de la scène, et non décliner un décor générique.
+- **Continuité esthétique globale** : le GLOBAL doit verrouiller un univers visuel cohérent entre les scènes — palette, niveau de détail, perspective, éclairage, architecture graphique, traitement du Hibou et densité — tout en autorisant des sujets différents.
+- **Cohérence de séquence** : l'uniformisation ne signifie pas répéter le même bureau ; conserver une identité commune tout en variant les compositions et les catégories visuelles.
+- **Texte généré dans les images** : continuer à le minimiser/éviter ; les faux mots observés sur certaines variantes confirment que les informations textuelles doivent rester dans les couches contrôlées du compositing.
+- **Primauté du SPÉCIFIQUE** : le SPÉCIFIQUE devient le principal objet créatif de chaque vidéo. Après validation du dialogue, chaque segment narratif doit être rattaché à une image précise et recevoir un brief visuel suffisamment détaillé pour être directement exécutable par la machine.
+- **Découpage dialogue → image** : pour chaque unité du dialogue, définir individuellement sujet, composition, rôle éventuel du Hibou, objets/graphes, cadrage, ambiance, continuité avec les scènes voisines et éléments à exclure. Le GLOBAL encadre l'identité ; le SPÉCIFIQUE décide réellement de ce qui est montré.
+- **Sélection automatique des candidats** : par défaut, générer plusieurs candidats puis laisser l'assistant sélectionner le meilleur candidat QC-PASS selon respect du GLOBAL, du SPÉCIFIQUE, cohérence séquentielle, lisibilité et absence d'artefacts. L'utilisateur ne doit être sollicité qu'en cas d'ambiguïté ou de défaut majeur.
+- **Musique interchangeable** : le pipeline doit accepter une piste locale autorisée comme source musicale de référence, avec ducking/fades/mastering inchangés. La cible créative exprimée est la musique de *Succession* si un fichier d'usage autorisé est fourni ; ne pas coupler les droits au moteur de production.
+- **Voix interchangeable** : conserver un profil vocal remplaçable. Utiliser une voix temporaire non identique tant qu'une autorisation de reproduction d'une voix identifiable n'est pas acquise ; une référence autorisée pourra ensuite être branchée sans modifier le reste du pipeline.
+
+Ces corrections sont un backlog créatif pour la prochaine itération du GLOBAL/SPÉCIFIQUE, après visionnage du premier master. Elles ne doivent pas invalider le run actuel.
 
 ## Desktop Commander
 
@@ -168,18 +188,27 @@ Remote Desktop Commander est désormais disponible comme couche optionnelle d'in
 - le sélecteur de tests « runnable » est purement informatif : même une étape éligible garde `manual_start_required:true` et n’est jamais lancée par l’audit ;
 - Desktop Commander pourra utiliser ce plan après confirmation explicite d’un ROG idle, sans devenir une dépendance du pipeline.
 
-## E2E à ne lancer qu'après fin du rendu/téléchargement local actuel
+## État E2E réel au 29/09/2026
 
-- ComfyUI/FLUX PREVIEW 1–2 scènes ;
-- pose Hibou réelle ;
-- Chatterbox prosodie A/B ;
-- musique / ducking à l'écoute ;
-- QC créatif local CLIP/SigLIP ;
-- PREVIEW → retouche → FINAL avec cache hits réels ;
-- sélection humaine puis reprise locale et distante fingerprintée ;
+**Validé ou démontré sur média réel :**
+- ROG/Windows + ComfyUI/FLUX opérationnels en production locale ;
+- chaîne storyboard/planning/prosodie/voix/QC durée/mastering/musique/sous-titres/style/poses/assets/images exécutée sans rupture jusqu'au checkpoint humain ;
+- 13 scènes, 26 candidats image terminés, 0 échec image ;
+- contrat de prompt V2 `strict:true` et `pass:true`, GLOBAL constant et SPECIFIC conservé par scène ;
+- reçus d'application réels pour voix, musique, sous-titres et chaque candidat image ;
+- anomalie Chatterbox de durée rencontrée en conditions réelles puis récupérée par la stratégie de retry bornée ;
+- `WAITING_HUMAN_SELECTION` atteint réellement, package de revue 13 scènes généré, reprise même job prévue ;
+- un master de certification antérieur a déjà atteint render PASS + Master QC PASS avec publication verrouillée.
+
+**Encore à fermer E2E :**
+- choix humain réel puis reprise du même job sans refaire FLUX ;
+- master frais complet + inspection visuelle/sonore + revue humaine V4 ;
+- PREVIEW → retouche → FINAL avec cache hits sélectifs mesurés ;
+- calibration QC créatif local CLIP/SigLIP ;
 - cancel / supersede Windows ;
-- master V5 complet ;
-- revue humaine V4 complète.
+- reprise distante en deux phases ;
+- backend durable/uploader séparé ;
+- publication reste hors périmètre et verrouillée.
 
 ## Chaîne de preuve avant activation
 
@@ -191,4 +220,4 @@ Remote Desktop Commander est désormais disponible comme couche optionnelle d'in
 
 ## Activation
 
-Aucune nouvelle brique de cette feuille n'est considérée **active** parce qu'elle est codée. L'activation se fera brique par brique après E2E, avec les flags GLOBAL/runtime correspondants, publication toujours désactivée.
+Aucune nouvelle brique de cette feuille n'est considérée **activée en production** parce qu'elle est codée ou parce qu'un flag runtime a été temporairement activé sur un run E2E. Le run frais du 29/09 a volontairement activé plusieurs flags ensemble pour démontrer leur comportement réel ; cela constitue une preuve E2E partielle, pas une promotion automatique en production. L'activation officielle reste brique par brique après satisfaction complète des critères E2E et mise à jour explicite de l'état machine-readable, publication toujours désactivée.

@@ -42,13 +42,44 @@ function extractStyleSection(styleLock){
   return String(match?.[1]||"").trim();
 }
 
+const CHARACTER_TOKEN_RE=/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/iu;
+
+function scrubOverlayCharacterClause(clause){
+  let value=String(clause||"").trim();
+  if(!value) return "";
+  if(!CHARACTER_TOKEN_RE.test(value)) return value;
+
+  const action=value.match(/\b(retirant|retirer|effaçant|effacer|supprimant|supprimer)\s+([^.;!?]+)/iu);
+  if(action){
+    const verb=/retirant|retirer/iu.test(action[1])?"retirer":/effaçant|effacer/iu.test(action[1])?"effacer":"supprimer";
+    return `Action visuelle sans personnage : ${verb} ${String(action[2]).trim()}`;
+  }
+
+  value=value
+    .replace(/\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
+    .replace(/\s+(?:zone|espace|place)\s+[^,;.!?]*?\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
+    .replace(/\s+(?:avec\s+)?(?:une?\s+)?(?:zone|espace|place)\s+[^,;.!?]*?\s+pour\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"");
+
+  if(CHARACTER_TOKEN_RE.test(value)){
+    value=value
+      .replace(/^\s*(?:le|la|un|une|the|an?)?\s*(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\s+/iu,"")
+      .replace(/\b(?:le|la|un|une|du|au|the|an?)?\s*(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"")
+      .replace(/\s{2,}/g," ")
+      .trim();
+  }
+  return value;
+}
+
 function removeOverlayCharacterSentences(text){
   const source=String(text||"").trim();
   if(!source) return "";
   return source
     .split(/(?<=[.!?])\s+/u)
-    .filter(sentence=>!/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/iu.test(sentence))
-    .join(" ")
+    .flatMap(sentence=>sentence.split(/\s*;\s*/u))
+    .map(scrubOverlayCharacterClause)
+    .filter(Boolean)
+    .join(". ")
+    .replace(/\.\s*\./g,".")
     .trim();
 }
 

@@ -15,11 +15,12 @@ test("Chatterbox cache requires a plausible stored voice duration", () => {
   assert.match(batch, /if not duration_is_plausible\(data\.get\("voice_duration_s"\), bounds\)/);
 });
 
-test("implausible generated duration gets exactly one deterministic retry path", () => {
+test("implausible generated duration gets a bounded deterministic retry path", () => {
   assert.match(batch, /HIBOU_VOICE_DURATION_RETRY/);
-  assert.match(batch, /duration_retry_seed_offset = 100000/);
+  assert.match(batch, /retry_seed_offsets = \(100000, 200000, 300000\)/);
+  assert.match(batch, /for retry_attempt, seed_offset in enumerate\(retry_seed_offsets, start=1\)/);
   assert.match(batch, /retry_item\["native"\]\["seed"\] = int\(item\["native"\]\["seed"\]\) \+ duration_retry_seed_offset/);
-  assert.match(batch, /voice duration remained implausible after one deterministic retry/);
+  assert.match(batch, /voice duration remained implausible after \{len\(retry_seed_offsets\)\} deterministic retries/);
   assert.doesNotMatch(batch, /while .*duration/i);
 });
 

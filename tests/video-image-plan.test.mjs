@@ -225,6 +225,42 @@ test("visual idea is used only as a fallback when no dedicated image prompt exis
 });
 
 
+test("deterministic character overlay preserves scene mechanics instead of dropping the whole SPECIFIC sentence",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[
+   {
+     scene_id:"REMOVE_BANK",
+     image_prompt:"Schéma très épuré avec un intermédiaire bancaire au centre d’un flux ; prévoir le Hibou canonique en train de retirer cet intermédiaire. Fond très sobre pour permettre une grande punchline ajoutée en post-production.",
+     visual_idea:"",
+     framing:{hibou:true,type:"schéma",anchor:"centre"}
+   },
+   {
+     scene_id:"CTA",
+     image_prompt:"Décor final premium récurrent de la marque : bureau-bibliothèque financier sobre, guide posé sur le bureau, espace central réservé au Hibou canonique. Prévoir des zones propres pour trois textes successifs ajoutés en post-production.",
+     visual_idea:"",
+     framing:{hibou:true,type:"plan moyen",anchor:"centre"}
+   }
+ ];
+ const p=buildImagePlan(good,binding);
+ const removePrompt=p.requests.find(x=>x.scene_id==="REMOVE_BANK").request.overrides["6"].text;
+ assert.match(removePrompt,/intermédiaire bancaire au centre d’un flux/i);
+ assert.match(removePrompt,/retirer cet intermédiaire/i);
+ assert.doesNotMatch(removePrompt,/\bhibou\b/i);
+ const ctaPrompt=p.requests.find(x=>x.scene_id==="CTA").request.overrides["6"].text;
+ assert.match(ctaPrompt,/bureau-bibliothèque financier sobre/i);
+ assert.match(ctaPrompt,/guide posé sur le bureau/i);
+ assert.doesNotMatch(ctaPrompt,/\bhibou\b/i);
+});
+
 test("preview never selects a vertical profile below the technical QC floor",()=>{
  const tiny=structuredClone(binding);
  tiny.profile={width:384,height:640,batch_size:1};

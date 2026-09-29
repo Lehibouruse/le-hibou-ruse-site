@@ -61,8 +61,8 @@ function normalizeImageLayer(layer,kind,defaults={}){
     fade_ms:Math.max(0,Math.min(250,num(layer.fade_ms,defaults.fade_ms??80))),
     remove_background:Boolean(layer.remove_background??defaults.remove_background??false),
     chroma_key_color:String(layer.chroma_key_color||defaults.chroma_key_color||"0xFBF6EE"),
-    chroma_key_similarity:Math.min(1,Math.max(0,num(layer.chroma_key_similarity,defaults.chroma_key_similarity??0.11))),
-    chroma_key_blend:Math.min(1,Math.max(0,num(layer.chroma_key_blend,defaults.chroma_key_blend??0.07))),
+    chroma_key_similarity:Math.min(1,Math.max(0,num(layer.chroma_key_similarity,defaults.chroma_key_similarity??0.025))),
+    chroma_key_blend:Math.min(1,Math.max(0,num(layer.chroma_key_blend,defaults.chroma_key_blend??0.01))),
   };
 }
 
@@ -400,6 +400,7 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     const next=`text${index}`;
     const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
     const opts=[
+      ...(process.platform==="win32"?["fontfile='C\\:/Windows/Fonts/arial.ttf'"]:[]),
       `text='${safeText(layer.text)}'`,
       `fontsize=${layer.font_size}`,
       `fontcolor=${layer.font_color}`,
@@ -421,6 +422,7 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     const next=`ttext${index}`;
     const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
     const opts=[
+      ...(process.platform==="win32"?["fontfile='C\\:/Windows/Fonts/arial.ttf'"]:[]),
       `text='${safeText(layer.text)}'`,
       `fontsize=${layer.font_size}`,
       `fontcolor=${layer.font_color}`,

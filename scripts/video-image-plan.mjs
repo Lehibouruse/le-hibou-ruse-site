@@ -241,6 +241,11 @@ export function buildImagePlan(contract,binding){
   binding=normalizeSizeBinding(binding);
   if(contract.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract version");
   if(contract.contract_state!=="storyboard") fail("image planning expects storyboard contract");
+  const promptContract=contract?.prompt_contract_v2;
+  if(promptContract?.schema!=="HIBOU_PROMPT_CONTRACT_V2"||promptContract?.strict!==true){
+    fail("strict prompt_contract_v2 required before image planning");
+  }
+  const promptSceneMap=new Map((promptContract.scenes||[]).map(x=>[String(x.scene_id),x]));
   if(!binding?.workflow_path) fail("binding.workflow_path required");
   if(!binding?.prompt?.node_id||!binding?.prompt?.input) fail("binding.prompt node_id/input required");
   if(!binding?.seed?.node_id||!binding?.seed?.input) fail("binding.seed node_id/input required");
@@ -315,6 +320,8 @@ export function buildImagePlan(contract,binding){
       skipped_full_reuse.push(scene.scene_id);
       continue;
     }
+    const promptSceneRef=promptSceneMap.get(String(scene.scene_id||""));
+    if(!promptSceneRef) fail(`${scene.scene_id}: missing SPECIFIC prompt contract hash`);
     const sceneImagePrompt=String(scene.image_prompt||"").trim();
     const sceneVisualIdea=String(scene.visual_idea||"").trim();
     if(!sceneImagePrompt&&!sceneVisualIdea) fail(`${scene.scene_id}: image prompt/visual idea missing`);
@@ -390,7 +397,15 @@ export function buildImagePlan(contract,binding){
           overrides,
           output_node_ids:binding.output_node_ids.map(String),
           timeout_seconds:Number(binding.timeout_seconds||600),
-          max_retries:Number(binding.max_retries??1)
+          max_retries:Number(binding.max_retries??1),
+          prompt_contract_ref:{
+            schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+            contract_sha256:promptContract.contract_sha256,
+            global_sha256:promptContract.global_sha256,
+            specific_sha256:promptSceneRef.specific_sha256,
+            combined_sha256:promptSceneRef.combined_sha256,
+            scene_id:String(scene.scene_id)
+          }
         };
       };
       const request=requestForProfile(primaryProfile);
@@ -407,7 +422,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,creative_contract_enforced:airtableCreativeContract,creative_routing:{global_style_applied:Boolean(styleLock),global_character_policy_applied:Boolean(characterLock||creative.reference_mode),global_character_policy_applied_in_postproduction:String(creative.reference_mode||"")==="deterministic_character_overlay",global_negative_policy_present:Boolean(negativeLock),global_negative_policy_injected_as_literal_tokens:false,specific_content_brief_present:Boolean(contentBrief),specific_content_brief_copied_into_each_image_prompt:false,scene_image_prompt_preferred:true,visual_idea_used_only_as_fallback:true,background_character_tokens_forbidden:true},scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:promptContract.contract_sha256,global_sha256:promptContract.global_sha256,scene_count:(promptContract.scenes||[]).length},creative_contract_enforced:airtableCreativeContract,creative_routing:{global_style_applied:Boolean(styleLock),global_character_policy_applied:Boolean(characterLock||creative.reference_mode),global_character_policy_applied_in_postproduction:String(creative.reference_mode||"")==="deterministic_character_overlay",global_negative_policy_present:Boolean(negativeLock),global_negative_policy_injected_as_literal_tokens:false,specific_content_brief_present:Boolean(contentBrief),specific_content_brief_copied_into_each_image_prompt:false,scene_image_prompt_preferred:true,visual_idea_used_only_as_fallback:true,background_character_tokens_forbidden:true},scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

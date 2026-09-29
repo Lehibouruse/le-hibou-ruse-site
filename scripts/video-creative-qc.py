@@ -41,16 +41,20 @@ def image_embedding(model, processor, device, torch, image_path: Path):
     inputs = processor(images=image, return_tensors="pt")
     pixel_values = inputs["pixel_values"].to(device)
     with torch.inference_mode():
-        return model.get_image_features(pixel_values=pixel_values)
+        vision_outputs = model.vision_model(pixel_values=pixel_values)
+        pooled = vision_outputs.pooler_output
+        return model.visual_projection(pooled)
 
 def text_embedding(model, processor, device, torch, text: str):
-    inputs = processor(text=[text], return_tensors="pt", padding=True)
+    inputs = processor(text=[text], return_tensors="pt", padding=True, truncation=True, max_length=77)
     ids = inputs["input_ids"].to(device)
     mask = inputs.get("attention_mask")
     if mask is not None:
         mask = mask.to(device)
     with torch.inference_mode():
-        return model.get_text_features(input_ids=ids, attention_mask=mask)
+        text_outputs = model.text_model(input_ids=ids, attention_mask=mask)
+        pooled = text_outputs.pooler_output
+        return model.text_projection(pooled)
 
 def sim01(a, b):
     return clamp01((cosine(a, b) + 1.0) / 2.0)
@@ -70,6 +74,9 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
     brief = str(scene.get("brief") or scene.get("visual_idea") or "").strip()
     style = str(scene.get("style_prompt") or "premium editorial flat illustration, clean vector-like shapes, ivory background, dark navy, teal and restrained gold accents").strip()
     expected_hibou = scene.get("expected_hibou")
+    hibou_composited_later = bool(scene.get("hibou_composited_later"))
+    if hibou_composited_later:
+        expected_hibou = False
     scores = {}
 
     if brief:
@@ -78,9 +85,15 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
 
     owl_prompt = "a stylized owl character, the canonical Le Hibou Ruse mascot"
     animal_prompt = "an animal or anthropomorphic character"
+    objects_prompt = "an empty editorial financial diagram made only of geometric shapes and objects"
     gibberish_prompt = "random illegible text, gibberish letters, accidental watermark, malformed typography"
     scores["hibou_presence"] = sim01(image, text_embedding(model, processor, device, torch, owl_prompt))
     scores["animal_presence"] = sim01(image, text_embedding(model, processor, device, torch, animal_prompt))
+    scores["objects_only"] = sim01(image, text_embedding(model, processor, device, torch, objects_prompt))
+    scores["unexpected_character_contrast"] = max(
+        scores["animal_presence"] - scores["objects_only"],
+        scores["hibou_presence"] - scores["objects_only"],
+    )
     scores["text_artifact_risk"] = sim01(image, text_embedding(model, processor, device, torch, gibberish_prompt))
     if canonical_embedding is not None:
         scores["canonical_identity"] = sim01(image, canonical_embedding)
@@ -89,6 +102,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
     min_style = float(thresholds.get("global_style_min", 0.52))
     min_hibou = float(thresholds.get("hibou_presence_min", 0.52))
     max_animal = float(thresholds.get("unexpected_animal_max", 0.57))
+    max_character_contrast = float(thresholds.get("unexpected_character_contrast_max", 0.005))
     min_identity = float(thresholds.get("canonical_identity_min", 0.55))
     max_text_risk = float(thresholds.get("text_artifact_risk_max", 0.62))
 
@@ -99,8 +113,10 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
         reasons.append(f"style drift: {scores['global_style']:.3f} < {min_style:.3f}")
     if expected_hibou is True and scores["hibou_presence"] < min_hibou:
         reasons.append(f"Hibou expected but weakly detected: {scores['hibou_presence']:.3f} < {min_hibou:.3f}")
-    if expected_hibou is False and scores["animal_presence"] > max_animal:
-        reasons.append(f"animal/character not expected: {scores['animal_presence']:.3f} > {max_animal:.3f}")
+    if expected_hibou is False and scores["unexpected_character_contrast"] > max_character_contrast:
+        reasons.append(
+            f"unexpected character contrast: {scores['unexpected_character_contrast']:.3f} > {max_character_contrast:.3f}"
+        )
     if expected_hibou is True and "canonical_identity" in scores and scores["canonical_identity"] < min_identity:
         reasons.append(f"canonical Hibou drift: {scores['canonical_identity']:.3f} < {min_identity:.3f}")
     if scores["text_artifact_risk"] > max_text_risk:
@@ -117,6 +133,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
             "global_style_min": min_style,
             "hibou_presence_min": min_hibou,
             "unexpected_animal_max": max_animal,
+            "unexpected_character_contrast_max": max_character_contrast,
             "canonical_identity_min": min_identity,
             "text_artifact_risk_max": max_text_risk,
         },
@@ -154,6 +171,7 @@ def main():
     failed = [r for r in results if not r["pass"]]
     report = {
         "schema": SCHEMA,
+        "prompt_contract_ref": payload.get("prompt_contract_ref"),
         "model": args.model,
         "device": device,
         "local_only": True,

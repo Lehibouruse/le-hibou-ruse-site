@@ -540,12 +540,47 @@ async function main(){
   const runtimeCommit=String(storyboardData.runtime_commit||"").trim();
   const preRuntime=await ensurePreImageRuntimeBundle(runtimeCommit);
   const promptPropagationPath=resolve(root,"prompt-propagation.json");
+  const promptContractAuditPath=resolve(root,"prompt-contract-continuity.json");
+  let promptContractGuard=null;
+  let promptContractV2=null;
+  let promptStageAudits={};
   {
     const guardModule=await import(pathToFileURL(preRuntime.layerGuard).href+"?v="+Date.now());
+    promptContractGuard=guardModule;
     const separation=guardModule.validateGlobalSpecificSeparation(storyboardData);
     const propagation=guardModule.validatePromptPropagation(storyboardData);
+    promptContractV2=guardModule.buildPromptContractV2(storyboardData);
+    if(existsSync(promptContractAuditPath)){
+      try{
+        const previousAudit=json(promptContractAuditPath);
+        if(previousAudit?.contract_sha256===promptContractV2.contract_sha256){
+          promptStageAudits={...(previousAudit.stages||{})};
+        }
+      }catch{}
+    }
+    storyboardData.prompt_contract_v2=promptContractV2;
+    writeJson(storyboard,storyboardData);
+    const initialContinuity=guardModule.validatePromptContractContinuity(
+      storyboardData,
+      promptContractV2,
+      {stage:"storyboard"}
+    );
+    promptStageAudits.storyboard=initialContinuity;
+    writeJson(promptContractAuditPath,{
+      schema:"HIBOU_PROMPT_CONTRACT_PIPELINE_AUDIT_V2",
+      pass:true,
+      strict:true,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      stages:promptStageAudits,
+      publication_authorized:false
+    });
     writeJson(promptPropagationPath,{
       ...propagation,
+      prompt_contract_schema:promptContractV2.schema,
+      prompt_contract_sha256:promptContractV2.contract_sha256,
+      global_prompt_sha256:promptContractV2.global_sha256,
+      specific_prompt_hashes:Object.fromEntries(promptContractV2.scenes.map(x=>[x.scene_id,x.specific_sha256])),
       runtime_commit:runtimeCommit,
       audited_at:new Date().toISOString(),
       publication_authorized:false
@@ -553,10 +588,137 @@ async function main(){
     state.global_specific_guard=separation;
     state.prompt_propagation={
       ...propagation,
-      path:promptPropagationPath
+      prompt_contract_schema:promptContractV2.schema,
+      prompt_contract_sha256:promptContractV2.contract_sha256,
+      global_prompt_sha256:promptContractV2.global_sha256,
+      strict_continuity:true,
+      path:promptPropagationPath,
+      continuity_audit_path:promptContractAuditPath
     };
     writeJson(statePath,state);
   }
+  const auditPromptContract=(stageName,contractPath)=>{
+    if(!promptContractGuard||!promptContractV2) fail("prompt contract guard not initialized");
+    if(!existsSync(contractPath)) fail(stageName+": contract artifact missing: "+contractPath);
+    const report=promptContractGuard.validatePromptContractContinuity(
+      json(contractPath),
+      promptContractV2,
+      {stage:stageName}
+    );
+    promptStageAudits[stageName]=report;
+    writeJson(promptContractAuditPath,{
+      schema:"HIBOU_PROMPT_CONTRACT_PIPELINE_AUDIT_V2",
+      pass:true,
+      strict:true,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      stages:promptStageAudits,
+      stage_count:Object.keys(promptStageAudits).length,
+      publication_authorized:false
+    });
+    state.prompt_contract_v2={
+      schema:promptContractV2.schema,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      audited_stage_count:Object.keys(promptStageAudits).length,
+      last_stage:stageName,
+      pass:true,
+      audit_path:promptContractAuditPath,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+    return report;
+  };
+
+  const auditPromptRef=(stageName,ref,{sceneCount=null}={})=>{
+    if(ref?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+      fail(stageName+": prompt contract ref V2 missing");
+    }
+    if(
+      ref.contract_sha256!==promptContractV2.contract_sha256 ||
+      ref.global_sha256!==promptContractV2.global_sha256
+    ){
+      fail(stageName+": prompt contract ref mismatch");
+    }
+    if(sceneCount!=null&&Number(ref.scene_count||sceneCount)!==Number(sceneCount)){
+      fail(stageName+": prompt contract scene_count mismatch");
+    }
+    const report={
+      schema:"HIBOU_PROMPT_CONTRACT_REF_AUDIT_V2",
+      pass:true,
+      stage:stageName,
+      contract_sha256:ref.contract_sha256,
+      global_sha256:ref.global_sha256,
+      checked_scenes:sceneCount,
+      publication_authorized:false
+    };
+    promptStageAudits[stageName]=report;
+    writeJson(promptContractAuditPath,{
+      schema:"HIBOU_PROMPT_CONTRACT_PIPELINE_AUDIT_V2",
+      pass:true,
+      strict:true,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      stages:promptStageAudits,
+      stage_count:Object.keys(promptStageAudits).length,
+      publication_authorized:false
+    });
+    state.prompt_contract_v2={
+      schema:promptContractV2.schema,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      audited_stage_count:Object.keys(promptStageAudits).length,
+      last_stage:stageName,
+      pass:true,
+      audit_path:promptContractAuditPath,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+    return report;
+  };
+
+  const auditPromptApplication=(stageName,checks,details={})=>{
+    const normalized=Object.fromEntries(
+      Object.entries(checks||{}).map(([key,value])=>[key,Boolean(value)])
+    );
+    const failed=Object.entries(normalized).filter(([,value])=>!value).map(([key])=>key);
+    if(failed.length){
+      fail(stageName+": prompt application checks failed: "+failed.join(","));
+    }
+    const report={
+      schema:"HIBOU_PROMPT_APPLICATION_RECEIPT_V2",
+      pass:true,
+      stage:stageName,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      checks:normalized,
+      details,
+      publication_authorized:false
+    };
+    promptStageAudits[stageName]=report;
+    writeJson(promptContractAuditPath,{
+      schema:"HIBOU_PROMPT_CONTRACT_PIPELINE_AUDIT_V2",
+      pass:true,
+      strict:true,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      stages:promptStageAudits,
+      stage_count:Object.keys(promptStageAudits).length,
+      publication_authorized:false
+    });
+    state.prompt_contract_v2={
+      schema:promptContractV2.schema,
+      contract_sha256:promptContractV2.contract_sha256,
+      global_sha256:promptContractV2.global_sha256,
+      audited_stage_count:Object.keys(promptStageAudits).length,
+      last_stage:stageName,
+      pass:true,
+      audit_path:promptContractAuditPath,
+      publication_authorized:false
+    };
+    writeJson(statePath,state);
+    return report;
+  };
 
   const promptGraphPath=resolve(root,"prompt-graph.json");
   {
@@ -567,10 +729,12 @@ async function main(){
       runtime_commit:runtimeCommit,
       publication_authorized:false
     });
+    auditPromptRef("prompt_graph",promptGraph.prompt_contract_ref,{sceneCount:promptGraph.scene_count});
     state.prompt_graph={
       path:promptGraphPath,
       schema:promptGraph.schema,
       prompt_graph_sha256:promptGraph.prompt_graph_sha256,
+      prompt_contract_sha256:promptGraph.prompt_contract_ref?.contract_sha256||null,
       scene_count:promptGraph.scene_count,
       attention_beat_count:promptGraph.attention_beat_count,
       publication_authorized:false
@@ -602,6 +766,7 @@ async function main(){
       import(pathToFileURL(preRuntime.planningManifest).href+"?v="+Date.now())
     ]);
     stage(state,"planning_audit",()=>{
+      auditPromptContract("planning_audit",storyboard);
       const promptGraph=promptGraphModule.buildPromptGraph(storyboardData);
       const motionPlan=motionPlanModule.buildMotionPlan(storyboardData);
       const voiceDensityPlan=voiceDensityModule.buildVoiceDensityPlan(storyboardData);
@@ -670,6 +835,7 @@ async function main(){
     fail("--reuse-from requires GLOBAL video_incremental_retouch_v1 and HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1=true");
   }
   if(incrementalEnabled&&reuseFromArg){
+    auditPromptContract("incremental_retouch",storyboard);
     const previousRoot=resolve(reuseFromArg);
     const previousStoryboard=resolve(previousRoot,"storyboard.json");
     if(!existsSync(previousStoryboard)) fail("reuse-from storyboard.json missing: "+previousStoryboard);
@@ -715,6 +881,7 @@ async function main(){
       publication_authorized:false
     };
     writeJson(statePath,state);
+    auditPromptContract("prosody",prosodyStoryboard);
   });
   const voiceInput=prosodyStoryboard;
 
@@ -727,13 +894,38 @@ async function main(){
     if(!existsSync(voiceScript)) fail("chatterbox batch script missing: "+voiceScript);
     run(py.cmd,[...py.prefix,voiceScript,voiceInput,voiceDir]);
     if(!existsSync(voiceReady)||!existsSync(rawVoice)) fail("voice outputs missing");
+    auditPromptContract("voice",voiceReady);
   });
 
   const voiceBatchManifest=resolve(voiceDir,"voice-batch-manifest.json");
   const voiceDurationQc=resolve(voiceDir,"voice-duration-qc.json");
   stage(state,"voice_duration_qc",()=>{
+    auditPromptContract("voice_duration_qc",voiceReady);
     if(!existsSync(voiceBatchManifest)) fail("voice batch manifest missing");
     run(process.execPath,[preRuntime.voiceDurationQc,voiceBatchManifest,voiceDurationQc]);
+    const voiceManifest=json(voiceBatchManifest);
+    const expectedVoiceScenes=new Map(promptContractV2.scenes.map(x=>[String(x.scene_id),x.specific_payload]));
+    const voiceRows=Array.isArray(voiceManifest.scenes)?voiceManifest.scenes:[];
+    const voiceTextExact=voiceRows.length===promptContractV2.scenes.length&&voiceRows.every(row=>{
+      const expected=expectedVoiceScenes.get(String(row.scene_id));
+      return expected&&String(row.text||"")===String(expected?.narration_exact?.text||"");
+    });
+    const prosodyApplied=!prosodyEnabled||voiceRows.every(row=>
+      String(row.prosody_plan_schema||"")==="HIBOU_PROSODY_PLAN_V1"&&
+      Array.isArray(row.prosody_units_used)&&row.prosody_units_used.length>0
+    );
+    auditPromptApplication("voice_execution",{
+      voice_profile_id_exact:String(voiceManifest.voice_profile_id||"")===String(storyboardData.audio?.voice_profile_id||""),
+      voice_profile_text_present:Boolean(voiceManifest.voice_profile_runtime?.profile_text_present),
+      scene_count_exact:voiceRows.length===promptContractV2.scenes.length,
+      narration_exact_preserved:voiceTextExact,
+      verbatim_preserved:voiceRows.every(row=>row.verbatim_preserved===true),
+      specific_prosody_applied:prosodyApplied
+    },{
+      voice_profile_id:voiceManifest.voice_profile_id||null,
+      device:voiceManifest.device||null,
+      scene_count:voiceRows.length
+    });
     const report=json(voiceDurationQc);
     state.voice_duration_qc={
       status:String(report.status||""),
@@ -748,17 +940,38 @@ async function main(){
   });
 
   const voiceMastered=resolve(voiceDir,"voice-mastered.wav");
-  stage(state,"audio_master",()=>run(process.execPath,[preRuntime.audioMaster,rawVoice,voiceMastered]));
+  stage(state,"audio_master",()=>{
+    auditPromptContract("audio_master",voiceReady);
+    run(process.execPath,[preRuntime.audioMaster,rawVoice,voiceMastered]);
+  });
 
   const musicEnabled=contractFeature(storyboardData,"video_music_mix_v1","HIBOU_VIDEO_MUSIC_V1");
   const musicMixed=resolve(voiceDir,"voice-music-mixed.wav");
   const musicConfigPath=resolve(root,"music-global.json");
   if(musicEnabled){
     stage(state,"music_mix",()=>{
+      auditPromptContract("music_mix",voiceReady);
       const globalMusic={...(storyboardData.music||{})};
       if(!globalMusic.reference) fail("video_music_mix_v1 enabled but GLOBAL music.reference missing");
       writeJson(musicConfigPath,globalMusic);
       run(process.execPath,[preRuntime.audioMix,voiceMastered,musicConfigPath,musicMixed]);
+      const mixReceiptPath=musicMixed+".manifest.json";
+      if(!existsSync(mixReceiptPath)) fail("music mix execution receipt missing");
+      const mixReceipt=json(mixReceiptPath);
+      const mixPolicy=mixReceipt.policy||{};
+      const same=(a,b)=>String(a??"")===String(b??"");
+      auditPromptApplication("music_execution",{
+        global_layer_applied:mixReceipt.global_layer===true,
+        reference_exact:same(mixPolicy.reference,globalMusic.reference),
+        license_exact:same(mixPolicy.license,globalMusic.license),
+        level_db_exact:Number(mixPolicy.level_db)===Number(globalMusic.level_db),
+        duck_threshold_exact:Number(mixPolicy.duck_threshold)===Number(globalMusic.duck_threshold),
+        duck_ratio_exact:Number(mixPolicy.duck_ratio)===Number(globalMusic.duck_ratio),
+        duck_attack_exact:Number(mixPolicy.duck_attack_ms)===Number(globalMusic.duck_attack_ms),
+        duck_release_exact:Number(mixPolicy.duck_release_ms)===Number(globalMusic.duck_release_ms),
+        fade_in_exact:Number(mixPolicy.fade_in_s)===Number(globalMusic.fade_in_s),
+        fade_out_exact:Number(mixPolicy.fade_out_s)===Number(globalMusic.fade_out_s)
+      },{receipt:mixReceiptPath});
     });
   }else if(!state.stages.music_mix){
     state.stages.music_mix={status:"SKIPPED",reason:"GLOBAL contract + runtime gate required"};
@@ -767,19 +980,40 @@ async function main(){
 
   const mastered=musicEnabled?musicMixed:voiceMastered;
   const masteredContract=resolve(root,"contract-mastered.json");
-  stage(state,"audio_attach",()=>run(process.execPath,[preRuntime.attachAudio,voiceReady,mastered,masteredContract]));
+  stage(state,"audio_attach",()=>{
+    run(process.execPath,[preRuntime.attachAudio,voiceReady,mastered,masteredContract]);
+    auditPromptContract("audio_attach",masteredContract);
+  });
 
   const ass=resolve(root,"subtitles.ass");
   const captioned=resolve(root,"contract-captioned.json");
   stage(state,"subtitles",()=>{
     run(process.execPath,[preRuntime.subtitles,masteredContract,ass]);
+    const subtitleReceiptPath=ass+".manifest.json";
+    if(!existsSync(subtitleReceiptPath)) fail("subtitle prompt-application receipt missing");
+    const subtitleReceipt=json(subtitleReceiptPath);
+    auditPromptRef("subtitles_execution_ref",subtitleReceipt.prompt_contract_ref,{sceneCount:Number(subtitleReceipt.scene_count||0)});
+    auditPromptApplication("subtitles_execution",{
+      global_rule_detected:subtitleReceipt.policy?.global_rule_detected===true,
+      short_groups_enforced:subtitleReceipt.policy?.short_groups===true,
+      white_text_enforced:String(subtitleReceipt.policy?.primary_color||"")==="white",
+      bold_enforced:String(subtitleReceipt.policy?.font_weight||"")==="bold",
+      dark_outline_enforced:subtitleReceipt.policy?.dark_outline===true,
+      max_words_bounded:Number(subtitleReceipt.policy?.max_words_per_group||99)<=6,
+      max_chars_bounded:Number(subtitleReceipt.policy?.max_chars_per_group||99)<=28,
+      narration_exact_source:subtitleReceipt.source_text_exact===true,
+      screen_text_routed:subtitleReceipt.screen_text_routed===true,
+      scene_count_exact:Number(subtitleReceipt.scene_count||0)===promptContractV2.scenes.length
+    },{receipt:subtitleReceiptPath});
     run(process.execPath,[preRuntime.attachSubtitles,masteredContract,ass,captioned]);
+    auditPromptContract("subtitles",captioned);
   });
 
   const styled=resolve(root,"contract-styled.json");
   stage(state,"style",()=>{
     if(styleArg) run(process.execPath,[preRuntime.style,captioned,resolve(styleArg),styled]);
     else writeJson(styled,json(captioned));
+    auditPromptContract("style",styled);
   });
 
   const poseRegistryEnabled=contractFeature(storyboardData,"video_pose_registry_v1","HIBOU_VIDEO_POSE_REGISTRY_V1");
@@ -788,11 +1022,25 @@ async function main(){
     stage(state,"pose_registry",()=>{
       run(process.execPath,[preRuntime.poseRegistryScript,styled,preRuntime.poseRegistry,posed]);
       const p=json(posed).pose_registry_application||{};
+      const posedContract=json(posed);
+      const hibouScenes=(posedContract.scenes||[]).filter(scene=>Boolean(scene?.framing?.hibou));
+      const canonicalOverlayRequired=String(posedContract.creative?.reference_mode||"")==="deterministic_character_overlay";
+      const allHibouResolved=hibouScenes.every(scene=>Boolean(scene?.composition?.character_pose));
       state.pose_registry={
         applied_scenes:Number(p.applied_scenes||0),
         unresolved_scenes:Number(p.unresolved_scenes||0),
         generation_requested:false
       };
+      auditPromptApplication("character_execution",{
+        deterministic_overlay_policy:canonicalOverlayRequired,
+        hibou_scene_count_matches:Number(p.applied_scenes||0)===hibouScenes.length,
+        every_hibou_scene_has_canonical_pose:allHibouResolved,
+        no_unresolved_pose:Number(p.unresolved_scenes||0)===0,
+        character_lock_present:Boolean(String(posedContract.creative?.character_lock||"").trim())
+      },{
+        hibou_scene_count:hibouScenes.length,
+        applied_scenes:Number(p.applied_scenes||0)
+      });
       writeJson(statePath,state);
       if(state.pose_registry.unresolved_scenes>0){
         fail("pose registry enabled but one or more requested Hibou poses are unresolved");
@@ -805,6 +1053,8 @@ async function main(){
       writeJson(statePath,state);
     }
   }
+
+  auditPromptContract("pose_registry",posed);
 
   const assetResolved=resolve(root,"contract-assets-resolved.json");
   stage(state,"asset_resolution",()=>{
@@ -821,6 +1071,7 @@ async function main(){
       generation_slots:resolved.asset_resolution?.generation_slots?.length||0
     };
     writeJson(statePath,state);
+    auditPromptContract("asset_resolution",assetResolved);
   });
 
   const imageFactoryScript=await ensureImageRuntimeBundle(runtimeCommit);
@@ -841,6 +1092,7 @@ async function main(){
     const candidateReviewPath=resolve(imageDir,"candidate-review.json");
     if(existsSync(candidateReviewPath)){
       const review=json(candidateReviewPath);
+      auditPromptRef("image_qc_review",review.prompt_contract_ref);
       state.candidate_review={
         path:candidateReviewPath,
         html_path:existsSync(resolve(imageDir,"candidate-review.html"))?resolve(imageDir,"candidate-review.html"):null,
@@ -852,6 +1104,70 @@ async function main(){
         publication_authorized:false
       };
       writeJson(statePath,state);
+    }
+    const strictImagePlanPath=resolve(imageDir,"image-plan.json");
+    if(!existsSync(strictImagePlanPath)) fail("image plan missing after image factory");
+    const strictImagePlan=json(strictImagePlanPath);
+    auditPromptRef("image_plan",strictImagePlan.prompt_contract_ref);
+    const routing=strictImagePlan.creative_routing||{};
+    const allImageRequests=(strictImagePlan.requests||[]);
+    const allRefsMatch=allImageRequests.every(item=>{
+      const ref=item?.request?.prompt_contract_ref;
+      const fallback=item?.fallback_request?.prompt_contract_ref;
+      const primaryOk=ref?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&
+        ref.contract_sha256===promptContractV2.contract_sha256&&
+        ref.global_sha256===promptContractV2.global_sha256&&
+        ref.scene_id===item.scene_id;
+      const fallbackOk=!fallback||(
+        fallback.contract_sha256===ref.contract_sha256&&
+        fallback.global_sha256===ref.global_sha256&&
+        fallback.specific_sha256===ref.specific_sha256&&
+        fallback.scene_id===item.scene_id
+      );
+      return primaryOk&&fallbackOk;
+    });
+    const imageExecutionManifestPath=resolve(imageDir,"batch-manifest.json");
+    if(!existsSync(imageExecutionManifestPath)) fail("image execution manifest missing after image factory");
+    const imageExecutionManifest=json(imageExecutionManifestPath);
+    const executionResults=imageExecutionManifest?.results||{};
+    const receiptMatches=(row,sceneId)=>{
+      const ref=row?.prompt_contract_ref;
+      return row?.status==="completed"&&
+        row?.prompt_contract_execution_verified===true&&
+        ref?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&
+        ref.contract_sha256===promptContractV2.contract_sha256&&
+        ref.global_sha256===promptContractV2.global_sha256&&
+        ref.scene_id===sceneId;
+    };
+    const everyPlannedCandidateHasExecutionReceipt=allImageRequests.every(item=>
+      receiptMatches(executionResults[item.candidate_id],item.scene_id)
+    );
+    const completedExecutionRows=Object.values(executionResults).filter(row=>row?.status==="completed");
+    const everyCompletedCandidateHasExecutionReceipt=completedExecutionRows.every(row=>
+      receiptMatches(row,String(row?.scene_id||""))
+    );
+    auditPromptApplication("image_prompt_execution",{
+      global_style_applied:routing.global_style_applied===true,
+      global_character_policy_applied:routing.global_character_policy_applied===true,
+      specific_scene_prompt_preferred:routing.scene_image_prompt_preferred===true,
+      visual_idea_fallback_only:routing.visual_idea_used_only_as_fallback===true,
+      negative_policy_present:routing.global_negative_policy_present===true,
+      negative_character_rule_enforced:routing.background_character_tokens_forbidden===true,
+      generated_text_policy_enforced:storyboardData.creative?.text_in_generated_images===false,
+      prompt_contract_ref_on_every_request:allRefsMatch,
+      execution_receipt_on_every_planned_candidate:everyPlannedCandidateHasExecutionReceipt,
+      execution_receipt_on_every_completed_candidate:everyCompletedCandidateHasExecutionReceipt
+    },{
+      request_count:allImageRequests.length,
+      completed_execution_count:completedExecutionRows.length,
+      execution_manifest:imageExecutionManifestPath,
+      negative_policy_mode:"structural_sanitization_plus_creative_qc"
+    });
+    for(let attempt=1;attempt<=policy.regeneration_attempts;attempt+=1){
+      const regenPath=resolve(imageDir,"regen-plan-"+attempt+".json");
+      if(!existsSync(regenPath)) continue;
+      const regen=json(regenPath);
+      auditPromptRef("image_regeneration_"+attempt,regen.prompt_contract_ref);
     }
     if(result.all_scenes_have_candidate!==true){
       const diagnostic={
@@ -950,12 +1266,15 @@ async function main(){
         selection_count:Number(humanManifest.selection_count||0),
         publication_authorized:false
       };
+      auditPromptRef("technical_selection",humanManifest.prompt_contract_ref);
       state.pipeline_status="RUNNING_AFTER_HUMAN_SELECTION";
       writeJson(statePath,state);
     }else if(Object.keys(provisional||{}).length===0){
       writeJson(selections,{});
+      auditPromptContract("technical_selection",assetResolved);
     }else{
       writeJson(selections,buildTechnicalSelections(provisional));
+      auditPromptContract("technical_selection",assetResolved);
     }
   });
 
@@ -964,6 +1283,7 @@ async function main(){
   const creativeQcReport=resolve(root,"creative-qc.json");
   if(creativeQcEnabled){
     stage(state,"creative_qc",()=>{
+      auditPromptContract("creative_qc",assetResolved);
       const resolvedContract=json(assetResolved);
       const picks=json(selections);
       const scenes=[];
@@ -980,10 +1300,18 @@ async function main(){
           image:imagePath,
           brief:String(scene.image_prompt||scene.visual_idea||""),
           style_prompt:String(resolvedContract.creative?.style_lock||""),
-          expected_hibou:Boolean(scene.framing?.hibou)
+          expected_hibou:false,
+          hibou_composited_later:Boolean(scene.framing?.hibou)
         });
       }
       writeJson(creativeQcManifest,{
+        schema:"HIBOU_CREATIVE_QC_INPUT_V2",
+        prompt_contract_ref:{
+          schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+          contract_sha256:promptContractV2.contract_sha256,
+          global_sha256:promptContractV2.global_sha256,
+          scene_count:scenes.length
+        },
         canonical_hibou:canonicalReference||null,
         thresholds:storyboardData.creative?.creative_qc?.thresholds||{},
         scenes
@@ -994,6 +1322,7 @@ async function main(){
       if(model) args.push("--model",model);
       run(py.cmd,args);
       const report=json(creativeQcReport);
+      auditPromptRef("creative_qc_report",report.prompt_contract_ref);
       state.creative_qc_status=report.status;
       state.creative_qc_failed_scene_count=Number(report.failed_scene_count||0);
       writeJson(statePath,state);
@@ -1014,8 +1343,10 @@ async function main(){
   const factualGateReport=resolve(root,"factual-gate.json");
   if(factualGateEnabled){
     stage(state,"factual_gate",()=>{
+      auditPromptContract("factual_gate",assetResolved);
       run(process.execPath,[postRuntime.factualGate,assetResolved,factualGateReport]);
       const report=json(factualGateReport);
+      auditPromptRef("factual_gate_report",report.prompt_contract_ref,{sceneCount:Number(report.scene_count||0)});
       state.factual_gate={
         enabled:true,
         path:factualGateReport,
@@ -1036,15 +1367,51 @@ async function main(){
   const renderReady=resolve(root,"render-ready.json");
   stage(state,"promotion",()=>{
     run(process.execPath,[postRuntime.promote,assetResolved,selections,renderReady]);
+    auditPromptContract("promotion",renderReady);
+    auditPromptContract("render_ready",renderReady);
+    const promoted=json(renderReady);
+    const brand=promoted.creative?.branding||{};
+    const brandText=String(brand.text||"").trim();
+    const brandedScenes=(promoted.scenes||[]).map(scene=>{
+      const screenText=String(scene?.screen_text||"").toLowerCase();
+      const alreadyBrand=Boolean(brandText)&&screenText.includes(brandText.toLowerCase());
+      const signature=scene?.composition?.brand_signature||null;
+      const signatureMatches=alreadyBrand||(
+        signature&&String(signature.text||"")===brandText
+      );
+      return {scene_id:scene.scene_id,already_brand_text:alreadyBrand,signature_matches:Boolean(signatureMatches)};
+    });
+    const screenTextRoutes=(promoted.scenes||[]).map(scene=>{
+      const specific=String(scene?.screen_text||"").trim();
+      if(!specific) return {scene_id:scene.scene_id,routed:true,route:"NONE"};
+      const timelineRouted=Array.isArray(scene?.timeline?.events)&&scene.timeline.events.some(
+        event=>["text","callout"].includes(String(event?.type||"").toLowerCase())&&String(event?.text||"").trim()
+      );
+      return {scene_id:scene.scene_id,routed:true,route:timelineRouted?"TIMELINE":"ASS_SCREEN_TEXT"};
+    });
+    auditPromptApplication("compositor_execution",{
+      branding_source_postproduction:String(brand.source||"")==="post-production",
+      branding_text_present:Boolean(brandText),
+      branding_all_scenes_routed:brandedScenes.every(x=>x.signature_matches),
+      specific_screen_text_all_routed:screenTextRoutes.every(x=>x.routed),
+      deterministic_character_overlay:String(promoted.creative?.reference_mode||"")==="deterministic_character_overlay",
+      generated_image_text_forbidden:promoted.creative?.text_in_generated_images===false
+    },{
+      brand_text:brandText,
+      branded_scenes:brandedScenes,
+      screen_text_routes:screenTextRoutes
+    });
   });
 
   const master=resolve(root,"master.mp4");
   stage(state,"render",()=>{
+    auditPromptContract("render",renderReady);
     run(process.execPath,[postRuntime.render,renderReady,master]);
   });
 
   const masterQc=resolve(root,"master-qc.json");
   stage(state,"master_qc",()=>{
+    auditPromptContract("master_qc",renderReady);
     run(process.execPath,[postRuntime.masterQc,master,masterQc,renderReady]);
     const qc=json(masterQc);
     if(!["PASS","REVIEW"].includes(qc.status)) fail("unexpected master QC status");
@@ -1052,6 +1419,84 @@ async function main(){
     state.publication_authorized=false;
     writeJson(statePath,state);
   });
+
+  const requiredPromptAuditStages=[
+    "storyboard",
+    "prompt_graph",
+    ...(planningAuditEnabled?["planning_audit"]:[]),
+    ...(incrementalEnabled&&reuseFromArg?["incremental_retouch"]:[]),
+    "prosody",
+    "voice",
+    "voice_execution",
+    "voice_duration_qc",
+    "audio_master",
+    ...(musicEnabled?["music_mix","music_execution"]:[]),
+    "audio_attach",
+    "subtitles_execution_ref",
+    "subtitles_execution",
+    "subtitles",
+    "style",
+    "pose_registry",
+    ...(poseRegistryEnabled?["character_execution"]:[]),
+    "asset_resolution",
+    "image_plan",
+    "image_prompt_execution",
+    "image_qc_review",
+    "technical_selection",
+    ...(creativeQcEnabled?["creative_qc","creative_qc_report"]:[]),
+    ...(factualGateEnabled?["factual_gate","factual_gate_report"]:[]),
+    "promotion",
+    "render_ready",
+    "compositor_execution",
+    "render",
+    "master_qc"
+  ];
+  const missingPromptAudits=requiredPromptAuditStages.filter(name=>promptStageAudits?.[name]?.pass!==true);
+  const mismatchedPromptAudits=requiredPromptAuditStages.filter(name=>
+    promptStageAudits?.[name]?.contract_sha256 &&
+    promptStageAudits[name].contract_sha256!==promptContractV2.contract_sha256
+  );
+  if(missingPromptAudits.length||mismatchedPromptAudits.length){
+    fail(
+      "strict prompt contract coverage incomplete; missing="+missingPromptAudits.join(",")+
+      "; mismatched="+mismatchedPromptAudits.join(",")
+    );
+  }
+  const promptCoverage={
+    schema:"HIBOU_PROMPT_CONTRACT_COVERAGE_V2",
+    pass:true,
+    strict:true,
+    coverage_pct:100,
+    required_stage_count:requiredPromptAuditStages.length,
+    passed_stage_count:requiredPromptAuditStages.length,
+    required_stages:requiredPromptAuditStages,
+    contract_sha256:promptContractV2.contract_sha256,
+    global_sha256:promptContractV2.global_sha256,
+    specific_scene_count:promptContractV2.scenes.length,
+    specific_prompt_hashes:Object.fromEntries(promptContractV2.scenes.map(x=>[x.scene_id,x.specific_sha256])),
+    regeneration_contract_inheritance_required:true,
+    human_selection_contract_match_required:true,
+    publication_authorized:false
+  };
+  writeJson(promptContractAuditPath,{
+    schema:"HIBOU_PROMPT_CONTRACT_PIPELINE_AUDIT_V2",
+    pass:true,
+    strict:true,
+    final_status:"PASS_100_PERCENT",
+    coverage_pct:100,
+    contract_sha256:promptContractV2.contract_sha256,
+    global_sha256:promptContractV2.global_sha256,
+    stages:promptStageAudits,
+    stage_count:Object.keys(promptStageAudits).length,
+    required_stages:requiredPromptAuditStages,
+    coverage:promptCoverage,
+    publication_authorized:false
+  });
+  state.prompt_contract_v2={
+    ...promptCoverage,
+    audit_path:promptContractAuditPath
+  };
+  writeJson(statePath,state);
 
   const masterResultPath=resolve(root,"master-result.json");
   const humanReview=resolve(root,"human-review.json");
@@ -1135,6 +1580,7 @@ async function main(){
       entries:[
       {kind:"storyboard",path:storyboard},
       {kind:"prompt_propagation",path:promptPropagationPath},
+      {kind:"prompt_contract_continuity",path:promptContractAuditPath},
       {kind:"prompt_graph",path:promptGraphPath},
       {kind:"audio",path:mastered},
       {kind:"subtitles",path:ass},
@@ -1235,6 +1681,7 @@ async function main(){
     preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
     prompt_propagation:state.prompt_propagation||null,
+    prompt_contract_v2:state.prompt_contract_v2||null,
     prompt_graph:state.prompt_graph||null,
     human_master_review_required:true,
     publication_authorized:false

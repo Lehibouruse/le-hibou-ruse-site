@@ -44,6 +44,6 @@ test("contract application reuses only ready poses and never generates planned o
  assert.equal(out.pose_registry_application.applied_scenes,1);
  assert.equal(out.pose_registry_application.unresolved_scenes,1);
  assert.equal(out.pose_registry_application.generation_requested,false);
- assert.match(out.scenes[0].composition.character_pose.path,/poses\/pointe\.webp$/);
+ assert.match(out.scenes[0].composition.character_pose.path,/poses[\\/]pointe\.webp$/);
  assert.equal(out.scenes[1].pose_registry_resolution.status,"UNRESOLVED");
 });

@@ -5,6 +5,7 @@ import { buildAss, splitSubtitleGroups } from "../scripts/video-subtitles.mjs";
 function contract(screenText,timeline=null){
   return {
     contract_version:"HIBOU_VIDEO_CONTRACT_V1",
+    creative:{style_lock:"SOUS-TITRES : courts groupes de mots, blancs gras, contour sombre."},
     scenes:[{
       scene_id:"S01",
       narration_exact:{mode:"audio_reference",start_s:0,end_s:6},

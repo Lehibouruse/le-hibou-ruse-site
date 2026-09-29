@@ -58,6 +58,44 @@ test("request fingerprint covers the local OOM fallback as well as the primary r
  assert.notEqual(imageRequestFingerprint(a),imageRequestFingerprint(b));
 });
 
+test("request fingerprint ignores audit-only prompt contract metadata",()=>{
+ const a={request:{profile:"primary",prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:"a".repeat(64)}}};
+ const b={request:{profile:"primary",prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:"b".repeat(64)}}};
+ assert.equal(imageRequestFingerprint(a),imageRequestFingerprint(b));
+ const c={request:{profile:"primary",prompt:"different"}};
+ assert.notEqual(imageRequestFingerprint(a),imageRequestFingerprint(c));
+});
+
+test("legacy cached candidate is upgraded with strict execution receipt without regeneration",async()=>{
+ const root=mkdtempSync(resolve(tmpdir(),"hibou-img-receipt-"));
+ const manifest=resolve(root,"manifest.json"), selections=resolve(root,"selections.json");
+ let calls=0;
+ const runner=async req=>{
+   calls+=1; const path=resolve(root,"candidate.png"); writeFileSync(path,"img");
+   return {job_id:"job",request_sha256:"hash",attempts:1,outputs:[{path}]};
+ };
+ const legacy={schema:"HIBOU_IMAGE_PLAN_V1",content_id:"recREF",requests:[
+   {candidate_id:"S01-C1",scene_id:"S01",candidate:1,seed:1,request:{profile:"primary"}}
+ ]};
+ await executeImagePlan(legacy,{runner,manifestPath:manifest,selectionTemplatePath:selections});
+ assert.equal(calls,1);
+ const strict=structuredClone(legacy);
+ strict.requests[0].request.prompt_contract_ref={
+   schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+   contract_sha256:"a".repeat(64),
+   global_sha256:"b".repeat(64),
+   specific_sha256:"c".repeat(64),
+   combined_sha256:"d".repeat(64),
+   scene_id:"S01"
+ };
+ const second=await executeImagePlan(strict,{runner,manifestPath:manifest,selectionTemplatePath:selections});
+ assert.equal(calls,1);
+ assert.equal(second.cache_hits,1);
+ const stored=JSON.parse(readFileSync(manifest,"utf8")).results["S01-C1"];
+ assert.equal(stored.prompt_contract_execution_verified,true);
+ assert.deepEqual(stored.prompt_contract_ref,strict.requests[0].request.prompt_contract_ref);
+});
+
 test("CUDA OOM retries exactly once with the prepared local fallback request",async()=>{
  const root=mkdtempSync(resolve(tmpdir(),"hibou-img-oom-"));
  const manifest=resolve(root,"manifest.json"), selections=resolve(root,"selections.json");

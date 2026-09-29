@@ -21,6 +21,6 @@ test("voice runtime repairs only known tokenizer corruption once", () => {
 });
 
 test("voice runtime still fails closed for unrelated model-load failures", () => {
-  assert.match(voice, /else:\n\s+fail\(f"Chatterbox model load failed on \{device\}: \{exc\}"\)/);
+  assert.match(voice, /else:\r?\n\s+fail\(f"Chatterbox model load failed on \{device\}: \{exc\}"\)/);
   assert.doesNotMatch(voice, /device\s*=\s*["']cpu["']/);
 });

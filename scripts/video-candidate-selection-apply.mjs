@@ -29,6 +29,20 @@ export function applyHumanCandidateSelection({
   if (decisions?.schema !== HUMAN_IMAGE_SELECTION_SCHEMA) {
     fail("HIBOU_HUMAN_IMAGE_SELECTION_V1 required");
   }
+  const reviewPromptRef=review?.prompt_contract_ref;
+  const decisionPromptRef=decisions?.prompt_contract_ref;
+  if(reviewPromptRef?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+    fail("candidate review prompt contract ref missing");
+  }
+  if(decisionPromptRef?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+    fail("candidate decisions prompt contract ref missing");
+  }
+  if(
+    reviewPromptRef.contract_sha256!==decisionPromptRef.contract_sha256 ||
+    reviewPromptRef.global_sha256!==decisionPromptRef.global_sha256
+  ){
+    fail("candidate decisions prompt contract mismatch");
+  }
 
   const reviewContent = String(review?.content_id || "");
   const decisionContent = String(decisions?.content_id || "");
@@ -94,6 +108,17 @@ export function applyHumanCandidateSelection({
     if (decision.human_confirmed !== true) {
       fail(`${sceneId}: human_confirmed=true required`);
     }
+    const selectedPromptRef=selected?.prompt_contract_ref;
+    if(selectedPromptRef?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+      fail(`${sceneId}: selected candidate prompt contract ref missing`);
+    }
+    if(
+      selectedPromptRef.contract_sha256!==reviewPromptRef.contract_sha256 ||
+      selectedPromptRef.global_sha256!==reviewPromptRef.global_sha256 ||
+      selectedPromptRef.scene_id!==sceneId
+    ){
+      fail(`${sceneId}: selected candidate prompt contract ref mismatch`);
+    }
 
     selections[sceneId] = {
       candidates: candidates
@@ -104,6 +129,7 @@ export function applyHumanCandidateSelection({
       selection_reason: "explicit human candidate review",
       human_selected: true,
       human_note: String(decision?.note || "") || null,
+      prompt_contract_ref: structuredClone(selectedPromptRef),
       machine_recommended_candidate_id:
         String(scene?.machine_recommended_candidate_id || "") || null,
       publication_authorized: false,
@@ -142,6 +168,7 @@ export function applyHumanCandidateSelection({
     schema: HUMAN_IMAGE_SELECTION_SCHEMA,
     content_id: reviewContent || decisionContent || null,
     review_fingerprint_sha256: reviewFingerprint,
+    prompt_contract_ref: structuredClone(reviewPromptRef),
     selection_count: Object.keys(selections).length,
     selections,
     audit,

@@ -22,5 +22,5 @@ test("artifact registry hashes files and never invents durable URLs",()=>{
  const r=buildRegistry([{kind:"master",path:p}]); assert.equal(r.entries.length,1); assert.equal(r.entries[0].durable_url,null); assert.equal(r.entries[0].sha256.length,64);
 });
 test("optional DINOv2 rank wrapper is syntax-valid without downloading model",()=>{
- const r=spawnSync("python3",["-m","py_compile","scripts/video-dinov2-rank.py"],{encoding:"utf8"}); assert.equal(r.status,0,r.stderr);
+ const command=process.platform==="win32"?"py":"python3"; const args=process.platform==="win32"?["-3.11","-m","py_compile","scripts/video-dinov2-rank.py"]:["-m","py_compile","scripts/video-dinov2-rank.py"]; const r=spawnSync(command,args,{encoding:"utf8"}); assert.equal(r.status,0,r.stderr);
 });

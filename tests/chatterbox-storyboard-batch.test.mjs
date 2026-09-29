@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 test("batch Chatterbox storyboard wrapper is syntaxically valid without loading model",()=>{
- const r=spawnSync("python3",["-m","py_compile","scripts/chatterbox-storyboard-batch.py"],{encoding:"utf8"});
+ const command=process.platform==="win32"?"py":"python3";
+ const args=process.platform==="win32"?["-3.11","-m","py_compile","scripts/chatterbox-storyboard-batch.py"]:["-m","py_compile","scripts/chatterbox-storyboard-batch.py"];
+ const r=spawnSync(command,args,{encoding:"utf8"});
  assert.equal(r.status,0,r.stderr||r.stdout);
 });
 test("voice batch has per-scene cache and no silent paid fallback",()=>{

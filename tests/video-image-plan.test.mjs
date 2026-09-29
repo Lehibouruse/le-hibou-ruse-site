@@ -3,7 +3,8 @@ import test from "node:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildImagePlan, normalizeProductionMode, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
+import { buildImagePlan as buildImagePlanSource, normalizeProductionMode, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
+import { buildPromptContractV2 } from "../scripts/video-layer-guard.mjs";
 
 const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",content:{content_id:"recX"},scenes:[
  {scene_id:"S01",image_prompt:"prompt one",visual_idea:"v1"},
@@ -18,6 +19,15 @@ writeFileSync(workflowPath,JSON.stringify({
   "9":{class_type:"SaveImage",inputs:{}}
 }));
 const binding={workflow_path:workflowPath,prompt:{node_id:"6",input:"text"},seed:{node_id:"25",input:"noise_seed"},size:{node_id:"5",width_input:"width",height_input:"height",batch_input:"batch_size"},profile:{width:768,height:1344,batch_size:1},fallback_profile:{width:640,height:1136,batch_size:1},output_node_ids:["9"],style_prefix:"Hibou"};
+function buildImagePlan(input,bindingArg=binding){
+ const strict=structuredClone(input);
+ delete strict.prompt_contract_v2;
+ strict.prompt_contract_v2=buildPromptContractV2(strict);
+ return buildImagePlanSource(strict,bindingArg);
+}
+test("image plan fails closed without Prompt Contract V2",()=>{
+ assert.throws(()=>buildImagePlanSource(contract,binding),/strict prompt_contract_v2 required/);
+});
 test("image plan creates exactly 3 deterministic candidates per scene",()=>{
  const a=buildImagePlan(contract,binding); const b=buildImagePlan(contract,binding);
  assert.equal(a.request_count,6); assert.equal(a.candidates_per_scene,3);

@@ -1,9 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  applyHumanCandidateSelection,
+  applyHumanCandidateSelection as applyHumanCandidateSelectionSource,
   HUMAN_IMAGE_SELECTION_SCHEMA,
 } from "../scripts/video-candidate-selection-apply.mjs";
+
+const CONTRACT_REF={schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:"a".repeat(64),global_sha256:"b".repeat(64),scene_count:2};
+function sceneRef(sceneId,index){return {...CONTRACT_REF,specific_sha256:String(index).repeat(64),combined_sha256:String(index+2).repeat(64),scene_id:sceneId};}
+function applyHumanCandidateSelection(input){
+  const strict=structuredClone(input);
+  if(strict?.review?.schema==="HIBOU_CANDIDATE_REVIEW_V1"){
+    strict.review.prompt_contract_ref=structuredClone(CONTRACT_REF);
+    for(const scene of strict.review.scenes||[]){
+      const index=scene.scene_id==="S01"?1:2;
+      for(const candidate of scene.candidates||[]) candidate.prompt_contract_ref=sceneRef(scene.scene_id,index);
+    }
+  }
+  if(strict?.decisions?.schema===HUMAN_IMAGE_SELECTION_SCHEMA){
+    strict.decisions.prompt_contract_ref=structuredClone(CONTRACT_REF);
+  }
+  return applyHumanCandidateSelectionSource(strict);
+}
 
 function review() {
   return {

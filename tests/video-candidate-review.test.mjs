@@ -1,11 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildCandidateReview,
+  buildCandidateReview as buildCandidateReviewSource,
   CANDIDATE_REVIEW_SCHEMA,
   buildCandidateDecisionTemplate,
   renderCandidateReviewHtml,
 } from "../scripts/video-candidate-review.mjs";
+
+const CONTRACT_REF={schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:"a".repeat(64),global_sha256:"b".repeat(64),scene_count:2};
+function sceneRef(sceneId,index){return {...CONTRACT_REF,specific_sha256:String(index).repeat(64),combined_sha256:String(index+2).repeat(64),scene_id:sceneId};}
+function strictCandidateInput(input){
+  const out=structuredClone(input);
+  if(out?.plan?.schema==="HIBOU_IMAGE_PLAN_V1"){
+    out.plan.prompt_contract_ref=structuredClone(CONTRACT_REF);
+    for(const request of out.plan.requests||[]){
+      const index=request.scene_id==="S01"?1:2;
+      request.request={...(request.request||{}),prompt_contract_ref:sceneRef(request.scene_id,index)};
+    }
+  }
+  return out;
+}
+function buildCandidateReview(input,options){return buildCandidateReviewSource(strictCandidateInput(input),options);}
 
 function fixtures() {
   const plan = {

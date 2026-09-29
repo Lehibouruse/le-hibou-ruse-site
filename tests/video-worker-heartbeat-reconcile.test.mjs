@@ -35,7 +35,7 @@ test("worker sends its session on queue polls and reports", () => {
 test("queue heartbeats do not increment attempts", () => {
   assert.match(route, /if \(body\.heartbeat === true\)/);
   assert.match(route, /HIBOU_VIDEO_RENDER_HEARTBEAT_V1/);
-  assert.match(route, /else \{\n\s+fields\["D\\u00e9marr\\u00e9 le"\] = now;/);
+  assert.match(route, /else \{\r?\n\s+fields\["D\\u00e9marr\\u00e9 le"\] = now;/);
 });
 
 test("queue reconciliation is session-gated and fails stale jobs closed", () => {

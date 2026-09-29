@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildPromptGraph,
+  buildPromptGraph as buildPromptGraphSource,
   PROMPT_GRAPH_SCHEMA,
 } from "../scripts/video-prompt-graph.mjs";
+import { buildPromptContractV2 } from "../scripts/video-layer-guard.mjs";
 
 function contract() {
   return {
@@ -94,6 +95,17 @@ function contract() {
     ],
   };
 }
+
+function buildPromptGraph(input){
+  const strict=structuredClone(input);
+  delete strict.prompt_contract_v2;
+  strict.prompt_contract_v2=buildPromptContractV2(strict);
+  return buildPromptGraphSource(strict);
+}
+
+test("prompt graph fails closed without Prompt Contract V2",()=>{
+  assert.throws(()=>buildPromptGraphSource(contract()),/strict prompt_contract_v2 required/);
+});
 
 test("prompt graph preserves GLOBAL layers and makes every scene reference them", () => {
   const graph = buildPromptGraph(contract());

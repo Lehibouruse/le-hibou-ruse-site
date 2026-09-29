@@ -17,6 +17,7 @@ import { attachSubtitles } from "../scripts/video-attach-subtitles.mjs";
 const contract = {
   contract_version: "HIBOU_VIDEO_CONTRACT_V1",
   contract_state: "storyboard",
+  creative:{style_lock:"SOUS-TITRES : courts groupes de mots, blancs gras, contour sombre."},
   scenes: [{
     scene_id: "S01",
     narration_text: "Le Hibou parle.",

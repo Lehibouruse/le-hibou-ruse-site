@@ -39,6 +39,8 @@ test("les identifiants de travail sont stables et sensibles aux entrées", () =>
 
 
 test("le wrapper Chatterbox est syntaxiquement valide sans charger le modèle", () => {
-  const result = spawnSync("python3", ["-m", "py_compile", "scripts/chatterbox-local.py"], { encoding: "utf8" });
+  const command=process.platform==="win32"?"py":"python3";
+  const args=process.platform==="win32"?["-3.11","-m","py_compile","scripts/chatterbox-local.py"]:["-m","py_compile","scripts/chatterbox-local.py"];
+  const result = spawnSync(command, args, { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);
 });

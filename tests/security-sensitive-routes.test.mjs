@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root=resolve(new URL("..",import.meta.url).pathname);
+const root=resolve(fileURLToPath(new URL("..",import.meta.url)));
 const matrix=JSON.parse(readFileSync(resolve(root,"config/security-sensitive-routes.json"),"utf8"));
 
 test("security matrix covers sensitive route families",()=>{

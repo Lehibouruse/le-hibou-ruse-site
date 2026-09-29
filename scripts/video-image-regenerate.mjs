@@ -29,6 +29,9 @@ function mutateRequest(request,{oldSeed,newSeed,promptSuffix}){
 }
 export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
   if(plan?.schema!=="HIBOU_IMAGE_PLAN_V1") fail("unsupported image plan");
+  if(plan?.prompt_contract_ref?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+    fail("targeted regeneration requires prompt_contract_ref V2");
+  }
   if(qc?.schema!=="HIBOU_IMAGE_PERCEPTUAL_QC_V1") fail("unsupported perceptual QC");
   if(!Number.isInteger(attempt)||attempt<1) fail("attempt must be a positive integer");
   const failed=new Set(Object.entries(qc.scene_summary||{}).filter(([,v])=>v?.needs_regeneration).map(([k])=>k));
@@ -36,18 +39,47 @@ export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
   for(const item of plan.requests||[]){
     if(!failed.has(item.scene_id)) continue;
     const bump=100003*attempt;
+    const sourceRef=item?.request?.prompt_contract_ref||item?.fallback_request?.prompt_contract_ref||null;
+    if(sourceRef?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+      fail(item.scene_id+": regeneration source is missing strict prompt contract ref");
+    }
+    if(sourceRef.contract_sha256!==plan.prompt_contract_ref.contract_sha256||
+       sourceRef.global_sha256!==plan.prompt_contract_ref.global_sha256||
+       sourceRef.scene_id!==item.scene_id){
+      fail(item.scene_id+": regeneration prompt contract ref does not match source plan");
+    }
+    const sourceRefSnapshot=JSON.stringify(sourceRef);
     const clone=structuredClone(item);
     clone.seed=Number(item.seed)+bump;
     clone.candidate_id=`${item.scene_id}-R${attempt}-C${item.candidate}`;
-    const promptSuffix="Variation locale "+attempt+": conserver le sujet, la palette et la composition; corriger uniquement les défauts QC; produire une alternative visuellement distincte mais cohérente.";
+    const summary=qc.scene_summary?.[item.scene_id]||{};
+    const reasons=Object.keys(summary.reason_counts||{});
+    const corrections=[];
+    if(reasons.includes("bright_clipping")) corrections.push("utiliser un fond majoritairement bleu nuit ou gris très sombre, réduire fortement les surfaces ivoire/blanches et les hautes lumières, éviter toute grande zone claire ou surexposée");
+    if(reasons.includes("dark_clipping")) corrections.push("augmenter modérément l'éclairage global et éviter les aplats noirs bouchés");
+    if(reasons.includes("brightness_low")) corrections.push("éclaircir légèrement les tons moyens sans créer de zones brûlées");
+    if(reasons.includes("brightness_high")) corrections.push("assombrir les tons moyens et réduire les hautes lumières");
+    const correctionText=corrections.length?(" Correction QC obligatoire: "+corrections.join("; ")+"."):"";
+    const promptSuffix="Variation locale "+attempt+": conserver le sujet, la palette et la composition; corriger uniquement les défauts QC; produire une alternative visuellement distincte mais cohérente."+correctionText;
     mutateRequest(clone.request,{oldSeed:item.seed,newSeed:clone.seed,promptSuffix});
     mutateRequest(clone.fallback_request,{oldSeed:item.seed,newSeed:clone.seed,promptSuffix});
-    clone.regeneration={attempt,source_candidate_id:item.candidate_id,reason:"scene_has_no_qc_pass"};
+    const clonedRef=clone?.request?.prompt_contract_ref||clone?.fallback_request?.prompt_contract_ref||null;
+    if(JSON.stringify(clonedRef)!==sourceRefSnapshot){
+      fail(item.scene_id+": regeneration mutated prompt contract ref");
+    }
+    clone.regeneration={
+      attempt,
+      source_candidate_id:item.candidate_id,
+      reason:"scene_has_no_qc_pass",
+      prompt_contract_inherited:true,
+      prompt_contract_ref:structuredClone(sourceRef)
+    };
     requests.push(clone);
   }
   return {
     schema:"HIBOU_IMAGE_PLAN_V1",
     content_id:plan.content_id,
+    prompt_contract_ref:structuredClone(plan.prompt_contract_ref),
     source_plan:plan.source_plan||null,
     regeneration:{schema:"HIBOU_TARGETED_REGEN_V1",attempt,failed_scenes:[...failed],untouched_scene_count:new Set((plan.requests||[]).map(x=>x.scene_id)).size-failed.size},
     requests

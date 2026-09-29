@@ -251,6 +251,52 @@ def atempo_waveform(wav, sample_rate, factor, scene_id, unit_id):
             except Exception:
                 pass
 
+def _atempo_chain(factor):
+    remaining = max(0.25, min(4.0, float(factor)))
+    parts = []
+    while remaining > 2.0:
+        parts.append(2.0)
+        remaining /= 2.0
+    while remaining < 0.5:
+        parts.append(0.5)
+        remaining /= 0.5
+    parts.append(remaining)
+    return ",".join(f"atempo={part:.6f}" for part in parts)
+
+def fit_scene_duration(wav, sample_rate, target_s, scene_id):
+    try:
+        target_s = float(target_s)
+    except Exception:
+        return wav, False, 1.0
+    if target_s <= 0:
+        return wav, False, 1.0
+    actual_s = wav.shape[-1] / sample_rate
+    factor = actual_s / target_s
+    if 0.97 <= factor <= 1.03:
+        return wav, False, 1.0
+    factor = max(0.25, min(4.0, factor))
+    temp_in = scene_dir / f".{scene_id}-timing-in.wav"
+    temp_out = scene_dir / f".{scene_id}-timing-out.wav"
+    try:
+        ta.save(str(temp_in), wav.detach().cpu(), sample_rate)
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(temp_in),
+             "-filter:a", _atempo_chain(factor), "-ar", str(sample_rate), str(temp_out)],
+            text=True, capture_output=True, check=False,
+        )
+        if result.returncode != 0:
+            fail(f"{scene_id}: scene timing-lock atempo failed: {result.stderr[-2000:]}")
+        stretched, stretched_sr = ta.load(str(temp_out))
+        if int(stretched_sr) != int(sample_rate):
+            fail(f"{scene_id}: timing-lock sample-rate mismatch")
+        return stretched, True, factor
+    finally:
+        for p in (temp_in, temp_out):
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
 def generate_prosody_scene(model, item, np, torch, sample_rate):
     units = item.get("prosody_units") or []
     if not units:
@@ -456,6 +502,7 @@ for item in descriptors:
             fail(f"{scene_id}: cached sample rate mismatch")
         cache_hits += 1
         cache_state = "hit"
+        prosody_units_used = list(item["cache"].get("prosody_units_used") or [])
         duration_retry_applied = bool(item["cache"].get("duration_retry_applied"))
         duration_retry_seed_offset = int(item["cache"].get("duration_retry_seed_offset") or 0)
     else:
@@ -519,6 +566,42 @@ for item in descriptors:
         cache_state = "miss"
 
     pause_ms = int((scene.get("voice") or {}).get("pause_after_ms", 0))
+    planned_scene_s = float(scene.get("planned_duration_s") or 0)
+    target_voice_s = max(0.35, planned_scene_s - (pause_ms / 1000.0)) if planned_scene_s > 0 else 0
+    prelock_duration_s = wav.shape[-1] / sample_rate
+    wav, timing_lock_applied, timing_lock_factor = fit_scene_duration(
+        wav, sample_rate, target_voice_s, scene_id
+    )
+    final_duration_s = wav.shape[-1] / sample_rate
+    ta.save(str(item["scene_path"]), wav, sample_rate)
+    scene_manifest = {
+        "schema": "HIBOU_CHATTERBOX_SCENE_CACHE_V1",
+        "engine_revision": ENGINE_REVISION,
+        "fingerprint": item["fingerprint"],
+        "wav": str(item["scene_path"]),
+        "wav_sha256": sha256_file(item["scene_path"]),
+        "sample_rate": sample_rate,
+        "native": item["native"],
+        "text": item["text"],
+        "voice_duration_s": final_duration_s,
+        "duration_bounds": item["duration_bounds"],
+        "duration_retry_applied": duration_retry_applied,
+        "duration_retry_seed_offset": duration_retry_seed_offset,
+        "prosody_units_used": prosody_units_used,
+        "timing_lock": {
+            "applied": timing_lock_applied,
+            "planned_scene_s": planned_scene_s,
+            "target_voice_s": target_voice_s,
+            "source_duration_s": prelock_duration_s,
+            "final_duration_s": final_duration_s,
+            "atempo_factor": timing_lock_factor,
+            "pitch_preserved": True,
+        },
+    }
+    item["manifest_path"].write_text(
+        json.dumps(scene_manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
     pause_samples = max(0, round(sample_rate * pause_ms / 1000))
     silence = torch.zeros((wav.shape[0], pause_samples), dtype=wav.dtype)
 

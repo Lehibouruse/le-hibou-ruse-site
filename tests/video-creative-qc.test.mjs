@@ -6,7 +6,9 @@ import { spawnSync } from "node:child_process";
 const source=readFileSync(new URL("../scripts/video-creative-qc.py",import.meta.url),"utf8");
 
 test("creative QC Python is syntactically valid without loading a model",()=>{
-  const r=spawnSync("python3",["-m","py_compile","scripts/video-creative-qc.py"],{encoding:"utf8"});
+  const command=process.platform==="win32"?"py":"python3";
+  const args=process.platform==="win32"?["-3.11","-m","py_compile","scripts/video-creative-qc.py"]:["-m","py_compile","scripts/video-creative-qc.py"];
+  const r=spawnSync(command,args,{encoding:"utf8"});
   assert.equal(r.status,0,r.stderr||r.stdout);
 });
 

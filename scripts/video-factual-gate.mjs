@@ -64,6 +64,12 @@ export function assessFactualGate(contract,{mode=null}={}){
 
   const core={
     schema:FACTUAL_GATE_SCHEMA,
+    prompt_contract_ref:contract?.prompt_contract_v2?{
+      schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+      contract_sha256:contract.prompt_contract_v2.contract_sha256,
+      global_sha256:contract.prompt_contract_v2.global_sha256,
+      scene_count:Array.isArray(contract.prompt_contract_v2.scenes)?contract.prompt_contract_v2.scenes.length:0
+    }:null,
     mode:configured,
     scene_count:scenes.length,
     in_scope_scene_count:inScopeCount,

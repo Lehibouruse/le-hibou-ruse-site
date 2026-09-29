@@ -10,6 +10,10 @@ export function isCudaOom(error){
   const message=String(error?.message||error||"");
   return /(?:cuda[^\n]{0,80})?out of memory|cuda error[^\n]{0,80}memory|cublas_status_alloc_failed|torch\.outofmemoryerror/i.test(message);
 }
+export function isImageFallbackError(error){
+  const message=String(error?.message||error||"");
+  return isCudaOom(error) || /ComfyUI timeout waiting for history|AbortError|fetch failed|ECONNRESET|ETIMEDOUT/i.test(message);
+}
 function stable(value){
   if(Array.isArray(value)) return value.map(stable);
   if(value&&typeof value==="object"){
@@ -17,11 +21,17 @@ function stable(value){
   }
   return value;
 }
+function effectiveRequestForFingerprint(request){
+  if(!request||typeof request!=="object") return request||null;
+  const copy=structuredClone(request);
+  delete copy.prompt_contract_ref;
+  return copy;
+}
 export function imageRequestFingerprint(item){
   return createHash("sha256")
     .update(JSON.stringify(stable({
-      request:item?.request||null,
-      fallback_request:item?.fallback_request||null
+      request:effectiveRequestForFingerprint(item?.request||null),
+      fallback_request:effectiveRequestForFingerprint(item?.fallback_request||null)
     })))
     .digest("hex");
 }
@@ -54,10 +64,13 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
   const generatedCandidateDurations=[];
   const requestedKeys=new Set(plan.requests.map(item=>item.candidate_id));
   let prunedCacheEntries=0;
-  for(const key of Object.keys(state.results||{})){
-    if(requestedKeys.has(key)) continue;
-    delete state.results[key];
-    prunedCacheEntries+=1;
+  const targetedRegeneration=Boolean(plan?.regeneration);
+  if(!targetedRegeneration){
+    for(const key of Object.keys(state.results||{})){
+      if(requestedKeys.has(key)) continue;
+      delete state.results[key];
+      prunedCacheEntries+=1;
+    }
   }
   const allowedScenes=[];
   for(const item of plan.requests){
@@ -68,8 +81,18 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     if(!allowedScenes.includes(item.scene_id)) continue;
     const key=item.candidate_id;
     const requestFingerprint=imageRequestFingerprint(item);
+    const promptContractRef=structuredClone(
+      item?.request?.prompt_contract_ref || item?.fallback_request?.prompt_contract_ref || null
+    );
     const prior=state.results[key];
-    if(outputsStillExist(prior,requestFingerprint)){cacheHits+=1;continue;}
+    if(outputsStillExist(prior,requestFingerprint)){
+      if(promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"){
+        prior.prompt_contract_ref=promptContractRef;
+        prior.prompt_contract_execution_verified=true;
+      }
+      cacheHits+=1;
+      continue;
+    }
     if(prior?.status==="completed"&&Array.isArray(prior.outputs)&&prior.outputs.length){
       invalidatedCacheEntries+=1;
     }
@@ -81,17 +104,29 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
       let primaryElapsedMs=null;
       let fallbackElapsedMs=null;
       const primaryStartedMs=Number(now());
-      try{
-        result=await runner(item.request);
-        primaryElapsedMs=Math.max(0,Number(now())-primaryStartedMs);
-      }catch(error){
-        primaryElapsedMs=Math.max(0,Number(now())-primaryStartedMs);
-        if(!isCudaOom(error)||!item.fallback_request) throw error;
-        primaryError=String(error?.message||error).slice(0,500);
+      const primaryTimeout=Math.max(30,Number(process.env.HIBOU_IMAGE_PRIMARY_TIMEOUT_SECONDS||180));
+      const fallbackTimeout=Math.max(60,Number(process.env.HIBOU_IMAGE_FALLBACK_TIMEOUT_SECONDS||300));
+      const forceFallback=String(process.env.HIBOU_IMAGE_FORCE_FALLBACK||"").toLowerCase()==="true";
+      if(forceFallback&&item.fallback_request){
+        primaryElapsedMs=0;
+        primaryError="forced_fallback_profile";
         const fallbackStartedMs=Number(now());
-        result=await runner(item.fallback_request);
+        result=await runner({...item.fallback_request,timeout_seconds:Math.min(Number(item.fallback_request?.timeout_seconds||fallbackTimeout),fallbackTimeout)});
         fallbackElapsedMs=Math.max(0,Number(now())-fallbackStartedMs);
         fallbackUsed=true;
+      }else{
+        try{
+          result=await runner({...item.request,timeout_seconds:Math.min(Number(item.request?.timeout_seconds||primaryTimeout),primaryTimeout)});
+          primaryElapsedMs=Math.max(0,Number(now())-primaryStartedMs);
+        }catch(error){
+          primaryElapsedMs=Math.max(0,Number(now())-primaryStartedMs);
+          if(!isImageFallbackError(error)||!item.fallback_request) throw error;
+          primaryError=String(error?.message||error).slice(0,500);
+          const fallbackStartedMs=Number(now());
+          result=await runner({...item.fallback_request,timeout_seconds:Math.min(Number(item.fallback_request?.timeout_seconds||fallbackTimeout),fallbackTimeout)});
+          fallbackElapsedMs=Math.max(0,Number(now())-fallbackStartedMs);
+          fallbackUsed=true;
+        }
       }
       const candidateFinishedMs=Number(now());
       const elapsedMs=Math.max(0,candidateFinishedMs-candidateStartedMs);
@@ -100,6 +135,8 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
         status:"completed",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,
         request_fingerprint:requestFingerprint,
         job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,
+        prompt_contract_ref:promptContractRef,
+        prompt_contract_execution_verified:promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2",
         fallback_used:fallbackUsed,primary_error:primaryError,error:"",
         generation_started_at:new Date(candidateStartedMs).toISOString(),
         generation_finished_at:new Date(candidateFinishedMs).toISOString(),
@@ -114,6 +151,8 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
       state.results[key]={
         status:"error",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,outputs:[],
         request_fingerprint:requestFingerprint,
+        prompt_contract_ref:promptContractRef,
+        prompt_contract_execution_verified:false,
         fallback_used:false,error:String(error?.message||error).slice(0,700),
         generation_started_at:new Date(candidateStartedMs).toISOString(),
         generation_finished_at:new Date(candidateFinishedMs).toISOString(),

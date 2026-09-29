@@ -89,6 +89,7 @@ export function buildCandidateDecisionTemplate(review) {
   return {
     schema: "HIBOU_HUMAN_IMAGE_SELECTION_V1",
     content_id: review.content_id || null,
+    prompt_contract_ref: review.prompt_contract_ref ? structuredClone(review.prompt_contract_ref) : null,
     review_fingerprint_sha256:
       String(review.review_fingerprint_sha256 || "") || null,
     decisions,
@@ -203,6 +204,9 @@ export function buildCandidateReview({
   if (perceptualQc?.schema !== "HIBOU_IMAGE_PERCEPTUAL_QC_V1") {
     fail("HIBOU_IMAGE_PERCEPTUAL_QC_V1 required");
   }
+  if(plan?.prompt_contract_ref?.schema!=="HIBOU_PROMPT_CONTRACT_REF_V2"){
+    fail("candidate review requires strict prompt_contract_ref V2");
+  }
 
   const requests = byCandidate(plan);
   const scenes = new Map();
@@ -227,6 +231,11 @@ export function buildCandidateReview({
       request_fingerprint: String(
         request?.request_fingerprint || row?.request_fingerprint || "",
       ) || null,
+      prompt_contract_ref: structuredClone(
+        request?.request?.prompt_contract_ref ||
+        request?.fallback_request?.prompt_contract_ref ||
+        null
+      ),
       machine_rank_only: true,
       human_approved: false,
     };
@@ -317,6 +326,7 @@ export function buildCandidateReview({
   return {
     schema: CANDIDATE_REVIEW_SCHEMA,
     content_id: contentId,
+    prompt_contract_ref: structuredClone(plan.prompt_contract_ref),
     review_fingerprint_sha256: reviewFingerprintSha256,
     scene_count: outputScenes.length,
     blocking_scene_count: blockingSceneCount,

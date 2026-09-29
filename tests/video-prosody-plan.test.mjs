@@ -35,7 +35,9 @@ test("contract planner only adds prosody metadata and keeps narration exact",()=
 });
 
 test("Chatterbox batch supports prosody units but remains syntactically valid",()=>{
-  const r=spawnSync("python3",["-m","py_compile","scripts/chatterbox-storyboard-batch.py"],{encoding:"utf8"});
+  const command=process.platform==="win32"?"py":"python3";
+  const args=process.platform==="win32"?["-3.11","-m","py_compile","scripts/chatterbox-storyboard-batch.py"]:["-m","py_compile","scripts/chatterbox-storyboard-batch.py"];
+  const r=spawnSync(command,args,{encoding:"utf8"});
   assert.equal(r.status,0,r.stderr||r.stdout);
   const source=readFileSync(new URL("../scripts/chatterbox-storyboard-batch.py",import.meta.url),"utf8");
   assert.match(source,/HIBOU_CHATTERBOX_BATCH_V3_PROSODY/);

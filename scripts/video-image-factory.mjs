@@ -223,6 +223,7 @@ async function main(){
     const emptyCandidateReview={
       schema:"HIBOU_CANDIDATE_REVIEW_V1",
       content_id:plan.content_id||null,
+      prompt_contract_ref:structuredClone(plan.prompt_contract_ref||null),
       scene_count:0,
       blocking_scene_count:0,
       all_scenes_reviewable:true,

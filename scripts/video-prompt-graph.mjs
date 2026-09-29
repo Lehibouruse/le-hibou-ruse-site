@@ -233,6 +233,11 @@ export function buildPromptGraph(contract) {
 
   const scenes = Array.isArray(contract.scenes) ? contract.scenes : [];
   if (!scenes.length) fail("at least one scene required");
+  const promptContract=contract?.prompt_contract_v2;
+  if(promptContract?.schema!=="HIBOU_PROMPT_CONTRACT_V2"||promptContract?.strict!==true){
+    fail("strict prompt_contract_v2 required before prompt graph construction");
+  }
+  const promptSceneMap=new Map((promptContract.scenes||[]).map(x=>[String(x.scene_id),x]));
 
   const seen = new Set();
   for (const scene of scenes) {
@@ -265,7 +270,22 @@ export function buildPromptGraph(contract) {
     .replace(/\s+/g, " ")
     .trim();
   const scriptSha = sha256Text(scriptText);
-  const sceneNodes = scenes.map(sceneNode);
+  const sceneNodes = scenes.map(sceneNode).map(node=>{
+    const sceneId=String(node?.SCENE_DELTA?.scene_id||"");
+    const ref=promptSceneMap.get(sceneId);
+    if(!ref) fail(sceneId+": prompt graph missing SPECIFIC prompt contract ref");
+    return {
+      ...node,
+      prompt_contract_ref:{
+        schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+        contract_sha256:promptContract.contract_sha256,
+        global_sha256:promptContract.global_sha256,
+        specific_sha256:ref.specific_sha256,
+        combined_sha256:ref.combined_sha256,
+        scene_id:sceneId
+      }
+    };
+  });
   const beatCount = sceneNodes.reduce(
     (sum, node) => sum + node.ATTENTION_BEATS.length,
     0,
@@ -379,6 +399,12 @@ export function buildPromptGraph(contract) {
     schema: PROMPT_GRAPH_SCHEMA,
     graph_version: PROMPT_GRAPH_VERSION,
     content_id: nonEmpty(contract?.content?.content_id) || null,
+    prompt_contract_ref:{
+      schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+      contract_sha256:promptContract.contract_sha256,
+      global_sha256:promptContract.global_sha256,
+      scene_count:(promptContract.scenes||[]).length
+    },
     profile_name: nonEmpty(contract?.creative?.profile_name),
     script_sha256: scriptSha,
     scene_count: scenes.length,

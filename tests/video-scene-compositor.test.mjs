@@ -56,3 +56,32 @@ test("ffmpeg plan composes transparent layers, text and camera transform before 
   assert.match(plan.filter_complex,/s=1080x1920:fps=30/);
   assert.equal(plan.output_label,"[outv]");
 });
+
+
+test("camera motion is applied before timed overlays so fades and timed captions remain live",()=>{
+  const scene={
+    scene_id:"S",
+    planned_duration_s:4,
+    image:{selected:"bg.png"},
+    framing:{anchor:"center"},
+    composition:{
+      character_pose:{path:"owl.webp",width:560,anchor:"bottom-center",remove_background:true,chroma_key_similarity:0.025,chroma_key_blend:0.01},
+      brand_signature:{text:"Le Hibou Rusé",anchor:"bottom-center",font_size:28,font_color:"#C7A65A",offset_y:150}
+    },
+    timeline:{
+      schema:"HIBOU_SCENE_TIMELINE_V1",
+      events:[
+        {id:"caption",type:"text",start_s:0.5,end_s:1.5,text:"HOOK",anchor:"top-center"},
+        {id:"zoom",type:"camera",start_s:1.5,end_s:3,zoom_percent:3,anchor:"center"}
+      ]
+    }
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:4,width:1080,height:1920,fps:30});
+  const zoomIndex=plan.filter_complex.indexOf("zoompan=");
+  const overlayIndex=plan.filter_complex.indexOf("overlay=");
+  const timedTextIndex=plan.filter_complex.indexOf("enable='between(t,0.500,1.500)'");
+  assert.ok(zoomIndex>=0);
+  assert.ok(overlayIndex>zoomIndex);
+  assert.ok(timedTextIndex>zoomIndex);
+  assert.match(plan.filter_complex,/fontfile='C\\:\/Windows\/Fonts\/arial\.ttf'/);
+});

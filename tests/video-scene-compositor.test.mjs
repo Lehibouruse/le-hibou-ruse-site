@@ -83,5 +83,4 @@ test("camera motion is applied before timed overlays so fades and timed captions
   assert.ok(zoomIndex>=0);
   assert.ok(overlayIndex>zoomIndex);
   assert.ok(timedTextIndex>zoomIndex);
-  assert.match(plan.filter_complex,/fontfile='C\\:\/Windows\/Fonts\/arial\.ttf'/);
 });

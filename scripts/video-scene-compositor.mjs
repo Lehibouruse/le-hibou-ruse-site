@@ -438,7 +438,7 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     const next=`accent${index}`;
     const m=event.margin;
     filters.push(
-      `[${base}]drawbox=x=${m}:y=${m}:w=w-${m*2}:h=h-${m*2}:color=${event.color}:t=${event.thickness}:enable='${timelineEnable(event)}'[${next}]`
+      `[${base}]drawbox=x=${m}:y=${m}:w=iw-${m*2}:h=ih-${m*2}:color=${event.color}:t=${event.thickness}:enable='${timelineEnable(event)}'[${next}]`
     );
     base=next;
   });

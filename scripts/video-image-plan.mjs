@@ -49,9 +49,10 @@ function scrubOverlayCharacterClause(clause){
   if(!value) return "";
   if(!CHARACTER_TOKEN_RE.test(value)) return value;
 
-  const action=value.match(/\b(retirant|retirer|effaçant|effacer|supprimant|supprimer)\s+([^.;!?]+)/iu);
+  const action=value.match(/\b(retir(?:ant|er|e)|effa(?:çant|cer|ce)|supprim(?:ant|er|e)|élimin(?:ant|er|e))\s+([^.;!?]+)/iu);
   if(action){
-    const verb=/retirant|retirer/iu.test(action[1])?"retirer":/effaçant|effacer/iu.test(action[1])?"effacer":"supprimer";
+    const token=String(action[1]).toLowerCase();
+    const verb=token.startsWith("retir")?"retirer":token.startsWith("effa")?"effacer":token.startsWith("élimin")?"éliminer":"supprimer";
     return `Action visuelle sans personnage : ${verb} ${String(action[2]).trim()}`;
   }
 
@@ -60,13 +61,12 @@ function scrubOverlayCharacterClause(clause){
     .replace(/\s+(?:zone|espace|place)\s+[^,;.!?]*?\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
     .replace(/\s+(?:avec\s+)?(?:une?\s+)?(?:zone|espace|place)\s+[^,;.!?]*?\s+pour\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"");
 
-  if(CHARACTER_TOKEN_RE.test(value)){
-    value=value
-      .replace(/^\s*(?:le|la|un|une|the|an?)?\s*(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\s+/iu,"")
-      .replace(/\b(?:le|la|un|une|du|au|the|an?)?\s*(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"")
-      .replace(/\s{2,}/g," ")
-      .trim();
-  }
+  if(CHARACTER_TOKEN_RE.test(value)) return "";
+  value=value
+    .replace(/\b(?:prévoir|garder|réserver)\s*[.!?]*$/iu,"")
+    .replace(/\s{2,}/g," ")
+    .trim();
+  if(value.length<4) return "";
   return value;
 }
 
@@ -79,15 +79,48 @@ function removeOverlayCharacterSentences(text){
     .map(scrubOverlayCharacterClause)
     .filter(Boolean)
     .join(". ")
+    .replace(/\bautour de (?:lui|elle)\b/giu,"autour d’une zone centrale")
+    .replace(/\bvers (?:lui|elle)\b/giu,"vers une zone centrale")
     .replace(/\.\s*\./g,".")
     .trim();
 }
 
-function imageStylePrompt(styleLock){
+function globalStyleSections(styleLock){
+  const source=String(styleLock||"").trim();
+  if(!source) return {};
+  const headerRe=/(IDENTIT[EÉ]|STYLE|D[EÉ]COR|COH[EÉ]RENCE|GRAMMAIRE CONCURRENTIELLE ADAPT[EÉ]E|MOUVEMENT|CADENCE|SOUS-TITRES|BRANDING|LANGUE|TEXTE DANS LES IMAGES|CTA|PRIORIT[EÉ])\s*:/giu;
+  const matches=[...source.matchAll(headerRe)];
+  const out={};
+  const key=value=>String(value||"").normalize("NFD").replace(/\p{M}/gu,"").toUpperCase();
+  for(let index=0;index<matches.length;index+=1){
+    const current=matches[index];
+    const start=(current.index||0)+current[0].length;
+    const end=index+1<matches.length?(matches[index+1].index||source.length):source.length;
+    out[key(current[1])]=source.slice(start,end).trim();
+  }
+  return out;
+}
+
+function imageStylePrompt(styleLock,{backgroundOnly=false}={}){
+  const sections=globalStyleSections(styleLock);
   const extracted=extractStyleSection(styleLock);
-  const base=extracted||String(styleLock||"").trim();
+  const style=sections.STYLE||extracted||(!Object.keys(sections).length?String(styleLock||"").trim():"");
+  let decor=sections.DECOR||"";
+  let coherence=sections.COHERENCE||"";
+  const grammar=sections["GRAMMAIRE CONCURRENTIELLE ADAPTEE"]||"";
+  decor=decor.replace(/\bet les sous-titres dominent\b/giu,"et la composition reste immédiatement lisible");
+  if(backgroundOnly){
+    decor=decor.replace(/\bla mascotte\b/giu,"le sujet principal composité ensuite");
+    coherence=coherence.replace(/^\s*personnage\s*,?\s*/iu,"");
+  }
   const reinforcement="STYLE_RENDERING_GUIDE: flat vector-like 2D editorial illustration, crisp ink outlines, simplified geometry, controlled cel shading, restrained texture, graphic poster-like composition, consistent ivory/navy/gold accents, shallow illustrative depth.";
-  return [base?("IMAGE_STYLE_LOCK: "+base):"",reinforcement].filter(Boolean).join(" ");
+  return [
+    style?`IMAGE_STYLE_LOCK: ${style}`:"",
+    decor?`IMAGE_ENVIRONMENT_LOCK: ${decor}`:"",
+    coherence?`IMAGE_COHERENCE_LOCK: ${coherence}`:"",
+    grammar?`IMAGE_VISUAL_GRAMMAR_LOCK: ${grammar}`:"",
+    reinforcement
+  ].filter(Boolean).join("\n");
 }
 
 function removeTextRiskSentences(text){
@@ -95,7 +128,7 @@ function removeTextRiskSentences(text){
   if(!source) return "";
   const withoutTextInstructions=source
     .split(/(?<=[.!?])\s+/u)
-    .filter(sentence=>!/(?:\btexte\b|\btext\b|\bletter(?:s|ing)?\b|\blogo\b|\bsign(?:age)?\b|\bécriture\b|\binscription\b)/iu.test(sentence))
+    .filter(sentence=>!/(?:\btextes?\b|\btext\b|\bletter(?:s|ing)?\b|\blogo\b|\bsign(?:age)?\b|\bécriture\b|\binscription\b|\bcallouts?\b|\bpunchline\b|\bpost[- ]prod(?:uction)?\b|\bà l[’']écran\b|\bon screen\b|\bphrase principale\b|\blabels?\b|\bjargon\b|\bisoler\b|\bcall\s*\/\s*put\b|\bzoom\b|\bentrée rapide\b|\bapparitions? successives?\b|\bcalendrier qui tourne\b|\baccélération\b)/iu.test(sentence))
     .join(" ")
     .trim();
   return withoutTextInstructions
@@ -353,24 +386,35 @@ export function buildImagePlan(contract,binding){
     }
     const promptSceneRef=promptSceneMap.get(String(scene.scene_id||""));
     if(!promptSceneRef) fail(`${scene.scene_id}: missing SPECIFIC prompt contract hash`);
-    const sceneImagePrompt=String(scene.image_prompt||"").trim();
-    const sceneVisualIdea=String(scene.visual_idea||"").trim();
+    const specificPayload=promptSceneRef?.specific_payload;
+    if(!specificPayload||String(specificPayload.scene_id||"")!==String(scene.scene_id||"")){
+      fail(`${scene.scene_id}: missing authoritative SPECIFIC payload`);
+    }
+    const sceneImagePrompt=String(specificPayload.image_prompt||"").trim();
+    const sceneVisualIdea=String(specificPayload.visual_idea||"").trim();
+    if(String(scene.image_prompt||"").trim()!==sceneImagePrompt||String(scene.visual_idea||"").trim()!==sceneVisualIdea){
+      fail(`${scene.scene_id}: storyboard visual fields drifted from SPECIFIC payload`);
+    }
     if(!sceneImagePrompt&&!sceneVisualIdea) fail(`${scene.scene_id}: image prompt/visual idea missing`);
     const deterministicCharacterOverlay=
       creativeLockEnabled
       && String(creative.reference_mode||"")==="deterministic_character_overlay"
       && Boolean(scene?.framing?.hibou);
     const sceneWantsHibou=Boolean(scene?.framing?.hibou);
-    const rawSpecificVisual=sceneImagePrompt||sceneVisualIdea;
-    const characterSafeVisual=deterministicCharacterOverlay
-      ? removeOverlayCharacterSentences(rawSpecificVisual)
-      : rawSpecificVisual;
-    const compiledSpecificVisual=creativeLockEnabled
-      ? removeTextRiskSentences(characterSafeVisual)
-      : characterSafeVisual;
-    if(!compiledSpecificVisual) fail(`${scene.scene_id}: compiled scene image prompt is empty`);
-    const specificVisual=(sceneImagePrompt?"SCENE_IMAGE_PROMPT: ":"SCENE_VISUAL_FALLBACK: ")+compiledSpecificVisual;
-    const styleForImage=imageStylePrompt(styleLock);
+    const compileVisual=(value)=>{
+      const characterSafe=deterministicCharacterOverlay
+        ?removeOverlayCharacterSentences(value)
+        :String(value||"").trim();
+      return creativeLockEnabled?removeTextRiskSentences(characterSafe):characterSafe;
+    };
+    const compiledImagePrompt=compileVisual(sceneImagePrompt);
+    const compiledVisualIdea=compileVisual(sceneVisualIdea);
+    const specificVisual=[
+      compiledImagePrompt?`SCENE_IMAGE_PROMPT: ${compiledImagePrompt}`:"",
+      compiledVisualIdea&&compiledVisualIdea!==compiledImagePrompt?`SCENE_VISUAL_INTENT: ${compiledVisualIdea}`:""
+    ].filter(Boolean).join("\n");
+    if(!specificVisual) fail(`${scene.scene_id}: compiled scene visual prompt is empty`);
+    const styleForImage=imageStylePrompt(styleLock,{backgroundOnly:creativeLockEnabled&&String(creative.reference_mode||"")==="deterministic_character_overlay"});
     const framingLock=framingPrompt(scene);
     const compiledPrefix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(prefix)):removeTextRiskSentences(prefix);
     const compiledSuffix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(suffix)):removeTextRiskSentences(suffix);
@@ -399,9 +443,42 @@ export function buildImagePlan(contract,binding){
           compiledSuffix
         ].filter(Boolean).join("\n")
       : [prefix,specificVisual,suffix].filter(Boolean).join("\n");
-    if(deterministicCharacterOverlay&&/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/iu.test(prompt)){
-      fail(`${scene.scene_id}: deterministic background prompt leaked character tokens`);
+    const leakedCharacterTokens=deterministicCharacterOverlay
+      ?[...prompt.matchAll(/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/giu)].map(match=>String(match[0]).toLowerCase())
+      :[];
+    if(leakedCharacterTokens.length){
+      fail(`${scene.scene_id}: deterministic background prompt leaked character tokens: ${[...new Set(leakedCharacterTokens)].join(",")}`);
     }
+    const retention=(raw,compiled)=>raw.length?Number((compiled.length/raw.length).toFixed(3)):null;
+    const imagePromptRetention=retention(sceneImagePrompt,compiledImagePrompt);
+    const visualIdeaRetention=retention(sceneVisualIdea,compiledVisualIdea);
+    const promptApplication={
+      schema:"HIBOU_IMAGE_PROMPT_APPLICATION_V2",
+      prompt_node_id:String(binding.prompt.node_id),
+      prompt_input:String(binding.prompt.input),
+      compiled_prompt_sha256:createHash("sha256").update(prompt).digest("hex"),
+      specific_sha256:promptSceneRef.specific_sha256,
+      image_prompt_sha256:createHash("sha256").update(sceneImagePrompt).digest("hex"),
+      compiled_image_prompt_sha256:createHash("sha256").update(compiledImagePrompt).digest("hex"),
+      visual_idea_sha256:createHash("sha256").update(sceneVisualIdea).digest("hex"),
+      compiled_visual_idea_sha256:createHash("sha256").update(compiledVisualIdea).digest("hex"),
+      image_prompt_component_included:Boolean(compiledImagePrompt),
+      visual_idea_component_included:Boolean(compiledVisualIdea&&compiledVisualIdea!==compiledImagePrompt),
+      preservation:{
+        raw_image_prompt_chars:sceneImagePrompt.length,
+        compiled_image_prompt_chars:compiledImagePrompt.length,
+        image_prompt_retention_ratio:imagePromptRetention,
+        raw_visual_idea_chars:sceneVisualIdea.length,
+        compiled_visual_idea_chars:compiledVisualIdea.length,
+        visual_idea_retention_ratio:visualIdeaRetention,
+        character_overlay_sanitized:deterministicCharacterOverlay,
+        text_risk_sanitized:creativeLockEnabled,
+        status:(
+          (!sceneImagePrompt||sceneImagePrompt.length<24||compiledImagePrompt.length>=24)
+          && (imagePromptRetention==null||imagePromptRetention>=0.25)
+        )?"PASS":"REVIEW"
+      }
+    };
     for(let candidate=1;candidate<=candidatesPerScene;candidate+=1){
       const seed=seedFor(contentId,scene.scene_id,candidate);
       const baseOverrides={
@@ -429,6 +506,7 @@ export function buildImagePlan(contract,binding){
           output_node_ids:binding.output_node_ids.map(String),
           timeout_seconds:Number(binding.timeout_seconds||600),
           max_retries:Number(binding.max_retries??1),
+          prompt_application:structuredClone(promptApplication),
           prompt_contract_ref:{
             schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
             contract_sha256:promptContract.contract_sha256,
@@ -453,7 +531,7 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:promptContract.contract_sha256,global_sha256:promptContract.global_sha256,scene_count:(promptContract.scenes||[]).length},creative_contract_enforced:airtableCreativeContract,creative_routing:{global_style_applied:Boolean(styleLock),global_character_policy_applied:Boolean(characterLock||creative.reference_mode),global_character_policy_applied_in_postproduction:String(creative.reference_mode||"")==="deterministic_character_overlay",global_negative_policy_present:Boolean(negativeLock),global_negative_policy_injected_as_literal_tokens:false,specific_content_brief_present:Boolean(contentBrief),specific_content_brief_copied_into_each_image_prompt:false,scene_image_prompt_preferred:true,visual_idea_used_only_as_fallback:true,background_character_tokens_forbidden:true},scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:promptContract.contract_sha256,global_sha256:promptContract.global_sha256,scene_count:(promptContract.scenes||[]).length},creative_contract_enforced:airtableCreativeContract,creative_routing:{global_style_applied:Boolean(styleLock),global_character_policy_applied:Boolean(characterLock||creative.reference_mode),global_character_policy_applied_in_postproduction:String(creative.reference_mode||"")==="deterministic_character_overlay",global_negative_policy_present:Boolean(negativeLock),global_negative_policy_injected_as_literal_tokens:false,specific_content_brief_present:Boolean(contentBrief),specific_payload_authoritative:true,scene_image_prompt_applied:true,visual_idea_compiled_as_supplement:true,compiled_prompt_hash_bound:true,background_character_tokens_forbidden:true},scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);

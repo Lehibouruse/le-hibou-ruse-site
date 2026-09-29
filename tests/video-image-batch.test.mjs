@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { executeImagePlan, imageRequestFingerprint, isCudaOom } from "../scripts/video-image-batch.mjs";
+import { executeImagePlan, imageRequestFingerprint, isCudaOom, promptApplicationVerified } from "../scripts/video-image-batch.mjs";
 
 const plan={schema:"HIBOU_IMAGE_PLAN_V1",content_id:"recX",requests:[
  {candidate_id:"S01-C1",scene_id:"S01",candidate:1,seed:1,request:{a:1}},
@@ -66,7 +67,7 @@ test("request fingerprint ignores audit-only prompt contract metadata",()=>{
  assert.notEqual(imageRequestFingerprint(a),imageRequestFingerprint(c));
 });
 
-test("legacy cached candidate is upgraded with strict execution receipt without regeneration",async()=>{
+test("legacy cached candidate is not falsely upgraded without compiled prompt proof",async()=>{
  const root=mkdtempSync(resolve(tmpdir(),"hibou-img-receipt-"));
  const manifest=resolve(root,"manifest.json"), selections=resolve(root,"selections.json");
  let calls=0;
@@ -92,8 +93,39 @@ test("legacy cached candidate is upgraded with strict execution receipt without 
  assert.equal(calls,1);
  assert.equal(second.cache_hits,1);
  const stored=JSON.parse(readFileSync(manifest,"utf8")).results["S01-C1"];
- assert.equal(stored.prompt_contract_execution_verified,true);
+ assert.equal(stored.prompt_contract_execution_verified,false);
  assert.deepEqual(stored.prompt_contract_ref,strict.requests[0].request.prompt_contract_ref);
+});
+
+test("compiled prompt application proof is bound to the exact ComfyUI override text",()=>{
+ const prompt="SCENE_IMAGE_PROMPT: rich mechanics\nSCENE_VISUAL_INTENT: four blocks converge";
+ const v1={
+   overrides:{"6":{text:prompt}},
+   prompt_application:{
+     schema:"HIBOU_IMAGE_PROMPT_APPLICATION_V1",
+     prompt_node_id:"6",
+     prompt_input:"text",
+     compiled_prompt_sha256:createHash("sha256").update(prompt).digest("hex"),
+     image_prompt_component_included:true,
+     visual_idea_component_included:true
+   }
+ };
+ assert.equal(promptApplicationVerified(v1),true);
+ const v2=structuredClone(v1);
+ v2.prompt_application={
+   ...v2.prompt_application,
+   schema:"HIBOU_IMAGE_PROMPT_APPLICATION_V2",
+   compiled_image_prompt_sha256:"a".repeat(64),
+   compiled_visual_idea_sha256:"b".repeat(64),
+   preservation:{status:"PASS",image_prompt_retention_ratio:0.8}
+ };
+ assert.equal(promptApplicationVerified(v2),true);
+ const review=structuredClone(v2);
+ review.prompt_application.preservation.status="REVIEW";
+ assert.equal(promptApplicationVerified(review),false);
+ const drifted=structuredClone(v2);
+ drifted.overrides["6"].text+=" altered";
+ assert.equal(promptApplicationVerified(drifted),false);
 });
 
 test("CUDA OOM retries exactly once with the prepared local fallback request",async()=>{

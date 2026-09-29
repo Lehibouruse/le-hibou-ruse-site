@@ -18,6 +18,34 @@ function brandColor(value){
   if(/^#[0-9a-f]{6}$/i.test(raw)) return raw;
   return "#C7A65A";
 }
+function cameraAnchor(value){
+  const raw=String(value||"").trim().toLowerCase();
+  if(raw==="centre") return "center";
+  if(["left","right","center","top","bottom","top-left","top-right","bottom-left","bottom-right"].includes(raw)) return raw;
+  return "";
+}
+function materializeFallbackCameraMotion(scene){
+  const timelineEvents=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
+  if(timelineEvents.some(event=>String(event?.type||"").toLowerCase()==="camera")) return scene;
+  const existing=scene?.composition?.camera_transform||{};
+  const rawZoom=Number(existing.zoom_percent??scene?.zoom_percent??0);
+  const zoomPercent=Math.min(4,Math.max(3.2,Number.isFinite(rawZoom)?rawZoom:3.2));
+  const requestedAnchor=cameraAnchor(existing.anchor||scene?.framing?.anchor);
+  const fallbackAnchors=["left","right","center"];
+  const anchor=requestedAnchor&&requestedAnchor!=="center"
+    ?requestedAnchor
+    :fallbackAnchors[(Math.max(1,Number(scene?.order||1))-1)%fallbackAnchors.length];
+  scene.composition={
+    ...(scene.composition||{}),
+    camera_transform:{
+      ...existing,
+      zoom_percent:zoomPercent,
+      anchor,
+      source:"global_fallback_micro_motion_v2",
+    }
+  };
+  return scene;
+}
 
 export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPathArg) {
   const contractPath=resolve(contractPathArg);
@@ -141,6 +169,8 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         })
       };
     }
+
+    materializeFallbackCameraMotion(scene);
 
     if(scene.narration_exact?.mode!=="audio_reference") fail(`${sceneId}: audio_reference required before promotion`);
     if(scene.narration_exact.sha256!==contract.audio.sha256) fail(`${sceneId}: narration/audio hash mismatch`);

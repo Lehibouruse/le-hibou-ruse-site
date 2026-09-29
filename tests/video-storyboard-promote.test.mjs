@@ -31,6 +31,9 @@ test("promotion copies selected media and keeps publication locked",()=>{
   assert.match(promoted.audio.reference,/^assets\/audio\//);
   assert.match(promoted.scenes[0].image.selected,/^assets\/images\//);
   assert.equal(promoted.scenes[0].image.selected_sha256,hash(image));
+  assert.equal(promoted.scenes[0].composition.camera_transform.zoom_percent,3.2);
+  assert.equal(promoted.scenes[0].composition.camera_transform.anchor,"left");
+  assert.equal(promoted.scenes[0].composition.camera_transform.source,"global_fallback_micro_motion_v2");
 });
 
 test("promotion refuses missing scene selection",()=>{

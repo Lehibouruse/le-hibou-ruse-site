@@ -37,6 +37,60 @@ function sceneEventTimes(path,threshold){
  }
  return out;
 }
+export function creativeMasterReview({contract=null,visualEventRate=null}={}){
+ const reasons=[];
+ if(!contract){
+   return {status:"NOT_EVALUATED",reasons,metrics:{contract_present:false}};
+ }
+ const scenes=Array.isArray(contract?.scenes)?contract.scenes:[];
+ const voiceRuntime=contract?.audio?.voice_profile_runtime||null;
+ const voiceIdentityLocked=voiceRuntime?.identity_lock_enabled===true;
+ const voiceReferenceReady=Boolean(
+   voiceRuntime?.audio_reference_present
+   || voiceRuntime?.bootstrap_reference_sha256
+   || contract?.audio?.audio_prompt_sha256
+ );
+ if(!voiceIdentityLocked) reasons.push({code:"voice_identity_lock_missing"});
+ if(voiceIdentityLocked&&!voiceReferenceReady) reasons.push({code:"voice_identity_reference_missing"});
+ const motionScenes=scenes.filter(scene=>{
+   const hasSpecificCamera=Array.isArray(scene?.timeline?.events)
+     && scene.timeline.events.some(event=>String(event?.type||"").toLowerCase()==="camera");
+   const source=String(scene?.composition?.camera_transform?.source||"");
+   return hasSpecificCamera||source==="global_fallback_micro_motion_v2";
+ });
+ const motionCoverageRatio=scenes.length?motionScenes.length/scenes.length:0;
+ if(scenes.length&&motionCoverageRatio<0.6){
+   reasons.push({code:"motion_contract_coverage_low",coverage_ratio:Number(motionCoverageRatio.toFixed(3))});
+ }
+ const hibouScenes=scenes.filter(scene=>scene?.framing?.hibou===true);
+ const missingHibouLayers=hibouScenes
+   .filter(scene=>!scene?.composition?.character_pose)
+   .map(scene=>scene.scene_id);
+ if(missingHibouLayers.length){
+   reasons.push({code:"hibou_layer_missing",scene_ids:missingHibouLayers});
+ }
+ const emptyMotionThirds=Array.isArray(visualEventRate?.thirds)
+   ?visualEventRate.thirds.filter(third=>Number(third?.subtle_event_count||0)===0&&Number(third?.planned_attention_beat_count||0)===0).length
+   :0;
+ if(motionCoverageRatio<0.6&&emptyMotionThirds>=2){
+   reasons.push({code:"subtle_motion_proxy_sparse",empty_thirds:emptyMotionThirds});
+ }
+ return {
+   status:reasons.length?"REVIEW":"PASS",
+   reasons,
+   metrics:{
+     contract_present:true,
+     scene_count:scenes.length,
+     motion_scene_count:motionScenes.length,
+     motion_coverage_ratio:Number(motionCoverageRatio.toFixed(3)),
+     voice_identity_locked:voiceIdentityLocked,
+     voice_reference_ready:voiceReferenceReady,
+     hibou_scene_count:hibouScenes.length,
+     missing_hibou_layer_count:missingHibouLayers.length,
+     empty_motion_thirds:emptyMotionThirds,
+   }
+ };
+}
 export function qcMaster(path,{contract=null}={}){
  path=resolve(path); const p=probe(path); const video=p.streams.find(x=>x.codec_type==="video"), audio=p.streams.find(x=>x.codec_type==="audio");
  const blackLog=detects(path,"blackdetect=d=0.25:pix_th=0.02");
@@ -57,7 +111,10 @@ export function qcMaster(path,{contract=null}={}){
   no_long_silence:sil.length===0,
   loudness_measured:Boolean(loud)
  };
- return {schema:"HIBOU_MASTER_QC_V2",file:path,sha256:sha256(path),duration_s:duration,size_bytes:Number(p.format?.size),streams:p.streams,black_intervals:black,silence_events:sil,loudness:loud,visual_event_rate,checks,status:Object.values(checks).every(Boolean)?"PASS":"REVIEW",paid_fallback:false};
+ const technicalStatus=Object.values(checks).every(Boolean)?"PASS":"REVIEW";
+ const creative_review=creativeMasterReview({contract,visualEventRate:visual_event_rate});
+ const status=technicalStatus==="PASS"&&(!contract||creative_review.status==="PASS")?"PASS":"REVIEW";
+ return {schema:"HIBOU_MASTER_QC_V3",file:path,sha256:sha256(path),duration_s:duration,size_bytes:Number(p.format?.size),streams:p.streams,black_intervals:black,silence_events:sil,loudness:loud,visual_event_rate,checks,technical_status:technicalStatus,creative_review,status,paid_fallback:false};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [path,out,contractPath]=process.argv.slice(2); if(!path) fail("usage: video-master-qc.mjs master.mp4 [qc.json] [contract.json]");

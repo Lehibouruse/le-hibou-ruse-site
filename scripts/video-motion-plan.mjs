@@ -66,6 +66,22 @@ function motionSignals(scene){
   }
   return signals;
 }
+function specificActionCues(scene){
+  const source=text(scene?.visual_idea).toLowerCase();
+  if(!source) return [];
+  const cues=[];
+  const rules=[
+    ["disappear",/\bdispara(?:î|i)t|\bdisparaissent?/iu],
+    ["erase_remove",/\beffac(?:e|er)|\bretir(?:e|er)|(?:^|\s)élimin(?:e|er)|\bsupprim(?:e|er)/iu],
+    ["open_passage",/\bouvre?\s+un\s+passage|\bpassage\s+s['’]ouvre/iu],
+    ["appear",/\bappara(?:î|i)t|\bapparaissent?/iu],
+    ["turn_rotate",/\btourne|\btourner|\brotat/iu],
+    ["renew_recreate",/\brecr[eé][eé]|\brenouvel[eé]|\bencha[iî]nement/iu],
+    ["accelerate",/\bacc[eé]l[eé]r/iu],
+  ];
+  for(const [code,re] of rules){ if(re.test(source)) cues.push(code); }
+  return cues;
+}
 function curveZone(scene,curveProfile){
   if(!curveProfile) return null;
   const intent=text(scene?.voice?.intent).toLowerCase();
@@ -150,6 +166,15 @@ export function buildMotionPlan(contract){
     const sceneId=text(scene?.scene_id);
     if(!sceneId) fail(`scene ${index+1}: scene_id missing`);
     const signals=motionSignals(scene);
+    const actionCues=specificActionCues(scene);
+    const specificExecutionGap=actionCues.length>0&&signals.attention_beat_count===0;
+    if(specificExecutionGap){
+      warnings.push({
+        code:"specific_action_cues_unstructured",
+        scene_id:sceneId,
+        cues:actionCues,
+      });
+    }
     const mode=resolveSceneMode(scene,movementProfile,signals,warnings);
     return {
       scene_id:sceneId,
@@ -159,6 +184,8 @@ export function buildMotionPlan(contract){
       recommendation_source:mode.source,
       curve_zone:curveZone(scene,curveProfile),
       voice_intent:text(scene?.voice?.intent)||null,
+      specific_action_cues:actionCues,
+      specific_execution_gap:specificExecutionGap,
       signals,
     };
   });
@@ -168,6 +195,7 @@ export function buildMotionPlan(contract){
     acc[key]=(acc[key]||0)+1;
     return acc;
   },{});
+  const specificExecutionGapScenes=scenePlans.filter(scene=>scene.specific_execution_gap);
 
   const core={
     schema:MOTION_PLAN_SCHEMA,
@@ -176,6 +204,8 @@ export function buildMotionPlan(contract){
     curve_profile:curveProfile,
     scene_count:scenePlans.length,
     scene_mode_counts:sceneModeCounts,
+    specific_execution_gap_count:specificExecutionGapScenes.length,
+    specific_execution_gap_scenes:specificExecutionGapScenes.map(scene=>scene.scene_id),
     suggested_beat_kinds:suggestedBeatKinds(movementProfile),
     scenes:scenePlans,
     warnings,
@@ -189,6 +219,7 @@ export function buildMotionPlan(contract){
       contract_mutation_performed:false,
       publication_authorized:false,
       explicit_motion_signal_required_for_intra_scene_animation:true,
+      unstructured_specific_actions_reported:true,
       camera_motion_reclassifies_scene:true,
       micro_zoom_does_not_by_itself_reclassify_static_scene:false,
     },

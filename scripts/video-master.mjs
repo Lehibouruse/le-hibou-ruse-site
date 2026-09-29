@@ -194,7 +194,7 @@ const POST_RUNTIME_FILES=[
   ["video-storyboard-promote.mjs","promoteStoryboard"],
   ["video-local-render.mjs","renderVideoContract"],
   ["video-scene-compositor.mjs","buildSceneCompositePlan"],
-  ["video-master-qc.mjs","HIBOU_MASTER_QC_V2"],
+  ["video-master-qc.mjs","HIBOU_MASTER_QC_V3"],
   ["video-visual-event-metrics.mjs","HIBOU_VISUAL_EVENT_RATE_V1"],
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
   ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
@@ -769,6 +769,13 @@ async function main(){
       auditPromptContract("planning_audit",storyboard);
       const promptGraph=promptGraphModule.buildPromptGraph(storyboardData);
       const motionPlan=motionPlanModule.buildMotionPlan(storyboardData);
+      auditPromptApplication("specific_motion_execution",{
+        specific_actions_structured:Number(motionPlan.specific_execution_gap_count||0)===0,
+        unstructured_specific_actions_reported:motionPlan.policy?.unstructured_specific_actions_reported===true
+      },{
+        specific_execution_gap_count:Number(motionPlan.specific_execution_gap_count||0),
+        specific_execution_gap_scenes:motionPlan.specific_execution_gap_scenes||[]
+      });
       const voiceDensityPlan=voiceDensityModule.buildVoiceDensityPlan(storyboardData);
       const continuityPlan=continuityModule.buildContinuityPlan(storyboardData);
       let assetReadiness=null;
@@ -1149,10 +1156,12 @@ async function main(){
     auditPromptApplication("image_prompt_execution",{
       global_style_applied:routing.global_style_applied===true,
       global_character_policy_applied:routing.global_character_policy_applied===true,
-      specific_scene_prompt_preferred:routing.scene_image_prompt_preferred===true,
-      visual_idea_fallback_only:routing.visual_idea_used_only_as_fallback===true,
-      negative_policy_present:routing.global_negative_policy_present===true,
-      negative_character_rule_enforced:routing.background_character_tokens_forbidden===true,
+      specific_payload_authoritative:routing.specific_payload_authoritative===true,
+      scene_image_prompt_applied:routing.scene_image_prompt_applied===true,
+      visual_idea_compiled_as_supplement:routing.visual_idea_compiled_as_supplement===true,
+      compiled_prompt_hash_bound:routing.compiled_prompt_hash_bound===true,
+      negative_policy_documented:routing.global_negative_policy_present===true,
+      model_safe_character_constraint_applied:routing.background_character_tokens_forbidden===true,
       generated_text_policy_enforced:storyboardData.creative?.text_in_generated_images===false,
       prompt_contract_ref_on_every_request:allRefsMatch,
       execution_receipt_on_every_planned_candidate:everyPlannedCandidateHasExecutionReceipt,
@@ -1161,7 +1170,7 @@ async function main(){
       request_count:allImageRequests.length,
       completed_execution_count:completedExecutionRows.length,
       execution_manifest:imageExecutionManifestPath,
-      negative_policy_mode:"structural_sanitization_plus_creative_qc"
+      negative_policy_mode:"no_native_negative_channel_positive_structural_sanitization_plus_creative_qc"
     });
     for(let attempt=1;attempt<=policy.regeneration_attempts;attempt+=1){
       const regenPath=resolve(imageDir,"regen-plan-"+attempt+".json");

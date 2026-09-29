@@ -35,6 +35,23 @@ export function imageRequestFingerprint(item){
     })))
     .digest("hex");
 }
+export function promptApplicationVerified(request){
+  const app=request?.prompt_application;
+  if(!["HIBOU_IMAGE_PROMPT_APPLICATION_V1","HIBOU_IMAGE_PROMPT_APPLICATION_V2"].includes(app?.schema)) return false;
+  const nodeId=String(app.prompt_node_id||"");
+  const input=String(app.prompt_input||"");
+  const prompt=request?.overrides?.[nodeId]?.[input];
+  if(typeof prompt!=="string"||!prompt.length) return false;
+  const sha=createHash("sha256").update(prompt).digest("hex");
+  if(sha!==String(app.compiled_prompt_sha256||"")) return false;
+  if(!Boolean(app.image_prompt_component_included||app.visual_idea_component_included)) return false;
+  if(app.schema==="HIBOU_IMAGE_PROMPT_APPLICATION_V2"){
+    if(app?.preservation?.status!=="PASS") return false;
+    if(app.compiled_image_prompt_sha256&&typeof app.compiled_image_prompt_sha256!=="string") return false;
+    if(app.compiled_visual_idea_sha256&&typeof app.compiled_visual_idea_sha256!=="string") return false;
+  }
+  return true;
+}
 function loadExisting(path,contentId){
   if(!path||!existsSync(path)) return {schema:"HIBOU_IMAGE_BATCH_V1",content_id:contentId,results:{}};
   try{
@@ -86,10 +103,12 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
     );
     const prior=state.results[key];
     if(outputsStillExist(prior,requestFingerprint)){
-      if(promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"){
-        prior.prompt_contract_ref=promptContractRef;
-        prior.prompt_contract_execution_verified=true;
-      }
+      const cachedRequest=prior?.fallback_used?item.fallback_request:item.request;
+      const applicationVerified=promptApplicationVerified(cachedRequest);
+      prior.prompt_contract_ref=promptContractRef;
+      prior.prompt_application=structuredClone(cachedRequest?.prompt_application||null);
+      prior.prompt_contract_execution_verified=
+        promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&applicationVerified;
       cacheHits+=1;
       continue;
     }
@@ -131,12 +150,16 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
       const candidateFinishedMs=Number(now());
       const elapsedMs=Math.max(0,candidateFinishedMs-candidateStartedMs);
       generatedCandidateDurations.push(elapsedMs);
+      const executedRequest=fallbackUsed?item.fallback_request:item.request;
+      const applicationVerified=promptApplicationVerified(executedRequest);
       state.results[key]={
         status:"completed",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,
         request_fingerprint:requestFingerprint,
         job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,
         prompt_contract_ref:promptContractRef,
-        prompt_contract_execution_verified:promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2",
+        prompt_application:structuredClone(executedRequest?.prompt_application||null),
+        prompt_contract_execution_verified:
+          promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&applicationVerified,
         fallback_used:fallbackUsed,primary_error:primaryError,error:"",
         generation_started_at:new Date(candidateStartedMs).toISOString(),
         generation_finished_at:new Date(candidateFinishedMs).toISOString(),

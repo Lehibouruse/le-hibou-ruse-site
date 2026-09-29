@@ -12,7 +12,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V4_IDENTITY_LOCK"
+ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V4_IDENTITY_LOCK_FINAL_EDGE"
 
 def fail(message):
     raise RuntimeError(message)
@@ -603,6 +603,7 @@ for item in descriptors:
     wav, timing_lock_applied, timing_lock_factor = fit_scene_duration(
         wav, sample_rate, target_voice_s, scene_id
     )
+    wav = edge_fade_waveform(wav, sample_rate)
     final_duration_s = wav.shape[-1] / sample_rate
     ta.save(str(item["scene_path"]), wav, sample_rate)
     scene_manifest = {
@@ -619,6 +620,8 @@ for item in descriptors:
         "duration_retry_applied": duration_retry_applied,
         "duration_retry_seed_offset": duration_retry_seed_offset,
         "prosody_units_used": prosody_units_used,
+        "conditioning_reference_sha256": audio_prompt_hash or bootstrap_reference_hash,
+        "final_edge_fade_ms": 6,
         "timing_lock": {
             "applied": timing_lock_applied,
             "planned_scene_s": planned_scene_s,
@@ -673,6 +676,8 @@ for item in descriptors:
         "native": item["native"],
         "prosody_plan_schema": ((scene.get("voice") or {}).get("prosody_plan") or {}).get("schema"),
         "prosody_units_used": prosody_units_used,
+        "conditioning_reference_sha256": audio_prompt_hash or bootstrap_reference_hash,
+        "final_edge_fade_ms": 6,
         "verbatim_preserved": True,
         "prosody_metadata_not_native": scene.get("voice"),
         "cache": cache_state,

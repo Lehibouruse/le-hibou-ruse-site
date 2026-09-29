@@ -19,20 +19,20 @@
 
 | Étape | Brique | État code | Tests CPU / statiques | E2E réel restant |
 | --- | --- | --- | --- | --- |
-| 0 / 0.4 / 0.5 | Benchmark + séparation GLOBAL / SPÉCIFIQUE | codé + appliqué | oui | **E2E partiellement validé** : contrat strict cohérent sur 13 scènes ; reçus d'exécution voix, musique, sous-titres et 26/26 candidats image ; continuité finale post-master encore à fermer |
+| 0 / 0.4 / 0.5 | Benchmark + séparation GLOBAL / SPÉCIFIQUE | codé + appliqué | oui | **E2E réel jusqu'au master** ; perte partielle du SPÉCIFIQUE corrigée ; receipt `HIBOU_IMAGE_PROMPT_APPLICATION_V2` validé sur les 13 scènes réelles (`13/13 PASS`) |
 | 1 | Script verrouillé / hash / verbatim | socle existant | oui partiel | validation éditoriale humaine finale |
-| 2 | BREATH_UNIT_FIRST + storyboard + ATTENTION_BEATS | codé + exécuté | oui | **E2E technique validé jusqu'au checkpoint humain** ; inspection du master final restante |
+| 2 | BREATH_UNIT_FIRST + storyboard + ATTENTION_BEATS | codé + exécuté | oui | **master V1 inspecté** ; défaut de mouvement réel identifié : 12 hard cuts et 1 seul événement subtil mesuré ; fallback caméra et interpolation corrigés |
 | 3 | Préflight machine / modèles | codé + exécuté | oui | **Windows/ROG réel validé** sur production locale |
-| 4 | Carte prosodique / unités de souffle | codé + exécuté | oui | **Chatterbox réel exécuté sur 13 scènes** ; écoute qualitative humaine finale restante |
-| 5 | Voix + mastering + contrôle verbatim | codé + QC durée + cache durée-aware + retries déterministes bornés | oui CPU/statique + ciblé | **retry réel validé** sur anomalie de durée scène 10 ; voix, QC durée et mastering PASS ; écoute continuité de timbre restante |
+| 4 | Carte prosodique / unités de souffle | codé + exécuté | oui | **mini E2E voix V4 validé sur média réel** : `identity_lock_enabled:true`, mode `bootstrap_first_scene`, référence SHA256 propagée aux scènes suivantes, micro-fade final appliqué après timing-lock |
+| 5 | Voix + mastering + contrôle verbatim | codé + QC durée + cache durée-aware + retries déterministes bornés + identity lock | oui CPU/statique + ciblé | QC technique V1 avait laissé passer une dérive perceptuelle ; verrou de timbre désormais séparé de la prosodie, avec première scène comme référence interne si aucune référence externe n'est fournie |
 | 6 | Image plan ComfyUI / FLUX | codé + exécuté | oui | **GPU E2E validé sur le run frais : 26/26 candidats terminés, 0 échec, reçus prompt vérifiés** |
-| 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, template, fingerprint anti-stale, validateur, pause/reprise feature-gatée | oui statique | **checkpoint réel atteint : `WAITING_HUMAN_SELECTION` sur 13 scènes** ; décision fingerprintée → reprise même job sans régénération reste à valider |
+| 7 | Ranking assisté + sélection humaine | codé : ranking, revue JSON/HTML, template, fingerprint anti-stale, validateur, pause/reprise feature-gatée | oui statique | **E2E validé** : sélection enregistrée puis reprise du même job sans régénérer les 26 images ; prochaine V2 = sélection assistée automatique par défaut |
 | 8 | Captions + texte écran + timeline | codé + exécuté | oui | sous-titres/contrat PASS ; lisibilité sur master final restante |
-| 9 | Promotion render-ready / hashes | codé | oui | reprise après décision humaine puis E2E média final |
-| 10 | FFmpeg + BEAT_VARIATION_POLICY | codé | oui | précédent master de certification PASS ; inspection du master frais restante |
+| 9 | Promotion render-ready / hashes | codé + exécuté | oui | **PASS réel** sur le premier master |
+| 10 | FFmpeg + BEAT_VARIATION_POLICY | codé + exécuté | oui | master V1 PASS techniquement mais postmortem créatif insuffisant ; bug alpha/fade du Hibou corrigé et nouveau mouvement réel validé sur scène isolée |
 | 10.5 | PREVIEW + retouches incrémentales | codé | oui | E2E cache hits sélectifs sur médias réels encore à faire |
-| 11 | QC technique avancé master | codé | oui | master de certification déjà PASS ; revalidation sur le run frais après sélection humaine |
-| 12 | Revue éditoriale humaine V4 | codé : manifeste consolidé, checklist 10 points | oui | décision humaine réelle sur master frais |
+| 11 | QC technique avancé master | codé + exécuté | oui | **QC V3 codé et validé** : le master V1 reste `TECH=PASS` mais bascule correctement en `REVIEW` pour voix non verrouillée et couverture mouvement insuffisante |
+| 12 | Revue éditoriale humaine V4 | codé : manifeste consolidé, checklist 10 points | oui | **revue humaine réelle effectuée sur le master V1** ; défauts voix/mouvement/Hibou/variété visuelle documentés |
 | 13 | Registre artefacts + remontée | codé V2 | oui | fermeture E2E registre + plan durable après master frais |
 | 14 | Publication + apprentissage | publication verrouillée | oui statique | publication séparée et toujours interdite sans validation explicite |
 
@@ -149,19 +149,19 @@
 - remote cancel/supersede limité au job propriétaire ;
 - publication toujours séparée de la production.
 
-## Priorités restantes après le run frais du 29/09
+## Priorités restantes après le postmortem du master V1
 
-1. **Fermer le checkpoint de sélection humaine** : l'E2E a maintenant atteint `WAITING_HUMAN_SELECTION` sur 13 scènes avec package JSON/HTML et `resume_same_job:true`. Reste : décision fingerprintée réelle → reprise du même job → vérifier que les 26 images ne sont pas régénérées.
-2. **Sortir et inspecter le master frais complet** : promotion → compositing → FFmpeg → Master QC → manifeste de revue humaine V4 → audit final du verrou de publication.
-3. **Valider la retouche incrémentale réelle** : PREVIEW A → B avec changements caption-only / image-only / narration-only et preuve de cache hits sélectifs conformes aux fingerprints.
-4. **Calibrer le QC créatif sémantique** : fixtures connues bonnes/mauvaises, seuils advisory, puis seulement envisager un mode bloquant.
-5. **Tester les scénarios de résilience rares** : cancel/supersede Windows, reprise distante en deux phases et vérification des receipts one-shot sans toucher aux jobs non propriétaires.
-6. **Fermer la durabilité** : registre + plan content-addressed déjà codés ; choisir/valider un backend durable et l'uploader séparé, sans coupler ce choix au pipeline de production.
-7. **Mettre à jour l'état d'activation machine-readable** uniquement quand chaque critère E2E complet est réellement satisfait ; un flag activé ponctuellement sur un run ne vaut pas activation production.
+1. **Fermer la voix V4 sur une vidéo complète** : le mini E2E est validé (`VOICE_IDENTITY_LOCK`, bootstrap de la première scène, référence SHA256 commune, bords premier/dernier échantillon à zéro). Reste à confirmer perceptuellement la continuité de timbre/accent sur le master V2 complet.
+2. **Rendre la grammaire de mouvement réellement perceptible** : conserver les timelines SPÉCIFIQUES prioritaires, interpoler les zooms plutôt que les appliquer par saut, et garantir un micro-zoom/pan déterministe quand aucune timeline caméra n'est fournie.
+3. **Fermer la composition Hibou** : les calques fixes ne doivent plus recevoir de fade alpha automatique ; validation réelle déjà positive sur la scène 1, puis revalider sur un master V2.
+4. **Préserver intégralement le SPÉCIFIQUE jusqu'à FLUX** : correctif en place ; le sanitiseur retire uniquement les clauses réservées au personnage/textes et le receipt V2 vérifie le prompt compilé. Validation réelle : `13/13 PASS`, rétention minimale du prompt image 51 %.
+5. **Étendre le QC V3** : les contrôles contractuels voix/mouvement/Hibou sont maintenant en place ; rester à compléter par la conformité visuelle perceptuelle du SPÉCIFIQUE sur le master V2.
+6. **Automatiser la sélection d'images** : génération multi-candidats conservée, sélection assistée par l'IA par défaut, intervention utilisateur seulement en cas d'ambiguïté ou d'échec créatif.
+7. **Ensuite seulement refaire une vidéo complète V2** avec GLOBAL/SPÉCIFIQUE retravaillés, puis reprendre les chantiers de retouche incrémentale, résilience rare et stockage durable.
 
 ## Feedback visuel du premier run frais — à intégrer avant V2
 
-Le premier run complet met en évidence un problème de direction artistique plutôt qu'un problème de propagation du contrat. À corriger dans les prochains GLOBAL/SPÉCIFIQUE, sans modifier rétroactivement le run de validation en cours :
+Le premier master complet met en évidence **un mélange de défauts créatifs et de défauts d'infrastructure**. Le contrat GLOBAL/SPÉCIFIQUE est bien tracé, mais plusieurs intentions ont été altérées ou perdues plus loin dans la chaîne. Les constats ci-dessous servent de base à la V2 :
 
 - **Présence du Hibou** : la mascotte ne doit pas disparaître de la séquence ; planifier explicitement sa présence, sa pose et sa fonction narrative sur les scènes pertinentes, avec contrôle de continuité.
 - **Variété sémantique** : réduire la répétition de bureaux/intérieurs génériques ; mobiliser davantage graphes, schémas, argent, marchés, calendriers, comparaisons, flux et métaphores financières lorsque la narration le justifie.
@@ -192,17 +192,17 @@ Remote Desktop Commander est désormais disponible comme couche optionnelle d'in
 
 **Validé ou démontré sur média réel :**
 - ROG/Windows + ComfyUI/FLUX opérationnels en production locale ;
-- chaîne storyboard/planning/prosodie/voix/QC durée/mastering/musique/sous-titres/style/poses/assets/images exécutée sans rupture jusqu'au checkpoint humain ;
 - 13 scènes, 26 candidats image terminés, 0 échec image ;
-- contrat de prompt V2 `strict:true` et `pass:true`, GLOBAL constant et SPECIFIC conservé par scène ;
-- reçus d'application réels pour voix, musique, sous-titres et chaque candidat image ;
-- anomalie Chatterbox de durée rencontrée en conditions réelles puis récupérée par la stratégie de retry bornée ;
-- `WAITING_HUMAN_SELECTION` atteint réellement, package de revue 13 scènes généré, reprise même job prévue ;
-- un master de certification antérieur a déjà atteint render PASS + Master QC PASS avec publication verrouillée.
+- checkpoint `WAITING_HUMAN_SELECTION` atteint, décision appliquée, reprise du même job sans régénération des 26 images ;
+- promotion, factual gate, render, Master QC, revue, registre artefacts et reporting terminés en PASS ;
+- premier `master.mp4` complet produit et revu humainement ;
+- postmortem technique : absence du Hibou reliée au fade alpha des calques fixes ; dérive vocale reliée à l'absence de verrou d'identité/référence ; densité de mouvement insuffisante mesurée ; sanitiseur image destructif sur certaines phrases SPÉCIFIQUES ;
+- correctif Hibou validé sur vraie scène ; correctif SPÉCIFIQUE validé sur les 13 vraies scènes (`13/13 PASS`, rétention minimale du prompt image 51 %) ; mini E2E voix V4 validé ; QC V3 reclasse correctement le master V1 en `REVIEW` ; **50/50 tests ciblés puis 1 228/1 228 tests complets PASS**.
 
 **Encore à fermer E2E :**
-- choix humain réel puis reprise du même job sans refaire FLUX ;
-- master frais complet + inspection visuelle/sonore + revue humaine V4 ;
+- full E2E voix sur master V2 avec contrôle perceptuel de continuité ;
+- master V2 complet avec nouveau compositeur/mouvement et inspection visuelle/sonore ;
+- compléter le QC V3 par la conformité visuelle perceptuelle du SPÉCIFIQUE et l'évaluation du master V2 ;
 - PREVIEW → retouche → FINAL avec cache hits sélectifs mesurés ;
 - calibration QC créatif local CLIP/SigLIP ;
 - cancel / supersede Windows ;

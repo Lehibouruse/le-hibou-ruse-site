@@ -592,13 +592,14 @@
         {
           "path": "scripts/video-master-qc.mjs",
           "markers": [
-            "HIBOU_MASTER_QC_V2"
+            "HIBOU_MASTER_QC_V3"
           ]
         }
       ],
       "tests": [
         "tests/video-master.test.mjs",
-        "tests/video-smoke-one-scene.test.mjs"
+        "tests/video-smoke-one-scene.test.mjs",
+        "tests/video-master-qc.test.mjs"
       ],
       "e2e_pending": true,
       "e2e_step_ids": [

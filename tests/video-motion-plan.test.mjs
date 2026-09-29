@@ -84,6 +84,26 @@ test("micro-zoom is treated as real camera motion",()=>{
   assert.equal(plan.policy.micro_zoom_does_not_by_itself_reclassify_static_scene,false);
 });
 
+test("SPECIFIC action cues without timeline are reported as execution gaps",()=>{
+  const input=fixture();
+  input.scenes.push({
+    scene_id:"S04",
+    order:4,
+    visual_idea:"Le Hibou efface la banque puis quatre blocs apparaissent.",
+    voice:{intent:"payoff"},
+    timeline:null,
+  });
+  const plan=buildMotionPlan(input);
+  const s4=plan.scenes.find(x=>x.scene_id==="S04");
+  assert.equal(s4.recommended_motion_mode,"STATIC_SCENE");
+  assert.equal(s4.specific_execution_gap,true);
+  assert.deepEqual(s4.specific_action_cues,["erase_remove","appear"]);
+  assert.equal(plan.specific_execution_gap_count,1);
+  assert.deepEqual(plan.specific_execution_gap_scenes,["S04"]);
+  assert(plan.warnings.some(w=>w.code==="specific_action_cues_unstructured"&&w.scene_id==="S04"));
+  assert.equal(plan.policy.unstructured_specific_actions_reported,true);
+});
+
 test("unsupported movement profiles fail closed",()=>{
   const input=fixture();
   input.creative.movement_profile="RANDOM_MOTION";

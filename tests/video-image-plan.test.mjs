@@ -39,8 +39,18 @@ test("image plan binds only declared workflow prompt and seed inputs",()=>{
  const p=buildImagePlan(contract,binding);
  const r=p.requests[0].request;
  assert.match(r.overrides["6"].text,/Hibou/);
- assert.doesNotMatch(r.overrides["6"].text,/SCENE_VISUAL_IDEA/);
  assert.match(r.overrides["6"].text,/SCENE_IMAGE_PROMPT: prompt one/);
+ assert.match(r.overrides["6"].text,/SCENE_VISUAL_INTENT: v1/);
+ assert.equal(r.prompt_application.schema,"HIBOU_IMAGE_PROMPT_APPLICATION_V2");
+ assert.equal(r.prompt_application.prompt_node_id,"6");
+ assert.equal(r.prompt_application.prompt_input,"text");
+ assert.equal(r.prompt_application.image_prompt_component_included,true);
+ assert.equal(r.prompt_application.visual_idea_component_included,true);
+ assert.equal(r.prompt_application.preservation.status,"PASS");
+ assert.equal(r.prompt_application.preservation.image_prompt_retention_ratio,1);
+ assert.equal(r.prompt_application.preservation.visual_idea_retention_ratio,1);
+ assert.equal(typeof r.prompt_application.compiled_image_prompt_sha256,"string");
+ assert.equal(typeof r.prompt_application.compiled_visual_idea_sha256,"string");
  assert.equal(typeof r.overrides["25"].noise_seed,"number");
  assert.equal(r.endpoint,"http://127.0.0.1:8188");
 });
@@ -181,9 +191,12 @@ test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free charact
  assert.doesNotMatch(promptWithHibou,/\b(?:hibou|owl|bird|animal|mascot|mascotte)\b/i);
  assert.doesNotMatch(promptWithHibou,/SPECIFIC_BRIEF Lombard vs Box Spread/);
  assert.equal(p.creative_routing.specific_content_brief_present,true);
- assert.equal(p.creative_routing.specific_content_brief_copied_into_each_image_prompt,false);
+ assert.equal(p.creative_routing.specific_payload_authoritative,true);
+ assert.equal(p.creative_routing.scene_image_prompt_applied,true);
+ assert.equal(p.creative_routing.visual_idea_compiled_as_supplement,true);
+ assert.equal(p.creative_routing.compiled_prompt_hash_bound,true);
  assert.match(promptWithHibou,/SCENE_IMAGE_PROMPT: prompt one/);
- assert.doesNotMatch(promptWithHibou,/SCENE_VISUAL_IDEA/);
+ assert.match(promptWithHibou,/SCENE_VISUAL_INTENT: v1/);
  assert.doesNotMatch(promptWithHibou,/ABSOLUTELY AVOID/);
  assert.match(promptWithHibou,/CLEAN_SURFACE_LOCK/);
  assert.equal(p.creative_routing.global_negative_policy_present,true);
@@ -214,14 +227,18 @@ test("Airtable renders reject a legacy VIDEO_METHOD_V3 storyboard even when scen
 });
 
 
-test("visual idea is used only as a fallback when no dedicated image prompt exists",()=>{
+test("visual idea is compiled with image prompt and remains sufficient when image prompt is absent",()=>{
+ const both=buildImagePlan(contract,binding);
+ const bothPrompt=both.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.match(bothPrompt,/SCENE_IMAGE_PROMPT: prompt one/);
+ assert.match(bothPrompt,/SCENE_VISUAL_INTENT: v1/);
  const fallback=structuredClone(contract);
  fallback.scenes[0].image_prompt="";
  const p=buildImagePlan(fallback,binding);
  const prompt=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
- assert.match(prompt,/SCENE_VISUAL_FALLBACK: v1/);
- assert.equal(p.creative_routing.scene_image_prompt_preferred,true);
- assert.equal(p.creative_routing.visual_idea_used_only_as_fallback,true);
+ assert.doesNotMatch(prompt,/SCENE_IMAGE_PROMPT:/);
+ assert.match(prompt,/SCENE_VISUAL_INTENT: v1/);
+ assert.equal(p.creative_routing.visual_idea_compiled_as_supplement,true);
 });
 
 

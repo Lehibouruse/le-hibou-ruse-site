@@ -238,7 +238,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
         "-pix_fmt", "yuv420p",
         clip,
       );
-      run("ffmpeg", args);
+      run("ffmpeg", args, { env: subtitleFontRuntime.env });
       sceneCacheMisses += 1;
     }
 

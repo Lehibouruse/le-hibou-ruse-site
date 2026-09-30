@@ -8,6 +8,7 @@ import {
 } from "../../../lib/airtable";
 import { buildStoryboardContract, resolveCanonicalVideoProfile } from "../../../scripts/video-airtable-sync.mjs";
 import { buildServerAirtableSourceSnapshot } from "../../../scripts/video-airtable-source-snapshot.mjs";
+import { completedVideoResultAllowed } from "../../../scripts/video-render-status-gate.mjs";
 import { validateReuseLineage } from "../../../scripts/video-job-lineage.mjs";
 import { scopeStoryboardForJob } from "../../../scripts/video-storyboard-scope.mjs";
 
@@ -1262,6 +1263,7 @@ export async function GET(request) {
           mode:preview ? "preview" : "final"
         });
         job.storyboard.production = {
+          ...(job.storyboard.production || {}),
           mode: preview ? "preview" : "final",
           candidates_per_scene: job.options.candidates_per_scene,
           regeneration_attempts: job.options.regen_attempts,
@@ -1381,6 +1383,12 @@ export async function POST(request) {
       return NextResponse.json(
         { ok: false, error: "job_type_not_allowed" },
         { status: 400 },
+      );
+    }
+    if (status === "Completed" && !completedVideoResultAllowed(body.result)) {
+      return NextResponse.json(
+        { ok: false, error: "prompt_contract_pass_required_for_completion" },
+        { status: 409 },
       );
     }
 

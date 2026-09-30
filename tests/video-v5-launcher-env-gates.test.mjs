@@ -26,3 +26,15 @@ test("V5 launcher does not persist feature gates globally outside its activated 
   assert.doesNotMatch(launcher,/SetEnvironmentVariable\("HIBOU_VIDEO_TIMELINE_V1"/);
   assert.doesNotMatch(launcher,/SetEnvironmentVariable\("HIBOU_VIDEO_CREATIVE_QC_V1"/);
 });
+
+test("V5 launcher fails before worker activation when local Creative QC is unavailable",()=>{
+  assert.match(launcher,/HIBOU_PYTHON/);
+  assert.match(launcher,/openai\/clip-vit-base-patch32/);
+  assert.match(launcher,/CLIPProcessor\.from_pretrained\(model_id, local_files_only=True\)/);
+  assert.match(launcher,/CLIPModel\.from_pretrained\(model_id, local_files_only=True\)/);
+  assert.match(launcher,/creative_qc_local_ready = \$true/);
+  assert.ok(
+    launcher.indexOf("QC créatif V5 indisponible localement") <
+    launcher.indexOf("$Queue = Invoke-RestMethod")
+  );
+});

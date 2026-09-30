@@ -69,6 +69,7 @@ export function inspectPipeline(rootArg=""){
   const masterExists=existsSync(p("master.mp4"));
   const qc=json(p("master-qc.json"));
   const creativeQc=json(p("creative-qc.json"));
+  const masterSemanticQc=json(p("master-semantic-qc.json"));
   const promptVerdict=json(p("prompt-contract-verdict.json"));
   const stageError=latestStageError(run);
 
@@ -107,7 +108,9 @@ export function inspectPipeline(rootArg=""){
   }else if(qc.status!=="PASS"){
     gate="TECHNICAL_REVIEW"; next="fix master QC findings then rerender";
   }else if(creativeQc&&creativeQc.status!=="PASS"){
-    gate="CREATIVE_REVIEW"; next="fix creative QC findings before approval";
+    gate="CREATIVE_REVIEW"; next="fix source-image creative QC findings before approval";
+  }else if(masterSemanticQc&&masterSemanticQc.status!=="PASS"){
+    gate="MASTER_SEMANTIC_REVIEW"; next="fix crop/compositing/final-frame semantic losses before approval";
   }else if(promptVerdict?.PROMPT_CONTRACT_PASS===false){
     gate="PROMPT_CONTRACT_REVIEW"; next="resolve failed prompt execution/semantic/human-review checks";
   }else{
@@ -154,6 +157,7 @@ export function inspectPipeline(rootArg=""){
       master:masterExists,
       qc:qc?.status||null,
       creative_qc:creativeQc?.status||null,
+      master_semantic_qc:masterSemanticQc?.status||null,
       prompt_contract_pass:promptVerdict?.PROMPT_CONTRACT_PASS??null
     },
     publication_authorized:false

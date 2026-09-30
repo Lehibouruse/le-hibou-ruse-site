@@ -34,6 +34,20 @@ function provisionalCandidate(provisional, sceneId) {
   return String(row?.selected_candidate_id || "") || null;
 }
 
+function effectivePromptProof(planRequest) {
+  const request = planRequest?.request || planRequest?.fallback_request || {};
+  const app = request?.prompt_application || {};
+  const nodeId = String(app?.prompt_node_id || "");
+  const input = String(app?.prompt_input || "");
+  const prompt = request?.overrides?.[nodeId]?.[input];
+  return {
+    compiled_prompt: typeof prompt === "string" ? prompt : null,
+    compiled_prompt_sha256: String(app?.compiled_prompt_sha256 || "") || null,
+    specific_sha256: String(app?.specific_sha256 || "") || null,
+    prompt_binding: nodeId && input ? `${nodeId}.${input}` : null,
+  };
+}
+
 function sha256Text(value) {
   return createHash("sha256").update(String(value)).digest("hex");
 }
@@ -62,6 +76,8 @@ function reviewFingerprint(contentId, scenes) {
           : null,
         request_fingerprint:
           String(candidate?.request_fingerprint || "") || null,
+        compiled_prompt_sha256:
+          String(candidate?.compiled_prompt_sha256 || "") || null,
         perceptual_score: Number.isFinite(
           Number(candidate?.perceptual_score),
         )
@@ -126,6 +142,8 @@ export function renderCandidateReviewHtml(review) {
   }
 
   const sceneBlocks = asArray(review.scenes).map((scene) => {
+    const effectivePrompt = asArray(scene.candidates).find(candidate => candidate?.effective_prompt)?.effective_prompt || "";
+    const compiledPromptSha = asArray(scene.candidates).find(candidate => candidate?.compiled_prompt_sha256)?.compiled_prompt_sha256 || "";
     const cards = asArray(scene.candidates).map((candidate) => {
       const recommended =
         candidate.candidate_id === scene.machine_recommended_candidate_id;
@@ -157,6 +175,7 @@ export function renderCandidateReviewHtml(review) {
             ? "ambiguë — aucun choix machine"
             : (scene.machine_recommended_candidate_id || "aucune"),
         )}</strong> · Sélection technique provisoire : <strong>${escapeHtml(scene.technical_provisional_candidate_id || "aucune")}</strong> · Décision humaine : <strong>EN ATTENTE</strong></p>
+        ${effectivePrompt ? `<details class="prompt-proof"><summary>Brief effectif envoyé à ComfyUI</summary><p><strong>SHA-256 :</strong> ${escapeHtml(compiledPromptSha || "—")}</p><pre>${escapeHtml(effectivePrompt)}</pre></details>` : ""}
         <div class="grid">${cards}</div>
       </section>`;
   }).join("\n");
@@ -179,6 +198,8 @@ header{max-width:1100px;margin:auto auto 24px}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:5px 10px;font-size:13px}
 dt{font-weight:700} dd{margin:0}.missing{aspect-ratio:9/16;display:grid;place-items:center;background:#eee;border-radius:10px}
 .notice{padding:12px 14px;background:#fff6cf;border-radius:10px}
+.prompt-proof{margin:12px 0 16px;background:#eef3f8;border:1px solid #c9d6e2;border-radius:10px;padding:10px 12px}
+.prompt-proof pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:280px;overflow:auto}
 </style>
 </head>
 <body>
@@ -217,6 +238,7 @@ export function buildCandidateReview({
     if (!sceneId || !candidateId) continue;
 
     const request = requests.get(candidateId) || {};
+    const promptProof = effectivePromptProof(request);
     const candidate = {
       candidate_id: candidateId,
       candidate: Number(row?.candidate ?? request?.candidate ?? 0) || null,
@@ -231,6 +253,10 @@ export function buildCandidateReview({
       request_fingerprint: String(
         request?.request_fingerprint || row?.request_fingerprint || "",
       ) || null,
+      effective_prompt: promptProof.compiled_prompt,
+      compiled_prompt_sha256: promptProof.compiled_prompt_sha256,
+      specific_sha256: promptProof.specific_sha256,
+      prompt_binding: promptProof.prompt_binding,
       prompt_contract_ref: structuredClone(
         request?.request?.prompt_contract_ref ||
         request?.fallback_request?.prompt_contract_ref ||

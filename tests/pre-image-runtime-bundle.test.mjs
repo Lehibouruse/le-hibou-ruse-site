@@ -19,7 +19,7 @@ const sources = [
 
 test("video-master downloads pre-image scripts from immutable runtime commit",()=>{
   assert.match(master,/PRE_IMAGE_RUNTIME_FILES/);
-  assert.match(master,/LeHibou","pre-image-runtime",normalized/);
+  assert.match(master,/runtimeBundleDir\("pre-image-runtime",normalized\)/);
   assert.match(master,/raw\.githubusercontent\.com\/Lehibouruse\/le-hibou-ruse-site\/\$\{normalized\}\/scripts\/\$\{name\}/);
   assert.match(master,/preRuntime\.audioMaster/);
   assert.match(master,/preRuntime\.attachAudio/);

@@ -86,6 +86,7 @@ function run(command,args,{env={}}={}){
     const tail=String(r.stderr||r.stdout||"").slice(-12000);
     fail(command+" failed with status "+r.status+(tail?"\n"+tail:""));
   }
+  return String(r.stdout||"");
 }
 function flag(name){ return process.argv.includes("--"+name); }
 function arg(name,fallback=""){
@@ -127,13 +128,17 @@ const PRE_IMAGE_RUNTIME_FILES=[
   ["video-iteration-plan.mjs","HIBOU_INCREMENTAL_RETOUCH_PLAN_V1"]
 ];
 
+export function runtimeBundleDir(kind,commit,{
+  localAppData=process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
+  localOverride=envFlag("HIBOU_LOCAL_RUNTIME_OVERRIDE")
+}={}){
+  return resolve(localAppData,"LeHibou",kind,commit,...(localOverride?["local-override"]:[]));
+}
+
 async function ensurePreImageRuntimeBundle(commit){
   const normalized=String(commit||"").trim().toLowerCase();
   if(!/^[0-9a-f]{40}$/.test(normalized)) fail("storyboard runtime_commit missing or invalid");
-  const localBase=resolve(
-    process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
-    "LeHibou","pre-image-runtime",normalized
-  );
+  const localBase=runtimeBundleDir("pre-image-runtime",normalized);
   mkdirSync(localBase,{recursive:true});
   for(const [name,marker,sourcePath] of PRE_IMAGE_RUNTIME_FILES){
     const target=resolve(localBase,name);
@@ -192,10 +197,7 @@ const IMAGE_RUNTIME_FILES=[
 async function ensureImageRuntimeBundle(commit){
   const normalized=String(commit||"").trim().toLowerCase();
   if(!/^[0-9a-f]{40}$/.test(normalized)) fail("storyboard runtime_commit missing or invalid");
-  const localBase=resolve(
-    process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
-    "LeHibou","image-runtime",normalized
-  );
+  const localBase=runtimeBundleDir("image-runtime",normalized);
   mkdirSync(localBase,{recursive:true});
   for(const [name,marker,sourcePath] of IMAGE_RUNTIME_FILES){
     const target=resolve(localBase,name);
@@ -228,16 +230,14 @@ const POST_RUNTIME_FILES=[
   ["video-factual-gate.mjs","HIBOU_VIDEO_FACTUAL_GATE_V1"],
   ["video-review-diff.mjs","HIBOU_INCREMENTAL_REVIEW_DIFF_V1"],
   ["video-durable-storage-plan.mjs","HIBOU_DURABLE_STORAGE_PLAN_V1"],
+  ["video-prompt-contract-verdict.mjs","HIBOU_PROMPT_CONTRACT_VERDICT_V1"],
   ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1"]
 ];
 
 async function ensurePostRuntimeBundle(commit){
   const normalized=String(commit||"").trim().toLowerCase();
   if(!/^[0-9a-f]{40}$/.test(normalized)) fail("storyboard runtime_commit missing or invalid");
-  const localBase=resolve(
-    process.env.LOCALAPPDATA||dirname(resolve(process.argv[1])),
-    "LeHibou","post-runtime",normalized
-  );
+  const localBase=runtimeBundleDir("post-runtime",normalized);
   mkdirSync(localBase,{recursive:true});
   for(const [name,marker] of POST_RUNTIME_FILES){
     const target=resolve(localBase,name);
@@ -266,6 +266,7 @@ async function ensurePostRuntimeBundle(commit){
     factualGate:resolve(localBase,"video-factual-gate.mjs"),
     reviewDiff:resolve(localBase,"video-review-diff.mjs"),
     storagePlan:resolve(localBase,"video-durable-storage-plan.mjs"),
+    promptContractVerdict:resolve(localBase,"video-prompt-contract-verdict.mjs"),
     creativeQc:resolve(localBase,"video-creative-qc.py")
   };
 }
@@ -365,6 +366,200 @@ export function normalizeExecutionProfileOverride({mode="",candidates=""}={}){
   };
 }
 
+export function imagePromptPreservationPass(requests){
+  return Array.isArray(requests)&&requests.every(item=>
+    item?.request?.prompt_application?.preservation?.status==="PASS"&&
+    (!item?.fallback_request||item.fallback_request.prompt_application?.preservation?.status==="PASS")
+  );
+}
+
+export function unverifiedSpecificMontageActions(motionPlan){
+  const objectChanges=new Set(["disappear","erase_remove","open_passage","appear","renew_recreate"]);
+  return (motionPlan?.scenes||[]).flatMap(scene=>{
+    const detectedCues=Array.isArray(scene?.specific_action_cues)
+      ?scene.specific_action_cues
+      :specificMotionCues(scene);
+    const cues=detectedCues.filter(cue=>objectChanges.has(cue));
+    const v2Required=/\[ADDITIF SP[ÉE]CIFIQUE V2\s*[—–-]\s*MONTAGE\]/iu.test(String(scene?.visual_idea||""));
+    const boxspread=String(motionPlan?.content?.content_id||"")==="rec8lgQT8jXreflmt";
+    if(boxspread&&Number(scene?.order)>=5&&Number(scene?.order)<=12){
+      const expected=boxspreadMontageTimeline(scene);
+      const actual=scene?.timeline;
+      const expectedDiagrams=expected?.events||[];
+      const actualDiagrams=(actual?.events||[]).filter(event=>event?.type==="diagram");
+      if(expected&&actual?.specific_montage?.source_visual_sha256===expected.specific_montage.source_visual_sha256&&
+         JSON.stringify(actualDiagrams)===JSON.stringify(expectedDiagrams)) return [];
+      return [{scene_id:String(scene.scene_id||""),cues,specific_v2_montage_required:true,
+        reason:"box spread V2 typed montage plan missing or changed"}];
+    }
+    return cues.length||v2Required?[{
+      scene_id:String(scene.scene_id||""),
+      cues,
+      specific_v2_montage_required:v2Required,
+      reason:v2Required?
+        "specific V2 montage mechanism has no verified execution receipt":
+        "object-level montage action has no verified execution receipt"
+    }]:[];
+  });
+}
+
+function montageHash(text){ return createHash("sha256").update(String(text||"")).digest("hex"); }
+function diagramNode(id,label,x,y,w,h,color="0x224054@0.96",font_size=38){
+  return {id,label,x,y,w,h,color,font_size};
+}
+function diagramLink(text,x,y,font_size=52){return {text,x,y,font_size};}
+function diagramLine(x,y,w,h){return {kind:"line",x,y,w,h};}
+function boxspreadMontageTimeline(scene){
+  const order=Number(scene?.order);
+  if(!Number.isInteger(order)||order<5||order>12) return null;
+  if(order!==6&&!/\[ADDITIF SP[ÉE]CIFIQUE V2\s*[—–-]\s*MONTAGE\]/iu.test(String(scene?.visual_idea||""))) return null;
+  const duration=Number(scene?.planned_duration_s);
+  if(!Number.isFinite(duration)||duration<=0) return null;
+  const states=[];
+  const add=(title,nodes,links=[],action=null)=>states.push({title,nodes,links,action});
+  const market=diagramNode("market","MARCHÉ",110,790,240,115);
+  const bank=diagramNode("bank","BANQUE",425,790,240,115,"0x81593F@0.97");
+  const you=diagramNode("you","TOI",740,790,220,115);
+  if(order===5){
+    const rate=diagramNode("rate","TAUX DE MARCHÉ",190,700,700,115);
+    add("LE COÛT DU LOMBARD",[rate]);
+    add("LA BANQUE AJOUTE SA MARGE",[rate,diagramNode("margin_1","MARGE BANQUE +1 %",190,910,700,115,"0x81593F@0.97")],[diagramLink("+",515,845)]);
+    add("AUTRE VARIANTE",[rate,diagramNode("margin_15","MARGE BANQUE +1,5 %",190,910,700,115,"0x81593F@0.97")],[diagramLink("+",515,845)]);
+    add("LA MARGE SE RÉPÈTE",[
+      diagramNode("year1","AN 1",100,720,255,115),diagramNode("year2","AN 2",410,720,255,115),diagramNode("year3","AN 3",720,720,255,115),
+      diagramNode("annual","MARGE BANCAIRE CHAQUE ANNÉE",135,990,810,125,"0x81593F@0.97",34)
+    ],[diagramLink("→",365,735),diagramLink("→",675,735)]);
+  }else if(order===6){
+    add("LE CIRCUIT LOMBARD",[market,bank,you],[diagramLink("→",360,805),diagramLink("→",675,805)]);
+    add("LA BANQUE SORT DU CIRCUIT",[
+      diagramNode("market","MARCHÉ",110,730,270,115),
+      diagramNode("options","4 OPTIONS",425,730,270,115,"0xA2814E@0.97"),
+      diagramNode("cash","CASH",740,730,220,115)
+    ],[diagramLink("→",390,745),diagramLink("→",700,745)],{operation:"remove",target_layer_id:"bank",before:"market-bank-you",after:"market-options-cash"});
+  }else if(order===7){
+    const options=[1,2,3,4].map((n,i)=>diagramNode(`option_${n}`,`OPTION ${n}`,105,610+i*158,300,112,"0xA2814E@0.97"));
+    const funding=diagramNode("funding","FINANCEMENT",625,820,350,130);
+    add("QUATRE OPTIONS DISTINCTES",[...options,funding]);
+    add("UN SEUL FINANCEMENT",[...options,funding],[
+      ...options.map((_,i)=>diagramLine(405,665+i*158,115,6)),
+      diagramLine(517,665,6,480),diagramLine(520,882,85,6),diagramLink(">",590,852,56)
+    ]);
+  }else if(order===8){
+    const today=diagramNode("today","AUJOURD’HUI",90,675,410,120);
+    const cash=diagramNode("cash","CASH REÇU",90,870,410,125,"0xA2814E@0.97");
+    const maturity=diagramNode("maturity","À L'ÉCHÉANCE",580,675,410,120);
+    const repay=diagramNode("repayment","REMBOURSEMENT CONNU",580,870,410,125,"0xA2814E@0.97",31);
+    add("DU CASH MAINTENANT",[today,cash],[diagramLink("↓",265,790)]);
+    add("UN REMBOURSEMENT CONNU",[today,cash,maturity,repay],[diagramLink("↓",265,790),diagramLink("→",515,840),diagramLink("↓",755,790)]);
+  }else if(order===9){
+    const rate=diagramNode("rate","TAUX DE MARCHÉ",95,690,420,115);
+    const margin=diagramNode("bank_margin","MARGE BANQUE",95,905,420,115,"0x81593F@0.97");
+    const box=diagramNode("box_rate","TAUX IMPLICITE MARCHÉ",565,795,430,125,"0xA2814E@0.97",33);
+    add("LOMBARD : TAUX + MARGE",[rate,margin],[diagramLink("+",265,820)]);
+    add("BOX : SANS COUCHE BANCAIRE",[rate,margin,box],[diagramLink("+",265,820),diagramLink("→",510,820)],{operation:"remove",target_layer_id:"bank_margin",before:"lombard_rate_plus_margin",after:"box_market_rate_no_bank_margin"});
+  }else if(order===10){
+    const years=[2026,2027,2028,2029];
+    years.forEach((year,index)=>{
+      const nodes=years.slice(0,index+1).map((y,i)=>diagramNode(`year_${y}`,`${y} BOX`,100+i*240,760,160,125,i===index?"0xA2814E@0.97":"0x224054@0.96",28));
+      const links=years.slice(0,index).map((_,i)=>diagramLink("→",280+i*240,790,42));
+      add(`RENOUVELLEMENT ${index+1} / 4`,nodes,links,index?{operation:"renew",target_layer_id:`year_${year}`,before:`year_${years[index-1]}`,after:`year_${year}`}:null);
+    });
+  }else if(order===11){
+    const left=[diagramNode("left_market","MARCHÉ",80,660,280,108),diagramNode("left_bank","BANQUE",80,830,280,108,"0x81593F@0.97"),diagramNode("left_you","TOI",80,1000,280,108)];
+    const right=[diagramNode("right_market","MARCHÉ",670,720,300,108),diagramNode("right_you","TOI",670,1000,300,108)];
+    add("LOMBARD : TROIS NŒUDS",left,[diagramLink("↓",190,780),diagramLink("↓",190,950),diagramLink("MARGE",400,855,34)]);
+    add("BOX : DEUX NŒUDS",[...left,...right],[diagramLink("↓",190,780),diagramLink("↓",190,950),diagramLink("MARGE",400,855,34),diagramLink("↓",800,845)]);
+  }else if(order===12){
+    add("AVEC L’INTERMÉDIAIRE",[market,bank,you],[diagramLink("→",360,805),diagramLink("→",675,805)]);
+    add("UN INTERMÉDIAIRE DE MOINS",[diagramNode("market","MARCHÉ",160,790,290,115),diagramNode("you","TOI",670,790,250,115)],[diagramLink("→",505,805,65)],{operation:"remove",target_layer_id:"bank",before:"market-bank-you",after:"market-you"});
+  }
+  const events=states.map((state,index)=>({
+    id:`boxspread-v2-s${String(order).padStart(2,"0")}-beat-${index+1}`,
+    type:"diagram",
+    beat_kind:index&&state.action?"BEFORE_AFTER":"MINI_DIAGRAM",
+    start_s:Number((duration*index/states.length).toFixed(3)),
+    end_s:index===states.length-1?duration:Number((duration*(index+1)/states.length).toFixed(3)),
+    diagram:{title:state.title,nodes:state.nodes,links:state.links},
+    action:state.action
+  }));
+  return {
+    schema:"HIBOU_SCENE_TIMELINE_V1",
+    source:"boxspread_specific_v2_montage",
+    specific_montage:{
+      schema:"HIBOU_SPECIFIC_MONTAGE_PLAN_V1",
+      template:"boxspread_v2",
+      source_visual_sha256:montageHash(scene.visual_idea),
+      visual_units:Array.from({length:Math.max(1,Math.ceil(duration/5))},(_,index)=>({
+        index:index+1,
+        duration_s:Number((duration/Math.max(1,Math.ceil(duration/5))).toFixed(3))
+      })),
+      render_execution_verified:false
+    },
+    events
+  };
+}
+
+function boxspreadAuxiliaryTimeline(scene){
+  const duration=Number(scene?.planned_duration_s);
+  if(Number(scene?.order)===3&&Math.abs(duration-6)<0.1){
+    const states=[
+      {title:"100 000 € INVESTIS",nodes:[
+        diagramNode("portfolio","PORTEFEUILLE 100 000 €",135,720,810,135,"0xA2814E@0.97",39),
+        diagramNode("invested","TITRES CONSERVÉS",280,980,520,115)
+      ],links:[diagramLink("↓",510,865)]},
+      {title:"DU CASH SANS VENDRE",nodes:[
+        diagramNode("portfolio","PORTEFEUILLE CONSERVÉ",90,820,420,135,"0xA2814E@0.97",34),
+        diagramNode("need_cash","BESOIN DE CASH",570,820,420,135)
+      ],links:[diagramLink("→",515,845)]}
+    ];
+    return {schema:"HIBOU_SCENE_TIMELINE_V1",source:"boxspread_scene_03_timing",
+      timing_visual_units:[{index:1,duration_s:3},{index:2,duration_s:3}],
+      events:states.map((state,index)=>({id:`boxspread-s03-visual-${index+1}`,type:"diagram",beat_kind:"MINI_DIAGRAM",
+        start_s:index*3,end_s:(index+1)*3,diagram:state,action:null}))};
+  }
+  if(Number(scene?.order)===13&&duration>=3&&duration<=6){
+    const ctaStart=Number((duration-3).toFixed(3));
+    const middle=Number((ctaStart+1.5).toFixed(3));
+    return {schema:"HIBOU_SCENE_TIMELINE_V1",source:"boxspread_scene_13_cta",
+      cta_window:{start_s:ctaStart,end_s:duration,active_duration_s:3},
+      events:[
+        {id:"outro-brand",type:"text",beat_kind:"CAPTION_CHANGE",start_s:0,end_s:ctaStart,
+          text:"LE HIBOU RUSÉ",font_size:56,anchor:"top-center",box:false},
+        {id:"outro-subscribe",type:"text",beat_kind:"CAPTION_CHANGE",start_s:ctaStart,end_s:middle,
+          text:"ABONNE-TOI",font_size:60,anchor:"top-center",box:false},
+        {id:"outro-guide",type:"text",beat_kind:"CAPTION_CHANGE",start_s:middle,end_s:duration,
+          text:"LE GUIDE — DANS LA BIO",font_size:51,anchor:"top-center",box:false}
+      ]};
+  }
+  return null;
+}
+
+export function buildCompositionTimingQc(contract){
+  const target=contract?.creative?.pacing?.scene_duration_target_s||[2.8,5];
+  const min=Number(target[0]),max=Number(target[1]);
+  const scenes=(contract?.scenes||[]).map(scene=>{
+    const duration=Number(scene?.planned_duration_s);
+    const units=duration<=max&&duration>=min?
+      [{index:1,duration_s:duration}]:
+      (scene?.timeline?.specific_montage?.visual_units||scene?.timeline?.timing_visual_units||[]);
+    const sum=units.reduce((total,unit)=>total+Number(unit?.duration_s||0),0);
+    const status=units.length&&units.every(unit=>Number(unit?.duration_s)>=min&&Number(unit?.duration_s)<=max)&&
+      Math.abs(sum-duration)<0.1?"PASS":"FAIL";
+    return {scene_id:scene.scene_id,planned_duration_s:duration,visual_units:units,status};
+  });
+  const cta=(contract?.scenes||[]).find(scene=>Number(scene?.order)===13);
+  const ctaWindow=cta?.timeline?.cta_window||null;
+  const ctaPass=!cta||(
+    Number(ctaWindow?.active_duration_s)<=3&&
+    Number(ctaWindow?.end_s)===Number(cta?.planned_duration_s)&&
+    Array.isArray(cta?.timeline?.events)&&
+    cta.timeline.events.filter(event=>String(event?.id||"").startsWith("outro-")).length===3
+  );
+  return {schema:"HIBOU_COMPOSITION_TIMING_QC_V1",pass:scenes.every(scene=>scene.status==="PASS")&&ctaPass,
+    scenes,cta:{scene_id:cta?.scene_id||null,active_duration_s:ctaWindow?.active_duration_s??null,status:ctaPass?"PASS":"FAIL"},
+    publication_authorized:false};
+}
+
 function specificMotionCues(scene){
   const source=String(scene?.visual_idea||"").toLowerCase();
   if(!source) return [];
@@ -384,6 +579,24 @@ export function materializeSpecificActionTimelines(contract){
   const compiled=[];
   for(const [index,scene] of scenes.entries()){
     const existing=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
+    if(String(contract?.content?.content_id||"")==="rec8lgQT8jXreflmt"){
+      const specific=boxspreadMontageTimeline(scene);
+      if(specific){
+        if(scene?.timeline?.specific_montage?.source_visual_sha256===specific.specific_montage.source_visual_sha256&&
+           JSON.stringify(existing.filter(event=>event?.type==="diagram"))===JSON.stringify(specific.events)) continue;
+        const prior=(scene?.timeline?.events||[]).filter(event=>event?.type!=="diagram");
+        scene.timeline={...specific,events:[...prior,...specific.events]};
+        compiled.push({scene_id:String(scene.scene_id||""),action_cues:specific.events.map(event=>event.action?.operation).filter(Boolean),event_count:specific.events.length});
+        continue;
+      }
+      const auxiliary=boxspreadAuxiliaryTimeline(scene);
+      if(auxiliary){
+        if(scene?.timeline?.source===auxiliary.source&&JSON.stringify(scene.timeline.events)===JSON.stringify(auxiliary.events)) continue;
+        scene.timeline=auxiliary;
+        compiled.push({scene_id:String(scene.scene_id||""),action_cues:[],event_count:auxiliary.events.length});
+        continue;
+      }
+    }
     if(existing.length) continue;
     const cues=specificMotionCues(scene);
     if(!cues.length) continue;
@@ -456,6 +669,61 @@ export function buildTechnicalSelections(provisional){
   if(!Object.keys(out).length) fail("no technical selections available");
   return out;
 }
+
+export async function verifySpecificMontageRenderReceipt({root,storyboard,compositorPath}){
+  const master=resolve(root,"master.mp4");
+  const receiptPath=master+".montage-execution.json";
+  const manifestPath=master+".manifest.json";
+  if(!existsSync(master)||!existsSync(receiptPath)||!existsSync(manifestPath)){
+    fail("specific montage render receipt or master missing");
+  }
+  const receipt=json(receiptPath);
+  const manifest=json(manifestPath);
+  if(receipt?.schema!=="HIBOU_SPECIFIC_MONTAGE_RENDER_EXECUTION_V1"||
+     receipt.master_sha256!==sha256(master)) fail("specific montage master hash mismatch");
+  const compositor=await import(pathToFileURL(compositorPath).href+"?v="+Date.now());
+  const byReceipt=new Map((receipt.scenes||[]).map(row=>[row.scene_id,row]));
+  const byManifest=new Map((manifest.scenes||[]).map(scene=>[scene.scene_id,scene]));
+  const required=(storyboard?.scenes||[]).filter(scene=>
+    String(storyboard?.content?.content_id||"")==="rec8lgQT8jXreflmt"&&
+    Number(scene?.order)>=5&&Number(scene?.order)<=12);
+  const rows=[];
+  for(const scene of required){
+    const expected=boxspreadMontageTimeline(scene);
+    const rendered=byManifest.get(scene.scene_id);
+    const row=byReceipt.get(scene.scene_id);
+    if(!expected||!rendered||!row) fail("specific montage scene render receipt missing: "+scene.scene_id);
+    const timeline=rendered?.timeline;
+    if(timeline?.specific_montage?.source_visual_sha256!==expected.specific_montage.source_visual_sha256||
+       JSON.stringify((timeline?.events||[]).filter(event=>event?.type==="diagram"))!==JSON.stringify(expected.events)){
+      fail("specific montage render contract changed: "+scene.scene_id);
+    }
+    const clip=resolve(row.clip_path||"");
+    if(!existsSync(clip)||row.clip_sha256!==sha256(clip)) fail("specific montage clip hash mismatch: "+scene.scene_id);
+    const plan=compositor.buildSceneCompositePlan(rendered,{
+      duration:Number(rendered.planned_duration_s),
+      width:Number(manifest.engine?.width||1080),
+      height:Number(manifest.engine?.height||1920),
+      fps:Number(manifest.engine?.fps||30)
+    });
+    const filterHash=montageHash(plan.filter_complex);
+    const expectedEvents=plan.timeline.events.filter(event=>event.type==="diagram").map(event=>({
+      id:event.id,start_s:event.start_s,end_s:event.end_s,
+      node_ids:event.diagram.nodes.map(node=>node.id),action:event.action
+    }));
+    if(row.source_visual_sha256!==expected.specific_montage.source_visual_sha256||
+       row.filter_complex_sha256!==filterHash||
+       JSON.stringify(row.diagram_events)!==JSON.stringify(expectedEvents)){
+      fail("specific montage compositor execution mismatch: "+scene.scene_id);
+    }
+    rows.push({scene_id:scene.scene_id,clip_sha256:row.clip_sha256,
+      filter_complex_sha256:filterHash,diagram_event_count:expectedEvents.length,status:"PASS"});
+  }
+  if((receipt.scenes||[]).length!==required.length) fail("specific montage render receipt scene count mismatch");
+  return {schema:"HIBOU_SPECIFIC_ACTION_MONTAGE_AUDIT_V1",pass:true,plan_pass:true,
+    render_execution_pass:true,master_sha256:receipt.master_sha256,scenes:rows,gaps:[],
+    semantic_scene_review_performed:false,publication_authorized:false};
+}
 function stage(state,name,fn){
   if(state.stages[name]?.status==="PASS") return false;
   state.stage_history=Array.isArray(state.stage_history)?state.stage_history:[];
@@ -526,9 +794,10 @@ function stage(state,name,fn){
     throw error;
   }
 }
-async function main(){
+export async function main(){
   const contentId=arg("content","");
   const storyboardArg=arg("storyboard","");
+  const sourceSnapshotArg=arg("source-snapshot","");
   const bindingArg=arg("binding","");
   const outputArg=arg("output","");
   const styleArg=arg("style","");
@@ -543,6 +812,8 @@ async function main(){
   if(!outputArg) fail("--output=<dir> required");
   if(!bindingArg) fail("--binding=<comfyui-binding.json> required");
   if(Boolean(contentId)===Boolean(storyboardArg)) fail("provide exactly one of --content=<Airtable record> or --storyboard=<json>");
+  if(sourceSnapshotArg&&!storyboardArg) fail("--source-snapshot requires --storyboard=<json>; it does not replace Airtable export");
+  if(sourceSnapshotArg&&!existsSync(resolve(sourceSnapshotArg))) fail("source snapshot file missing");
   if(!existsSync(resolve(bindingArg))) fail("binding file missing");
   if(styleArg&&!existsSync(resolve(styleArg))) fail("style profile missing");
   if(assetGraphArg&&!existsSync(resolve(assetGraphArg))) fail("asset graph missing");
@@ -558,6 +829,7 @@ async function main(){
   const statePath=resolve(root,"pipeline-run.json");
   const inputs={
     source:contentId?{type:"airtable",content_id:contentId}:{type:"file",path:resolve(storyboardArg),sha256:sha256(resolve(storyboardArg))},
+    source_snapshot:sourceSnapshotArg?{type:"connector_snapshot",path:resolve(sourceSnapshotArg)}:null,
     binding:{path:resolve(bindingArg),sha256:sha256(resolve(bindingArg))},
     style:styleArg?{path:resolve(styleArg),sha256:sha256(resolve(styleArg))}:null,
     asset_graph:assetGraphArg?{path:resolve(assetGraphArg),sha256:sha256(resolve(assetGraphArg))}:null,
@@ -602,6 +874,44 @@ async function main(){
   });
 
   const storyboardData=json(storyboard);
+  if(sourceSnapshotArg&&storyboardData?.content?.source!=="airtable"){
+    fail("--source-snapshot requires storyboard content.source=airtable");
+  }
+  if(contentId&&(
+    storyboardData?.content?.source!=="airtable"||
+    storyboardData?.content?.content_id!==contentId
+  )) fail("Airtable master source does not match --content");
+  if(storyboardData?.content?.source==="airtable"){
+    const freshnessPath=resolve(root,"airtable-source-freshness.json");
+    try{
+      const verifierOutput=run(process.execPath,[
+        resolve("scripts/video-airtable-sync.mjs"),
+        "verify",
+        storyboard,
+        ...(sourceSnapshotArg?[`--source-snapshot=${resolve(sourceSnapshotArg)}`]:[])
+      ]);
+      const receipt=JSON.parse(verifierOutput.trim());
+      if(receipt.pass!==true) fail("Airtable source verification did not pass");
+      state.airtable_source_freshness={
+        ...receipt,
+        ...(sourceSnapshotArg?{source_snapshot_path:resolve(sourceSnapshotArg),source_snapshot_sha256:sha256(resolve(sourceSnapshotArg))}:{})
+      };
+      writeJson(freshnessPath,state.airtable_source_freshness);
+      writeJson(statePath,state);
+    }catch(error){
+      const receipt={
+        schema:"HIBOU_AIRTABLE_SOURCE_FRESHNESS_V1",
+        pass:false,
+        content_id:String(storyboardData?.content?.content_id||""),
+        checked_at:new Date().toISOString(),
+        error:String(error?.message||error)
+      };
+      state.airtable_source_freshness=receipt;
+      writeJson(freshnessPath,receipt);
+      writeJson(statePath,state);
+      throw error;
+    }
+  }
   if(executionOverride.production_mode||executionOverride.candidates_per_scene!=null){
     storyboardData.production={
       ...(storyboardData.production||{}),
@@ -652,6 +962,44 @@ async function main(){
       writeJson(storyboard,storyboardData);
     }
     writeJson(statePath,state);
+  }
+  const unverifiedMontageActions=unverifiedSpecificMontageActions(storyboardData);
+  const montageAuditPath=resolve(root,"specific-action-montage-audit.json");
+  writeJson(montageAuditPath,{
+    schema:"HIBOU_SPECIFIC_ACTION_MONTAGE_AUDIT_V1",
+    pass:false,
+    plan_pass:unverifiedMontageActions.length===0,
+    render_execution_pass:false,
+    gaps:unverifiedMontageActions,
+    publication_authorized:false
+  });
+  state.specific_action_montage={
+    status:unverifiedMontageActions.length?"BLOCKED":"PLANNED",
+    audit_path:montageAuditPath,
+    gap_count:unverifiedMontageActions.length
+  };
+  writeJson(statePath,state);
+  if(unverifiedMontageActions.length){
+    fail("specific_motion_plan: specific montage mechanisms lack a typed renderable plan; see "+montageAuditPath);
+  }
+  const compositionTimingQcPath=resolve(root,"composition-timing-qc.json");
+  const compositionTimingQc=buildCompositionTimingQc(storyboardData);
+  writeJson(compositionTimingQcPath,compositionTimingQc);
+  state.composition_timing_qc={
+    pass:compositionTimingQc.pass,
+    path:compositionTimingQcPath,
+    failed_scene_ids:compositionTimingQc.scenes.filter(scene=>scene.status!=="PASS").map(scene=>scene.scene_id),
+    cta_status:compositionTimingQc.cta.status,
+    publication_authorized:false
+  };
+  writeJson(statePath,state);
+  if(!compositionTimingQc.pass){
+    fail("composition_timing_qc: visual units or final CTA duration invalid; see "+compositionTimingQcPath);
+  }
+  if(flag("preflight-only")){
+    process.stdout.write(JSON.stringify({ok:true,mode:"preflight_only",source_freshness:state.airtable_source_freshness||null,
+      montage_plan_pass:true,composition_timing_qc_pass:true,publication_authorized:false})+"\n");
+    return;
   }
   const canonicalReference=await ensureCanonicalReference(storyboardData,root);
   if(canonicalReference) writeJson(storyboard,storyboardData);
@@ -897,18 +1245,31 @@ async function main(){
       auditPromptContract("planning_audit",storyboard);
       const promptGraph=promptGraphModule.buildPromptGraph(storyboardData);
       const motionPlan=motionPlanModule.buildMotionPlan(storyboardData);
+      writeJson(resolve(planningDir,"motion-plan.json"),motionPlan);
+      const unverifiedMontageActions=unverifiedSpecificMontageActions(storyboardData);
+      const montageAuditPath=resolve(planningDir,"specific-action-montage-audit.json");
+      writeJson(montageAuditPath,{
+        schema:"HIBOU_SPECIFIC_ACTION_MONTAGE_AUDIT_V1",
+        pass:false,
+        plan_pass:unverifiedMontageActions.length===0,
+        render_execution_pass:false,
+        gaps:unverifiedMontageActions,
+        publication_authorized:false
+      });
       auditPromptApplication("specific_motion_execution",{
         specific_actions_structured:Number(motionPlan.specific_execution_gap_count||0)===0,
-        unstructured_specific_actions_reported:motionPlan.policy?.unstructured_specific_actions_reported===true
+        unstructured_specific_actions_reported:motionPlan.policy?.unstructured_specific_actions_reported===true,
+        specific_montage_plan_verified:unverifiedMontageActions.length===0
       },{
         specific_execution_gap_count:Number(motionPlan.specific_execution_gap_count||0),
-        specific_execution_gap_scenes:motionPlan.specific_execution_gap_scenes||[]
+        specific_execution_gap_scenes:motionPlan.specific_execution_gap_scenes||[],
+        unverified_object_montage_actions:unverifiedMontageActions,
+        montage_audit_path:montageAuditPath
       });
       const voiceDensityPlan=voiceDensityModule.buildVoiceDensityPlan(storyboardData);
       const continuityPlan=continuityModule.buildContinuityPlan(storyboardData);
       let assetReadiness=null;
       writeJson(resolve(planningDir,"prompt-graph.json"),promptGraph);
-      writeJson(resolve(planningDir,"motion-plan.json"),motionPlan);
       writeJson(resolve(planningDir,"voice-density-plan.json"),voiceDensityPlan);
       writeJson(resolve(planningDir,"continuity-plan.json"),continuityPlan);
       if(assetGraphArg){
@@ -1292,6 +1653,7 @@ async function main(){
       model_safe_character_constraint_applied:routing.background_character_tokens_forbidden===true,
       generated_text_policy_enforced:storyboardData.creative?.text_in_generated_images===false,
       prompt_contract_ref_on_every_request:allRefsMatch,
+      prompt_preservation_pass_on_every_request:imagePromptPreservationPass(allImageRequests),
       execution_receipt_on_every_planned_candidate:everyPlannedCandidateHasExecutionReceipt,
       execution_receipt_on_every_completed_candidate:everyCompletedCandidateHasExecutionReceipt
     },{
@@ -1313,6 +1675,60 @@ async function main(){
       };
       fail("one or more scenes still have no QC PASS candidate; diagnostics="+JSON.stringify(diagnostic));
     }
+  });
+
+  const generatedTextAuditPath=resolve(imageDir,"generated-text-qc.json");
+  stage(state,"generated_text_qc",()=>{
+    const ocrPython=String(process.env.HIBOU_OCR_PYTHON||"").trim();
+    const ocrScript=resolve("scripts/video-generated-text-qc.py");
+    if(!ocrPython||!existsSync(resolve(ocrPython))||!existsSync(ocrScript)){
+      fail("generated text OCR requires HIBOU_OCR_PYTHON and video-generated-text-qc.py");
+    }
+    const manifest=json(resolve(imageDir,"batch-manifest.json"));
+    const completed=Object.entries(manifest?.results||{}).filter(([,row])=>row?.status==="completed");
+    if(!completed.length) fail("generated text OCR has no completed image candidates");
+    const plannedIds=(json(resolve(imageDir,"image-plan.json")).requests||[]).map(item=>String(item?.candidate_id||""));
+    if(completed.length!==new Set(plannedIds).size||
+       plannedIds.some(id=>manifest?.results?.[id]?.status!=="completed")){
+      fail("generated text OCR candidate coverage differs from image plan");
+    }
+    const reportDir=resolve(imageDir,"generated-text-qc");
+    mkdirSync(reportDir,{recursive:true});
+    const candidates=[];
+    for(const [candidateId,row] of completed){
+      const outputs=Array.isArray(row.outputs)?row.outputs:[];
+      const imageOutputs=outputs.filter(output=>/\.(png|jpe?g|webp)$/i.test(String(output?.path||"")));
+      if(!imageOutputs.length) fail("generated text OCR candidate has no image output: "+candidateId);
+      for(const [index,output] of imageOutputs.entries()){
+        const imagePath=String(output?.path||"").trim();
+        if(!existsSync(resolve(imagePath))) {
+          fail("generated text OCR background image missing: "+candidateId);
+        }
+        const receiptPath=resolve(reportDir,candidateId.replace(/[^a-zA-Z0-9_-]/g,"_")+"-"+(index+1)+".json");
+        const processResult=spawnSync(ocrPython,[ocrScript,imagePath,receiptPath],{
+          cwd:resolve("."),encoding:"utf8",windowsHide:true,shell:false,
+          maxBuffer:8*1024*1024
+        });
+        if(!existsSync(receiptPath)) fail("generated text OCR produced no receipt: "+candidateId+
+          "; "+String(processResult.stderr||processResult.stdout||"").slice(-1000));
+        const receipt=json(receiptPath);
+        if(receipt?.schema!=="HIBOU_GENERATED_TEXT_QC_V1"||
+           receipt.sha256!==sha256(resolve(imagePath))) fail("generated text OCR receipt invalid: "+candidateId);
+        candidates.push({candidate_id:candidateId,scene_id:row.scene_id,path:imagePath,
+          receipt_path:receiptPath,status:receipt.status,findings:receipt.findings||[]});
+      }
+    }
+    const rejected=candidates.filter(candidate=>candidate.status!=="PASS");
+    writeJson(generatedTextAuditPath,{schema:"HIBOU_GENERATED_TEXT_BATCH_QC_V1",
+      pass:rejected.length===0,candidate_count:candidates.length,
+      rejected_count:rejected.length,candidates,publication_authorized:false});
+    if(rejected.length) fail("generated text OCR rejected "+rejected.length+" image candidates; see "+generatedTextAuditPath);
+    state.generated_text_qc={pass:true,path:generatedTextAuditPath,candidate_count:candidates.length};
+    writeJson(statePath,state);
+    auditPromptApplication("generated_text_qc",{
+      all_generated_backgrounds_ocr_pass:true,
+      source_images_hash_bound:true
+    },{audit_path:generatedTextAuditPath,candidate_count:candidates.length});
   });
 
   const selections=resolve(imageDir,"selections.json");
@@ -1548,6 +1964,18 @@ async function main(){
     auditPromptContract("render",renderReady);
     run(process.execPath,[postRuntime.render,renderReady,master]);
   });
+  const montageRenderAudit=await verifySpecificMontageRenderReceipt({
+    root,storyboard:storyboardData,
+    compositorPath:resolve(dirname(postRuntime.render),"video-scene-compositor.mjs")
+  });
+  writeJson(montageAuditPath,montageRenderAudit);
+  state.specific_action_montage={status:"RENDER_EXECUTED",audit_path:montageAuditPath,
+    scene_count:montageRenderAudit.scenes.length,master_sha256:montageRenderAudit.master_sha256};
+  writeJson(statePath,state);
+  auditPromptApplication("specific_montage_render_execution",{
+    typed_plan_verified:montageRenderAudit.plan_pass===true,
+    render_receipt_verified:montageRenderAudit.render_execution_pass===true
+  },{audit_path:montageAuditPath,scene_count:montageRenderAudit.scenes.length});
 
   const masterQc=resolve(root,"master-qc.json");
   stage(state,"master_qc",()=>{
@@ -1582,6 +2010,7 @@ async function main(){
     "image_plan",
     "image_prompt_execution",
     "image_qc_review",
+    "generated_text_qc",
     "technical_selection",
     ...(creativeQcEnabled?["creative_qc","creative_qc_report"]:[]),
     ...(factualGateEnabled?["factual_gate","factual_gate_report"]:[]),
@@ -1589,6 +2018,7 @@ async function main(){
     "render_ready",
     "compositor_execution",
     "render",
+    "specific_montage_render_execution",
     "master_qc"
   ];
   const missingPromptAudits=requiredPromptAuditStages.filter(name=>promptStageAudits?.[name]?.pass!==true);
@@ -1644,6 +2074,7 @@ async function main(){
     schema:"HIBOU_VIDEO_MASTER_RESULT_DRAFT_V1",
     production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
     preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
+    airtable_source_freshness:state.airtable_source_freshness||null,
     publication_authorized:false,
     features:{
       video_timeline_v1:timelineEnabled,
@@ -1786,6 +2217,19 @@ async function main(){
     writeJson(statePath,state);
   });
 
+  const verdictModule=await import(pathToFileURL(postRuntime.promptContractVerdict).href+"?v="+Date.now());
+  const promptContractVerdict=verdictModule.evaluatePromptContractRun(root);
+  const promptContractVerdictPath=resolve(root,"prompt-contract-verdict.json");
+  writeJson(promptContractVerdictPath,promptContractVerdict);
+  state.prompt_contract_verdict={
+    path:promptContractVerdictPath,
+    PROMPT_CONTRACT_PASS:promptContractVerdict.PROMPT_CONTRACT_PASS,
+    failed:promptContractVerdict.failed,
+    human_approval_required:true,
+    publication_authorized:false
+  };
+  writeJson(statePath,state);
+
   const final={
     ok:true,
     schema:"HIBOU_VIDEO_MASTER_RESULT_V1",
@@ -1820,8 +2264,10 @@ async function main(){
     production_mode:String(storyboardData.production?.mode||"final").toLowerCase()==="preview"?"preview":"final",
     preview_only:String(storyboardData.production?.mode||"final").toLowerCase()==="preview",
     airtable_report_mode:contentId?(reportAirtable?"applied":"dry_run"):"not_applicable",
+    airtable_source_freshness:state.airtable_source_freshness||null,
     prompt_propagation:state.prompt_propagation||null,
     prompt_contract_v2:state.prompt_contract_v2||null,
+    prompt_contract_verdict:state.prompt_contract_verdict,
     prompt_graph:state.prompt_graph||null,
     human_master_review_required:true,
     publication_authorized:false

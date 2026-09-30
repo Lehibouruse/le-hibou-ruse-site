@@ -36,14 +36,14 @@ test("layered composition keeps assets independently replaceable and ordered by 
   assert.equal(c.camera_transform.zoom_percent,2.5);
 });
 
-test("fallback camera motion is visible and alternates pan anchor when no timeline camera event exists",()=>{
+test("fallback camera motion respects the active 1.5–3.5 percent zoom profile",()=>{
   const scene={
     scene_id:"S02B",order:2,zoom_percent:1.2,
     image:{selected:"bg.png"},
     framing:{anchor:"center"},
   };
   const plan=buildSceneCompositePlan(scene,{duration:5,width:1080,height:1920,fps:30});
-  assert.match(plan.filter_complex,/1\.04200/);
+  assert.match(plan.filter_complex,/1\.01500/);
   assert.match(plan.filter_complex,/iw-\(iw\/zoom\)/);
 });
 
@@ -58,7 +58,7 @@ test("explicit camera beat interpolates zoom instead of jumping instantly",()=>{
   };
   const plan=buildSceneCompositePlan(scene,{duration:4,width:1080,height:1920,fps:30});
   assert.match(plan.filter_complex,/max\(0,min\(1,\(on-/);
-  assert.match(plan.filter_complex,/1\+0\.04000\*/);
+  assert.match(plan.filter_complex,/1\+0\.03500\*/);
 });
 
 test("timeline title text is placed in the top safe zone rather than the subtitle zone",()=>{

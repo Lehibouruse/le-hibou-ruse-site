@@ -108,6 +108,7 @@ function imageStylePrompt(styleLock,{backgroundOnly=false}={}){
   let decor=sections.DECOR||"";
   let coherence=sections.COHERENCE||"";
   const grammar=sections["GRAMMAIRE CONCURRENTIELLE ADAPTEE"]||"";
+  const denseFinanceAddendum=String(styleLock||"").match(/ADDITIF V4\.4[\s\S]*/iu)?.[0]||"";
   decor=decor.replace(/\bet les sous-titres dominent\b/giu,"et la composition reste immédiatement lisible");
   if(backgroundOnly){
     decor=decor.replace(/\bla mascotte\b/giu,"le sujet principal composité ensuite");
@@ -119,6 +120,7 @@ function imageStylePrompt(styleLock,{backgroundOnly=false}={}){
     decor?`IMAGE_ENVIRONMENT_LOCK: ${decor}`:"",
     coherence?`IMAGE_COHERENCE_LOCK: ${coherence}`:"",
     grammar?`IMAGE_VISUAL_GRAMMAR_LOCK: ${grammar}`:"",
+    denseFinanceAddendum?`IMAGE_FINANCIAL_MECHANIC_LOCK: ${removeTextRiskSentences(denseFinanceAddendum)}`:"",
     reinforcement
   ].filter(Boolean).join("\n");
 }
@@ -126,18 +128,23 @@ function imageStylePrompt(styleLock,{backgroundOnly=false}={}){
 function removeTextRiskSentences(text){
   const source=String(text||"").trim();
   if(!source) return "";
-  const withoutTextInstructions=source
-    .split(/(?<=[.!?])\s+/u)
-    .filter(sentence=>!/(?:\btextes?\b|\btext\b|\bletter(?:s|ing)?\b|\blogo\b|\bsign(?:age)?\b|\bécriture\b|\binscription\b|\bcallouts?\b|\bpunchline\b|\bpost[- ]prod(?:uction)?\b|\bà l[’']écran\b|\bon screen\b|\bphrase principale\b|\blabels?\b|\bjargon\b|\bisoler\b|\bcall\s*\/\s*put\b|\bzoom\b|\bentrée rapide\b|\bapparitions? successives?\b|\bcalendrier qui tourne\b|\baccélération\b)/iu.test(sentence))
-    .join(" ")
-    .trim();
-  return withoutTextInstructions
+  // Replace glyphs, not whole sentences: a sentence mentioning a caption may
+  // also specify the financial relationship or an ordered animation beat.
+  const counts={1:"one",2:"two",3:"three",4:"four",5:"five",6:"six",7:"seven",8:"eight",9:"nine",10:"ten",11:"eleven",12:"twelve"};
+  return source
+    .replace(/\b20\d{2}(?:\s*(?:→|->|–|-)\s*20\d{2}|\s+20\d{2}){1,}\b/gu,match=>{
+      const count=(match.match(/20\d{2}/g)||[]).length;
+      return `${counts[count]||count} ordered blank timeline milestones linked in sequence`;
+    })
+    .replace(/«[^»]*»|“[^”]*”|"[^"]*"/gu,"blank area reserved for post-production lettering")
     .replace(/\b20\d{2}\b/g,"abstract timeline milestone")
     .replace(/[+-]?\d+(?:[.,]\d+)?\s*%/g,"abstract percentage marker")
     .replace(/\b\d[\d\s.,]*\s*[€$£¥]\b/g,"abstract currency marker")
+    .replace(/\b(?:1[0-2]|[1-9])\b/gu,match=>counts[Number(match)])
     .replace(/\b\d[\d\s.,]*\b/g,"abstract unlabeled value marker")
     .replace(/[€$£¥]/g,"")
     .replace(/\b[A-ZÀ-ÖØ-Þ]{4,}\b/g,"unlabeled concept")
+    .replace(/\b(?:textes?|labels?|captions?|inscriptions?|lettres?|écriture|logos?)\s+(?:à\s+l[’']écran|dans\s+l[’']image)\b/giu,"blank post-production label areas")
     .replace(/\s{2,}/g," ")
     .trim();
 }
@@ -482,6 +489,7 @@ export function buildImagePlan(contract,binding){
         status:(
           (!sceneImagePrompt||sceneImagePrompt.length<24||compiledImagePrompt.length>=24)
           && (imagePromptRetention==null||imagePromptRetention>=0.25)
+          && (visualIdeaRetention==null||visualIdeaRetention>=0.4)
         )?"PASS":"REVIEW"
       }
     };

@@ -28,8 +28,8 @@ function materializeFallbackCameraMotion(scene){
   const timelineEvents=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
   if(timelineEvents.some(event=>String(event?.type||"").toLowerCase()==="camera")) return scene;
   const existing=scene?.composition?.camera_transform||{};
-  const rawZoom=Number(existing.zoom_percent??scene?.zoom_percent??0);
-  const zoomPercent=Math.min(4,Math.max(3.2,Number.isFinite(rawZoom)?rawZoom:3.2));
+  const rawZoom=Number(existing.zoom_percent??scene?.zoom_percent??2.5);
+  const zoomPercent=Math.min(3.5,Math.max(1.5,Number.isFinite(rawZoom)?rawZoom:2.5));
   const requestedAnchor=cameraAnchor(existing.anchor||scene?.framing?.anchor);
   const fallbackAnchors=["left","right","center"];
   const anchor=requestedAnchor&&requestedAnchor!=="center"

@@ -51,6 +51,7 @@ const VIDEO_CANCEL_GRACE_MS = Math.max(
 const WORKER_SELF_UPDATE_SCHEMA = "HIBOU_GITHUB_WORKER_SELF_UPDATE_V2";
 const WORKER_BUILD_MARKER = "HIBOU_WORKER_BUILD_20260927_V2";
 const WORKER_SELF_UPDATE_ENABLED =
+  !String(process.env.HIBOU_VIDEO_LOCAL_SOURCE_ROOT || "").trim() &&
   String(process.env.HIBOU_WORKER_SELF_UPDATE_ENABLED || "true")
     .trim()
     .toLowerCase() !== "false";
@@ -82,6 +83,10 @@ const VIDEO_OUTPUT_ROOT =
 const VIDEO_MASTER_SCRIPT =
   String(process.env.HIBOU_VIDEO_MASTER_SCRIPT || "").trim() ||
   path.join(PROJECT_ROOT, "scripts", "video-master.mjs");
+
+// The source checkout is opt-in and never installed over the commit-pinned runtime.
+const VIDEO_LOCAL_SOURCE_ROOT =
+  String(process.env.HIBOU_VIDEO_LOCAL_SOURCE_ROOT || "").trim();
 
 const CHATTERBOX_BATCH_SCRIPT =
   String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT || "").trim() ||
@@ -486,7 +491,7 @@ async function ensureCanonicalVideoRuntimes(job) {
     state.runtime_resume_state_path = resumeStateScript;
     return {
       commit,
-      master: VIDEO_MASTER_SCRIPT,
+      master: localVideoMasterPath(),
       voice: CHATTERBOX_BATCH_SCRIPT,
       comfy_start: COMFYUI_START_SCRIPT,
       resume_plan: resumePlanScript,
@@ -581,13 +586,27 @@ async function ensureCanonicalVideoRuntimes(job) {
 
   return {
     commit,
-    master: master.path,
+    master: localVideoMasterPath(),
     voice: voice.path,
     comfy_start: comfyStart.path,
     resume_plan: resumePlan.path,
     resume_state: resumeState.path,
     refreshed: true,
   };
+}
+
+function localVideoMasterPath() {
+  if (!VIDEO_LOCAL_SOURCE_ROOT) return VIDEO_MASTER_SCRIPT;
+  const candidate = path.resolve(VIDEO_LOCAL_SOURCE_ROOT, "scripts", "video-master.mjs");
+  if (!existsSync(candidate)) {
+    throw new Error("HIBOU_VIDEO_LOCAL_SOURCE_ROOT has no video-master.mjs");
+  }
+  const source = readFileSync(candidate, "utf8");
+  if (!source.includes("sourceSnapshotArg") ||
+      !source.includes("specific-action-montage-audit.json")) {
+    throw new Error("local video-master lacks source and montage guards");
+  }
+  return candidate;
 }
 
 function stableStoryboard(value) {
@@ -1535,6 +1554,26 @@ async function processVideoRender(job, processed) {
     "utf8",
   );
 
+  let sourceSnapshotPath = null;
+  if (incomingStoryboard?.content?.source === "airtable") {
+    const snapshot = job.source_snapshot;
+    if (!snapshot || snapshot.schema !== "HIBOU_AIRTABLE_SOURCE_SNAPSHOT_V1" ||
+        snapshot.capture_method !== "server_airtable_live" ||
+        snapshot.base_id !== "appWyUX7TYPNrDbyP" ||
+        snapshot.content_id !== contentId ||
+        snapshot.profile_record_id !== incomingStoryboard?.content?.profile_record_id) {
+      throw new Error("VIDEO_RENDER fresh Airtable source snapshot missing or mismatched");
+    }
+    const capturedMs = Date.parse(snapshot.captured_at);
+    if (!Number.isFinite(capturedMs) ||
+        Date.now() - capturedMs > 3_600_000 ||
+        Date.now() - capturedMs < -60_000) {
+      throw new Error("VIDEO_RENDER Airtable source snapshot expired");
+    }
+    sourceSnapshotPath = path.join(dir, "airtable-source-snapshot.json");
+    writeFileSync(sourceSnapshotPath, JSON.stringify(snapshot, null, 2) + "\n", "utf8");
+  }
+
   const remoteRepairResume =
     job.options?.repair_resume_request &&
     typeof job.options.repair_resume_request === "object" &&
@@ -2089,14 +2128,34 @@ async function processVideoRender(job, processed) {
     throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
   }
 
-  const masterScript = VIDEO_MASTER_SCRIPT;
+  const masterScript = runtime.master;
+  const runtimeProjectRoot = VIDEO_LOCAL_SOURCE_ROOT || PROJECT_ROOT;
   const preflightScript = path.join(
-    PROJECT_ROOT,
+    runtimeProjectRoot,
     "scripts",
     "video-local-preflight.mjs",
   );
   if (!existsSync(masterScript)) {
     throw new Error(`video-master missing: ${masterScript}`);
+  }
+  if (sourceSnapshotPath && !readFileSync(masterScript, "utf8").includes("sourceSnapshotArg")) {
+    throw new Error("VIDEO_RENDER runtime lacks Airtable source freshness guard");
+  }
+  if (sourceSnapshotPath) {
+    const verifier = path.join(runtimeProjectRoot, "scripts", "video-airtable-sync.mjs");
+    if (!existsSync(verifier)) throw new Error("VIDEO_RENDER source verifier missing");
+    const checked = spawnSync(process.execPath, [verifier, "verify", storyboardPath,
+      `--source-snapshot=${sourceSnapshotPath}`], {
+      cwd: runtimeProjectRoot,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+    });
+    if (checked.status !== 0) {
+      throw new Error("VIDEO_RENDER Airtable source verification failed: " +
+        String(checked.stderr || checked.stdout || "unknown").slice(-3000));
+    }
   }
   if (!existsSync(preflightScript)) {
     throw new Error(`video preflight missing: ${preflightScript}`);
@@ -2227,6 +2286,7 @@ async function processVideoRender(job, processed) {
     dir,
     binding: VIDEO_BINDING,
     runtime_commit: runtime.commit,
+    runtime_source: VIDEO_LOCAL_SOURCE_ROOT ? "local_v5_override" : "commit_pinned",
     runtime_refreshed: runtime.refreshed,
     production_mode: productionMode,
     candidates_per_scene: candidatesPerScene,
@@ -2247,7 +2307,7 @@ async function processVideoRender(job, processed) {
     process.execPath,
     [preflightScript, "--require-ready"],
     {
-      cwd: PROJECT_ROOT,
+      cwd: runtimeProjectRoot,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
@@ -2259,15 +2319,6 @@ async function processVideoRender(job, processed) {
     throw new Error(
       `video preflight failed with status ${preflight.status}`,
     );
-  }
-
-  if (!humanSelectionResume) {
-    await ensureComfyUIReady();
-  } else {
-    log("VIDEO_RENDER human-selection resume skips ComfyUI wake-up", {
-      job: job.id,
-      content_id: contentId,
-    });
   }
 
   const maxScenes = Math.max(
@@ -2283,6 +2334,7 @@ async function processVideoRender(job, processed) {
   const args = [
     masterScript,
     `--storyboard=${storyboardPath}`,
+    ...(sourceSnapshotPath ? [`--source-snapshot=${sourceSnapshotPath}`] : []),
     `--binding=${VIDEO_BINDING}`,
     `--output=${dir}`,
     `--max-scenes=${maxScenes}`,
@@ -2446,15 +2498,54 @@ async function processVideoRender(job, processed) {
     });
   }
 
+  if (sourceSnapshotPath) {
+    if (!readFileSync(masterScript, "utf8").includes('flag("preflight-only")')) {
+      throw new Error("VIDEO_RENDER runtime lacks pre-GPU montage preflight");
+    }
+    const preflightArgs = args.map(value => value === `--output=${dir}`
+      ? `--output=${path.join(dir, "_preflight")}` : value);
+    const preflightRun = spawnSync(process.execPath, [...preflightArgs, "--preflight-only"], {
+      cwd: runtimeProjectRoot,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: {
+        ...process.env,
+        ...(VIDEO_LOCAL_SOURCE_ROOT ? {
+          HIBOU_LOCAL_RUNTIME_OVERRIDE: "true",
+          HIBOU_LOCAL_REPO_ROOT: VIDEO_LOCAL_SOURCE_ROOT,
+        } : {}),
+      },
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    if (preflightRun.status !== 0) {
+      throw new Error("VIDEO_RENDER prompt contract preflight failed: " +
+        String(preflightRun.stderr || preflightRun.stdout || "unknown").slice(-4000));
+    }
+  }
+
+  if (!humanSelectionResume) {
+    await ensureComfyUIReady();
+  } else {
+    log("VIDEO_RENDER human-selection resume skips ComfyUI wake-up", {
+      job: job.id,
+      content_id: contentId,
+    });
+  }
+
   const renderOutcome = await new Promise((resolveRender, rejectRender) => {
     const renderClientId = `hibou:${job.id}:${state.worker_session}`;
     const child = spawn(process.execPath, args, {
-      cwd: PROJECT_ROOT,
+      cwd: runtimeProjectRoot,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
       env: {
         ...process.env,
+        ...(VIDEO_LOCAL_SOURCE_ROOT ? {
+          HIBOU_LOCAL_RUNTIME_OVERRIDE: "true",
+          HIBOU_LOCAL_REPO_ROOT: VIDEO_LOCAL_SOURCE_ROOT,
+        } : {}),
         HIBOU_VIDEO_CLIENT_ID: renderClientId,
         HIBOU_VIDEO_QUEUE_JOB_ID: job.id,
       },
@@ -2692,6 +2783,24 @@ async function processVideoRender(job, processed) {
   }
 
   const resultSha256 = sha256(masterPath);
+  const verdictPath = path.join(dir, "prompt-contract-verdict.json");
+  let promptContractVerdict = null;
+  if (sourceSnapshotPath) {
+    if (!existsSync(verdictPath)) {
+      throw new Error("VIDEO_RENDER completed without prompt contract verdict");
+    }
+    try {
+      promptContractVerdict = JSON.parse(readFileSync(verdictPath, "utf8"));
+    } catch (error) {
+      throw new Error("VIDEO_RENDER prompt contract verdict unreadable: " +
+        String(error?.message || error));
+    }
+    if (promptContractVerdict?.schema !== "HIBOU_PROMPT_CONTRACT_VERDICT_V1" ||
+        promptContractVerdict?.master !== masterPath ||
+        !Array.isArray(promptContractVerdict.failed)) {
+      throw new Error("VIDEO_RENDER prompt contract verdict invalid");
+    }
+  }
 
   let incrementalRetouch = {
     requested: Boolean(reuseFromJobId),
@@ -2747,7 +2856,12 @@ async function processVideoRender(job, processed) {
     human_review_required: true,
     publication_authorized: false,
     runtime_commit: runtime.commit,
-    runtime_master_sha256: state.runtime_master_sha256 || "",
+    runtime_source: VIDEO_LOCAL_SOURCE_ROOT ? "local_v5_override" : "commit_pinned",
+    runtime_master_sha256: sha256(masterScript),
+    airtable_source_snapshot_sha256: sourceSnapshotPath ? sha256(sourceSnapshotPath) : null,
+    prompt_contract_pass: promptContractVerdict?.PROMPT_CONTRACT_PASS === true,
+    prompt_contract_failed_checks: promptContractVerdict?.failed || null,
+    prompt_contract_verdict_path: promptContractVerdict ? verdictPath : null,
     runtime_voice_sha256: state.runtime_voice_sha256 || "",
     completed_at: new Date().toISOString(),
   };

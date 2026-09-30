@@ -43,7 +43,7 @@ test("timeline pose/object assets are independent inputs and camera event change
   assert.deepEqual(plan.input_refs,["bg.png","poses/pointe.webp","objects/chart.webp"]);
   assert.match(plan.filter_complex,/overlay=.*enable='between\(t,1\.000,4\.000\)'/);
   assert.match(plan.filter_complex,/between\(on,91,180\)/);
-  assert.match(plan.filter_complex,/1\+0\.05000\*\(max\(0,min\(1,\(on-91\)\/89\)\)\)/);
+  assert.match(plan.filter_complex,/1\+0\.03500\*\(max\(0,min\(1,\(on-91\)\/89\)\)\)/);
 });
 
 test("timed object can move slightly without replacing the scene image",()=>{

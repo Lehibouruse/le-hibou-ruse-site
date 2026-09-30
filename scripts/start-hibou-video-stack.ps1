@@ -48,6 +48,18 @@ if (-not (Test-Path $VoicePython)) {
   throw "Python Chatterbox introuvable : $VoicePython"
 }
 
+$OcrPython = Get-UserEnv "HIBOU_OCR_PYTHON"
+if ([string]::IsNullOrWhiteSpace($OcrPython)) {
+  $OcrPython = Join-Path $env:LOCALAPPDATA "LeHibou\video\ocr\venv\Scripts\python.exe"
+}
+if (-not (Test-Path $OcrPython)) {
+  throw "Python OCR introuvable : $OcrPython"
+}
+& $OcrPython -c "import rapidocr_onnxruntime"
+if ($LASTEXITCODE -ne 0) {
+  throw "Moteur OCR RapidOCR indisponible : $OcrPython"
+}
+
 $ComfyPortable = Join-Path $env:LOCALAPPDATA "LeHibou\video\comfyui\ComfyUI_windows_portable"
 $ComfyMain = Join-Path $ComfyPortable "ComfyUI\main.py"
 $Flux = Join-Path $ComfyPortable "ComfyUI\models\checkpoints\flux1-schnell-fp8.safetensors"
@@ -70,6 +82,7 @@ Set-UserEnv "HIBOU_PROJECT_ROOT" $ProjectRoot
 Set-UserEnv "HIBOU_VIDEO_BINDING" $Binding
 Set-UserEnv "HIBOU_VIDEO_OUTPUT_ROOT" $OutputRoot
 Set-UserEnv "HIBOU_PYTHON" $VoicePython
+Set-UserEnv "HIBOU_OCR_PYTHON" $OcrPython
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 

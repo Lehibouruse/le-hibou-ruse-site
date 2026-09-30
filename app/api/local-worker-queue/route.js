@@ -7,6 +7,7 @@ import {
   updateRecord,
 } from "../../../lib/airtable";
 import { buildStoryboardContract, resolveCanonicalVideoProfile } from "../../../scripts/video-airtable-sync.mjs";
+import { buildServerAirtableSourceSnapshot } from "../../../scripts/video-airtable-source-snapshot.mjs";
 import { validateReuseLineage } from "../../../scripts/video-job-lineage.mjs";
 import { scopeStoryboardForJob } from "../../../scripts/video-storyboard-scope.mjs";
 
@@ -1113,6 +1114,7 @@ export async function GET(request) {
         active: true,
         runtime_commit: RUNTIME_COMMIT,
         storyboard: null,
+        source_snapshot: null,
         queue_error: null,
         reuse_lineage: null,
       };
@@ -1229,6 +1231,7 @@ export async function GET(request) {
         const profile = await resolveCanonicalVideoProfile(content);
 
         job.storyboard = buildStoryboardContract(content, scenes, profile);
+        job.source_snapshot = buildServerAirtableSourceSnapshot(content, profile, scenes);
         const defaults = job.storyboard?.creative?.production_defaults || {};
         const preview = options.preview_mode === true;
         const defaultCandidates = Math.max(
@@ -1289,6 +1292,7 @@ export async function GET(request) {
     return NextResponse.json({
       ok: true,
       schema: "HIBOU_VIDEO_RENDER_QUEUE_V2",
+      source_snapshot_contract: "HIBOU_AIRTABLE_SOURCE_SNAPSHOT_V1",
       jobs,
       controls,
       remote_cancel_enabled: REMOTE_CANCEL_ENABLED,

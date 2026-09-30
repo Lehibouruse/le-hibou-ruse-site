@@ -215,6 +215,7 @@ export function renderVideoContract(contractPathArg, outputArg) {
   let sceneCacheMisses = 0;
   const clips = [];
   const clipFingerprints = [];
+  const montageScenes = [];
 
   for (let i = 0; i < contract.scenes.length; i += 1) {
     const scene = contract.scenes[i];
@@ -268,6 +269,24 @@ export function renderVideoContract(contractPathArg, outputArg) {
     };
     clips.push(clip);
     clipFingerprints.push(clipHash);
+    if (scene?.timeline?.specific_montage?.schema === "HIBOU_SPECIFIC_MONTAGE_PLAN_V1") {
+      const diagramEvents = plan.timeline.events.filter(event => event.type === "diagram");
+      montageScenes.push({
+        scene_id: scene.scene_id,
+        source_visual_sha256: scene.timeline.specific_montage.source_visual_sha256,
+        clip_path: clip,
+        clip_sha256: clipHash,
+        filter_complex_sha256: hashObject(plan.filter_complex),
+        asset_sha256: assetHashes,
+        diagram_events: diagramEvents.map(event => ({
+          id: event.id,
+          start_s: event.start_s,
+          end_s: event.end_s,
+          node_ids: event.diagram.nodes.map(node => node.id),
+          action: event.action,
+        })),
+      });
+    }
   }
 
   const visualFingerprint = hashObject({ clips: clipFingerprints, fps: 30, width: 1080, height: 1920 });
@@ -355,6 +374,14 @@ export function renderVideoContract(contractPathArg, outputArg) {
     preview_only: encoding.preview_only,
   };
   writeFileSync(`${output}.manifest.json`, JSON.stringify(contract, null, 2));
+  writeFileSync(`${output}.montage-execution.json`, JSON.stringify({
+    schema: "HIBOU_SPECIFIC_MONTAGE_RENDER_EXECUTION_V1",
+    master_path: output,
+    master_sha256: technical.sha256,
+    scenes: montageScenes,
+    semantic_scene_review_performed: false,
+    publication_authorized: false,
+  }, null, 2) + "\n");
   return technical;
 }
 

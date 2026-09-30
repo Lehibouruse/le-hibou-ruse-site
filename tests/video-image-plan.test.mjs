@@ -334,7 +334,7 @@ test("split-screen framing is routed and literal years are abstracted",()=>{
  assert.match(prompt,/strict two-panel split-screen composition/);
  assert.doesNotMatch(prompt,/2026|2027|2028|2029/);
  assert.doesNotMatch(prompt,/1\.5\s*%/);
- assert.match(prompt,/abstract timeline milestone/);
+ assert.match(prompt,/four ordered blank timeline milestones linked in sequence/);
  assert.match(prompt,/abstract percentage marker/);
 });
 
@@ -384,4 +384,32 @@ test("diagram framing compiles to flat diagrammatic composition",()=>{
  const prompt=p.requests[0].request.overrides["6"].text;
  assert.match(prompt,/flat diagrammatic editorial composition/);
  assert.match(prompt,/simplified blocks, arrows and icons/);
+});
+
+test("V2 financial montage survives glyph-free compilation",()=>{
+ const specific=structuredClone(contract);
+ specific.content={...specific.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ specific.creative={
+   style_lock:"STYLE: illustration éditoriale 2D. ADDITIF V4.4 — préserver les relations financières, les couches et les séquences.",
+   negative_prompt:"no generated lettering",
+   character_lock:"canonical character",
+   content_brief:"ADDITIF SPÉCIFIQUE V2",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ specific.scenes=[{
+   scene_id:"S10",
+   image_prompt:"Une timeline financière avec quatre carrés box",
+   visual_idea:"SCÈNE 10 — quatre jalons 2026→2027→2028→2029 ; apparitions successives des box ; accélération par succession des beats, pas par un simple zoom ; texte « ROULER LE FINANCEMENT » ajouté en post-production.",
+   framing:{hibou:false,type:"schéma",anchor:"center"}
+ }];
+ const plan=buildImagePlan(specific,binding);
+ const request=plan.requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert.match(prompt,/four ordered blank timeline milestones linked in sequence/);
+ assert.match(prompt,/apparitions successives des box/);
+ assert.match(prompt,/succession des beats/);
+ assert.match(prompt,/IMAGE_FINANCIAL_MECHANIC_LOCK/);
+ assert.doesNotMatch(prompt,/2026|2027|2028|2029|ROULER LE FINANCEMENT/);
+ assert.equal(request.prompt_application.preservation.status,"PASS");
 });

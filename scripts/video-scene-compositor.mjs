@@ -140,11 +140,45 @@ function normalizedBeatKind(event,type){
   return defaultBeatKind(event,type);
 }
 
+function normalizeDiagram(event){
+  const raw=event?.diagram;
+  if(!raw||!Array.isArray(raw.nodes)||!raw.nodes.length) fail(`timeline event ${event?.id||"?"}: diagram nodes required`);
+  const bounded=(value,min,max,name)=>{
+    const parsed=Number(value);
+    if(!Number.isFinite(parsed)||parsed<min||parsed>max) fail(`timeline event ${event?.id||"?"}: invalid ${name}`);
+    return Math.round(parsed);
+  };
+  const nodes=raw.nodes.map((node,index)=>({
+    id:String(node?.id||`node-${index+1}`),
+    label:String(node?.label||""),
+    x:bounded(node?.x,40,1000,"node.x"),
+    y:bounded(node?.y,330,1350,"node.y"),
+    w:bounded(node?.w,70,960,"node.w"),
+    h:bounded(node?.h,45,250,"node.h"),
+    color:String(node?.color||"0x163044@0.94"),
+    font_size:bounded(node?.font_size??38,22,66,"node.font_size")
+  }));
+  if(new Set(nodes.map(node=>node.id)).size!==nodes.length) fail(`timeline event ${event?.id||"?"}: duplicate diagram node id`);
+  for(const node of nodes){
+    if(node.x+node.w>1040||node.y+node.h>1500) fail(`timeline event ${event?.id||"?"}: diagram node outside safe region`);
+  }
+  const links=(raw.links||[]).map((link,index)=>{
+    const base={id:String(link?.id||`link-${index+1}`),
+      x:bounded(link?.x,40,1000,"link.x"),y:bounded(link?.y,330,1450,"link.y")};
+    if(link?.kind==="line"){
+      return {...base,kind:"line",w:bounded(link?.w,2,960,"link.w"),h:bounded(link?.h,2,960,"link.h")};
+    }
+    return {...base,kind:"text",text:String(link?.text||"→"),
+      font_size:bounded(link?.font_size??48,24,80,"link.font_size")};
+  });
+  return {title:String(raw.title||""),nodes,links};
+}
+
 export function normalizeSceneTimeline(scene,{duration}={}){
   const d=Number(duration??scene?.planned_duration_s??scene?.measured_duration_s);
   if(!Number.isFinite(d)||d<=0) return {schema:"HIBOU_SCENE_TIMELINE_V1",events:[]};
   const raw=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
-  const allowed=new Set(["text","callout","object","pose","camera","accent"]);
+  const allowed=new Set(["text","callout","object","pose","camera","accent","diagram"]);
   const events=raw.map((event,index)=>{
     const type=String(event?.type||"").trim().toLowerCase();
     if(!allowed.has(type)) fail(`timeline event ${event?.id||index+1}: unsupported type ${type}`);
@@ -179,7 +213,7 @@ export function normalizeSceneTimeline(scene,{duration}={}){
       };
     }
     if(type==="camera"){
-      return {...base,zoom_percent:Math.min(8,Math.max(0,num(event?.zoom_percent,0))),anchor:String(event?.anchor||"center")};
+      return {...base,zoom_percent:Math.min(3.5,Math.max(0,num(event?.zoom_percent,0))),anchor:String(event?.anchor||"center")};
     }
     if(type==="accent"){
       return {
@@ -189,6 +223,9 @@ export function normalizeSceneTimeline(scene,{duration}={}){
         thickness:Math.max(2,Math.min(24,Math.round(num(event?.thickness,8)))),
         margin:Math.max(0,Math.min(120,Math.round(num(event?.margin,28))))
       };
+    }
+    if(type==="diagram"){
+      return {...base,diagram:normalizeDiagram(event),action:event?.action||null};
     }
     return {...base};
   }).sort((a,b)=>a.start_s-b.start_s||a.z-b.z);
@@ -298,7 +335,7 @@ export function normalizeSceneComposition(scene){
   }
 
   const camera=c.camera_transform||{};
-  const zoomPercent=Math.min(5.5,Math.max(0,num(camera.zoom_percent,scene?.zoom_percent??3)));
+  const zoomPercent=Math.min(3.5,Math.max(1.5,num(camera.zoom_percent,scene?.zoom_percent??3)));
   const cameraAnchor=String(camera.anchor||scene?.framing?.anchor||scene?.anchor||"center");
   const safeZones={
     top:num(c.safe_zones?.top,120),
@@ -372,81 +409,11 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
   });
 
   const timeline=normalizeSceneTimeline(scene,{duration:d});
-  const timedImageEvents=timeline.events.filter(event=>event.layer?.ref);
-  timedImageEvents.forEach((event,index)=>{
-    const input=1+c.layers.length+index;
-    const overlay=`tov${index}`;
-    const next=`tbase${index}`;
-    const layer=event.layer;
-    const opacity=layer.opacity<1?`,colorchannelmixer=aa=${layer.opacity.toFixed(3)}`:"";
-    const keyFilter=layer.remove_background
-      ? `,colorkey=${layer.chroma_key_color}:${layer.chroma_key_similarity.toFixed(3)}:${layer.chroma_key_blend.toFixed(3)}`
-      :"";
-    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity},tpad=stop_mode=clone:stop_duration=${d.toFixed(3)}[${overlay}]`);
-    const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
-    const span=Math.max(0.001,event.end_s-event.start_s);
-    const dx=num(event.motion?.to_offset_x,layer.offset_x)-layer.offset_x;
-    const dy=num(event.motion?.to_offset_y,layer.offset_y)-layer.offset_y;
-    const motion=(baseExpr,delta)=>Math.abs(delta)<0.001
-      ?baseExpr
-      :`(${baseExpr})+((t-${event.start_s.toFixed(3)})/${span.toFixed(3)})*${delta.toFixed(3)}`;
-    filters.push(`[${base}][${overlay}]overlay=x='${motion(p.x,dx)}':y='${motion(p.y,dy)}':enable='${timelineEnable(event)}':format=auto[${next}]`);
-    base=next;
-  });
-
-  c.text_layers.forEach((layer,index)=>{
-    const next=`text${index}`;
-    const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
-    const opts=[
-      `text='${safeText(layer.text)}'`,
-      `fontsize=${layer.font_size}`,
-      `fontcolor=${layer.font_color}`,
-      `borderw=${layer.border_width}`,
-      `bordercolor=${layer.border_color}`,
-      `x='${p.x}'`,
-      `y='${p.y}'`,
-    ];
-    if(layer.box){
-      opts.push("box=1",`boxcolor=${layer.box_color}`,`boxborderw=${layer.box_border_width}`);
-    }
-    filters.push(`[${base}]drawtext=${opts.join(":")}[${next}]`);
-    base=next;
-  });
-
-  const timedTextEvents=timeline.events.filter(event=>event.style);
-  timedTextEvents.forEach((event,index)=>{
-    const layer=event.style;
-    const next=`ttext${index}`;
-    const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
-    const opts=[
-      `text='${safeText(layer.text)}'`,
-      `fontsize=${layer.font_size}`,
-      `fontcolor=${layer.font_color}`,
-      `borderw=${layer.border_width}`,
-      `bordercolor=${layer.border_color}`,
-      `x='${p.x}'`,
-      `y='${p.y}'`,
-      `enable='${timelineEnable(event)}'`,
-    ];
-    if(layer.box) opts.push("box=1",`boxcolor=${layer.box_color}`,`boxborderw=${layer.box_border_width}`);
-    filters.push(`[${base}]drawtext=${opts.join(":")}[${next}]`);
-    base=next;
-  });
-
-  const accentEvents=timeline.events.filter(event=>event.type==="accent");
-  accentEvents.forEach((event,index)=>{
-    const next=`accent${index}`;
-    const m=event.margin;
-    filters.push(
-      `[${base}]drawbox=x=${m}:y=${m}:w=iw-${m*2}:h=ih-${m*2}:color=${event.color}:t=${event.thickness}:enable='${timelineEnable(event)}'[${next}]`
-    );
-    base=next;
-  });
-
+  // Zoompan expands the first still into the scene's frames. Timed overlays must
+  // follow it so their enable expressions see output time rather than t=0.
   const frames=Math.max(1,Math.round(d*fps));
   const cameraEvents=timeline.events.filter(x=>x.type==="camera");
-  const requestedZoomPercent=c.camera_transform.zoom_percent;
-  const zoomPercent=cameraEvents.length?requestedZoomPercent:Math.max(4.2,requestedZoomPercent);
+  const zoomPercent=c.camera_transform.zoom_percent;
   const maxZoom=1+zoomPercent/100;
   const increment=(maxZoom-1)/frames;
   const rawAnchor=String(c.camera_transform.anchor||"center").toLowerCase();
@@ -471,8 +438,112 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
     panY=`if(between(on,${startFrame},${endFrame}),${eventPan.y},${panY})`;
   }
   filters.push(
-    `[${base}]zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${frames}:s=${width}x${height}:fps=${fps},format=yuv420p[outv]`
+    `[${base}]zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${frames}:s=${width}x${height}:fps=${fps},format=rgba[camera-base]`
   );
+  base="camera-base";
+  const timedImageEvents=timeline.events.filter(event=>event.layer?.ref);
+  timedImageEvents.forEach((event,index)=>{
+    const input=1+c.layers.length+index;
+    const overlay=`tov${index}`;
+    const next=`tbase${index}`;
+    const layer=event.layer;
+    const opacity=layer.opacity<1?`,colorchannelmixer=aa=${layer.opacity.toFixed(3)}`:"";
+    const keyFilter=layer.remove_background
+      ? `,colorkey=${layer.chroma_key_color}:${layer.chroma_key_similarity.toFixed(3)}:${layer.chroma_key_blend.toFixed(3)}`
+      :"";
+    filters.push(`[${input}:v]scale=${layer.width}:-2,format=rgba${keyFilter}${opacity},tpad=stop_mode=clone:stop_duration=${d.toFixed(3)}[${overlay}]`);
+    const p=positionExpr(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
+    const span=Math.max(0.001,event.end_s-event.start_s);
+    const dx=num(event.motion?.to_offset_x,layer.offset_x)-layer.offset_x;
+    const dy=num(event.motion?.to_offset_y,layer.offset_y)-layer.offset_y;
+    const motion=(baseExpr,delta)=>Math.abs(delta)<0.001
+      ?baseExpr
+      :`(${baseExpr})+((t-${event.start_s.toFixed(3)})/${span.toFixed(3)})*${delta.toFixed(3)}`;
+    filters.push(`[${base}][${overlay}]overlay=x='${motion(p.x,dx)}':y='${motion(p.y,dy)}':enable='${timelineEnable(event)}':format=auto[${next}]`);
+    base=next;
+  });
+
+  const diagramEvents=timeline.events.filter(event=>event.type==="diagram");
+  diagramEvents.forEach((event,eventIndex)=>{
+    const enable=timelineEnable(event);
+    const panel=`diagram-panel-${eventIndex}`;
+    filters.push(`[${base}]drawbox=x=52:y=390:w=976:h=1120:color=0x102331@0.91:t=fill:enable='${enable}'[${panel}]`);
+    base=panel;
+    if(event.diagram.title){
+      const next=`diagram-title-${eventIndex}`;
+      filters.push(`[${base}]drawtext=text='${safeText(event.diagram.title)}':expansion=none:fontsize=49:fontcolor=0xF2DFC0:borderw=2:bordercolor=black@0.8:x='(w-text_w)/2':y=438:enable='${enable}'[${next}]`);
+      base=next;
+    }
+    event.diagram.nodes.forEach((node,nodeIndex)=>{
+      const box=`diagram-box-${eventIndex}-${nodeIndex}`;
+      const label=`diagram-label-${eventIndex}-${nodeIndex}`;
+      filters.push(`[${base}]drawbox=x=${node.x}:y=${node.y}:w=${node.w}:h=${node.h}:color=${node.color}:t=fill:enable='${enable}'[${box}]`);
+      filters.push(`[${box}]drawtext=text='${safeText(node.label)}':expansion=none:fontsize=${node.font_size}:fontcolor=white:borderw=2:bordercolor=black@0.8:x='${node.x}+(${node.w}-text_w)/2':y='${node.y}+(${node.h}-text_h)/2':enable='${enable}'[${label}]`);
+      base=label;
+    });
+    event.diagram.links.forEach((link,linkIndex)=>{
+      const next=`diagram-link-${eventIndex}-${linkIndex}`;
+      if(link.kind==="line"){
+        filters.push(`[${base}]drawbox=x=${link.x}:y=${link.y}:w=${link.w}:h=${link.h}:color=0xE8C78B@0.98:t=fill:enable='${enable}'[${next}]`);
+      }else{
+        filters.push(`[${base}]drawtext=text='${safeText(link.text)}':expansion=none:fontsize=${link.font_size}:fontcolor=0xE8C78B:borderw=2:bordercolor=black@0.8:x=${link.x}:y=${link.y}:enable='${enable}'[${next}]`);
+      }
+      base=next;
+    });
+  });
+
+  c.text_layers.forEach((layer,index)=>{
+    const next=`text${index}`;
+    const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
+    const opts=[
+      `text='${safeText(layer.text)}'`,
+      "expansion=none",
+      `fontsize=${layer.font_size}`,
+      `fontcolor=${layer.font_color}`,
+      `borderw=${layer.border_width}`,
+      `bordercolor=${layer.border_color}`,
+      `x='${p.x}'`,
+      `y='${p.y}'`,
+    ];
+    if(layer.box){
+      opts.push("box=1",`boxcolor=${layer.box_color}`,`boxborderw=${layer.box_border_width}`);
+    }
+    filters.push(`[${base}]drawtext=${opts.join(":")}[${next}]`);
+    base=next;
+  });
+
+  const timedTextEvents=timeline.events.filter(event=>event.style);
+  timedTextEvents.forEach((event,index)=>{
+    const layer=event.style;
+    const next=`ttext${index}`;
+    const p=drawtextPosition(layer.anchor,c.safe_zones,layer.offset_x,layer.offset_y);
+    const opts=[
+      `text='${safeText(layer.text)}'`,
+      "expansion=none",
+      `fontsize=${layer.font_size}`,
+      `fontcolor=${layer.font_color}`,
+      `borderw=${layer.border_width}`,
+      `bordercolor=${layer.border_color}`,
+      `x='${p.x}'`,
+      `y='${p.y}'`,
+      `enable='${timelineEnable(event)}'`,
+    ];
+    if(layer.box) opts.push("box=1",`boxcolor=${layer.box_color}`,`boxborderw=${layer.box_border_width}`);
+    filters.push(`[${base}]drawtext=${opts.join(":")}[${next}]`);
+    base=next;
+  });
+
+  const accentEvents=timeline.events.filter(event=>event.type==="accent");
+  accentEvents.forEach((event,index)=>{
+    const next=`accent${index}`;
+    const m=event.margin;
+    filters.push(
+      `[${base}]drawbox=x=${m}:y=${m}:w=iw-${m*2}:h=ih-${m*2}:color=${event.color}:t=${event.thickness}:enable='${timelineEnable(event)}'[${next}]`
+    );
+    base=next;
+  });
+
+  filters.push(`[${base}]format=yuv420p[outv]`);
 
   return {
     schema:"HIBOU_SCENE_COMPOSITOR_PLAN_V1",

@@ -25,7 +25,7 @@ const registry = readFileSync(
 
 test("video-master downloads post-render scripts from immutable runtime commit", () => {
   assert.match(master, /POST_RUNTIME_FILES/);
-  assert.match(master, /LeHibou","post-runtime",normalized/);
+  assert.match(master, /runtimeBundleDir\("post-runtime",normalized\)/);
   assert.match(master, /raw\.githubusercontent\.com\/Lehibouruse\/le-hibou-ruse-site\/\$\{normalized\}\/scripts\/\$\{name\}/);
   assert.match(master, /postRuntime\.promote/);
   assert.match(master, /postRuntime\.render/);

@@ -321,6 +321,9 @@ export function buildImagePlan(contract,binding){
   }
   const promptSceneMap=new Map((promptContract.scenes||[]).map(x=>[String(x.scene_id),x]));
   if(!binding?.workflow_path) fail("binding.workflow_path required");
+  const workflowPath=resolve(binding.workflow_path);
+  if(!existsSync(workflowPath)) fail("binding.workflow_path missing: "+workflowPath);
+  const workflowSha256=createHash("sha256").update(readFileSync(workflowPath)).digest("hex");
   if(!binding?.prompt?.node_id||!binding?.prompt?.input) fail("binding.prompt node_id/input required");
   if(!binding?.seed?.node_id||!binding?.seed?.input) fail("binding.seed node_id/input required");
   if(!Array.isArray(binding.output_node_ids)||!binding.output_node_ids.length) fail("binding.output_node_ids required");
@@ -519,6 +522,7 @@ export function buildImagePlan(contract,binding){
           scene_id:`${scene.scene_id}-C${candidate}`,
           endpoint:binding.endpoint||"http://127.0.0.1:8188",
           workflow_path:binding.workflow_path,
+          workflow_sha256:workflowSha256,
           overrides,
           output_node_ids:binding.output_node_ids.map(String),
           timeout_seconds:Number(binding.timeout_seconds||600),

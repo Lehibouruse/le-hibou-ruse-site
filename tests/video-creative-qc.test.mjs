@@ -37,3 +37,8 @@ test("creative QC covers long visual briefs in multiple CLIP-sized chunks",()=>{
   assert.match(source,/semantic_brief_chunks/);
   assert.doesNotMatch(source,/scores\["semantic_brief"\]\s*=\s*sim01\(image,\s*text_embedding\([^\n]*brief\)/);
 });
+
+test("creative QC distinguishes generated-image text artifacts from intentional post-production text",()=>{
+  assert.match(source,/allow_postproduction_text/);
+  assert.match(source,/not allow_postproduction_text and scores\["text_artifact_risk"\]/);
+});

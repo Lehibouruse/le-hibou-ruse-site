@@ -186,7 +186,7 @@ export async function runImageGen(rawRequest) {
       const promptId = String(submitted?.prompt_id || "").trim();
       if (!promptId) fail("ComfyUI /prompt returned no prompt_id");
       const submittedExecutionReceipt = executionReceipt
-        ? { ...executionReceipt, prompt_id: promptId }
+        ? { ...executionReceipt, server_prompt_id: promptId }
         : null;
       const deadline = Date.now() + request.timeout_seconds * 1000;
       let history;

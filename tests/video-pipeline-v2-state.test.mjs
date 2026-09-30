@@ -15,7 +15,12 @@ test("pipeline state stops at human image selection after 3 candidates per scene
  writeFileSync(resolve(root,"images/batch-manifest.json"),JSON.stringify({results:{a:{status:"completed"},b:{status:"completed"},c:{status:"completed"}}}));
  writeFileSync(resolve(root,"images/image-qc.json"),JSON.stringify({all_scenes_have_candidate:true}));
  writeFileSync(resolve(root,"images/selections.json"),JSON.stringify({s1:{candidates:["a","b","c"],selected:null}}));
- const s=inspectPipeline(root); assert.equal(s.gate,"HUMAN_IMAGE_SELECTION"); assert.equal(s.publication_authorized,false);
+ const s=inspectPipeline(root);
+ assert.equal(s.gate,"HUMAN_IMAGE_SELECTION");
+ assert.equal(s.image_generation.legacy_inferred,true);
+ assert.equal(s.image_generation.expected_requests,3);
+ assert.equal(s.image_generation.completed_requests,3);
+ assert.equal(s.publication_authorized,false);
 });
 test("artifact registry hashes files and never invents durable URLs",()=>{
  const root=mkdtempSync(resolve(tmpdir(),"hibou-reg-")); const p=resolve(root,"a.bin"); writeFileSync(p,"abc");

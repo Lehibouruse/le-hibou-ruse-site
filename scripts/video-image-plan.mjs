@@ -472,7 +472,7 @@ export function buildImagePlan(contract,binding){
           textFreeLock,
           compiledSuffix
         ].filter(Boolean).join("\n")
-      : [prefix,specificVisual,suffix].filter(Boolean).join("\n");
+      : [prefix,specificVisual,outputSafeZoneLock,suffix].filter(Boolean).join("\n");
     const leakedCharacterTokens=deterministicCharacterOverlay
       ?[...prompt.matchAll(/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/giu)].map(match=>String(match[0]).toLowerCase())
       :[];

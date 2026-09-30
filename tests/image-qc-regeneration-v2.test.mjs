@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { buildTargetedRegeneration } from "../scripts/video-image-regenerate.mjs";
@@ -42,6 +43,16 @@ test("targeted regeneration mutates actual ComfyUI seed and prompt overrides", (
       seed: 123,
       request: {
         prompt_contract_ref: sceneRef,
+        prompt_application: {
+          schema:"HIBOU_IMAGE_PROMPT_APPLICATION_V2",
+          prompt_node_id:"6",
+          prompt_input:"text",
+          compiled_prompt_sha256:createHash("sha256").update("original visual prompt").digest("hex"),
+          image_prompt_component_included:true,
+          visual_idea_component_included:true,
+          preservation:{status:"PASS"}
+        },
+        seed_application:{schema:"HIBOU_IMAGE_SEED_APPLICATION_V1",seed_node_id:"25",seed_input:"noise_seed",seed:123},
         overrides: {
           "6": { text: "original visual prompt" },
           "25": { noise_seed: 123 },
@@ -50,6 +61,16 @@ test("targeted regeneration mutates actual ComfyUI seed and prompt overrides", (
       },
       fallback_request: {
         prompt_contract_ref: sceneRef,
+        prompt_application: {
+          schema:"HIBOU_IMAGE_PROMPT_APPLICATION_V2",
+          prompt_node_id:"6",
+          prompt_input:"text",
+          compiled_prompt_sha256:createHash("sha256").update("original visual prompt").digest("hex"),
+          image_prompt_component_included:true,
+          visual_idea_component_included:true,
+          preservation:{status:"PASS"}
+        },
+        seed_application:{schema:"HIBOU_IMAGE_SEED_APPLICATION_V1",seed_node_id:"25",seed_input:"noise_seed",seed:123},
         overrides: {
           "6": { text: "original visual prompt" },
           "25": { noise_seed: 123 },

@@ -115,6 +115,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
     if not image_path.exists():
         return {
             "scene_id": scene.get("scene_id"),
+            "candidate_id": scene.get("candidate_id"),
             "pass": False,
             "scores": {},
             "reasons": [f"image missing: {image_path}"],
@@ -186,6 +187,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
 
     return {
         "scene_id": scene.get("scene_id"),
+        "candidate_id": scene.get("candidate_id"),
         "image": str(image_path),
         "pass": not reasons,
         "scores": {k: round(v, 4) for k, v in scores.items()},

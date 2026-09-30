@@ -23,6 +23,21 @@ function writeLastRunPointer(root,statePath){
 }
 function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
 function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
+const V5_RUNTIME_GATES=[
+  "HIBOU_VIDEO_TIMELINE_V1",
+  "HIBOU_VIDEO_PLANNING_AUDIT_V1",
+  "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1",
+  "HIBOU_VIDEO_PROSODY_V1",
+  "HIBOU_VIDEO_MUSIC_V1",
+  "HIBOU_VIDEO_POSE_REGISTRY_V1",
+  "HIBOU_VIDEO_HUMAN_SELECTION_V1",
+  "HIBOU_VIDEO_CREATIVE_QC_V1",
+  "HIBOU_VIDEO_FACTUAL_GATE_V1"
+];
+export function enableV5RuntimeGates(env=process.env){
+  for(const name of V5_RUNTIME_GATES) env[name]="true";
+  return [...V5_RUNTIME_GATES];
+}
 function localRuntimeOverrideSource(repoPath,marker){
   if(!envFlag("HIBOU_LOCAL_RUNTIME_OVERRIDE")) return null;
   const root=String(process.env.HIBOU_LOCAL_REPO_ROOT||"").trim();
@@ -886,6 +901,9 @@ export async function main(){
   const regenAttempts=Number(arg("regen-attempts","1"));
   const reportAirtable=flag("report-airtable");
   const planOnly=flag("plan-only");
+  const enabledV5RuntimeGates=flag("enable-v5-runtime-gates")
+    ?enableV5RuntimeGates(process.env)
+    :[];
   if(!outputArg) fail("--output=<dir> required");
   if(!bindingArg) fail("--binding=<comfyui-binding.json> required");
   if(Boolean(contentId)===Boolean(storyboardArg)) fail("provide exactly one of --content=<Airtable record> or --storyboard=<json>");
@@ -931,6 +949,13 @@ export async function main(){
     publication_authorized:false
   };
   state.path=statePath;
+  state.runtime_feature_gates={
+    source:enabledV5RuntimeGates.length?"explicit_cli_enable_v5_runtime_gates":"environment",
+    cli_enabled:enabledV5RuntimeGates,
+    effective:Object.fromEntries(V5_RUNTIME_GATES.map(name=>[name,envFlag(name)])),
+    airtable_contract_still_required:true,
+    publication_authorized:false
+  };
   writeJson(statePath,state);
   writeLastRunPointer(root,statePath);
 

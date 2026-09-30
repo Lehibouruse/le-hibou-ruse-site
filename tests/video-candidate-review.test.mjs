@@ -68,6 +68,7 @@ function fixtures() {
         candidate: 1,
         path: "/tmp/s01-c1.png",
         perceptual_score: 80,
+        creative_semantic_score: 0.68,
         status: "PASS",
         reasons: [],
         warnings: ["low_sharpness"],
@@ -78,6 +79,7 @@ function fixtures() {
         candidate: 2,
         path: "/tmp/s01-c2.png",
         perceptual_score: 95,
+        creative_semantic_score: 0.74,
         status: "PASS",
         reasons: [],
         warnings: [],
@@ -145,6 +147,7 @@ test("candidate review preserves all candidates and sorts PASS before REJECT", (
     ["S01-C2", "S01-C1"],
   );
   assert.equal(scene.candidates[0].perceptual_score, 95);
+  assert.equal(scene.candidates[0].creative_semantic_score, 0.74);
   assert.deepEqual(scene.candidates[1].warnings, ["low_sharpness"]);
 });
 
@@ -205,6 +208,8 @@ test("contact sheet keeps recommendation machine visibly advisory", () => {
   assert.match(html, /S01-C2/);
   assert.match(html, /Brief effectif envoyé à ComfyUI/);
   assert.match(html, /two financing routes converge/);
+  assert.match(html, /Fidélité sémantique/);
+  assert.match(html, /0\.74/);
   assert.doesNotMatch(html, /publication_authorized=true/);
 });
 
@@ -280,6 +285,14 @@ test("candidate review fingerprint becomes stale when the effective compiled pro
   const changed=fixtures();
   changed.plan.requests[0].request.overrides["6"].text="SCENE_IMAGE_PROMPT: a different financial mechanism";
   changed.plan.requests[0].request.prompt_application.compiled_prompt_sha256="d".repeat(64);
+  const second=buildCandidateReview(changed);
+  assert.notEqual(first.review_fingerprint_sha256,second.review_fingerprint_sha256);
+});
+
+test("candidate review fingerprint changes when semantic fidelity changes",()=>{
+  const first=buildCandidateReview(fixtures());
+  const changed=fixtures();
+  changed.perceptualQc.rows[0].creative_semantic_score=0.31;
   const second=buildCandidateReview(changed);
   assert.notEqual(first.review_fingerprint_sha256,second.review_fingerprint_sha256);
 });

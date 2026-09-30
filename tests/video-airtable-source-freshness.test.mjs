@@ -114,6 +114,24 @@ test("V2 instructions are added to matching visual ideas while image prompts rem
   assert.equal(board.scenes[6].image.candidates.length,1);
 });
 
+test("linked 13 scenes override a stale nine-scene JSON draft",()=>{
+  const {content,profile,scenes}=fixture();
+  content.fields["Scènes JSON"]=JSON.stringify({contract_version:"HIBOU_VIDEO_CONTRACT_V4_DRAFT",
+    scenes:Array.from({length:9},(_,index)=>({scene_id:`OLD${index+1}`,narration:"obsolete"}))});
+  const board=buildStoryboardContract(content,scenes,profile);
+  assert.equal(board.scenes.length,13);
+  assert.equal(board.scenes[0].scene_id,"S01");
+  assert.deepEqual(board.content.source_warnings,[{
+    code:"LEGACY_SCENES_JSON_STALE_IGNORED",field:"Scènes JSON",authoritative_field:"Scènes vidéo",
+    legacy_scene_count:9,linked_scene_count:13
+  }]);
+  const snapshot=sourceSnapshot({content,profile,scenes});
+  assert.equal(verifyAirtableStoryboardSnapshot(board,snapshot).pass,true);
+  const updated=structuredClone(snapshot);
+  updated.content.fields["Scènes JSON"]="obsolete but unparsable";
+  assert.equal(verifyAirtableStoryboardSnapshot(board,updated).pass,true);
+});
+
 test("live Airtable source check accepts current export and rejects changed global, brief and scenes",async()=>{
   const {content,profile,scenes,loadRecord}=fixture();
   const board=buildStoryboardContract(content,scenes,profile);
@@ -250,6 +268,50 @@ test("video-master refuses a stale Airtable storyboard before reference, image o
     process.argv=previousArgv;
     if(previousToken===undefined) delete process.env.AIRTABLE_TOKEN;
     else process.env.AIRTABLE_TOKEN=previousToken;
+    rmSync(dir,{recursive:true,force:true});
+  }
+});
+
+test("master resume verifies the immutable Airtable source after derived storyboard changes",async()=>{
+  const live=fixture(V1);
+  live.profile.fields["Timeline intra-scène V1"]=true;
+  live.scenes=live.scenes.slice(0,8);
+  live.content.fields["Scènes vidéo"]=live.scenes.map(scene=>scene.id);
+  live.content.fields.Script=live.scenes.map(scene=>scene.fields.Narration).join(" ");
+  const board=buildStoryboardContract(live.content,live.scenes,live.profile);
+  const dir=mkdtempSync(join(tmpdir(),"hibou-source-resume-"));
+  const input=join(dir,"input.json");
+  const binding=join(dir,"binding.json");
+  const snapshot=join(dir,"snapshot.json");
+  const output=join(dir,"run");
+  writeFileSync(input,JSON.stringify(board));
+  writeFileSync(binding,"{}");
+  writeFileSync(snapshot,JSON.stringify(sourceSnapshot(live)));
+  const previousArgv=process.argv;
+  const previousTimeline=process.env.HIBOU_VIDEO_TIMELINE_V1;
+  process.argv=[process.execPath,resolve("scripts/video-master.mjs"),`--storyboard=${input}`,`--source-snapshot=${snapshot}`,`--binding=${binding}`,`--output=${output}`,"--preflight-only"];
+  process.env.HIBOU_VIDEO_TIMELINE_V1="true";
+  try{
+    await videoMasterMain();
+    const derivedPath=join(output,"storyboard.json");
+    const derived=JSON.parse(readFileSync(derivedPath,"utf8"));
+    derived.scenes[0].timeline={events:[{id:"derived",type:"camera",start_s:0,end_s:2,zoom_percent:3}]};
+    writeFileSync(derivedPath,JSON.stringify(derived));
+    await videoMasterMain();
+    const receipt=JSON.parse(readFileSync(join(output,"airtable-source-freshness.json"),"utf8"));
+    assert.equal(receipt.pass,true);
+    assert.equal(receipt.immutable_source,true);
+    assert.equal(receipt.verified_storyboard_path,join(output,"source-storyboard.json"));
+    const immutable=JSON.parse(readFileSync(join(output,"source-storyboard.json"),"utf8"));
+    assert.deepEqual(immutable,board);
+    immutable.scenes[0].image_prompt="tampered source";
+    writeFileSync(join(output,"source-storyboard.json"),JSON.stringify(immutable));
+    await assert.rejects(videoMasterMain(),/immutable source storyboard missing or changed/);
+    assert.equal(existsSync(join(output,"images")),false);
+  }finally{
+    process.argv=previousArgv;
+    if(previousTimeline===undefined) delete process.env.HIBOU_VIDEO_TIMELINE_V1;
+    else process.env.HIBOU_VIDEO_TIMELINE_V1=previousTimeline;
     rmSync(dir,{recursive:true,force:true});
   }
 });

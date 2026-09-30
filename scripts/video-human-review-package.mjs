@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { negativePolicyCoveragePass } from "./video-negative-policy-coverage.mjs";
 
 export const HUMAN_REVIEW_SCHEMA = "HIBOU_HUMAN_REVIEW_PACKAGE_V1";
 
@@ -35,12 +36,23 @@ export function buildHumanReviewPackage({
   masterQc = null,
   creativeQc = null,
   candidateReview = null,
+  imagePlan = null,
+  storyboard = null,
   artifactRegistry = null,
   incrementalPlan = null,
   reviewDiff = null,
 } = {}) {
   const blockers = [];
   const warnings = [];
+  const negativeCoverage = imagePlan?.negative_policy_coverage || null;
+  const negativePolicyRequired = storyboard?.content?.source === "airtable" ||
+    imagePlan?.creative_contract_enforced === true;
+  const negativeCoverageValid = negativePolicyCoveragePass(
+    negativeCoverage, storyboard?.creative?.negative_prompt,
+  );
+  if (negativePolicyRequired && !negativeCoverageValid) {
+    add(blockers, "global_negative_policy_coverage_missing_or_incomplete");
+  }
 
   const productionMode = String(
     masterResult?.production_mode ||
@@ -156,6 +168,15 @@ export function buildHumanReviewPackage({
       "original_identity",
       "Aucune dérive vers une imitation identifiable d’un concurrent",
     ),
+    ...(negativeCoverageValid ? negativeCoverage.groups : []).map(group => ({
+      ...checklistItem(
+        String(group.human_review_check_id || `negative_${group.id}`),
+        String(group.label || group.id),
+        (group.machine_evidence || []).map(String),
+      ),
+      source_exclusions: (group.clauses || []).map(String),
+      negative_policy_source_sha256: negativeCoverage.source_sha256,
+    })),
   ];
 
   const changedScenes = Array.isArray(incrementalPlan?.changed_scene_ids)
@@ -261,18 +282,24 @@ export function buildHumanReviewPackage({
         }
       : null,
     checklist,
+    negative_policy_source_sha256: negativeCoverageValid ? negativeCoverage.source_sha256 : null,
+    negative_policy_clause_count: negativeCoverageValid ? negativeCoverage.clause_count : 0,
+    negative_policy_review_check_ids: (negativeCoverageValid ? negativeCoverage.groups : []).map(group =>
+      String(group.human_review_check_id || `negative_${group.id}`)),
     policy: {
       machine_checks_never_equal_editorial_approval: true,
       all_checklist_items_require_human_decision: true,
       preview_cannot_be_finally_approved: true,
       publication_requires_separate_explicit_human_action: true,
+      negative_policy_checks_require_pass_status_and_human_pass: true,
+      negative_policy_coverage_is_not_pixel_compliance: true,
     },
     human_review_required: true,
     publication_authorized: false,
   };
 }
 
-if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const [rootArg, outputArg] = process.argv.slice(2);
   if (!rootArg) {
     throw new Error(
@@ -288,6 +315,8 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     masterQc: loadIf(resolve(root, "master-qc.json")),
     creativeQc: loadIf(resolve(root, "creative-qc.json")),
     candidateReview: loadIf(resolve(root, "images", "candidate-review.json")),
+    imagePlan: loadIf(resolve(root, "images", "image-plan.json")),
+    storyboard: loadIf(resolve(root, "storyboard.json")),
     artifactRegistry: loadIf(resolve(root, "artifact-registry.json")),
     incrementalPlan: loadIf(resolve(root, "incremental-retouch-plan.json")),
     reviewDiff: loadIf(resolve(root, "review-diff.json")),

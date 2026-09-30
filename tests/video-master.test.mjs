@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
-import { buildCompositionTimingQc, buildTechnicalSelections, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
+import { buildCompositionTimingQc, buildMasterSemanticFramePlan, buildTechnicalSelections, compareSemanticQcReports, enableV5RuntimeGates, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, specificCreativeBrief, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
 import { buildMotionPlan } from "../scripts/video-motion-plan.mjs";
 import { buildSceneCompositePlan } from "../scripts/video-scene-compositor.mjs";
 
@@ -154,4 +154,51 @@ test("job-level preview execution override is bounded and does not imply publica
  assert.deepEqual(p,{production_mode:"preview",candidates_per_scene:1});
  assert.throws(()=>normalizeExecutionProfileOverride({mode:"turbo",candidates:"1"}),/preview or final/);
  assert.throws(()=>normalizeExecutionProfileOverride({mode:"preview",candidates:"4"}),/1\.\.3/);
+});
+
+test("master semantic frame plan samples every scene after composition and keeps image_prompt + visual_idea cumulative",()=>{
+ const contract={scenes:[
+  {scene_id:"S01",order:1,planned_duration_s:4,image_prompt:"base diagram",visual_idea:"two flows converge",framing:{hibou:true}},
+  {scene_id:"S02",order:2,planned_duration_s:6,image_prompt:"second base",visual_idea:"bank disappears",framing:{hibou:false}}
+ ]};
+ assert.equal(specificCreativeBrief(contract.scenes[0]),"base diagram\ntwo flows converge");
+ const plan=buildMasterSemanticFramePlan(contract,{sampleRatio:0.5});
+ assert.equal(plan.schema,"HIBOU_MASTER_SEMANTIC_FRAME_PLAN_V1");
+ assert.equal(plan.frames.length,2);
+ assert.equal(plan.frames[0].sample_s,2);
+ assert.equal(plan.frames[1].sample_s,7);
+ assert.equal(plan.duration_s,10);
+ assert.equal(plan.frames[0].expected_hibou,true);
+ assert.match(plan.frames[1].brief,/second base\nbank disappears/);
+});
+
+test("semantic delta rejects a master that loses fidelity after crop/compositing",()=>{
+ const source={scenes:[
+  {scene_id:"S01",scores:{semantic_brief:0.72}},
+  {scene_id:"S02",scores:{semantic_brief:0.66}}
+ ]};
+ const good={scenes:[
+  {scene_id:"S01",scores:{semantic_brief:0.69}},
+  {scene_id:"S02",scores:{semantic_brief:0.64}}
+ ]};
+ const bad={scenes:[
+  {scene_id:"S01",scores:{semantic_brief:0.58}},
+  {scene_id:"S02",scores:{semantic_brief:0.64}}
+ ]};
+ assert.equal(compareSemanticQcReports(source,good,{maxDrop:0.08}).pass,true);
+ const result=compareSemanticQcReports(source,bad,{maxDrop:0.08});
+ assert.equal(result.pass,false);
+ assert.deepEqual(result.failed_scene_ids,["S01"]);
+ assert.equal(result.scenes[0].semantic_delta,-0.14);
+});
+
+test("manual V5 runtime gate activation exposes capabilities without bypassing Airtable feature flags",()=>{
+ const env={};
+ const enabled=enableV5RuntimeGates(env);
+ assert(enabled.includes("HIBOU_VIDEO_TIMELINE_V1"));
+ assert(enabled.includes("HIBOU_VIDEO_CREATIVE_QC_V1"));
+ assert(enabled.includes("HIBOU_VIDEO_FACTUAL_GATE_V1"));
+ assert.equal(enabled.length,9);
+ assert.equal(env.HIBOU_VIDEO_HUMAN_SELECTION_V1,"true");
+ assert.equal("publication_authorized" in env,false);
 });

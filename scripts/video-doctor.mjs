@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import net from "node:net";
 import { collectPreflight } from "./video-local-preflight.mjs";
 
@@ -24,6 +25,14 @@ export function decideVideoNextStep({preflight,installState={},comfyRunning=fals
   }
   if(voice.cuda_available===false){
     return {code:"FIX_VOICE_CUDA",command:"npm run video:doctor:windows",why:"Chatterbox installé mais CUDA non disponible"};
+  }
+  const creative=installState?.creative_qc||{};
+  if(creative.installed!==true||creative.model_cached!==true){
+    return {
+      code:"INSTALL_CREATIVE_QC",
+      command:"powershell -ExecutionPolicy Bypass -File .\\scripts\\video-local-install-windows.ps1 -InstallCreativeQc",
+      why:"QC créatif actif mais dépendances/modèle CLIP local non préparés"
+    };
   }
   const comfy=installState?.comfyui||{};
   if(!comfy.installed){
@@ -91,7 +100,7 @@ export async function collectVideoDoctor(){
   };
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const report=await collectVideoDoctor();
   process.stdout.write(JSON.stringify(report,null,2)+"\n");
   if(clean(report.next_step.code)==="FIX_GPU_DETECTION") process.exitCode=2;

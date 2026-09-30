@@ -52,6 +52,16 @@ export function promptApplicationVerified(request){
   }
   return true;
 }
+export function executionReceiptVerified(request,result){
+  const app=request?.prompt_application;
+  const receipt=result?.execution_receipt;
+  if(!app||receipt?.schema!=="HIBOU_COMFY_PROMPT_EXECUTION_V1"||receipt.prompt_verified!==true) return false;
+  const expected=String(app.compiled_prompt_sha256||"");
+  return Boolean(expected)
+    && receipt.compiled_prompt_sha256===expected
+    && receipt.applied_prompt_sha256===expected
+    && /^[a-f0-9]{64}$/i.test(String(receipt.workflow_sha256||""));
+}
 function loadExisting(path,contentId){
   if(!path||!existsSync(path)) return {schema:"HIBOU_IMAGE_BATCH_V1",content_id:contentId,results:{}};
   try{
@@ -102,13 +112,18 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
       item?.request?.prompt_contract_ref || item?.fallback_request?.prompt_contract_ref || null
     );
     const prior=state.results[key];
-    if(outputsStillExist(prior,requestFingerprint)){
-      const cachedRequest=prior?.fallback_used?item.fallback_request:item.request;
-      const applicationVerified=promptApplicationVerified(cachedRequest);
+    const cachedRequest=prior?.fallback_used?item.fallback_request:item.request;
+    const strictPromptProofRequired=promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2";
+    const cachedApplicationVerified=promptApplicationVerified(cachedRequest);
+    const cachedExecutionVerified=executionReceiptVerified(cachedRequest,prior);
+    if(outputsStillExist(prior,requestFingerprint)&&(
+      !strictPromptProofRequired||(cachedApplicationVerified&&cachedExecutionVerified)
+    )){
       prior.prompt_contract_ref=promptContractRef;
       prior.prompt_application=structuredClone(cachedRequest?.prompt_application||null);
+      prior.execution_receipt=structuredClone(prior?.execution_receipt||null);
       prior.prompt_contract_execution_verified=
-        promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&applicationVerified;
+        strictPromptProofRequired&&cachedApplicationVerified&&cachedExecutionVerified;
       cacheHits+=1;
       continue;
     }
@@ -152,14 +167,16 @@ export async function executeImagePlan(plan,{runner=runImageGen,manifestPath="",
       generatedCandidateDurations.push(elapsedMs);
       const executedRequest=fallbackUsed?item.fallback_request:item.request;
       const applicationVerified=promptApplicationVerified(executedRequest);
+      const executionVerified=executionReceiptVerified(executedRequest,result);
       state.results[key]={
         status:"completed",scene_id:item.scene_id,candidate:item.candidate,seed:item.seed,
         request_fingerprint:requestFingerprint,
         job_id:result.job_id,request_sha256:result.request_sha256,outputs:result.outputs||[],attempts:result.attempts??null,
         prompt_contract_ref:promptContractRef,
         prompt_application:structuredClone(executedRequest?.prompt_application||null),
+        execution_receipt:structuredClone(result?.execution_receipt||null),
         prompt_contract_execution_verified:
-          promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&applicationVerified,
+          promptContractRef?.schema==="HIBOU_PROMPT_CONTRACT_REF_V2"&&applicationVerified&&executionVerified,
         fallback_used:fallbackUsed,primary_error:primaryError,error:"",
         generation_started_at:new Date(candidateStartedMs).toISOString(),
         generation_finished_at:new Date(candidateFinishedMs).toISOString(),

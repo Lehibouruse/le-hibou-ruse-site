@@ -9,6 +9,7 @@ const readyPreflight={
 };
 const baseState={
   voice:{installed:true,cuda_available:true},
+  creative_qc:{installed:true,model_cached:true},
   comfyui:{installed:true},
   flux_schnell_fp8:{installed:true,hash_verified:true}
 };
@@ -20,7 +21,8 @@ test("doctor blocks before GPU detection",()=>{
 
 test("doctor walks installation stages deterministically",()=>{
   assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:{},comfyRunning:false}).code,"INSTALL_VOICE");
-  assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:{voice:{installed:true,cuda_available:true}},comfyRunning:false}).code,"INSTALL_COMFYUI");
+  assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:{voice:{installed:true,cuda_available:true}},comfyRunning:false}).code,"INSTALL_CREATIVE_QC");
+  assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:{voice:{installed:true,cuda_available:true},creative_qc:{installed:true,model_cached:true}},comfyRunning:false}).code,"INSTALL_COMFYUI");
   assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:{...baseState,flux_schnell_fp8:{installed:false}},comfyRunning:false}).code,"INSTALL_FLUX");
   assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:baseState,comfyRunning:false}).code,"START_COMFYUI");
   assert.equal(decideVideoNextStep({preflight:readyPreflight,installState:baseState,comfyRunning:true}).code,"RUN_ONE_SCENE_SMOKE");

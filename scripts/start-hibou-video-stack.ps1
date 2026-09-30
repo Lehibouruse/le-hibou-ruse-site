@@ -33,6 +33,16 @@ if ([string]::IsNullOrWhiteSpace($Token) -or $Token.Length -lt 32) {
   throw "HIBOU_LOCAL_REPORT_TOKEN absent ou invalide dans les variables utilisateur Windows."
 }
 
+$AirtableToken = [Environment]::GetEnvironmentVariable("AIRTABLE_TOKEN", "Process")
+if ([string]::IsNullOrWhiteSpace($AirtableToken)) {
+  $AirtableToken = Get-UserEnv "AIRTABLE_TOKEN"
+}
+if ([string]::IsNullOrWhiteSpace($AirtableToken)) {
+  throw "AIRTABLE_TOKEN absent des variables utilisateur/processus Windows."
+}
+$env:AIRTABLE_TOKEN = $AirtableToken
+Remove-Variable AirtableToken
+
 if (-not (Test-Path $ProjectRoot)) {
   throw "Depot Hibou introuvable : $ProjectRoot"
 }

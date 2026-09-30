@@ -5,6 +5,7 @@ import hashlib
 import inspect
 import importlib.metadata
 import json
+import math
 import os
 import random
 import re
@@ -12,7 +13,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V4_IDENTITY_LOCK_FINAL_EDGE"
+ENGINE_REVISION = "HIBOU_CHATTERBOX_BATCH_V5_PROSODY_NATIVE_WITH_IDENTITY_LOCK"
 
 def fail(message):
     raise RuntimeError(message)
@@ -86,6 +87,28 @@ def load_cache(manifest_path, scene_path, fingerprint, bounds):
         return data
     except Exception:
         return None
+
+def apply_prosody_native_controls(base, mapped, identity_lock):
+    """Apply supported Chatterbox controls without changing speaker reference or seed."""
+    native = dict(base)
+    if not isinstance(mapped, dict):
+        return native
+    limits = {
+        "exaggeration": (0.25, 2.0, 0.25),
+        "temperature": (0.05, 5.0, 0.25),
+        "cfg_weight": (0.0, 1.0, 0.15),
+    }
+    for key, (minimum, maximum, locked_delta) in limits.items():
+        if key not in mapped:
+            continue
+        value = float(mapped[key])
+        if not math.isfinite(value) or value < minimum or value > maximum:
+            fail(f"invalid prosody native control: {key}")
+        if identity_lock:
+            baseline = float(base[key])
+            value = max(baseline - locked_delta, min(baseline + locked_delta, value))
+        native[key] = value
+    return native
 
 if len(sys.argv) < 3:
     fail("usage: chatterbox-storyboard-batch.py storyboard.json output_dir")
@@ -329,13 +352,13 @@ def generate_prosody_scene(model, item, np, torch, sample_rate):
         tts_text = str(unit.get("tts_text") or "")
         if not tts_text:
             fail(f"{item['scene_id']}: empty prosody unit")
-        native = dict(item["native"])
         mapped = unit.get("chatterbox_native") or {}
-        if not voice_identity_lock:
-            for key in ("exaggeration", "temperature", "cfg_weight"):
-                if key in mapped:
-                    native[key] = float(mapped[key])
+        native = apply_prosody_native_controls(item["native"], mapped, voice_identity_lock)
         native["seed"] = int(item["native"]["seed"]) if voice_identity_lock else int(item["native"]["seed"]) + index - 1
+        applied_fields = [
+            key for key in ("exaggeration", "temperature", "cfg_weight")
+            if native[key] != item["native"][key]
+        ]
         set_seed(native["seed"], np, torch, device)
         before_ms = max(0, int(unit.get("pause_before_ms") or 0))
         after_ms = max(0, int(unit.get("pause_after_ms") or 0))
@@ -363,6 +386,7 @@ def generate_prosody_scene(model, item, np, torch, sample_rate):
             "emphasis": unit.get("emphasis"),
             "intent": unit.get("intent"),
             "chatterbox_native_used": native,
+            "native_control_fields_applied": applied_fields,
         })
         clear_cuda_cache()
     if not parts:
@@ -690,6 +714,10 @@ master = torch.cat(master_parts, dim=-1)
 master_path = output_dir / "voice-master.wav"
 ta.save(str(master_path), master, sample_rate)
 master_hash = sha256_file(master_path)
+prosody_native_unit_count = sum(
+    1 for row in scene_meta for unit in row["prosody_units_used"]
+    if unit.get("native_control_fields_applied")
+)
 
 updated = copy.deepcopy(contract)
 updated["contract_state"] = "storyboard"
@@ -708,6 +736,9 @@ updated["audio"] = {
     "voice_profile_runtime": {
         "profile_id": voice_profile_id,
         "profile_text_present": bool(voice_profile_text),
+        "profile_text_native_applied": False,
+        "profile_style_listening_review_required": bool(voice_profile_text),
+        "prosody_native_unit_count": prosody_native_unit_count,
         "audio_reference_present": bool(audio_prompt),
         "baseline_controls": {
             "exaggeration": default_exaggeration,
@@ -718,7 +749,8 @@ updated["audio"] = {
         "identity_lock_mode": "reference_audio" if audio_prompt else ("bootstrap_first_scene" if bootstrap_voice_reference else ("deterministic_seed_controls" if voice_identity_lock else "unlocked")),
         "bootstrap_reference_path": bootstrap_reference_path,
         "bootstrap_reference_sha256": bootstrap_reference_hash,
-        "scene_native_variation_enabled": not voice_identity_lock,
+        "scene_native_variation_enabled": (not voice_identity_lock) or prosody_native_unit_count > 0,
+        "scene_native_variation_bounded_by_identity_lock": voice_identity_lock,
         "prosody_timing_overrides_supported": True,
         "edge_fade_ms": 6,
         "scene_prosody_overrides_supported": True,

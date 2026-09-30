@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildImagePlan as buildImagePlanSource, normalizeProductionMode, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
@@ -52,6 +52,14 @@ test("image plan binds only declared workflow prompt and seed inputs",()=>{
  assert.equal(typeof r.prompt_application.compiled_image_prompt_sha256,"string");
  assert.equal(typeof r.prompt_application.compiled_visual_idea_sha256,"string");
  assert.equal(typeof r.overrides["25"].noise_seed,"number");
+ assert.equal(r.seed_application.schema,"HIBOU_IMAGE_SEED_APPLICATION_V1");
+ assert.equal(r.seed_application.seed_node_id,"25");
+ assert.equal(r.seed_application.seed_input,"noise_seed");
+ assert.equal(r.seed_application.seed,r.overrides["25"].noise_seed);
+ assert.match(r.workflow_sha256,/^[a-f0-9]{64}$/);
+ assert.ok(r.prompt_application.compiled_prompt_chars>0);
+ assert.ok(r.prompt_application.compiled_prompt_words>0);
+ assert.ok(r.prompt_application.compiled_prompt_lines>0);
  assert.equal(r.endpoint,"http://127.0.0.1:8188");
 });
 
@@ -412,4 +420,53 @@ test("V2 financial montage survives glyph-free compilation",()=>{
  assert.match(prompt,/IMAGE_FINANCIAL_MECHANIC_LOCK/);
  assert.doesNotMatch(prompt,/2026|2027|2028|2029|ROULER LE FINANCEMENT/);
  assert.equal(request.prompt_application.preservation.status,"PASS");
+});
+
+test("character scrub keeps generic financial geometry even without a recognized action verb",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+  style_lock:"STYLE: illustration éditoriale 2D premium",
+  negative_prompt:"no photorealism",
+  character_lock:"canonical character",
+  content_brief:"specific",
+  reference_mode:"deterministic_character_overlay",
+  text_in_generated_images:false
+ };
+ good.scenes=[{
+  scene_id:"GEOMETRY",
+  image_prompt:"Le Hibou est placé entre quatre blocs financiers distincts qui convergent par deux flux vers un actif commun.",
+  visual_idea:"",
+  framing:{hibou:true,type:"schéma",anchor:"center"}
+ }];
+ const plan=buildImagePlan(good,binding);
+ const prompt=plan.requests[0].request.overrides["6"].text;
+ assert.doesNotMatch(prompt,/\bhibou\b/i);
+ assert.match(prompt,/quatre blocs financiers distincts/i);
+ assert.match(prompt,/deux flux/i);
+ assert.match(prompt,/actif commun/i);
+ assert.match(prompt,/zone centrale réservée/i);
+});
+
+test("image prompt reserves a central semantic safe zone against crop and micro-zoom",()=>{
+ const p=buildImagePlan(contract,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.match(prompt,/OUTPUT_SAFE_ZONE_LOCK/);
+ assert.match(prompt,/critical financial block, arrow, relationship, comparison and focal object/i);
+ assert.match(prompt,/outer edges as expendable background/i);
+});
+
+test("workflow content hash changes when the ComfyUI graph changes at the same path",()=>{
+ const first=buildImagePlan(contract,binding);
+ const before=first.requests[0].request.workflow_sha256;
+ const original=readFileSync(workflowPath,"utf8");
+ try{
+  const graph=JSON.parse(original);
+  graph["6"].inputs.text="workflow template changed";
+  writeFileSync(workflowPath,JSON.stringify(graph));
+  const second=buildImagePlan(contract,binding);
+  assert.notEqual(second.requests[0].request.workflow_sha256,before);
+ }finally{
+  writeFileSync(workflowPath,original);
+ }
 });

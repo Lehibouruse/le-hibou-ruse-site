@@ -9,8 +9,35 @@ function fail(message){ throw new Error(message); }
 function sha256(path){ return createHash("sha256").update(readFileSync(path)).digest("hex"); }
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
+function lastRunPointerPath(){
+  const base=String(process.env.LOCALAPPDATA||process.env.HOME||".").trim()||".";
+  return resolve(base,"LeHibou","last-video-run.json");
+}
+function writeLastRunPointer(root,statePath){
+  writeJson(lastRunPointerPath(),{
+    schema:"HIBOU_LAST_VIDEO_RUN_V1",
+    root:resolve(root),
+    state_path:resolve(statePath),
+    updated_at:new Date().toISOString()
+  });
+}
 function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
 function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
+const V5_RUNTIME_GATES=[
+  "HIBOU_VIDEO_TIMELINE_V1",
+  "HIBOU_VIDEO_PLANNING_AUDIT_V1",
+  "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1",
+  "HIBOU_VIDEO_PROSODY_V1",
+  "HIBOU_VIDEO_MUSIC_V1",
+  "HIBOU_VIDEO_POSE_REGISTRY_V1",
+  "HIBOU_VIDEO_HUMAN_SELECTION_V1",
+  "HIBOU_VIDEO_CREATIVE_QC_V1",
+  "HIBOU_VIDEO_FACTUAL_GATE_V1"
+];
+export function enableV5RuntimeGates(env=process.env){
+  for(const name of V5_RUNTIME_GATES) env[name]="true";
+  return [...V5_RUNTIME_GATES];
+}
 function localRuntimeOverrideSource(repoPath,marker){
   if(!envFlag("HIBOU_LOCAL_RUNTIME_OVERRIDE")) return null;
   const root=String(process.env.HIBOU_LOCAL_REPO_ROOT||"").trim();
@@ -191,6 +218,7 @@ const IMAGE_RUNTIME_FILES=[
   ["video-candidate-review.mjs","HIBOU_CANDIDATE_REVIEW_V1","scripts/video-candidate-review.mjs"],
   ["video-candidate-selection-apply.mjs","HIBOU_HUMAN_IMAGE_SELECTION_V1","scripts/video-candidate-selection-apply.mjs"],
   ["video-image-perceptual-qc.py","input must contain technical QC rows","scripts/video-image-perceptual-qc.py"],
+  ["video-creative-qc.py","HIBOU_CREATIVE_QC_V1","scripts/video-creative-qc.py"],
   ["rog-g814ji-rtx4070-8gb.json","VALIDATED_LOCAL_BASELINE","video/hardware/rog-g814ji-rtx4070-8gb.json"]
 ];
 
@@ -656,6 +684,70 @@ export function materializeSpecificActionTimelines(contract){
   };
 }
 
+export function specificCreativeBrief(scene){
+  return [
+    String(scene?.image_prompt||"").trim(),
+    String(scene?.visual_idea||"").trim()
+  ].filter(Boolean).join("\n");
+}
+
+export function buildMasterSemanticFramePlan(contract,{sampleRatio=0.55}={}){
+  const ratio=Math.min(0.85,Math.max(0.15,Number(sampleRatio)||0.55));
+  let cursor=0;
+  const frames=[];
+  for(const [index,scene] of (contract?.scenes||[]).entries()){
+    const duration=Number(scene?.planned_duration_s);
+    if(!Number.isFinite(duration)||duration<=0) fail(`scene ${scene?.scene_id||index+1}: invalid duration for semantic frame plan`);
+    const timestamp=cursor+(duration*ratio);
+    frames.push({
+      scene_id:String(scene?.scene_id||`S${String(index+1).padStart(2,"0")}`),
+      order:Number(scene?.order||index+1),
+      start_s:Number(cursor.toFixed(3)),
+      duration_s:Number(duration.toFixed(3)),
+      sample_s:Number(timestamp.toFixed(3)),
+      brief:specificCreativeBrief(scene),
+      expected_hibou:Boolean(scene?.framing?.hibou)
+    });
+    cursor+=duration;
+  }
+  return {
+    schema:"HIBOU_MASTER_SEMANTIC_FRAME_PLAN_V1",
+    sample_ratio:ratio,
+    duration_s:Number(cursor.toFixed(3)),
+    frames
+  };
+}
+
+export function compareSemanticQcReports(sourceReport,masterReport,{maxDrop=0.08}={}){
+  const limit=Math.max(0,Number(maxDrop)||0.08);
+  const sourceByScene=new Map((sourceReport?.scenes||[]).map(row=>[String(row?.scene_id||""),row]));
+  const rows=(masterReport?.scenes||[]).map(row=>{
+    const sceneId=String(row?.scene_id||"");
+    const source=sourceByScene.get(sceneId);
+    const before=Number(source?.scores?.semantic_brief);
+    const after=Number(row?.scores?.semantic_brief);
+    const comparable=Number.isFinite(before)&&Number.isFinite(after);
+    const delta=comparable?Number((after-before).toFixed(4)):null;
+    return {
+      scene_id:sceneId,
+      source_semantic_brief:comparable?before:null,
+      master_semantic_brief:comparable?after:null,
+      semantic_delta:delta,
+      max_allowed_drop:limit,
+      pass:!comparable||delta>=-limit
+    };
+  });
+  const failed=rows.filter(row=>!row.pass);
+  return {
+    schema:"HIBOU_MASTER_SEMANTIC_DELTA_V1",
+    pass:failed.length===0,
+    max_allowed_drop:limit,
+    failed_scene_ids:failed.map(row=>row.scene_id),
+    scenes:rows,
+    publication_authorized:false
+  };
+}
+
 export function buildTechnicalSelections(provisional){
   const out={};
   for(const [sceneId,pick] of Object.entries(provisional||{})){
@@ -810,9 +902,15 @@ export async function main(){
   const regenAttempts=Number(arg("regen-attempts","1"));
   const reportAirtable=flag("report-airtable");
   const planOnly=flag("plan-only");
+  const enabledV5RuntimeGates=flag("enable-v5-runtime-gates")
+    ?enableV5RuntimeGates(process.env)
+    :[];
   if(!outputArg) fail("--output=<dir> required");
   if(!bindingArg) fail("--binding=<comfyui-binding.json> required");
   if(Boolean(contentId)===Boolean(storyboardArg)) fail("provide exactly one of --content=<Airtable record> or --storyboard=<json>");
+  if(contentId&&!String(process.env.AIRTABLE_TOKEN||"").trim()){
+    fail("AIRTABLE_TOKEN missing; cannot export Airtable storyboard. Load the token into this PowerShell session or Windows user environment before video:master.");
+  }
   if(sourceSnapshotArg&&!storyboardArg) fail("--source-snapshot requires --storyboard=<json>; it does not replace Airtable export");
   if(sourceSnapshotArg&&!existsSync(resolve(sourceSnapshotArg))) fail("source snapshot file missing");
   if(!existsSync(resolve(bindingArg))) fail("binding file missing");
@@ -852,11 +950,19 @@ export async function main(){
     publication_authorized:false
   };
   state.path=statePath;
+  state.runtime_feature_gates={
+    source:enabledV5RuntimeGates.length?"explicit_cli_enable_v5_runtime_gates":"environment",
+    cli_enabled:enabledV5RuntimeGates,
+    effective:Object.fromEntries(V5_RUNTIME_GATES.map(name=>[name,envFlag(name)])),
+    airtable_contract_still_required:true,
+    publication_authorized:false
+  };
   writeJson(statePath,state);
+  writeLastRunPointer(root,statePath);
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","planning_audit","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","planning_audit","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_semantic_qc","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -1855,7 +1961,7 @@ export async function main(){
         scenes.push({
           scene_id:scene.scene_id,
           image:imagePath,
-          brief:String(scene.image_prompt||scene.visual_idea||""),
+          brief:specificCreativeBrief(scene),
           style_prompt:String(resolvedContract.creative?.style_lock||""),
           expected_hibou:false,
           hibou_composited_later:Boolean(scene.framing?.hibou)
@@ -1965,6 +2071,86 @@ export async function main(){
     auditPromptContract("render",renderReady);
     run(process.execPath,[postRuntime.render,renderReady,master]);
   });
+
+  const masterSemanticQcManifest=resolve(root,"master-semantic-qc-input.json");
+  const masterSemanticQcReport=resolve(root,"master-semantic-qc.json");
+  const masterSemanticFrameDir=resolve(root,"master-semantic-frames");
+  if(creativeQcEnabled){
+    stage(state,"master_semantic_qc",()=>{
+      auditPromptContract("master_semantic_qc",renderReady);
+      const promoted=json(renderReady);
+      const framePlan=buildMasterSemanticFramePlan(promoted);
+      mkdirSync(masterSemanticFrameDir,{recursive:true});
+      const scenes=[];
+      for(const row of framePlan.frames){
+        const framePath=resolve(masterSemanticFrameDir,`${String(row.order).padStart(2,"0")}-${row.scene_id}.jpg`);
+        run("ffmpeg",[
+          "-y","-loglevel","error",
+          "-ss",row.sample_s.toFixed(3),
+          "-i",master,
+          "-frames:v","1",
+          "-q:v","2",
+          framePath
+        ]);
+        scenes.push({
+          scene_id:row.scene_id,
+          image:framePath,
+          brief:row.brief,
+          style_prompt:String(promoted.creative?.style_lock||""),
+          expected_hibou:row.expected_hibou,
+          hibou_composited_later:false,
+          allow_postproduction_text:true,
+          sample_s:row.sample_s
+        });
+      }
+      writeJson(masterSemanticQcManifest,{
+        schema:"HIBOU_MASTER_SEMANTIC_QC_INPUT_V1",
+        prompt_contract_ref:{
+          schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+          contract_sha256:promptContractV2.contract_sha256,
+          global_sha256:promptContractV2.global_sha256,
+          scene_count:scenes.length
+        },
+        thresholds:storyboardData.creative?.creative_qc?.thresholds||{},
+        frame_plan:framePlan,
+        canonical_hibou:null,
+        scenes
+      });
+      const py=pythonCommand();
+      const model=String(storyboardData.creative?.creative_qc?.model||"").trim();
+      const args=[...py.prefix,postRuntime.creativeQc,masterSemanticQcManifest,"--output",masterSemanticQcReport];
+      if(model) args.push("--model",model);
+      run(py.cmd,args);
+      const report=json(masterSemanticQcReport);
+      auditPromptRef("master_semantic_qc_report",report.prompt_contract_ref);
+      const sourceReport=json(creativeQcReport);
+      const semanticDelta=compareSemanticQcReports(sourceReport,report,{
+        maxDrop:Number(storyboardData.creative?.creative_qc?.master_semantic_max_drop??0.08)
+      });
+      report.source_to_master_semantic_delta=semanticDelta;
+      if(!semanticDelta.pass){
+        report.status="REJECT";
+        report.failed_scene_count=Math.max(
+          Number(report.failed_scene_count||0),
+          semanticDelta.failed_scene_ids.length
+        );
+      }
+      writeJson(masterSemanticQcReport,report);
+      const semanticDeltaPath=resolve(root,"master-semantic-delta.json");
+      writeJson(semanticDeltaPath,semanticDelta);
+      state.master_semantic_qc_status=report.status;
+      state.master_semantic_qc_failed_scene_count=Number(report.failed_scene_count||0);
+      state.master_semantic_qc_frame_plan=framePlan;
+      state.master_semantic_delta={path:semanticDeltaPath,...semanticDelta};
+      writeJson(statePath,state);
+      if(report.status==="REJECT"&&storyboardData.creative?.creative_qc?.block_on_reject===true){
+        fail("post-render semantic QC rejected one or more master scenes");
+      }
+    });
+  }else if(!state.stages.master_semantic_qc){
+    state.stages.master_semantic_qc={status:"SKIPPED",reason:"creative QC runtime gate required"};
+    writeJson(statePath,state);
+  }
   const montageRenderAudit=await verifySpecificMontageRenderReceipt({
     root,storyboard:storyboardData,
     compositorPath:resolve(dirname(postRuntime.render),"video-scene-compositor.mjs")
@@ -2013,7 +2199,7 @@ export async function main(){
     "image_qc_review",
     "generated_text_qc",
     "technical_selection",
-    ...(creativeQcEnabled?["creative_qc","creative_qc_report"]:[]),
+    ...(creativeQcEnabled?["creative_qc","creative_qc_report","master_semantic_qc","master_semantic_qc_report"]:[]),
     ...(factualGateEnabled?["factual_gate","factual_gate_report"]:[]),
     "promotion",
     "render_ready",

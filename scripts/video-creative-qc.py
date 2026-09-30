@@ -5,7 +5,7 @@ No paid fallback. Model loading is local-files-only by default so a production
 worker never silently downloads or calls a remote inference API.
 """
 from __future__ import annotations
-import argparse, json, math, os
+import argparse, json, math, os, re
 from pathlib import Path
 
 SCHEMA = "HIBOU_CREATIVE_QC_V1"
@@ -56,6 +56,56 @@ def text_embedding(model, processor, device, torch, text: str):
         pooled = text_outputs.pooler_output
         return model.text_projection(pooled)
 
+def chunk_text(text: str, max_chars: int = 220):
+    """Cover an entire creative brief with CLIP-sized semantic chunks.
+
+    CLIP text encoders have a short context window. Splitting by semantic
+    boundaries prevents requirements near the end of a long visual brief from
+    being silently ignored by QC.
+    """
+    normalized = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not normalized:
+        return []
+    raw_parts = [p.strip() for p in re.split(r"(?<=[.!?;:])\s+|\n+", normalized) if p.strip()]
+    chunks = []
+    current = ""
+    for part in raw_parts:
+        words = part.split()
+        if len(part) > max_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+            piece = ""
+            for word in words:
+                candidate = (piece + " " + word).strip()
+                if piece and len(candidate) > max_chars:
+                    chunks.append(piece)
+                    piece = word
+                else:
+                    piece = candidate
+            if piece:
+                chunks.append(piece)
+            continue
+        candidate = (current + " " + part).strip()
+        if current and len(candidate) > max_chars:
+            chunks.append(current)
+            current = part
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks or [normalized]
+
+def chunked_similarity(image, model, processor, device, torch, text: str):
+    chunks = chunk_text(text)
+    if not chunks:
+        return None, None, 0
+    values = [
+        sim01(image, text_embedding(model, processor, device, torch, chunk))
+        for chunk in chunks
+    ]
+    return float(sum(values) / len(values)), float(min(values)), len(values)
+
 def sim01(a, b):
     return clamp01((cosine(a, b) + 1.0) / 2.0)
 
@@ -65,6 +115,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
     if not image_path.exists():
         return {
             "scene_id": scene.get("scene_id"),
+            "candidate_id": scene.get("candidate_id"),
             "pass": False,
             "scores": {},
             "reasons": [f"image missing: {image_path}"],
@@ -75,13 +126,25 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
     style = str(scene.get("style_prompt") or "premium editorial flat illustration, clean vector-like shapes, ivory background, dark navy, teal and restrained gold accents").strip()
     expected_hibou = scene.get("expected_hibou")
     hibou_composited_later = bool(scene.get("hibou_composited_later"))
+    allow_postproduction_text = bool(scene.get("allow_postproduction_text"))
     if hibou_composited_later:
         expected_hibou = False
     scores = {}
 
+    text_coverage = {}
     if brief:
-        scores["semantic_brief"] = sim01(image, text_embedding(model, processor, device, torch, brief))
-    scores["global_style"] = sim01(image, text_embedding(model, processor, device, torch, style))
+        semantic_mean, semantic_min, semantic_chunks = chunked_similarity(
+            image, model, processor, device, torch, brief
+        )
+        scores["semantic_brief"] = semantic_mean
+        scores["semantic_brief_min_chunk"] = semantic_min
+        text_coverage["semantic_brief_chunks"] = semantic_chunks
+    style_mean, style_min, style_chunks = chunked_similarity(
+        image, model, processor, device, torch, style
+    )
+    scores["global_style"] = style_mean
+    scores["global_style_min_chunk"] = style_min
+    text_coverage["global_style_chunks"] = style_chunks
 
     owl_prompt = "a stylized owl character, the canonical Le Hibou Ruse mascot"
     animal_prompt = "an animal or anthropomorphic character"
@@ -119,14 +182,17 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
         )
     if expected_hibou is True and "canonical_identity" in scores and scores["canonical_identity"] < min_identity:
         reasons.append(f"canonical Hibou drift: {scores['canonical_identity']:.3f} < {min_identity:.3f}")
-    if scores["text_artifact_risk"] > max_text_risk:
+    if not allow_postproduction_text and scores["text_artifact_risk"] > max_text_risk:
         reasons.append(f"possible parasitic/fake text: {scores['text_artifact_risk']:.3f} > {max_text_risk:.3f}")
 
     return {
         "scene_id": scene.get("scene_id"),
+        "candidate_id": scene.get("candidate_id"),
         "image": str(image_path),
         "pass": not reasons,
         "scores": {k: round(v, 4) for k, v in scores.items()},
+        "text_coverage": text_coverage,
+        "allow_postproduction_text": allow_postproduction_text,
         "reasons": reasons,
         "thresholds": {
             "semantic_brief_min": min_semantic,

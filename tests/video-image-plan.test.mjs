@@ -413,3 +413,29 @@ test("V2 financial montage survives glyph-free compilation",()=>{
  assert.doesNotMatch(prompt,/2026|2027|2028|2029|ROULER LE FINANCEMENT/);
  assert.equal(request.prompt_application.preservation.status,"PASS");
 });
+
+test("character scrub keeps generic financial geometry even without a recognized action verb",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+  style_lock:"STYLE: illustration éditoriale 2D premium",
+  negative_prompt:"no photorealism",
+  character_lock:"canonical character",
+  content_brief:"specific",
+  reference_mode:"deterministic_character_overlay",
+  text_in_generated_images:false
+ };
+ good.scenes=[{
+  scene_id:"GEOMETRY",
+  image_prompt:"Le Hibou est placé entre quatre blocs financiers distincts qui convergent par deux flux vers un actif commun.",
+  visual_idea:"",
+  framing:{hibou:true,type:"schéma",anchor:"center"}
+ }];
+ const plan=buildImagePlan(good,binding);
+ const prompt=plan.requests[0].request.overrides["6"].text;
+ assert.doesNotMatch(prompt,/\bhibou\b/i);
+ assert.match(prompt,/quatre blocs financiers distincts/i);
+ assert.match(prompt,/deux flux/i);
+ assert.match(prompt,/actif commun/i);
+ assert.match(prompt,/zone centrale réservée/i);
+});

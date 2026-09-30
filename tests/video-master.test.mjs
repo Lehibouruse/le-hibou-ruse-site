@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
-import { buildCompositionTimingQc, buildTechnicalSelections, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
+import { buildCompositionTimingQc, buildMasterSemanticFramePlan, buildTechnicalSelections, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, specificCreativeBrief, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
 import { buildMotionPlan } from "../scripts/video-motion-plan.mjs";
 import { buildSceneCompositePlan } from "../scripts/video-scene-compositor.mjs";
 
@@ -154,4 +154,20 @@ test("job-level preview execution override is bounded and does not imply publica
  assert.deepEqual(p,{production_mode:"preview",candidates_per_scene:1});
  assert.throws(()=>normalizeExecutionProfileOverride({mode:"turbo",candidates:"1"}),/preview or final/);
  assert.throws(()=>normalizeExecutionProfileOverride({mode:"preview",candidates:"4"}),/1\.\.3/);
+});
+
+test("master semantic frame plan samples every scene after composition and keeps image_prompt + visual_idea cumulative",()=>{
+ const contract={scenes:[
+  {scene_id:"S01",order:1,planned_duration_s:4,image_prompt:"base diagram",visual_idea:"two flows converge",framing:{hibou:true}},
+  {scene_id:"S02",order:2,planned_duration_s:6,image_prompt:"second base",visual_idea:"bank disappears",framing:{hibou:false}}
+ ]};
+ assert.equal(specificCreativeBrief(contract.scenes[0]),"base diagram\ntwo flows converge");
+ const plan=buildMasterSemanticFramePlan(contract,{sampleRatio:0.5});
+ assert.equal(plan.schema,"HIBOU_MASTER_SEMANTIC_FRAME_PLAN_V1");
+ assert.equal(plan.frames.length,2);
+ assert.equal(plan.frames[0].sample_s,2);
+ assert.equal(plan.frames[1].sample_s,7);
+ assert.equal(plan.duration_s,10);
+ assert.equal(plan.frames[0].expected_hibou,true);
+ assert.match(plan.frames[1].brief,/second base\nbank disappears/);
 });

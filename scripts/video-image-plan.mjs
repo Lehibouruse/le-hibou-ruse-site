@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { buildNegativePolicyCoverage } from "./video-negative-policy-coverage.mjs";
 
 function fail(message){throw new Error(message);}
 export function normalizeProductionMode(value){
@@ -61,9 +62,6 @@ function scrubOverlayCharacterClause(clause){
     .replace(/\s+(?:zone|espace|place)\s+[^,;.!?]*?\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
     .replace(/\s+(?:avec\s+)?(?:une?\s+)?(?:zone|espace|place)\s+[^,;.!?]*?\s+pour\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"");
 
-  // Never discard an otherwise useful financial/mechanical clause merely
-  // because it still mentions the character. Replace only the character
-  // reference; the deterministic Hibou is composited later.
   value=value
     .replace(/\b(?:le|la|un|une|the|an|a)\s+(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"la zone centrale réservée")
     .replace(/\bl[’'](?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"la zone centrale réservée")
@@ -109,13 +107,18 @@ function globalStyleSections(styleLock){
 }
 
 function imageStylePrompt(styleLock,{backgroundOnly=false}={}){
-  const sections=globalStyleSections(styleLock);
-  const extracted=extractStyleSection(styleLock);
-  const style=sections.STYLE||extracted||(!Object.keys(sections).length?String(styleLock||"").trim():"");
+  const baseStyle=String(styleLock||"").split(/ADDITIF V4\.4/iu)[0];
+  const sections=globalStyleSections(baseStyle);
+  const extracted=extractStyleSection(baseStyle);
+  const style=sections.STYLE||extracted||(!Object.keys(sections).length?baseStyle.trim():"");
   let decor=sections.DECOR||"";
   let coherence=sections.COHERENCE||"";
   const grammar=sections["GRAMMAIRE CONCURRENTIELLE ADAPTEE"]||"";
-  const denseFinanceAddendum=String(styleLock||"").match(/ADDITIF V4\.4[\s\S]*/iu)?.[0]||"";
+  // The complete GLOBAL lock remains hashed in prompt_contract_v2. The image
+  // encoder receives only the image-executable part, so scene intent stays in
+  // the first context window and policy notes do not crowd it out.
+  const denseFinanceAddendum=/ADDITIF V4\.4/iu.test(String(styleLock||""))?
+    "Preserve each scene's count, order and relations using distinct blank nodes, paired blocks, arrows, layers and temporal markers as needed. Leave all cards and surfaces unmarked for exact post-production text. Keep finance objects concrete and legible; avoid decorative graphs and generic glowing symbols.":"";
   decor=decor.replace(/\bet les sous-titres dominent\b/giu,"et la composition reste immédiatement lisible");
   if(backgroundOnly){
     decor=decor.replace(/\bla mascotte\b/giu,"le sujet principal composité ensuite");
@@ -127,7 +130,7 @@ function imageStylePrompt(styleLock,{backgroundOnly=false}={}){
     decor?`IMAGE_ENVIRONMENT_LOCK: ${decor}`:"",
     coherence?`IMAGE_COHERENCE_LOCK: ${coherence}`:"",
     grammar?`IMAGE_VISUAL_GRAMMAR_LOCK: ${grammar}`:"",
-    denseFinanceAddendum?`IMAGE_FINANCIAL_MECHANIC_LOCK: ${removeTextRiskSentences(denseFinanceAddendum)}`:"",
+    denseFinanceAddendum?`IMAGE_FINANCIAL_MECHANIC_LOCK: ${denseFinanceAddendum}`:"",
     reinforcement
   ].filter(Boolean).join("\n");
 }
@@ -366,6 +369,16 @@ export function buildImagePlan(contract,binding){
       fail("Airtable creative contract incomplete; refusing generic render: "+missing.join(", "));
     }
   }
+  const negativePolicyCoverage=airtableCreativeContract
+    ?buildNegativePolicyCoverage(negativeLock)
+    :null;
+  const coveredCategories=new Set((negativePolicyCoverage?.groups||[]).map(group=>group.id));
+  const negativeBackgroundPolicy=["people_absence","editorial_style","canonical_character","relevant_background"]
+    .some(id=>coveredCategories.has(id))
+    ?"BACKGROUND_POLICY: Unoccupied flat 2D adult editorial scene with relevant concrete objects in an ordinary contemporary French setting. Fixed approved characters are composited later.":"";
+  const negativeRelationPolicy=["readable_layout","financial_mechanics"]
+    .some(id=>coveredCategories.has(id))
+    ?"RELATION_POLICY: Preserve distinct entities, counts, order and cause-effect with purposeful blank elements; typography and brand are added later.":"";
   const creativeLockEnabled=Boolean(
     Object.keys(creative||{}).length
     && (
@@ -380,10 +393,8 @@ export function buildImagePlan(contract,binding){
   const textFreeLock=creativeLockEnabled?[
     "STRICT_GLYPH_FREE_LOCK:",
     "CLEAN_SURFACE_LOCK:",
-    "Absolutely no readable or pseudo-readable text anywhere in the generated image.",
-    "No letters, words, digits, dates, prices, percentages, labels, logos, signs, bank names, captions, currency glyphs, watermarks or typography-like marks.",
-    "If the concept requires a number, date, name or financial label, represent it only with unlabeled geometric markers, blank cards, bars, dots or abstract icons; exact text and numbers are composited later.",
-    "Keep plaques, paper surfaces, walls, screens and decorative panels blank and unmarked."
+    "No letters, words, digits, dates, prices, percentages, labels, logos, names, captions, currency glyphs, watermarks or pseudo-readable marks.",
+    "All surfaces remain blank and unmarked. Preserve concrete objects, quantities, layers, directions and relations; reserve blank areas for exact post-production text."
   ].join(" "):"";
   const modeCandidates=productionMode==="preview"
     ?Number(production.preview_candidates_per_scene??1)
@@ -469,15 +480,27 @@ export function buildImagePlan(contract,binding){
           framingLock,
           outputSafeZoneLock,
           compositionLock,
+          negativeBackgroundPolicy,
+          negativeRelationPolicy,
           textFreeLock,
           compiledSuffix
         ].filter(Boolean).join("\n")
       : [prefix,specificVisual,outputSafeZoneLock,suffix].filter(Boolean).join("\n");
+    const effectivePromptLimit=4096;
+    if(prompt.length>effectivePromptLimit){
+      fail(`${scene.scene_id}: effective FLUX prompt has ${prompt.length} characters, exceeds ${effectivePromptLimit}; refusing silent image-encoder loss`);
+    }
     const leakedCharacterTokens=deterministicCharacterOverlay
       ?[...prompt.matchAll(/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/giu)].map(match=>String(match[0]).toLowerCase())
       :[];
     if(leakedCharacterTokens.length){
       fail(`${scene.scene_id}: deterministic background prompt leaked character tokens: ${[...new Set(leakedCharacterTokens)].join(",")}`);
+    }
+    const missingNegativeMarkers=(negativePolicyCoverage?.groups||[])
+      .filter(group=>group.prompt_marker&&!prompt.includes(group.prompt_marker))
+      .map(group=>group.id);
+    if(missingNegativeMarkers.length){
+      fail(`${scene.scene_id}: GLOBAL negative policy prompt coverage missing: ${missingNegativeMarkers.join(",")}`);
     }
     const retention=(raw,compiled)=>raw.length?Number((compiled.length/raw.length).toFixed(3)):null;
     const imagePromptRetention=retention(sceneImagePrompt,compiledImagePrompt);
@@ -487,6 +510,13 @@ export function buildImagePlan(contract,binding){
       prompt_node_id:String(binding.prompt.node_id),
       prompt_input:String(binding.prompt.input),
       compiled_prompt_sha256:createHash("sha256").update(prompt).digest("hex"),
+      effective_prompt_chars:prompt.length,
+      effective_prompt_limit_chars:effectivePromptLimit,
+      specific_prompt_prefix_preserved:prompt.indexOf(specificVisual)<=compiledPrefix.length+1,
+      glyph_free_lock_present:!creativeLockEnabled||prompt.includes("STRICT_GLYPH_FREE_LOCK:"),
+      negative_policy_source_sha256:negativePolicyCoverage?.source_sha256||null,
+      negative_policy_categories:(negativePolicyCoverage?.groups||[]).map(group=>group.id),
+      negative_policy_prompt_coverage:missingNegativeMarkers.length===0,
       specific_sha256:promptSceneRef.specific_sha256,
       image_prompt_sha256:createHash("sha256").update(sceneImagePrompt).digest("hex"),
       compiled_image_prompt_sha256:createHash("sha256").update(compiledImagePrompt).digest("hex"),
@@ -494,9 +524,6 @@ export function buildImagePlan(contract,binding){
       compiled_visual_idea_sha256:createHash("sha256").update(compiledVisualIdea).digest("hex"),
       image_prompt_component_included:Boolean(compiledImagePrompt),
       visual_idea_component_included:Boolean(compiledVisualIdea&&compiledVisualIdea!==compiledImagePrompt),
-      compiled_prompt_chars:prompt.length,
-      compiled_prompt_words:prompt.split(/\s+/u).filter(Boolean).length,
-      compiled_prompt_lines:prompt.split(/\r?\n/u).filter(Boolean).length,
       preservation:{
         raw_image_prompt_chars:sceneImagePrompt.length,
         compiled_image_prompt_chars:compiledImagePrompt.length,
@@ -572,9 +599,9 @@ export function buildImagePlan(contract,binding){
       });
     }
   }
-  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:promptContract.contract_sha256,global_sha256:promptContract.global_sha256,scene_count:(promptContract.scenes||[]).length},creative_contract_enforced:airtableCreativeContract,creative_routing:{global_style_applied:Boolean(styleLock),global_character_policy_applied:Boolean(characterLock||creative.reference_mode),global_character_policy_applied_in_postproduction:String(creative.reference_mode||"")==="deterministic_character_overlay",global_negative_policy_present:Boolean(negativeLock),global_negative_policy_injected_as_literal_tokens:false,specific_content_brief_present:Boolean(contentBrief),specific_payload_authoritative:true,scene_image_prompt_applied:true,visual_idea_compiled_as_supplement:true,compiled_prompt_hash_bound:true,background_character_tokens_forbidden:true},scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
+  return {schema:"HIBOU_IMAGE_PLAN_V1",content_id:contentId,prompt_contract_ref:{schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:promptContract.contract_sha256,global_sha256:promptContract.global_sha256,scene_count:(promptContract.scenes||[]).length},creative_contract_enforced:airtableCreativeContract,negative_policy_coverage:negativePolicyCoverage,creative_routing:{global_style_applied:Boolean(styleLock),global_character_policy_applied:Boolean(characterLock||creative.reference_mode),global_character_policy_applied_in_postproduction:String(creative.reference_mode||"")==="deterministic_character_overlay",global_negative_policy_present:Boolean(negativeLock),global_negative_policy_injected_as_literal_tokens:false,specific_content_brief_present:Boolean(contentBrief),specific_payload_authoritative:true,scene_image_prompt_applied:true,visual_idea_compiled_as_supplement:true,compiled_prompt_hash_bound:true,background_character_tokens_forbidden:true},scene_count:contract.scenes.length,generation_scene_count:new Set(requests.map(x=>x.scene_id)).size,skipped_full_reuse,candidates_per_scene:candidatesPerScene,production_mode:productionMode,preview_profile_applied:productionMode==="preview"&&Boolean(binding.fallback_profile),request_count:requests.length,requests,size_binding:binding.size,profile:primaryProfile,fallback_profile:fallbackProfile||null,size_binding_repaired:Boolean(binding.size_binding_repaired),profile_migrated:Boolean(binding.profile_migrated),profile_migration:binding.profile_migration||null,fallback_profile_migrated:Boolean(binding.fallback_profile_migrated),hardware_profile_id:binding.hardware_profile_id||null,paid_fallback:false};
 }
-if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const [contractPath,bindingPath,outPath]=process.argv.slice(2);
   if(!contractPath||!bindingPath||!outPath) fail("usage: video-image-plan.mjs storyboard.json comfyui-binding.json image-plan.json");
   const contract=JSON.parse(readFileSync(resolve(contractPath),"utf8"));

@@ -260,6 +260,7 @@ function compareAirtableStoryboardSource(contract,content,profile,scenes,sourceD
     ...expected,
     pass:true,
     ...sourceDetails,
+    source_warnings:fresh.content.source_warnings||[],
     content_id:contentId,
     profile_record_id:profile.id,
     checked_at:new Date().toISOString()
@@ -339,6 +340,22 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
   for(const order of specificV2Addenda.keys()){
     if(!sceneOrders.has(order)) fail(`specific V2 scene ${order} has no linked Scènes vidéo record`);
   }
+  // Scènes JSON is a historical draft; only linked Scènes vidéo are authoritative.
+  const legacyRaw=String(content["Scènes JSON"]||"").trim();
+  let legacySceneCount=null;
+  if(legacyRaw){
+    try{
+      const legacy=JSON.parse(legacyRaw);
+      const list=Array.isArray(legacy)?legacy:legacy?.scenes;
+      if(Array.isArray(list)) legacySceneCount=list.length;
+    }catch{}
+  }
+  const sourceWarnings=legacyRaw?[{
+    code:legacySceneCount!==null&&legacySceneCount!==ordered.length?
+      "LEGACY_SCENES_JSON_STALE_IGNORED":"LEGACY_SCENES_JSON_IGNORED",
+    field:"Scènes JSON",authoritative_field:"Scènes vidéo",
+    legacy_scene_count:legacySceneCount,linked_scene_count:ordered.length
+  }]:[];
 
   let total=0;
   const scenes=ordered.map((record,index)=>{
@@ -413,6 +430,7 @@ export function buildStoryboardContract(contentRecord, sceneRecords, profileReco
       source_default_production_mode:String(profile["Mode production par défaut"]?.name||profile["Mode production par défaut"]||"final").trim().toLowerCase(),
       method_version:"VIDEO_METHOD_V4.3",
       source:"airtable",
+      source_warnings:sourceWarnings,
       exported_at:new Date().toISOString()
     },
     features:{

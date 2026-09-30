@@ -71,11 +71,12 @@ function xmlEscape(value) {
 export function applyWindowsDrawtextFont(filterComplex, {
   platform = process.platform,
   windowsDir = process.env.WINDIR || "C:\\Windows",
+  fontExists = existsSync,
 } = {}) {
   const source = String(filterComplex || "");
   if (platform !== "win32" || !source.includes("drawtext=")) return source;
   const fontFile = resolve(windowsDir, "Fonts", "arial.ttf");
-  if (!existsSync(fontFile)) return source;
+  if (!fontExists(fontFile)) return source;
   const escapedFont = ffmpegFilterPath(fontFile);
   return source.replaceAll("drawtext=", `drawtext=fontfile='${escapedFont}':`);
 }

@@ -33,6 +33,7 @@ export default async function Home() {
   const purchaseUrl = checkoutUrl ? (consentEnabled ? "/achat-guide" : checkoutUrl) : "";
   const purchaseEvent = consentEnabled ? "purchase_consent_opened" : "checkout_opened";
   const ctaText = config.ebook_cta || product["CTA texte"] || "Acheter le guide — 29 €";
+  const heroCtaText = purchaseUrl ? ctaText : "Découvrir le guide";
   const articles = articleRecords
     .filter((record) => record.fields.Publié && record.fields["À la une"])
     .slice(0, 6);
@@ -41,8 +42,8 @@ export default async function Home() {
     <>
       <header className="header"><nav className="nav" aria-label="Navigation principale">
         <Brand href="#top" logoUrl={logoUrl} />
-        <div className="navlinks"><a href="#ebook">Le guide</a><a href="#methode">D4 → D6</a>{articles.length > 0 && <a href="#articles">Décryptages</a>}<a href="#services">Services proposés</a></div>
-        <TrackedLink event="header_ebook_click" className="nav-cta" href="#ebook">Découvrir le guide</TrackedLink>
+        <div className="navlinks"><a href="/guide">Le guide</a><a href="#methode">D4 → D6</a>{articles.length > 0 && <a href="#articles">Décryptages</a>}<a href="#services">Services proposés</a></div>
+        <TrackedLink event="header_ebook_click" className="nav-cta" href="/guide">Découvrir le guide</TrackedLink>
       </nav></header>
 
       <main id="top">
@@ -50,7 +51,7 @@ export default async function Home() {
           <div className="eyebrow"><span /> Fiscalité · Argent · Patrimoine</div>
           <h1>{hero.Titre || "Comprendre les règles. Exploiter les failles."}</h1>
           <p>{hero["Sous-titre"] || "Des stratégies optimisées, ingénieuses, parfois agressives. Des cas concrets. Des chiffres. Les risques. Pas de morale."}</p>
-          <div className="actions"><TrackedLink event="hero_ebook_click" className="button" href="#ebook">{ctaText}</TrackedLink><TrackedLink event="hero_montage_click" className="text-link" href="#services">Étudier un montage <span>↗</span></TrackedLink></div>
+          <div className="actions"><TrackedLink event="hero_ebook_click" className="button" href="/guide">{heroCtaText}</TrackedLink><TrackedLink event="hero_montage_click" className="text-link" href="#services">Étudier un montage <span>↗</span></TrackedLink></div>
           <p className="hero-reassurance">Cas concrets · exemples chiffrés · risques explicités</p>
         </div><aside className="hero-card" aria-label="La méthode du Hibou"><img src={logoUrl} alt="Emblème du Hibou Rusé" /><p className="hero-card-title">Trois niveaux de montage. Jusqu’où peut-on pousser l’optimisation ?</p><div className="level-line"><strong>D4</strong><span>Solide et documenté</span></div><div className="level-line"><strong>D5</strong><span>Agressif mais argumentable</span></div><div className="level-line"><strong>D6</strong><span>Limite (borderline selon interprétation)</span></div></aside></div></section>
 
@@ -64,6 +65,7 @@ export default async function Home() {
           </ul>
           <div className="not-basic"><strong>Vous n’apprendrez pas ici les montages que l’on retrouve partout.</strong><span>PEA · assurance-vie · PER · Girardin · 150-0 B ter · LMNP · SCPI…</span></div>
           <p className="ebook-goal"><strong>L’objectif :</strong> des montages plus élaborés, plus originaux et parfois plus gris. Toujours avec leurs conditions, leurs limites et leur niveau de risque D4, D5 ou D6.</p>
+          <p><a href="/guide" className="text-link">Voir la présentation détaillée du guide ↗</a></p>
           <div className="price"><span className="price-amount">{config.ebook_price || product["Prix €"] || 29}&nbsp;€</span> <small>paiement unique</small></div>{purchaseUrl ? <><TrackedLink event={purchaseEvent} className="button" href={purchaseUrl} {...(!consentEnabled ? { target: "_blank", rel: "noopener noreferrer" } : {})}>{ctaText}</TrackedLink><p className="checkout-note">Paiement sécurisé par Lemon Squeezy, Merchant of Record · accès protégé envoyé par e-mail</p></> : <><button className="button disabled" disabled>{ctaText} · bientôt disponible</button><p className="checkout-note">Ouverture commerciale après validation des dépendances techniques.</p></>}
         </div><div className="book-mark" aria-label="Couverture du guide"><img src={logoUrl} alt="" /><span>LE GUIDE DU</span><strong>HIBOU<br />RUSÉ</strong><small>COMPRENDRE · EXPLOITER · ARBITRER</small></div></section>
 
@@ -75,7 +77,7 @@ export default async function Home() {
       </main>
 
       <footer className="footer"><div className="footer-inner"><Brand className="footer-brand" logoUrl={logoUrl} /><p>{footer.Contenu || "Contenus pédagogiques et informatifs. Le Hibou Rusé n’est pas un CGP et ne fournit pas de conseil juridique, fiscal ou financier individualisé réglementé."}</p><div><a href="/mentions-legales">Mentions légales</a><a href="/cgv">CGV</a><a href="/confidentialite">Confidentialité</a><a href="/conditions-utilisation">Conditions d’utilisation</a><a href="/retractation">Rétractation — informations légales</a></div></div></footer>
-      <TrackedLink event="mobile_ebook_click" className="mobile-cta" href="#ebook">Découvrir le guide · {config.ebook_price || product["Prix €"] || 29} €</TrackedLink>
+      <TrackedLink event="mobile_ebook_click" className="mobile-cta" href="/guide">Découvrir le guide{purchaseUrl ? ` · ${config.ebook_price || product["Prix €"] || 29} €` : ""}</TrackedLink>
     </>
   );
 }

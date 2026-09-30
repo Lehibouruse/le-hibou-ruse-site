@@ -1,22 +1,16 @@
 import { publicSiteOrigin } from "../lib/site-origin.mjs";
+import { getRecords, TABLES } from "../lib/airtable.js";
 
-const STATIC_ROUTES = [
-  "",
-  "/mentions-legales",
-  "/cgv",
-  "/confidentialite",
-  "/conditions-utilisation",
-  "/retractation",
-  "/suppression-donnees",
-];
+export const revalidate = 3600;
 
-export default function sitemap() {
+export default async function sitemap() {
   const origin = publicSiteOrigin();
-  const now = new Date();
-  return STATIC_ROUTES.map((path, index) => ({
-    url: `${origin}${path}`,
-    lastModified: now,
-    changeFrequency: index === 0 ? "daily" : "monthly",
-    priority: index === 0 ? 1 : 0.4,
-  }));
+  const records = await getRecords(TABLES.articles);
+  const articles = records
+    .filter((record) => record.fields?.Publié && record.fields?.Slug)
+    .map((record) => ({
+      url: `${origin}/articles/${encodeURIComponent(record.fields.Slug)}`,
+      ...(record.fields["Date publication"] ? { lastModified: new Date(record.fields["Date publication"]) } : {}),
+    }));
+  return [{ url: origin, priority: 1 }, { url: `${origin}/guide`, priority: 0.8 }, ...articles];
 }

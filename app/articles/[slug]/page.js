@@ -4,6 +4,18 @@ import { getRecords, TABLES } from "../../../lib/airtable";
 
 export const revalidate = 60;
 
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const articles = await getRecords(TABLES.articles);
+  const article = articles.find((record) => record.fields.Slug === slug && record.fields.Publié)?.fields;
+  if (!article) return { robots: { index: false, follow: false } };
+  return {
+    title: article["SEO titre"] || article.Titre,
+    description: article["SEO description"] || article.Résumé,
+    alternates: { canonical: `/articles/${encodeURIComponent(slug)}` },
+  };
+}
+
 export default async function ArticlePage({ params }) {
   const { slug } = await params;
   const articles = await getRecords(TABLES.articles);

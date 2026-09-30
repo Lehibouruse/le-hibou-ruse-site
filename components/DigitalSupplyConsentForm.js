@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { track } from "@vercel/analytics";
+import { currentAttribution, sendConversionEvent } from "../lib/conversion-client.mjs";
 
 export default function DigitalSupplyConsentForm({ mode = "disabled" }) {
   const [state, setState] = useState("idle");
@@ -23,10 +25,16 @@ export default function DigitalSupplyConsentForm({ mode = "disabled" }) {
           request_id: requestId.current,
           immediate_supply_consent: data.get("immediate_supply_consent") === "on",
           withdrawal_loss_ack: data.get("withdrawal_loss_ack") === "on",
+          attribution: currentAttribution(),
         }),
       });
       const payload = await response.json();
       if (!response.ok || !payload?.checkout_url) throw new Error(payload?.error || "Impossible d’ouvrir le checkout.");
+      try {
+        const attribution = currentAttribution();
+        track("checkout_created");
+        sendConversionEvent("checkout_click", attribution);
+      } catch {}
       window.location.assign(payload.checkout_url);
     } catch (cause) {
       setError(String(cause?.message || "Impossible d’ouvrir le checkout."));

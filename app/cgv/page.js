@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Conditions générales de vente" };
+export const metadata = { title: "Conditions générales de vente", description: "Conditions applicables à la vente du guide numérique Le Hibou Rusé.", robots: { index: false, follow: true } };
 
 export default function Page() {
   return <LegalPage title="Conditions générales de vente">

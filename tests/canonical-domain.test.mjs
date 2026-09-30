@@ -14,6 +14,12 @@ test("la redirection canonique est désactivée par défaut", () => {
   assert.equal(shouldCanonicalRedirect({ host: "le-hibou-ruse-site.vercel.app", accept: "text/html", env: {} }), false);
 });
 
+test("la preview Vercel reste inspectable malgré le réglage de redirection de production", () => {
+  const preview = { ...enabled, VERCEL_ENV: "preview" };
+  assert.equal(canonicalRedirectEnabled(preview), false);
+  assert.equal(shouldCanonicalRedirect({ host: "le-hibou-ruse-site-git-fix-site-funnel-20260930-le-hibou-ruse.vercel.app", accept: "text/html", env: preview }), false);
+});
+
 test("www et alias Vercel redirigent après activation", () => {
   assert.equal(shouldCanonicalRedirect({ host: "www.d4d5d6.com", accept: "text/html", env: enabled }), true);
   assert.equal(shouldCanonicalRedirect({ host: "le-hibou-ruse-site.vercel.app", accept: "text/html", env: enabled }), true);

@@ -1,24 +1,14 @@
 "use client";
 
 import { track } from "@vercel/analytics";
-import { captureAttribution, checkoutWithAttribution } from "../lib/attribution.mjs";
-import { sendConversionEvent } from "../lib/conversion-client.mjs";
-
-function currentAttribution() {
-  try {
-    return captureAttribution({
-      search: window.location.search,
-      href: window.location.href,
-      referrer: document.referrer,
-    });
-  } catch {
-    return {};
-  }
-}
+import Link from "next/link";
+import { checkoutWithAttribution } from "../lib/attribution.mjs";
+import { currentAttribution, sendConversionEvent } from "../lib/conversion-client.mjs";
 
 export default function TrackedLink({ event, children, onClick, ...props }) {
+  const Anchor = typeof props.href === "string" && (props.href.startsWith("/") || props.href.startsWith("#")) ? Link : "a";
   return (
-    <a
+    <Anchor
       {...props}
       onClick={(clickEvent) => {
         try {
@@ -33,6 +23,6 @@ export default function TrackedLink({ event, children, onClick, ...props }) {
       }}
     >
       {children}
-    </a>
+    </Anchor>
   );
 }

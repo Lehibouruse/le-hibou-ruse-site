@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   captureAttribution,
+  attributionProvenance,
   checkoutWithAttribution,
   normalizeAttribution,
   saleAttribution,
@@ -18,6 +19,16 @@ test("capture une campagne et conserve la landing initiale", () => {
   assert.equal(captured.utm_content, "video_042");
   assert.match(captured.landing_page, /^\//);
   assert.match(captured.referrer, /^https:\/\/www\.tiktok\.com/);
+});
+
+test("reconnaît une arrivée Google sans UTM sans inventer de campagne", () => {
+  const attribution = captureAttribution({
+    href: "https://d4d5d6.com/guide",
+    referrer: "https://www.google.fr/search?q=patrimoine",
+  });
+  assert.equal(attribution.referrer, "https://www.google.fr");
+  assert.equal(attribution.utm_source, undefined);
+  assert.equal(attributionProvenance(attribution), "Google organique");
 });
 
 test("un checkout Lemon non signé reçoit uniquement des custom data bornées", () => {
@@ -55,6 +66,21 @@ test("normalisation supprime contrôles et borne les valeurs", () => {
   assert.equal(normalized.utm_content.length, 160);
 });
 
+test("la page d'arrivée et le referrer ne conservent aucun secret de requête", () => {
+  const captured = captureAttribution({
+    href: "https://d4d5d6.com/merci?order=private-order-id&utm_source=google",
+    search: "?order=private-order-id&utm_source=google",
+    referrer: "https://example.com/access?token=private-token",
+  });
+  assert.equal(captured.landing_page, "/merci");
+  assert.equal(captured.utm_source, "google");
+  assert.equal(captured.referrer, "https://example.com");
+  const untrusted = normalizeAttribution({ landing_page: "/merci?order=private-order-id", referrer: "https://example.com/access?token=private-token" });
+  assert.equal(untrusted.landing_page, "/merci");
+  assert.equal(untrusted.referrer, "https://example.com");
+  assert.doesNotMatch(JSON.stringify({ captured, untrusted }), /private-order-id|private-token/);
+});
+
 test("génère un lien social traçable par provider et création", () => {
   const url = new URL(socialCampaignUrl({
     provider: "instagram",
@@ -82,7 +108,7 @@ test("les custom data Lemon deviennent une attribution vente", () => {
     utm_medium: "organic_social",
     utm_campaign: "serie_d5",
     utm_content: "reel_018",
-    landing_page: "/?utm_source=instagram",
-    referrer: "https://instagram.com/lehibouruse",
+    landing_page: "/",
+    referrer: "https://instagram.com",
   });
 });

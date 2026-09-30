@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { canonicalSale, escapeFormula, lemonOrder, resolveLemonWebhookSecret, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
-import { saleAttribution } from "../../../../lib/attribution.mjs";
+import { attributionProvenance, saleAttribution } from "../../../../lib/attribution.mjs";
 import { refundDeliveryStatus } from "../../../../lib/commerce-lease.mjs";
 import { digitalSupplyConsentAudit, validDigitalSupplyCustomData } from "../../../../lib/digital-supply-consent.mjs";
 
@@ -86,7 +86,7 @@ async function journal(order, status, note, externalId = "") {
 function attributionFields(order) {
   const attribution = saleAttribution(order.customData);
   return {
-    Provenance: attribution.utm_source || "Lemon Squeezy",
+    Provenance: attributionProvenance(attribution),
     Campagne: attribution.utm_campaign || "",
     "UTM Source": attribution.utm_source || "",
     "UTM Medium": attribution.utm_medium || "",
@@ -111,6 +111,7 @@ function orderAuditNotes(order, reasons = []) {
     `product_id=${order.productId}`,
     `variant_id=${order.variantId}`,
     `test_mode=${order.testMode}`,
+    `session_id=${saleAttribution(order.customData).session_id || ""}`,
     ...digitalSupplyConsentAudit(order.customData),
     ...reasons,
   ].filter(Boolean).join("; ");

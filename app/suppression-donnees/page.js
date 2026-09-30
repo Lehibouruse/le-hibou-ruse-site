@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Suppression des données" };
+export const metadata = { title: "Suppression des données", description: "Demander la suppression des données liées au site Le Hibou Rusé.", robots: { index: false, follow: true } };
 
 export default function Page() {
   return <LegalPage title="Suppression des données">

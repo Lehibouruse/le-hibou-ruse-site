@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { configMap, createRecord, queryAllRecords, queryRecords, TABLES } from "../../../../lib/airtable";
 import { createLiveLemonCheckout, createTestLemonCheckout } from "../../../../lib/lemon-api.mjs";
-import { DIGITAL_SUPPLY_CONSENT_VERSION, digitalSupplyCustomData } from "../../../../lib/digital-supply-consent.mjs";
+import { DIGITAL_SUPPLY_CONSENT_VERSION, consentCheckoutCustomData } from "../../../../lib/digital-supply-consent.mjs";
 import { escapeFormula } from "../../../../lib/commerce.mjs";
+import { vercelDeploymentOrigin } from "../../../../lib/vercel-deployment-origin.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export const maxDuration = 30;
 
 const MAX_BODY_BYTES = 4_000;
 const ALLOWED_ORIGINS = new Set(["https://d4d5d6.com", "https://www.d4d5d6.com", "https://le-hibou-ruse-site.vercel.app"]);
+if (vercelDeploymentOrigin()) ALLOWED_ORIGINS.add(vercelDeploymentOrigin());
 const RECEIPT_CONFIRMATION = "Vous avez demandé le commencement immédiat de la fourniture du guide numérique et reconnu la conséquence de cette demande sur votre droit de rétractation lorsque les conditions légales applicables sont réunies. Conservez cet e-mail et votre référence de commande.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -105,7 +107,7 @@ export async function POST(request) {
 
     const consentId = requestId;
     const consentAt = new Date().toISOString();
-    const checkoutCustomData = digitalSupplyCustomData({ consentId, consentAt, version });
+    const checkoutCustomData = consentCheckoutCustomData({ consentId, consentAt, version }, body.attribution || {});
     const base = publicBase(config);
     const common = {
       productName: clean(config.lemon_product_name) || "Guide du Hibou Rusé",

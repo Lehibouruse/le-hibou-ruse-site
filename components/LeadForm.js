@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { track } from "@vercel/analytics";
+import { currentAttribution } from "../lib/conversion-client.mjs";
 
 export default function LeadForm() {
   const [state, setState] = useState("idle");
@@ -13,7 +14,7 @@ export default function LeadForm() {
       const response = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        body: JSON.stringify({ ...Object.fromEntries(new FormData(form)), attribution: currentAttribution() }),
       });
       if (!response.ok) throw new Error("Lead submission failed");
       form.reset();
@@ -32,6 +33,7 @@ export default function LeadForm() {
       <label>Thèmes et contexte<textarea name="context" required maxLength={3500} rows={6} placeholder="Entreprise, immobilier, rémunération, fiscalité, patrimoine, crédit… Indiquez les sujets et contraintes que vous souhaitez explorer." /></label>
       <label>Ce que vous souhaitez comprendre<textarea name="need" required maxLength={2500} rows={5} placeholder="Les mécanismes, questions ou scénarios que vous souhaitez voir expliqués ou approfondis." /></label>
       <label className="honeypot" aria-hidden="true"><input name="company" tabIndex={-1} autoComplete="off" /></label>
+      <p className="form-privacy">Vos coordonnées et votre message servent à traiter votre demande. Évitez d’indiquer des données bancaires ou des identifiants. <a href="/confidentialite">Consulter la politique de confidentialité</a>.</p>
       <div className="form-footer">
         <button className="button" disabled={state === "sending"} type="submit">{state === "sending" ? "Envoi…" : "Envoyer"}</button>
         <p role="status" aria-live="polite">{state === "sent" && "Demande reçue. Le Hibou va l’étudier."}{state === "error" && "L’envoi a échoué. Réessayez dans quelques instants."}</p>

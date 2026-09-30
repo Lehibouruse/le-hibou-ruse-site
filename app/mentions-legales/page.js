@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Mentions légales" };
+export const metadata = { title: "Mentions légales", description: "Informations sur l’édition et l’hébergement du site Le Hibou Rusé.", robots: { index: false, follow: true } };
 
 export default function Page() {
   return <LegalPage title="Mentions légales">

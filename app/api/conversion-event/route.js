@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES } from "../../../lib/airtable";
 import { normalizeAttribution } from "../../../lib/attribution.mjs";
+import { vercelDeploymentOrigin } from "../../../lib/vercel-deployment-origin.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.d4d5d6.com",
   "https://le-hibou-ruse-site.vercel.app",
 ]);
+if (vercelDeploymentOrigin()) ALLOWED_ORIGINS.add(vercelDeploymentOrigin());
 
 function clean(value, max = 120) {
   return String(value || "").replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, max);

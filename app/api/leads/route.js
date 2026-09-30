@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createRecord, queryRecords, TABLES } from "../../../lib/airtable";
 import { escapeFormula } from "../../../lib/commerce.mjs";
+import { attributionProvenance, normalizeAttribution } from "../../../lib/attribution.mjs";
+import { vercelDeploymentOrigin } from "../../../lib/vercel-deployment-origin.mjs";
 
 const MAX_BODY_BYTES = 10_000;
 const ALLOWED_ORIGINS = new Set([
@@ -8,6 +10,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.d4d5d6.com",
   "https://le-hibou-ruse-site.vercel.app",
 ]);
+if (vercelDeploymentOrigin()) ALLOWED_ORIGINS.add(vercelDeploymentOrigin());
 
 const clean = (value, max) => String(value || "")
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
@@ -46,6 +49,7 @@ export async function POST(request) {
     const email = clean(body.email, 160).toLowerCase();
     const context = clean(body.context, 3500);
     const need = clean(body.need, 2500);
+    const attribution = normalizeAttribution(body.attribution || {});
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!validEmail || !context || !need) return json({ error: "Données invalides" }, 400);
 
@@ -63,8 +67,15 @@ export async function POST(request) {
       Besoin: need,
       Objectif: need,
       Statut: "Nouveau",
-      Notes: "Créé automatiquement depuis le formulaire Services proposés du site.",
-      Source: "Site — Services proposés",
+      Notes: [
+        "Créé automatiquement depuis le formulaire Services proposés du site.",
+        `session_id=${attribution.session_id || ""}`,
+        `utm_medium=${attribution.utm_medium || ""}`,
+        `utm_campaign=${attribution.utm_campaign || ""}`,
+        `utm_content=${attribution.utm_content || ""}`,
+        `landing_page=${attribution.landing_page || ""}`,
+      ].join("; "),
+      Source: `Site — Services proposés — ${attributionProvenance(attribution)}`,
       Date: new Date().toISOString(),
     });
     return json({ ok: true }, 201);

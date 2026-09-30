@@ -438,3 +438,91 @@ test("long GLOBAL methodology is summarized for the encoder while SPECIFIC leads
  specific.scenes[0].visual_idea="very long concrete instruction ".repeat(200);
  assert.throws(()=>buildImagePlan(specific,binding),/effective FLUX prompt.*exceeds/);
 });
+
+// Exact visual fields from the stopped 2026-09-30 run recvn3jMCkQcOBFvs.
+// Keep these as a regression: the long S01 sentence used to collapse to its
+// final style sentence, while its separate subject/face instructions survived.
+const auditedOverlayScenes=[{
+ scene_id:"lombard_box_v1_scene_01_hook",
+ image_prompt:"Unbranded contemporary French private-bank interior, restrained and credible, clear reception desk and subtle financial folders, warm ivory, dark green and muted gold palette, clean architectural lines, no marble palace, no luxury lobby cliché, no signage or text, clear empty foreground reserved for the canonical owl character overlay added later. Premium editorial 2D illustration.",
+ visual_idea:"Hook : le Hibou est grand au premier plan devant un établissement de banque privée français crédible et sobre. Il tient un contrat LOMBARD. Expression méfiante avec une pointe d’amusement. Architecture bancaire contemporaine, accueillante et lisible, sans luxe de palais ; entrée rapide puis léger zoom avant.",
+ framing:{hibou:true,type:"plan moyen",anchor:"centre"}
+},{
+ scene_id:"lombard_box_v1_scene_05_marge",
+ image_prompt:"Schéma financier minimal composé d’une base horizontale représentant le taux de marché et d’une couche supplémentaire ajoutée par une banque stylisée. Intégrer un calendrier graphique simple pouvant suggérer le passage d’une année à la suivante. Aucun texte généré ; tous les labels sont ajoutés ensuite.",
+ visual_idea:"Schéma extrêmement simple : base « taux de marché », puis la banque ajoute physiquement une couche de marge. Apparitions successives +1 %, puis +1,5 %. Calendrier qui tourne. Sur la fin, isoler « CHAQUE ANNÉE ».\n\n[ADDITIF SPÉCIFIQUE V2 — MONTAGE] SCÈNE 5 — Quatre beats ordonnés : (1) taux de marché ; (2) taux de marché + marge bancaire de 1 % ; (3) variante exclusive, taux de marché + marge bancaire de 1,5 %, jamais 1 % + 1,5 % ; (4) calendrier et répétition annuelle dans le scénario illustré avec « CHAQUE ANNÉE » dominant. Les beats courts peuvent partager une composition de 2,8–5 s. La marge s'ajoute au taux ; le calendrier n'affirme pas que tous les contrats Lombard sont renouvelés annuellement.",
+ framing:{hibou:false,type:"schéma",anchor:"centre"}
+}];
+function overlayContract(scenes=auditedOverlayScenes){
+ const input=structuredClone(contract);
+ input.content={...input.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ input.creative={style_lock:"STYLE: premium 2D editorial illustration. ADDITIF V4.4 — preserve finance relations.",
+   negative_prompt:"no humans, no human faces, no photorealism, no critical baked-in text",
+   character_lock:"canonical character",content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",text_in_generated_images:false};
+ input.scenes=structuredClone(scenes);
+ return input;
+}
+
+test("audited S01 retains the specific bank environment and finance props without orphaned character instructions",()=>{
+ const input=overlayContract();
+ const before=structuredClone(input);
+ const request=buildImagePlan(input,binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ const scenePrompt=prompt.split("SCENE_IMAGE_PROMPT: ")[1].split("\n")[0];
+ for(const detail of ["contemporary French private-bank interior","reception desk","financial folders",
+   "warm ivory","dark green and muted gold palette","clean architectural lines","no marble palace",
+   "no luxury lobby cliché","clear empty foreground"]){
+   assert.ok(scenePrompt.includes(detail),`S01 lost its scene-specific detail: ${detail}`);
+ }
+ assert.match(prompt,/un établissement de banque privée français crédible et sobre/);
+ assert.match(prompt,/Objet financier posé dans le décor : un contrat unlabeled concept/);
+ assert.match(prompt,/Architecture bancaire contemporaine/);
+ assert.match(prompt,/léger zoom avant/);
+ assert.doesNotMatch(prompt,/\b(?:hibou|owl|bird|mascot|mascotte)\b|\bIl tient\b|Expression méfiante|entrée rapide/iu);
+ assert.ok(request.prompt_application.preservation.image_prompt_retention_ratio>0.7);
+ assert.deepEqual(input,before,"compilation must not rewrite the source storyboard or its strict payload");
+});
+
+test("generation safety leads the prompt while S01 scene detail remains ahead of GLOBAL style",()=>{
+ const request=buildImagePlan(overlayContract(),binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert.ok(prompt.startsWith("IMAGE_SAFETY_PREFIX: Empty environment. No people, faces, characters, text or glyphs. Blank unmarked surfaces.\nSCENE_IMAGE_PROMPT: Unbranded contemporary French private-bank interior"));
+ assert.ok(prompt.indexOf("reception desk")<prompt.indexOf("SCENE_VISUAL_INTENT:"));
+ assert.ok(prompt.indexOf("SCENE_IMAGE_PROMPT:")<prompt.indexOf("IMAGE_STYLE_LOCK:"));
+ assert.ok(prompt.indexOf("STRICT_GLYPH_FREE_LOCK:")>prompt.indexOf("SCENE_IMAGE_PROMPT:"));
+ assert.equal(request.prompt_application.specific_prompt_prefix_preserved,true);
+ assert.equal(request.prompt_application.safety_prefix_present,true);
+});
+
+test("audited S05 keeps its base-plus-margin, exclusive variants and ordered annual mechanism",()=>{
+ const input=overlayContract();
+ const request=buildImagePlan(input,binding).requests.find(x=>x.scene_id.endsWith("05_marge")).request;
+ const prompt=request.overrides["6"].text;
+ assert.match(prompt,/base horizontale représentant le taux de marché et d’une couche supplémentaire ajoutée par une banque stylisée/);
+ assert.match(prompt,/la banque ajoute physiquement une couche de marge/);
+ assert.match(prompt,/Quatre beats ordonnés/);
+ assert.match(prompt,/taux de marché \+ marge bancaire de abstract percentage marker/);
+ assert.match(prompt,/variante exclusive/);
+ assert.match(prompt,/jamais abstract percentage marker \+ abstract percentage marker/);
+ assert.match(prompt,/calendrier et répétition annuelle dans le scénario illustré/);
+ assert.match(prompt,/La marge s'ajoute au taux/);
+ assert.match(prompt,/n'affirme pas que tous les contrats Lombard sont renouvelés annuellement/);
+ assert.doesNotMatch(prompt,/1\s*%|1,5\s*%|CHAQUE ANNÉE/);
+ assert.equal(request.prompt_application.preservation.status,"PASS");
+ assert.equal(request.prompt_application.preservation.character_overlay_sanitized,false);
+});
+
+test("overlay sanitation preserves comma-separated financial relations and decimal markers while replacing held props",()=>{
+ const input=overlayContract([{
+   scene_id:"MIXED",image_prompt:"Deux blocs reliés de gauche à droite, base puis couche de marge de 1,5 %, espace réservé au Hibou canonique.",
+   visual_idea:"He holds his financial folder in his right hand. Facial expression suspicious. Arrows point toward him.",
+   framing:{hibou:true,type:"schéma",anchor:"centre"}
+ }]);
+ const prompt=buildImagePlan(input,binding).requests[0].request.overrides["6"].text;
+ assert.match(prompt,/Deux blocs reliés de gauche à droite/);
+ assert.match(prompt,/base puis couche de marge de abstract percentage marker/);
+ assert.match(prompt,/Objet financier posé dans le décor : the financial folder/);
+ assert.match(prompt,/Arrows point toward a central empty area/);
+ assert.doesNotMatch(prompt,/\b(?:hibou|he|him|his|hand)\b|Facial expression|1,5/iu);
+});

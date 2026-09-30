@@ -617,6 +617,34 @@ function stableStoryboard(value) {
   return clone;
 }
 
+function verifiedExistingStoryboardPath(storyboardPath, pipelineStatePath) {
+  if (!existsSync(pipelineStatePath)) {
+    return existsSync(storyboardPath) ? storyboardPath : null;
+  }
+  const pipeline = JSON.parse(readFileSync(pipelineStatePath, "utf8"));
+  const source = pipeline.source_storyboard;
+  if (source === undefined) {
+    return existsSync(storyboardPath) ? storyboardPath : null;
+  }
+  const sourcePath = path.join(path.dirname(storyboardPath), "source-storyboard.json");
+  const freshnessPath = path.join(path.dirname(storyboardPath), "airtable-source-freshness.json");
+  if (pipeline.schema !== "HIBOU_VIDEO_MASTER_RUN_V1" ||
+      pipeline.stages?.storyboard?.status !== "PASS" ||
+      source?.immutable !== true || path.resolve(String(source.path || "")) !== sourcePath ||
+      !existsSync(sourcePath) || !existsSync(freshnessPath) ||
+      source.sha256 !== sha256(sourcePath)) {
+    throw new Error("VIDEO_RENDER immutable source storyboard missing or changed");
+  }
+  const freshness = JSON.parse(readFileSync(freshnessPath, "utf8"));
+  if (freshness.schema !== "HIBOU_AIRTABLE_SOURCE_FRESHNESS_V1" ||
+      freshness.pass !== true || freshness.immutable_source !== true ||
+      path.resolve(String(freshness.verified_storyboard_path || "")) !== sourcePath ||
+      freshness.verified_storyboard_sha256 !== source.sha256) {
+    throw new Error("VIDEO_RENDER immutable source freshness receipt mismatched");
+  }
+  return sourcePath;
+}
+
 function jsonEqual(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -1527,16 +1555,13 @@ async function processVideoRender(job, processed) {
   const masterPath = path.join(dir, "master.mp4");
 
   const incomingStoryboard = stableStoryboard(job.storyboard);
+  const existingStoryboardPath = verifiedExistingStoryboardPath(storyboardPath, pipelineStatePath);
   let existingStoryboard = null;
 
-  if (existsSync(storyboardPath)) {
-    try {
-      existingStoryboard = stableStoryboard(
-        JSON.parse(readFileSync(storyboardPath, "utf8")),
-      );
-    } catch {
-      existingStoryboard = null;
-    }
+  if (existingStoryboardPath) {
+    existingStoryboard = stableStoryboard(
+      JSON.parse(readFileSync(existingStoryboardPath, "utf8")),
+    );
   }
 
   if (
@@ -1548,11 +1573,13 @@ async function processVideoRender(job, processed) {
     );
   }
 
-  writeFileSync(
-    storyboardPath,
-    JSON.stringify(incomingStoryboard, null, 2) + "\n",
-    "utf8",
-  );
+  if (existingStoryboardPath === storyboardPath || !existsSync(storyboardPath)) {
+    writeFileSync(
+      storyboardPath,
+      JSON.stringify(incomingStoryboard, null, 2) + "\n",
+      "utf8",
+    );
+  }
 
   let sourceSnapshotPath = null;
   if (incomingStoryboard?.content?.source === "airtable") {
@@ -2144,7 +2171,7 @@ async function processVideoRender(job, processed) {
   if (sourceSnapshotPath) {
     const verifier = path.join(runtimeProjectRoot, "scripts", "video-airtable-sync.mjs");
     if (!existsSync(verifier)) throw new Error("VIDEO_RENDER source verifier missing");
-    const checked = spawnSync(process.execPath, [verifier, "verify", storyboardPath,
+    const checked = spawnSync(process.execPath, [verifier, "verify", existingStoryboardPath || storyboardPath,
       `--source-snapshot=${sourceSnapshotPath}`], {
       cwd: runtimeProjectRoot,
       encoding: "utf8",
@@ -2174,7 +2201,9 @@ async function processVideoRender(job, processed) {
       if (samePath && source.sha256 !== sha256(storyboardPath)) {
         source.sha256 = sha256(storyboardPath);
         pipeline.retry_migration = {
-          reason: "volatile_storyboard_export_timestamp_removed",
+          reason: existingStoryboardPath && existingStoryboardPath !== storyboardPath
+            ? "verified_immutable_source_derived_storyboard_resume"
+            : "volatile_storyboard_export_timestamp_removed",
           migrated_at: new Date().toISOString(),
         };
         writeFileSync(

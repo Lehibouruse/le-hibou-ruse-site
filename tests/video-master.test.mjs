@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
-import { buildCompositionTimingQc, buildMasterSemanticFramePlan, buildTechnicalSelections, compareSemanticQcReports, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, specificCreativeBrief, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
+import { buildCompositionTimingQc, buildMasterSemanticFramePlan, buildTechnicalSelections, compareSemanticQcReports, enableV5RuntimeGates, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, specificCreativeBrief, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
 import { buildMotionPlan } from "../scripts/video-motion-plan.mjs";
 import { buildSceneCompositePlan } from "../scripts/video-scene-compositor.mjs";
 
@@ -190,4 +190,15 @@ test("semantic delta rejects a master that loses fidelity after crop/compositing
  assert.equal(result.pass,false);
  assert.deepEqual(result.failed_scene_ids,["S01"]);
  assert.equal(result.scenes[0].semantic_delta,-0.14);
+});
+
+test("manual V5 runtime gate activation exposes capabilities without bypassing Airtable feature flags",()=>{
+ const env={};
+ const enabled=enableV5RuntimeGates(env);
+ assert(enabled.includes("HIBOU_VIDEO_TIMELINE_V1"));
+ assert(enabled.includes("HIBOU_VIDEO_CREATIVE_QC_V1"));
+ assert(enabled.includes("HIBOU_VIDEO_FACTUAL_GATE_V1"));
+ assert.equal(enabled.length,9);
+ assert.equal(env.HIBOU_VIDEO_HUMAN_SELECTION_V1,"true");
+ assert.equal("publication_authorized" in env,false);
 });

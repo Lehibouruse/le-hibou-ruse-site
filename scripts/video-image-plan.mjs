@@ -477,6 +477,9 @@ export function buildImagePlan(contract,binding){
       compiled_visual_idea_sha256:createHash("sha256").update(compiledVisualIdea).digest("hex"),
       image_prompt_component_included:Boolean(compiledImagePrompt),
       visual_idea_component_included:Boolean(compiledVisualIdea&&compiledVisualIdea!==compiledImagePrompt),
+      compiled_prompt_chars:prompt.length,
+      compiled_prompt_words:prompt.split(/\s+/u).filter(Boolean).length,
+      compiled_prompt_lines:prompt.split(/\r?\n/u).filter(Boolean).length,
       preservation:{
         raw_image_prompt_chars:sceneImagePrompt.length,
         compiled_image_prompt_chars:compiledImagePrompt.length,
@@ -521,6 +524,12 @@ export function buildImagePlan(contract,binding){
           timeout_seconds:Number(binding.timeout_seconds||600),
           max_retries:Number(binding.max_retries??1),
           prompt_application:structuredClone(promptApplication),
+          seed_application:{
+            schema:"HIBOU_IMAGE_SEED_APPLICATION_V1",
+            seed_node_id:String(binding.seed.node_id),
+            seed_input:String(binding.seed.input),
+            seed
+          },
           prompt_contract_ref:{
             schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
             contract_sha256:promptContract.contract_sha256,

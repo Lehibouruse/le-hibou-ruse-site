@@ -43,6 +43,7 @@ export function evaluatePromptContractRun(root){
   const generatedTextQc=file("images/generated-text-qc.json");
   const selections=file("images/selections.json");
   const creative=file("creative-qc.json");
+  const masterSemantic=file("master-semantic-qc.json");
   const masterQc=file("master-qc.json");
   const human=file("human-review.json");
   const semantic=file("semantic-review.json");
@@ -108,6 +109,9 @@ export function evaluatePromptContractRun(root){
       return Boolean(selected)&&row?.status==="PASS"&&Number(row?.perceptual_score)>=imageThreshold;
     }),
     creative_qc_pass:stage("creative_qc")&&creative?.status==="PASS",
+    post_render_semantic_qc_pass:stage("creative_qc")
+      ? stage("master_semantic_qc")&&masterSemantic?.status==="PASS"
+      : true,
     render_completed:stage("render")&&existsSync(resolve(root,"master.mp4")),
     master_qc_pass:stage("master_qc")&&masterQc?.status==="PASS",
     semantic_scene_review_pass:semantic?.pass===true&&

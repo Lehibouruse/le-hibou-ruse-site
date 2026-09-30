@@ -86,16 +86,59 @@ export function applyWorkflowOverrides(workflow, overrides = {}) {
   return copy;
 }
 
+function shaText(value) {
+  return createHash("sha256").update(String(value ?? ""), "utf8").digest("hex");
+}
+
+function shaCanonical(value) {
+  return createHash("sha256").update(JSON.stringify(canonical(value)), "utf8").digest("hex");
+}
+
+export function verifyComfyPromptExecution(request, workflow) {
+  const app = request?.prompt_application;
+  if (!app) return null;
+  if (!["HIBOU_IMAGE_PROMPT_APPLICATION_V1", "HIBOU_IMAGE_PROMPT_APPLICATION_V2"].includes(app.schema)) {
+    fail("unsupported prompt_application schema");
+  }
+  const nodeId = String(app.prompt_node_id || "");
+  const input = String(app.prompt_input || "");
+  const applied = workflow?.[nodeId]?.inputs?.[input];
+  if (typeof applied !== "string" || !applied.length) {
+    fail(`compiled prompt missing from applied workflow at ${nodeId}.${input}`);
+  }
+  const appliedSha = shaText(applied);
+  const expectedSha = String(app.compiled_prompt_sha256 || "");
+  if (!expectedSha || appliedSha !== expectedSha) {
+    fail("ComfyUI applied prompt hash mismatch before /prompt submission");
+  }
+  return {
+    schema: "HIBOU_COMFY_PROMPT_EXECUTION_V1",
+    prompt_verified: true,
+    prompt_node_id: nodeId,
+    prompt_input: input,
+    compiled_prompt_sha256: expectedSha,
+    applied_prompt_sha256: appliedSha,
+    workflow_sha256: shaCanonical(workflow),
+  };
+}
+
 function artifactRoot(request) {
   const root = resolve(process.env.HIBOU_VIDEO_OUTPUT_ROOT || ".hibou-video-artifacts");
   return resolve(root, safeId(request.content_id, "content_id"), safeId(request.scene_id, "scene_id"));
 }
 
-function manifestReusable(path, requestHash) {
+function manifestReusable(path, requestHash, request) {
   if (!existsSync(path)) return false;
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8"));
-    return parsed.request_sha256 === requestHash && (parsed.outputs || []).every(output => existsSync(output.path));
+    if (parsed.request_sha256 !== requestHash || !(parsed.outputs || []).every(output => existsSync(output.path))) return false;
+    if (request?.prompt_application) {
+      const receipt = parsed.execution_receipt;
+      return receipt?.schema === "HIBOU_COMFY_PROMPT_EXECUTION_V1" &&
+        receipt.prompt_verified === true &&
+        receipt.applied_prompt_sha256 === request.prompt_application.compiled_prompt_sha256;
+    }
+    return true;
   } catch { return false; }
 }
 
@@ -112,15 +155,22 @@ async function fetchJson(url, options = {}, timeoutMs = 15000) {
 
 export async function runImageGen(rawRequest) {
   const request = validateImageRequest(rawRequest);
-  const jobId = stableJobId("IMAGE_GEN", request);
+  const workflowFile = resolve(request.workflow_path);
+  const workflowBytes = readFileSync(workflowFile);
+  const workflowTemplateSha256 = createHash("sha256").update(workflowBytes).digest("hex");
+  if (request.workflow_sha256 && request.workflow_sha256 !== workflowTemplateSha256) {
+    fail("ComfyUI workflow content drifted after image plan creation");
+  }
+  const effectiveRequest = { ...request, workflow_sha256: workflowTemplateSha256 };
+  const jobId = stableJobId("IMAGE_GEN", effectiveRequest);
   const requestHash = jobId.split("-").at(-1);
   const outDir = resolve(artifactRoot(request), "images", jobId);
   const manifest = resolve(outDir, "manifest.json");
-  if (manifestReusable(manifest, requestHash)) return JSON.parse(readFileSync(manifest, "utf8"));
+  if (manifestReusable(manifest, requestHash, effectiveRequest)) return JSON.parse(readFileSync(manifest, "utf8"));
   mkdirSync(outDir, { recursive: true });
 
-  const workflowFile = resolve(request.workflow_path);
-  const workflow = applyWorkflowOverrides(JSON.parse(readFileSync(workflowFile, "utf8")), request.overrides || {});
+  const workflow = applyWorkflowOverrides(JSON.parse(workflowBytes.toString("utf8")), request.overrides || {});
+  const executionReceipt = verifyComfyPromptExecution(effectiveRequest, workflow);
   let lastError;
 
   for (let attempt = 0; attempt <= request.max_retries; attempt += 1) {
@@ -135,6 +185,9 @@ export async function runImageGen(rawRequest) {
       });
       const promptId = String(submitted?.prompt_id || "").trim();
       if (!promptId) fail("ComfyUI /prompt returned no prompt_id");
+      const submittedExecutionReceipt = executionReceipt
+        ? { ...executionReceipt, prompt_id: promptId }
+        : null;
       const deadline = Date.now() + request.timeout_seconds * 1000;
       let history;
       while (Date.now() < deadline) {
@@ -166,7 +219,17 @@ export async function runImageGen(rawRequest) {
         }
       }
       if (!outputs.length) fail("ComfyUI completed but no requested image output was found");
-      const result = { interface: request.interface, engine: request.engine, job_id: jobId, request_sha256: requestHash, attempts: attempt + 1, outputs, paid_fallback: false };
+      const result = {
+        interface: request.interface,
+        engine: request.engine,
+        job_id: jobId,
+        request_sha256: requestHash,
+        workflow_template_sha256: workflowTemplateSha256,
+        execution_receipt: submittedExecutionReceipt,
+        attempts: attempt + 1,
+        outputs,
+        paid_fallback: false
+      };
       writeFileSync(manifest, JSON.stringify(result, null, 2));
       return result;
     } catch (error) {

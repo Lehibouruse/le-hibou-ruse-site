@@ -80,6 +80,7 @@ test("windows scene drawtext uses an explicit font file and avoids Fontconfig lo
   const filter=applyWindowsDrawtextFont("[v]drawtext=text='Test':fontsize=30[out]",{
     platform:"win32",
     windowsDir:"C:\\Windows",
+    fontExists:()=>true,
   });
   assert.match(filter,/drawtext=fontfile='C\\:\/Windows\/Fonts\/arial\.ttf':/);
 });

@@ -38,6 +38,7 @@ export function evaluatePromptContractRun(root){
   const continuity=file("prompt-contract-continuity.json");
   const montage=file("specific-action-montage-audit.json")||file("planning/specific-action-montage-audit.json");
   const imagePlan=file("images/image-plan.json");
+  const imageBatch=file("images/batch-manifest.json");
   const imageQc=file("images/image-perceptual-qc.json");
   const generatedTextQc=file("images/generated-text-qc.json");
   const selections=file("images/selections.json");
@@ -51,6 +52,7 @@ export function evaluatePromptContractRun(root){
     storyboard?.creative?.production_defaults?.candidates_per_scene||2));
   const imageThreshold=Number(storyboard?.creative?.production_defaults?.image_qc_threshold||85);
   const imageRows=Array.isArray(imageQc?.rows)?imageQc.rows:[];
+  const completedExecutions=Object.values(imageBatch?.results||{}).filter(row=>row?.status==="completed");
   const stage=name=>state?.stages?.[name]?.status==="PASS";
   const byScene=new Map((semantic?.scenes||[]).map(row=>[String(row?.scene_id||""),row]));
   const timingByScene=new Map((timing?.scenes||[]).map(row=>[String(row?.scene_id||""),row]));
@@ -81,6 +83,17 @@ export function evaluatePromptContractRun(root){
     effective_image_prompts_preserved:requests.length>0&&requests.every(item=>
       preserved(item?.request)&&(!item?.fallback_request||preserved(item.fallback_request))
     ),
+    comfy_prompt_execution_verified:completedExecutions.length>0&&completedExecutions.every(row=>{
+      const receipt=row?.execution_receipt;
+      const app=row?.prompt_application;
+      return row?.prompt_contract_execution_verified===true&&
+        receipt?.schema==="HIBOU_COMFY_PROMPT_EXECUTION_V1"&&
+        receipt?.prompt_verified===true&&
+        Boolean(String(app?.compiled_prompt_sha256||""))&&
+        receipt?.compiled_prompt_sha256===app.compiled_prompt_sha256&&
+        receipt?.applied_prompt_sha256===app.compiled_prompt_sha256&&
+        /^[a-f0-9]{64}$/i.test(String(receipt?.workflow_sha256||""));
+    }),
     candidate_coverage_complete:scenes.length>0&&scenes.every(scene=>
       new Set(requests.filter(item=>item?.scene_id===scene.scene_id)
         .map(item=>String(item?.candidate_id||""))).size>=expectedCandidates

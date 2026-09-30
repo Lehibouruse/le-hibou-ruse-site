@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -7,22 +8,63 @@ import { mkdirSync } from "node:fs";
 function fail(m){throw new Error(m);}
 function load(path){return JSON.parse(readFileSync(resolve(path),"utf8"));}
 
+function shaText(value){
+  return createHash("sha256").update(String(value??""),"utf8").digest("hex");
+}
+
 function mutateRequest(request,{oldSeed,newSeed,promptSuffix}){
   if(!request||typeof request!=="object") return;
-  if(typeof request.prompt==="string"&&request.prompt.trim()){
-    request.prompt=request.prompt+" "+promptSuffix;
+  if(!request.overrides||typeof request.overrides!=="object"){
+    fail("targeted regeneration requires workflow overrides");
   }
+
+  const app=request.prompt_application;
+  if(!["HIBOU_IMAGE_PROMPT_APPLICATION_V1","HIBOU_IMAGE_PROMPT_APPLICATION_V2"].includes(app?.schema)){
+    fail("targeted regeneration requires prompt_application binding proof");
+  }
+  const promptNodeId=String(app.prompt_node_id||"");
+  const promptInput=String(app.prompt_input||"");
+  const promptNode=request.overrides?.[promptNodeId];
+  const currentPrompt=promptNode?.[promptInput];
+  if(typeof currentPrompt!=="string"||!currentPrompt.trim()){
+    fail("targeted regeneration cannot locate the bound ComfyUI prompt input");
+  }
+  const oldPromptSha=shaText(currentPrompt);
+  if(app.compiled_prompt_sha256&&oldPromptSha!==String(app.compiled_prompt_sha256)){
+    fail("targeted regeneration source prompt hash mismatch");
+  }
+  const nextPrompt=(currentPrompt+" "+promptSuffix).trim();
+  promptNode[promptInput]=nextPrompt;
+  app.compiled_prompt_sha256=shaText(nextPrompt);
+  app.regeneration={
+    schema:"HIBOU_PROMPT_REGENERATION_APPLICATION_V1",
+    base_compiled_prompt_sha256:oldPromptSha,
+    suffix_sha256:shaText(promptSuffix),
+    regenerated_compiled_prompt_sha256:app.compiled_prompt_sha256
+  };
+
   if(request.seed!==undefined&&Number(request.seed)===Number(oldSeed)){
     request.seed=newSeed;
   }
-  if(!request.overrides||typeof request.overrides!=="object") return;
-  for(const node of Object.values(request.overrides)){
-    if(!node||typeof node!=="object") continue;
-    for(const [key,value] of Object.entries(node)){
-      if(typeof value==="number"&&Number(value)===Number(oldSeed)){
-        node[key]=newSeed;
-      } else if(typeof value==="string"&&value.trim()){
-        node[key]=value+" "+promptSuffix;
+  const seedApp=request.seed_application;
+  if(seedApp?.schema==="HIBOU_IMAGE_SEED_APPLICATION_V1"){
+    const seedNodeId=String(seedApp.seed_node_id||"");
+    const seedInput=String(seedApp.seed_input||"");
+    const seedNode=request.overrides?.[seedNodeId];
+    if(!seedNode||!(seedInput in seedNode)){
+      fail("targeted regeneration cannot locate the bound ComfyUI seed input");
+    }
+    if(Number(seedNode[seedInput])!==Number(oldSeed)){
+      fail("targeted regeneration source seed mismatch");
+    }
+    seedNode[seedInput]=newSeed;
+    seedApp.seed=newSeed;
+  }else{
+    // Backward-compatible fallback for plans created before explicit seed binding.
+    for(const node of Object.values(request.overrides)){
+      if(!node||typeof node!=="object") continue;
+      for(const [key,value] of Object.entries(node)){
+        if(typeof value==="number"&&Number(value)===Number(oldSeed)) node[key]=newSeed;
       }
     }
   }

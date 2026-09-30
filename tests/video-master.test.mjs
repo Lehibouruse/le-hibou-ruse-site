@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
-import { buildCompositionTimingQc, buildMasterSemanticFramePlan, buildTechnicalSelections, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, specificCreativeBrief, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
+import { buildCompositionTimingQc, buildMasterSemanticFramePlan, buildTechnicalSelections, compareSemanticQcReports, imagePromptPreservationPass, masterPolicy, materializeSpecificActionTimelines, normalizeExecutionProfileOverride, runtimeBundleDir, specificCreativeBrief, unverifiedSpecificMontageActions } from "../scripts/video-master.mjs";
 import { buildMotionPlan } from "../scripts/video-motion-plan.mjs";
 import { buildSceneCompositePlan } from "../scripts/video-scene-compositor.mjs";
 
@@ -170,4 +170,24 @@ test("master semantic frame plan samples every scene after composition and keeps
  assert.equal(plan.duration_s,10);
  assert.equal(plan.frames[0].expected_hibou,true);
  assert.match(plan.frames[1].brief,/second base\nbank disappears/);
+});
+
+test("semantic delta rejects a master that loses fidelity after crop/compositing",()=>{
+ const source={scenes:[
+  {scene_id:"S01",scores:{semantic_brief:0.72}},
+  {scene_id:"S02",scores:{semantic_brief:0.66}}
+ ]};
+ const good={scenes:[
+  {scene_id:"S01",scores:{semantic_brief:0.69}},
+  {scene_id:"S02",scores:{semantic_brief:0.64}}
+ ]};
+ const bad={scenes:[
+  {scene_id:"S01",scores:{semantic_brief:0.58}},
+  {scene_id:"S02",scores:{semantic_brief:0.64}}
+ ]};
+ assert.equal(compareSemanticQcReports(source,good,{maxDrop:0.08}).pass,true);
+ const result=compareSemanticQcReports(source,bad,{maxDrop:0.08});
+ assert.equal(result.pass,false);
+ assert.deepEqual(result.failed_scene_ids,["S01"]);
+ assert.equal(result.scenes[0].semantic_delta,-0.14);
 });

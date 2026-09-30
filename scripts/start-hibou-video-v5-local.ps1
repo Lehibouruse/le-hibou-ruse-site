@@ -87,6 +87,18 @@ $Report = [ordered]@{
   current_worker_idle = [bool]$Idle
   already_local = [bool]$AlreadyLocal
   ready_for_activation = [bool]$Ready
+  v5_runtime_gates = @(
+    "HIBOU_VIDEO_TIMELINE_V1",
+    "HIBOU_VIDEO_PLANNING_AUDIT_V1",
+    "HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1",
+    "HIBOU_VIDEO_PROSODY_V1",
+    "HIBOU_VIDEO_MUSIC_V1",
+    "HIBOU_VIDEO_POSE_REGISTRY_V1",
+    "HIBOU_VIDEO_HUMAN_SELECTION_V1",
+    "HIBOU_VIDEO_CREATIVE_QC_V1",
+    "HIBOU_VIDEO_FACTUAL_GATE_V1"
+  )
+  airtable_contract_still_required = $true
   activated = $false
   publication_authorized = $false
 }
@@ -129,6 +141,18 @@ try {
   $env:HIBOU_VIDEO_RENDER_ENABLED = "true"
   $env:HIBOU_VIDEO_BINDING = $Binding
   $env:HIBOU_OCR_PYTHON = $OcrPython
+  # Runtime capability gates: Airtable/profile flags are still required by video-master.
+  # Setting these here means an explicitly activated V5 worker can execute only
+  # the V5 features that the exported GLOBAL contract has opted into.
+  $env:HIBOU_VIDEO_TIMELINE_V1 = "true"
+  $env:HIBOU_VIDEO_PLANNING_AUDIT_V1 = "true"
+  $env:HIBOU_VIDEO_INCREMENTAL_RETOUCH_V1 = "true"
+  $env:HIBOU_VIDEO_PROSODY_V1 = "true"
+  $env:HIBOU_VIDEO_MUSIC_V1 = "true"
+  $env:HIBOU_VIDEO_POSE_REGISTRY_V1 = "true"
+  $env:HIBOU_VIDEO_HUMAN_SELECTION_V1 = "true"
+  $env:HIBOU_VIDEO_CREATIVE_QC_V1 = "true"
+  $env:HIBOU_VIDEO_FACTUAL_GATE_V1 = "true"
   $LocalProcess = Start-Process -FilePath $Node -ArgumentList ('"' + $Worker + '"') `
     -WorkingDirectory $SourceRoot -WindowStyle Hidden -PassThru
   $LocalHealth = $null

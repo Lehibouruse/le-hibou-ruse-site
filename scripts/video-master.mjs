@@ -702,6 +702,36 @@ export function buildMasterSemanticFramePlan(contract,{sampleRatio=0.55}={}){
   };
 }
 
+export function compareSemanticQcReports(sourceReport,masterReport,{maxDrop=0.08}={}){
+  const limit=Math.max(0,Number(maxDrop)||0.08);
+  const sourceByScene=new Map((sourceReport?.scenes||[]).map(row=>[String(row?.scene_id||""),row]));
+  const rows=(masterReport?.scenes||[]).map(row=>{
+    const sceneId=String(row?.scene_id||"");
+    const source=sourceByScene.get(sceneId);
+    const before=Number(source?.scores?.semantic_brief);
+    const after=Number(row?.scores?.semantic_brief);
+    const comparable=Number.isFinite(before)&&Number.isFinite(after);
+    const delta=comparable?Number((after-before).toFixed(4)):null;
+    return {
+      scene_id:sceneId,
+      source_semantic_brief:comparable?before:null,
+      master_semantic_brief:comparable?after:null,
+      semantic_delta:delta,
+      max_allowed_drop:limit,
+      pass:!comparable||delta>=-limit
+    };
+  });
+  const failed=rows.filter(row=>!row.pass);
+  return {
+    schema:"HIBOU_MASTER_SEMANTIC_DELTA_V1",
+    pass:failed.length===0,
+    max_allowed_drop:limit,
+    failed_scene_ids:failed.map(row=>row.scene_id),
+    scenes:rows,
+    publication_authorized:false
+  };
+}
+
 export function buildTechnicalSelections(provisional){
   const out={};
   for(const [sceneId,pick] of Object.entries(provisional||{})){
@@ -2067,9 +2097,25 @@ export async function main(){
       run(py.cmd,args);
       const report=json(masterSemanticQcReport);
       auditPromptRef("master_semantic_qc_report",report.prompt_contract_ref);
+      const sourceReport=json(creativeQcReport);
+      const semanticDelta=compareSemanticQcReports(sourceReport,report,{
+        maxDrop:Number(storyboardData.creative?.creative_qc?.master_semantic_max_drop??0.08)
+      });
+      report.source_to_master_semantic_delta=semanticDelta;
+      if(!semanticDelta.pass){
+        report.status="REJECT";
+        report.failed_scene_count=Math.max(
+          Number(report.failed_scene_count||0),
+          semanticDelta.failed_scene_ids.length
+        );
+      }
+      writeJson(masterSemanticQcReport,report);
+      const semanticDeltaPath=resolve(root,"master-semantic-delta.json");
+      writeJson(semanticDeltaPath,semanticDelta);
       state.master_semantic_qc_status=report.status;
       state.master_semantic_qc_failed_scene_count=Number(report.failed_scene_count||0);
       state.master_semantic_qc_frame_plan=framePlan;
+      state.master_semantic_delta={path:semanticDeltaPath,...semanticDelta};
       writeJson(statePath,state);
       if(report.status==="REJECT"&&storyboardData.creative?.creative_qc?.block_on_reject===true){
         fail("post-render semantic QC rejected one or more master scenes");

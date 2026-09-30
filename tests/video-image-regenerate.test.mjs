@@ -50,3 +50,12 @@ test("targeted regeneration touches only failed scenes",()=>{
 test("invalid attempt fails closed",()=>{
  assert.throws(()=>buildTargetedRegeneration(plan,qc,{attempt:0}),/positive integer/);
 });
+
+test("strict targeted regeneration refuses ambiguous legacy seed mutation",()=>{
+ const legacy=structuredClone(plan);
+ delete legacy.requests[0].request.seed_application;
+ assert.throws(
+   ()=>buildTargetedRegeneration(legacy,qc,{attempt:1}),
+   /explicit seed_application binding proof/
+ );
+});

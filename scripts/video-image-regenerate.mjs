@@ -47,27 +47,20 @@ function mutateRequest(request,{oldSeed,newSeed,promptSuffix}){
     request.seed=newSeed;
   }
   const seedApp=request.seed_application;
-  if(seedApp?.schema==="HIBOU_IMAGE_SEED_APPLICATION_V1"){
-    const seedNodeId=String(seedApp.seed_node_id||"");
-    const seedInput=String(seedApp.seed_input||"");
-    const seedNode=request.overrides?.[seedNodeId];
-    if(!seedNode||!(seedInput in seedNode)){
-      fail("targeted regeneration cannot locate the bound ComfyUI seed input");
-    }
-    if(Number(seedNode[seedInput])!==Number(oldSeed)){
-      fail("targeted regeneration source seed mismatch");
-    }
-    seedNode[seedInput]=newSeed;
-    seedApp.seed=newSeed;
-  }else{
-    // Backward-compatible fallback for plans created before explicit seed binding.
-    for(const node of Object.values(request.overrides)){
-      if(!node||typeof node!=="object") continue;
-      for(const [key,value] of Object.entries(node)){
-        if(typeof value==="number"&&Number(value)===Number(oldSeed)) node[key]=newSeed;
-      }
-    }
+  if(seedApp?.schema!=="HIBOU_IMAGE_SEED_APPLICATION_V1"){
+    fail("targeted regeneration requires explicit seed_application binding proof");
   }
+  const seedNodeId=String(seedApp.seed_node_id||"");
+  const seedInput=String(seedApp.seed_input||"");
+  const seedNode=request.overrides?.[seedNodeId];
+  if(!seedNode||!(seedInput in seedNode)){
+    fail("targeted regeneration cannot locate the bound ComfyUI seed input");
+  }
+  if(Number(seedNode[seedInput])!==Number(oldSeed)){
+    fail("targeted regeneration source seed mismatch");
+  }
+  seedNode[seedInput]=newSeed;
+  seedApp.seed=newSeed;
 }
 export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
   if(plan?.schema!=="HIBOU_IMAGE_PLAN_V1") fail("unsupported image plan");

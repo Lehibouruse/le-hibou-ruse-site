@@ -668,6 +668,40 @@ export function materializeSpecificActionTimelines(contract){
   };
 }
 
+export function specificCreativeBrief(scene){
+  return [
+    String(scene?.image_prompt||"").trim(),
+    String(scene?.visual_idea||"").trim()
+  ].filter(Boolean).join("\n");
+}
+
+export function buildMasterSemanticFramePlan(contract,{sampleRatio=0.55}={}){
+  const ratio=Math.min(0.85,Math.max(0.15,Number(sampleRatio)||0.55));
+  let cursor=0;
+  const frames=[];
+  for(const [index,scene] of (contract?.scenes||[]).entries()){
+    const duration=Number(scene?.planned_duration_s);
+    if(!Number.isFinite(duration)||duration<=0) fail(`scene ${scene?.scene_id||index+1}: invalid duration for semantic frame plan`);
+    const timestamp=cursor+(duration*ratio);
+    frames.push({
+      scene_id:String(scene?.scene_id||`S${String(index+1).padStart(2,"0")}`),
+      order:Number(scene?.order||index+1),
+      start_s:Number(cursor.toFixed(3)),
+      duration_s:Number(duration.toFixed(3)),
+      sample_s:Number(timestamp.toFixed(3)),
+      brief:specificCreativeBrief(scene),
+      expected_hibou:Boolean(scene?.framing?.hibou)
+    });
+    cursor+=duration;
+  }
+  return {
+    schema:"HIBOU_MASTER_SEMANTIC_FRAME_PLAN_V1",
+    sample_ratio:ratio,
+    duration_s:Number(cursor.toFixed(3)),
+    frames
+  };
+}
+
 export function buildTechnicalSelections(provisional){
   const out={};
   for(const [sceneId,pick] of Object.entries(provisional||{})){
@@ -872,7 +906,7 @@ export async function main(){
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[
-      "storyboard","planning_audit","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_qc","registry","airtable_report"
+      "storyboard","planning_audit","prosody","voice","voice_duration_qc","audio_master","music_mix","audio_attach","subtitles","style","pose_registry","asset_resolution","images","technical_selection","creative_qc","promotion","render","master_semantic_qc","master_qc","registry","airtable_report"
     ]},null,2)+"\n");
     return;
   }
@@ -1871,7 +1905,7 @@ export async function main(){
         scenes.push({
           scene_id:scene.scene_id,
           image:imagePath,
-          brief:String(scene.image_prompt||scene.visual_idea||""),
+          brief:specificCreativeBrief(scene),
           style_prompt:String(resolvedContract.creative?.style_lock||""),
           expected_hibou:false,
           hibou_composited_later:Boolean(scene.framing?.hibou)
@@ -1981,6 +2015,70 @@ export async function main(){
     auditPromptContract("render",renderReady);
     run(process.execPath,[postRuntime.render,renderReady,master]);
   });
+
+  const masterSemanticQcManifest=resolve(root,"master-semantic-qc-input.json");
+  const masterSemanticQcReport=resolve(root,"master-semantic-qc.json");
+  const masterSemanticFrameDir=resolve(root,"master-semantic-frames");
+  if(creativeQcEnabled){
+    stage(state,"master_semantic_qc",()=>{
+      auditPromptContract("master_semantic_qc",renderReady);
+      const promoted=json(renderReady);
+      const framePlan=buildMasterSemanticFramePlan(promoted);
+      mkdirSync(masterSemanticFrameDir,{recursive:true});
+      const scenes=[];
+      for(const row of framePlan.frames){
+        const framePath=resolve(masterSemanticFrameDir,`${String(row.order).padStart(2,"0")}-${row.scene_id}.jpg`);
+        run("ffmpeg",[
+          "-y","-loglevel","error",
+          "-ss",row.sample_s.toFixed(3),
+          "-i",master,
+          "-frames:v","1",
+          "-q:v","2",
+          framePath
+        ]);
+        scenes.push({
+          scene_id:row.scene_id,
+          image:framePath,
+          brief:row.brief,
+          style_prompt:String(promoted.creative?.style_lock||""),
+          expected_hibou:row.expected_hibou,
+          hibou_composited_later:false,
+          allow_postproduction_text:true,
+          sample_s:row.sample_s
+        });
+      }
+      writeJson(masterSemanticQcManifest,{
+        schema:"HIBOU_MASTER_SEMANTIC_QC_INPUT_V1",
+        prompt_contract_ref:{
+          schema:"HIBOU_PROMPT_CONTRACT_REF_V2",
+          contract_sha256:promptContractV2.contract_sha256,
+          global_sha256:promptContractV2.global_sha256,
+          scene_count:scenes.length
+        },
+        thresholds:storyboardData.creative?.creative_qc?.thresholds||{},
+        frame_plan:framePlan,
+        canonical_hibou:null,
+        scenes
+      });
+      const py=pythonCommand();
+      const model=String(storyboardData.creative?.creative_qc?.model||"").trim();
+      const args=[...py.prefix,postRuntime.creativeQc,masterSemanticQcManifest,"--output",masterSemanticQcReport];
+      if(model) args.push("--model",model);
+      run(py.cmd,args);
+      const report=json(masterSemanticQcReport);
+      auditPromptRef("master_semantic_qc_report",report.prompt_contract_ref);
+      state.master_semantic_qc_status=report.status;
+      state.master_semantic_qc_failed_scene_count=Number(report.failed_scene_count||0);
+      state.master_semantic_qc_frame_plan=framePlan;
+      writeJson(statePath,state);
+      if(report.status==="REJECT"&&storyboardData.creative?.creative_qc?.block_on_reject===true){
+        fail("post-render semantic QC rejected one or more master scenes");
+      }
+    });
+  }else if(!state.stages.master_semantic_qc){
+    state.stages.master_semantic_qc={status:"SKIPPED",reason:"creative QC runtime gate required"};
+    writeJson(statePath,state);
+  }
   const montageRenderAudit=await verifySpecificMontageRenderReceipt({
     root,storyboard:storyboardData,
     compositorPath:resolve(dirname(postRuntime.render),"video-scene-compositor.mjs")
@@ -2029,7 +2127,7 @@ export async function main(){
     "image_qc_review",
     "generated_text_qc",
     "technical_selection",
-    ...(creativeQcEnabled?["creative_qc","creative_qc_report"]:[]),
+    ...(creativeQcEnabled?["creative_qc","creative_qc_report","master_semantic_qc","master_semantic_qc_report"]:[]),
     ...(factualGateEnabled?["factual_gate","factual_gate_report"]:[]),
     "promotion",
     "render_ready",

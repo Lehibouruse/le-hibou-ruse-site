@@ -706,7 +706,8 @@ export async function verifySpecificMontageRenderReceipt({root,storyboard,compos
       height:Number(manifest.engine?.height||1920),
       fps:Number(manifest.engine?.fps||30)
     });
-    const filterHash=montageHash(plan.filter_complex);
+    // The renderer hashes JSON.stringify(value), including string quotes.
+    const filterHash=montageHash(JSON.stringify(plan.filter_complex));
     const expectedEvents=plan.timeline.events.filter(event=>event.type==="diagram").map(event=>({
       id:event.id,start_s:event.start_s,end_s:event.end_s,
       node_ids:event.diagram.nodes.map(node=>node.id),action:event.action

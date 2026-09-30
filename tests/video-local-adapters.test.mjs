@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { applyWorkflowOverrides, stableJobId, validateImageRequest, validateVoiceRequest } from "../scripts/video-local-adapters.mjs";
+import { applyWorkflowOverrides, stableJobId, validateImageRequest, validateVoiceRequest, verifyComfyPromptExecution } from "../scripts/video-local-adapters.mjs";
 
 test("IMAGE_GEN refuse un endpoint ComfyUI distant", () => {
   assert.throws(() => validateImageRequest({
@@ -17,6 +18,31 @@ test("IMAGE_GEN applique uniquement des overrides explicitement présents", () =
   assert.equal(next["6"].inputs.seed, 42);
   assert.equal(graph["6"].inputs.text, "old");
   assert.throws(() => applyWorkflowOverrides(graph, { "7": { text: "x" } }), /node missing/);
+});
+
+
+test("ComfyUI execution receipt is bound to the exact prompt node immediately before submission", () => {
+  const prompt = "SCENE_IMAGE_PROMPT: two financing routes converge";
+  const request = {
+    prompt_application: {
+      schema: "HIBOU_IMAGE_PROMPT_APPLICATION_V2",
+      prompt_node_id: "6",
+      prompt_input: "text",
+      compiled_prompt_sha256: createHash("sha256").update(prompt).digest("hex"),
+    },
+  };
+  const workflow = { "6": { inputs: { text: prompt } } };
+  const receipt = verifyComfyPromptExecution(request, workflow);
+  assert.equal(receipt.prompt_verified, true);
+  assert.equal(receipt.applied_prompt_sha256, request.prompt_application.compiled_prompt_sha256);
+  assert.match(receipt.workflow_sha256, /^[a-f0-9]{64}$/);
+
+  const drifted = structuredClone(workflow);
+  drifted["6"].inputs.text += " silently changed";
+  assert.throws(
+    () => verifyComfyPromptExecution(request, drifted),
+    /applied prompt hash mismatch/
+  );
 });
 
 test("VOICE_GEN expose seulement les paramètres Chatterbox natifs et garde la prosodie comme métadonnée", () => {

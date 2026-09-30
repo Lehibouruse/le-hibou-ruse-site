@@ -80,8 +80,14 @@ test("windows scene drawtext uses an explicit font file and avoids Fontconfig lo
   const filter=applyWindowsDrawtextFont("[v]drawtext=text='Test':fontsize=30[out]",{
     platform:"win32",
     windowsDir:"C:\\Windows",
+    fontExists:path=>path==="C:\\Windows\\Fonts\\arial.ttf",
   });
   assert.match(filter,/drawtext=fontfile='C\\:\/Windows\/Fonts\/arial\.ttf':/);
+});
+
+test("missing Windows font leaves drawtext unchanged",()=>{
+  const source="[v]drawtext=text='Test':fontsize=30[out]";
+  assert.equal(applyWindowsDrawtextFont(source,{platform:"win32",fontExists:()=>false}),source);
 });
 
 test("non-Windows subtitle runtime leaves system font configuration untouched",()=> {

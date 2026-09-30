@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { buildSceneCompositePlan, sceneAssetRefs } from "./video-scene-compositor.mjs";
@@ -71,12 +71,13 @@ function xmlEscape(value) {
 export function applyWindowsDrawtextFont(filterComplex, {
   platform = process.platform,
   windowsDir = process.env.WINDIR || "C:\\Windows",
+  fontExists = existsSync,
 } = {}) {
   const source = String(filterComplex || "");
   if (platform !== "win32" || !source.includes("drawtext=")) return source;
-  const fontFile = resolve(windowsDir, "Fonts", "arial.ttf");
-  if (!existsSync(fontFile)) return source;
-  const escapedFont = ffmpegFilterPath(fontFile);
+  const fontFile = win32.resolve(windowsDir, "Fonts", "arial.ttf");
+  if (!fontExists(fontFile)) return source;
+  const escapedFont = fontFile.replaceAll("\\", "/").replaceAll(":", "\\:").replaceAll("'", "\\'");
   return source.replaceAll("drawtext=", `drawtext=fontfile='${escapedFont}':`);
 }
 

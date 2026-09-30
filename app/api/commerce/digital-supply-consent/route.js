@@ -4,6 +4,7 @@ import { createLiveLemonCheckout, createTestLemonCheckout } from "../../../../li
 import { DIGITAL_SUPPLY_CONSENT_VERSION, consentCheckoutCustomData } from "../../../../lib/digital-supply-consent.mjs";
 import { escapeFormula } from "../../../../lib/commerce.mjs";
 import { vercelDeploymentOrigin } from "../../../../lib/vercel-deployment-origin.mjs";
+import { bookEditionManifest } from "../../../../lib/book-edition-manifest.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,6 +132,9 @@ export async function POST(request) {
     } else {
       if (!truthy(config.commerce_launch_authorized)) throw new Error("commerce_launch_authorized=false");
       if (!truthy(config.digital_supply_consent_durable_confirmation_tested)) throw new Error("preuve durable du parcours de consentement non validée");
+      if (!truthy(config.commerce_end_to_end_tested)) throw new Error("parcours de paiement et livraison non validé de bout en bout");
+      const currentBook = await queryAllRecords(TABLES.book, {}, { maxRecords: 200 });
+      if (!bookEditionManifest(currentBook, config.book_current_edition).chapter_count) throw new Error("aucun texte du guide disponible pour la vente");
       checkout = await createLiveLemonCheckout({
         ...common,
         storeId: clean(config.lemon_store_id),

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { createRecord, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
+import { createRecord, queryAllRecords, queryRecords, TABLES, updateRecord } from "../../../../lib/airtable";
 import { canonicalSale, escapeFormula, lemonOrder, resolveLemonWebhookSecret, saleIsRefunded, verifyLemonSignature } from "../../../../lib/commerce.mjs";
 import { attributionProvenance, saleAttribution } from "../../../../lib/attribution.mjs";
 import { refundDeliveryStatus } from "../../../../lib/commerce-lease.mjs";
 import { digitalSupplyConsentAudit, validDigitalSupplyCustomData } from "../../../../lib/digital-supply-consent.mjs";
+import { bookEditionAuditNote, bookEditionManifest } from "../../../../lib/book-edition-manifest.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,8 +39,8 @@ async function matchingProduct(order) {
 
 async function currentCommerceState() {
   const records = await queryRecords(TABLES.configuration, {
-    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized',{Clé}='digital_supply_consent_checkout_mode',{Clé}='delivery_provider_mode',{Clé}='lemon_native_delivery_verified',{Clé}='lemon_downloadable_file_removed_verified'))",
-    pageSize: 10,
+    filterByFormula: "AND({Actif}=1,OR({Clé}='book_current_edition',{Clé}='commerce_launch_authorized',{Clé}='digital_supply_consent_checkout_mode',{Clé}='digital_supply_consent_durable_confirmation_tested',{Clé}='commerce_end_to_end_tested',{Clé}='delivery_provider_mode',{Clé}='lemon_native_delivery_verified',{Clé}='lemon_downloadable_file_removed_verified'))",
+    pageSize: 20,
     priorityAware: false,
   });
   const values = Object.fromEntries(records.map((record) => [String(record.fields?.Clé || ""), record.fields?.Valeur]));
@@ -47,11 +48,12 @@ async function currentCommerceState() {
   return {
     edition: String(values.book_current_edition || "").trim(),
     launchAuthorized: truthy(values.commerce_launch_authorized),
+    durableConfirmationTested: truthy(values.digital_supply_consent_durable_confirmation_tested),
+    endToEndTested: truthy(values.commerce_end_to_end_tested),
     deliveryProvider: String(values.delivery_provider_mode || "digify").trim().toLowerCase(),
     lemonNativeVerified: truthy(values.lemon_native_delivery_verified),
     readerDownloadRemoved: truthy(values.lemon_downloadable_file_removed_verified),
     consentMode,
-    consentRequired: consentMode === "live",
   };
 }
 
@@ -256,15 +258,26 @@ export async function POST(request) {
   const attribution = attributionFields(order);
   const refundedBeforeCreate = Boolean(refundMarker);
   const consentValid = validDigitalSupplyCustomData(order.customData);
-  const consentSatisfied = !commerce.consentRequired || consentValid;
+  const consentSatisfied = commerce.consentMode === "live" && consentValid;
   const deliveryProvider = commerce.deliveryProvider;
+  let editionManifest = null;
+  if (deliveryProvider === "hibou_reader") {
+    try {
+      const currentChapters = await queryAllRecords(TABLES.book, {}, { maxRecords: 200 });
+      editionManifest = bookEditionManifest(currentChapters, edition);
+    } catch {
+      editionManifest = null;
+    }
+  }
   const providerKnown = ["digify", "lemon_native", "hibou_reader"].includes(deliveryProvider);
   const digifyProviderReady = deliveryProvider === "digify" && Boolean(fileGuid);
   const lemonNativeProviderReady = deliveryProvider === "lemon_native" && commerce.lemonNativeVerified;
-  const hibouReaderProviderReady = deliveryProvider === "hibou_reader" && commerce.readerDownloadRemoved;
+  const hibouReaderProviderReady = deliveryProvider === "hibou_reader" && commerce.readerDownloadRemoved && Boolean(editionManifest?.chapter_count);
   const providerReady = digifyProviderReady || lemonNativeProviderReady || hibouReaderProviderReady;
   const ready = Boolean(
     launchAuthorized
+    && commerce.durableConfirmationTested
+    && commerce.endToEndTested
     && consentSatisfied
     && product
     && providerKnown
@@ -284,12 +297,16 @@ export async function POST(request) {
       : "manual_review";
   const reasons = [`delivery_provider=${deliveryProvider || "absent"}`];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
-  if (commerce.consentRequired && !consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
+  if (!commerce.durableConfirmationTested) reasons.push("confirmation durable du consentement non testée: livraison bloquée");
+  if (!commerce.endToEndTested) reasons.push("parcours paiement et livraison non testé de bout en bout: livraison bloquée");
+  if (commerce.consentMode !== "live") reasons.push("parcours de consentement LIVE désactivé: livraison bloquée");
+  if (!consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);
   if (!providerKnown) reasons.push(`provider de livraison inconnu: ${deliveryProvider || "absent"}`);
   if (deliveryProvider === "digify" && product && !fileGuid) reasons.push("Digify File GUID absent du produit");
   if (deliveryProvider === "lemon_native" && !commerce.lemonNativeVerified) reasons.push("livraison native Lemon non vérifiée");
   if (deliveryProvider === "hibou_reader" && !commerce.readerDownloadRemoved) reasons.push("PDF téléchargeable Lemon encore présent ou retrait non vérifié");
+  if (deliveryProvider === "hibou_reader" && !editionManifest?.chapter_count) reasons.push("aucun texte livrable ou manifeste d'édition indisponible");
   if (order.status !== "paid") reasons.push(`statut Lemon=${order.status || "absent"}`);
   if (order.refunded) reasons.push("commande déjà remboursée");
   if (order.testMode) reasons.push("commande Lemon en mode test: livraison bloquée");
@@ -313,7 +330,7 @@ export async function POST(request) {
     Referrer: attribution.Referrer,
     Remboursement: refundedBeforeCreate ? (refundMarker?.createdTime || new Date().toISOString()) : "",
     "Email client": order.email,
-    Notes: orderAuditNotes(order, [attribution.attribution?.utm_term ? `utm_term=${attribution.attribution.utm_term}` : "", ...reasons]),
+    Notes: orderAuditNotes(order, [attribution.attribution?.utm_term ? `utm_term=${attribution.attribution.utm_term}` : "", bookEditionAuditNote(editionManifest), ...reasons]),
     "Livraison statut": deliveryStatus,
     "Digify recipient email": order.email,
     "Digify File GUID": fileGuid,

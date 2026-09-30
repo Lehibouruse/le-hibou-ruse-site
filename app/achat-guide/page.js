@@ -18,7 +18,8 @@ export default async function PurchasePage() {
       <article>
         <p className="eyebrow dark"><span /> Guide numérique</p>
         <h1>Avant le paiement</h1>
-        <p>Le guide est un contenu numérique destiné à être fourni immédiatement après confirmation du paiement. Le parcours ci-dessous recueille séparément votre demande de commencement immédiat et votre reconnaissance de la conséquence correspondante sur le droit de rétractation, lorsque les conditions légales applicables sont réunies.</p>
+        <p>L’offre porte sur l’édition actuellement disponible du guide numérique, une version en accès anticipé incomplète. Les sections sans texte ne sont pas comprises. Une version enrichie du même guide remplacera cette édition dans votre accès lorsqu’elle sera publiée, sans nouvel achat et sans date annoncée.</p>
+        <p>Le guide est destiné à être fourni dans le lecteur sécurisé du Hibou Rusé après confirmation du paiement. Le parcours ci-dessous recueille séparément votre demande de commencement immédiat et votre reconnaissance de la conséquence correspondante sur le droit de rétractation, lorsque les conditions légales applicables sont réunies.</p>
         <DigitalSupplyConsentForm mode={safeMode} />
         <p><a className="text-link" href="/cgv">Lire les conditions générales de vente</a></p>
       </article>

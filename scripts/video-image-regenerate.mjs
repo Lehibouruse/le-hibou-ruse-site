@@ -94,6 +94,7 @@ export function buildTargetedRegeneration(plan,qc,{attempt=1}={}){
     if(reasons.includes("dark_clipping")) corrections.push("augmenter modérément l'éclairage global et éviter les aplats noirs bouchés");
     if(reasons.includes("brightness_low")) corrections.push("éclaircir légèrement les tons moyens sans créer de zones brûlées");
     if(reasons.includes("brightness_high")) corrections.push("assombrir les tons moyens et réduire les hautes lumières");
+    if(reasons.includes("creative_semantic_reject")) corrections.push("prioriser la mécanique financière exacte décrite par SCENE_IMAGE_PROMPT et SCENE_VISUAL_INTENT: conserver tous les blocs, flux, relations, comparaisons, couches et directions demandés; ne pas les remplacer par une illustration financière générique");
     const correctionText=corrections.length?(" Correction QC obligatoire: "+corrections.join("; ")+"."):"";
     const promptSuffix="Variation locale "+attempt+": conserver le sujet, la palette et la composition; corriger uniquement les défauts QC; produire une alternative visuellement distincte mais cohérente."+correctionText;
     mutateRequest(clone.request,{oldSeed:item.seed,newSeed:clone.seed,promptSuffix});

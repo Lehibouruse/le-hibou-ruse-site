@@ -36,19 +36,44 @@ function latestStageError(run){
   return errors.at(-1)||null;
 }
 
-function completedRequests(imagePlan,imageBatch){
+function completedRequests(imagePlan,imageBatch,storyboard=null){
   const requests=Array.isArray(imagePlan?.requests)?imagePlan.requests:[];
   const results=imageBatch?.results||{};
   if(requests.length){
     return {
       expected:requests.length,
       completed:requests.filter(req=>results?.[req.candidate_id]?.status==="completed").length,
-      ready:requests.every(req=>results?.[req.candidate_id]?.status==="completed")
+      ready:requests.every(req=>results?.[req.candidate_id]?.status==="completed"),
+      legacy_inferred:false
     };
   }
-  const sceneCount=Number(imagePlan?.scene_count||0);
+  const sceneCount=Number(imagePlan?.scene_count||storyboard?.scenes?.length||0);
   const reused=Array.isArray(imagePlan?.skipped_full_reuse)?imagePlan.skipped_full_reuse.length:0;
-  return {expected:0,completed:0,ready:sceneCount>0&&reused>=sceneCount};
+  if(sceneCount>0&&reused>=sceneCount){
+    return {expected:0,completed:0,ready:true,legacy_inferred:false};
+  }
+
+  // Observer compatibility for pre-request-plan V2 artifacts. This path never
+  // drives generation; it only prevents video:status from falsely regressing a
+  // completed historical run to IMAGE_GENERATION_REQUIRED.
+  const completedRows=Object.values(results).filter(row=>row?.status==="completed");
+  const configured=Number(
+    imagePlan?.candidates_per_scene||
+    storyboard?.production?.candidates_per_scene||
+    storyboard?.production?.final_candidates_per_scene||
+    storyboard?.creative?.production_defaults?.candidates_per_scene||0
+  );
+  const inferred=!configured&&sceneCount>0&&completedRows.length>0
+    ?Math.max(1,Math.ceil(completedRows.length/sceneCount))
+    :0;
+  const candidatesPerScene=configured||inferred;
+  const expected=candidatesPerScene>0?sceneCount*candidatesPerScene:0;
+  return {
+    expected,
+    completed:completedRows.length,
+    ready:expected>0&&completedRows.length>=expected,
+    legacy_inferred:Boolean(inferred)
+  };
 }
 
 export function inspectPipeline(rootArg=""){
@@ -62,7 +87,7 @@ export function inspectPipeline(rootArg=""){
   const imageBatch=json(p("images/batch-manifest.json"));
   const imageQc=json(p("images/image-perceptual-qc.json"))||json(p("images/image-qc.json"));
   const sceneCount=storyboard?.scenes?.length||0;
-  const candidateState=completedRequests(imagePlan,imageBatch);
+  const candidateState=completedRequests(imagePlan,imageBatch,storyboard);
   const selected=selectionsComplete(p("images/selections.json"),sceneCount)||
     run?.stages?.technical_selection?.status==="PASS";
   const renderReady=json(p("render-ready.json"));
@@ -142,7 +167,8 @@ export function inspectPipeline(rootArg=""){
         storyboard?.production?.final_candidates_per_scene||
         storyboard?.creative?.production_defaults?.candidates_per_scene||0)||null,
       cache_hits:Number(imageBatch?.cache_hits||0),
-      cache_invalidations:Number(imageBatch?.cache_invalidations||0)
+      cache_invalidations:Number(imageBatch?.cache_invalidations||0),
+      legacy_inferred:Boolean(candidateState.legacy_inferred)
     },
     artifacts:{
       storyboard:!!storyboard,

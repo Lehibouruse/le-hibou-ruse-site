@@ -439,6 +439,12 @@ export function buildImagePlan(contract,binding){
     if(!specificVisual) fail(`${scene.scene_id}: compiled scene visual prompt is empty`);
     const styleForImage=imageStylePrompt(styleLock,{backgroundOnly:creativeLockEnabled&&String(creative.reference_mode||"")==="deterministic_character_overlay"});
     const framingLock=framingPrompt(scene);
+    const outputSafeZoneLock=[
+      "OUTPUT_SAFE_ZONE_LOCK:",
+      "Keep every critical financial block, arrow, relationship, comparison and focal object inside the central 84% of the frame.",
+      "Treat the outer edges as expendable background for final 9:16 center-crop and micro-zoom.",
+      "Never place essential semantic information flush against the frame edge."
+    ].join(" ");
     const compiledPrefix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(prefix)):removeTextRiskSentences(prefix);
     const compiledSuffix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(suffix)):removeTextRiskSentences(suffix);
     const compositionLock=deterministicCharacterOverlay
@@ -461,6 +467,7 @@ export function buildImagePlan(contract,binding){
           specificVisual,
           styleForImage,
           framingLock,
+          outputSafeZoneLock,
           compositionLock,
           textFreeLock,
           compiledSuffix

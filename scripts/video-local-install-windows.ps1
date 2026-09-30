@@ -1,5 +1,6 @@
 param(
   [switch]$InstallVoice,
+  [switch]$InstallCreativeQc,
   [switch]$InstallComfyUI,
   [switch]$InstallFluxSchnell,
   [switch]$StartComfyUI,
@@ -21,6 +22,7 @@ $FluxPath = Join-Path $ComfyDir "models\checkpoints\flux1-schnell-fp8.safetensor
 $StatePath = Join-Path $VideoRoot "install-state.json"
 
 $ChatterboxVersion = "0.1.7"
+$CreativeQcModel = "openai/clip-vit-base-patch32"
 $TorchVersion = "2.6.0"
 $TorchIndex = "https://download.pytorch.org/whl/cu124"
 $ComfyVersion = "0.37.0"
@@ -104,6 +106,16 @@ function Write-State {
       $voiceCuda = ((& $voicePython -c "import torch; print(str(torch.cuda.is_available()).lower())" 2>$null | Select-Object -First 1) -eq "true")
     } catch {}
   }
+  $creativeDeps = $false
+  $creativeModel = $false
+  if ($voiceInstalled) {
+    try {
+      $creativeDeps = ((& $voicePython -c "import transformers, PIL; print('true')" 2>$null | Select-Object -First 1) -eq "true")
+      if ($creativeDeps) {
+        $creativeModel = ((& $voicePython -c "from transformers import CLIPModel, CLIPProcessor; m='$CreativeQcModel'; CLIPProcessor.from_pretrained(m, local_files_only=True); CLIPModel.from_pretrained(m, local_files_only=True); print('true')" 2>$null | Select-Object -Last 1) -eq "true")
+      }
+    } catch {}
+  }
   $fluxHash = ""
   $fluxOk = $false
   if (Test-Path $FluxPath) {
@@ -120,6 +132,14 @@ function Write-State {
       version = $voiceVersion
       python = $voicePython
       cuda_available = $voiceCuda
+    }
+    creative_qc = [ordered]@{
+      installed = ($creativeDeps -and $creativeModel)
+      dependencies_installed = $creativeDeps
+      model_cached = $creativeModel
+      model_id = $CreativeQcModel
+      python = $voicePython
+      local_files_only = $true
     }
     comfyui = [ordered]@{
       installed = (Test-Path $ComfyMain)
@@ -155,7 +175,7 @@ $diagnostic = Get-Preflight
 $diagnostic | ConvertTo-Json -Depth 6
 Write-State
 
-if (-not ($InstallVoice -or $InstallComfyUI -or $InstallFluxSchnell -or $StartComfyUI)) {
+if (-not ($InstallVoice -or $InstallCreativeQc -or $InstallComfyUI -or $InstallFluxSchnell -or $StartComfyUI)) {
   Write-Host "Diagnostic uniquement. Aucun paquet, modele ou service n'a ete installe/demarre." -ForegroundColor Yellow
   exit 0
 }
@@ -179,6 +199,36 @@ if ($InstallVoice) {
   if ($LASTEXITCODE -ne 0) { throw "Validation Chatterbox/CUDA echouee. Aucun fallback CPU/cloud n'est autorise." }
   [Environment]::SetEnvironmentVariable("HIBOU_PYTHON", $voicePython, "User")
   $env:HIBOU_PYTHON = $voicePython
+  Write-State
+}
+
+if ($InstallCreativeQc) {
+  $null = Require-GpuAndDisk 25
+  Ensure-Python311
+  $voicePython = Join-Path $VoiceVenv "Scripts\python.exe"
+  if (-not (Test-Path $voicePython)) {
+    throw "Installer d'abord Chatterbox (-InstallVoice) afin de partager le venv CUDA Hibou."
+  }
+  Write-Host "Installation des dependances QC creatif local..." -ForegroundColor Cyan
+  & $voicePython -m pip install "transformers>=4.45,<5" "pillow>=10,<12"
+  if ($LASTEXITCODE -ne 0) { throw "Installation des dependances QC creatif echouee." }
+
+  $creativeProbe = Join-Path $env:TEMP "hibou-creative-qc-bootstrap.py"
+  @(
+    "from transformers import CLIPModel, CLIPProcessor",
+    "m = '$CreativeQcModel'",
+    "CLIPProcessor.from_pretrained(m)",
+    "CLIPModel.from_pretrained(m)",
+    "CLIPProcessor.from_pretrained(m, local_files_only=True)",
+    "CLIPModel.from_pretrained(m, local_files_only=True)",
+    "print('HIBOU_CREATIVE_QC_READY')"
+  ) | Set-Content -Path $creativeProbe -Encoding UTF8
+  & $voicePython $creativeProbe
+  $creativeStatus = $LASTEXITCODE
+  Remove-Item -Force $creativeProbe -ErrorAction SilentlyContinue
+  if ($creativeStatus -ne 0) { throw "Telechargement/validation locale du modele QC creatif echoue." }
+  [Environment]::SetEnvironmentVariable("HIBOU_CREATIVE_QC_MODEL", $CreativeQcModel, "User")
+  $env:HIBOU_CREATIVE_QC_MODEL = $CreativeQcModel
   Write-State
 }
 

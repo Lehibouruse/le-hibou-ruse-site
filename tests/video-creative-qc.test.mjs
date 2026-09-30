@@ -29,3 +29,11 @@ test("creative QC checks expected Hibou, unexpected animal and parasitic text ri
   assert.match(source,/text_artifact_risk/);
   assert.match(source,/openai\/clip-vit-base-patch32/);
 });
+
+test("creative QC covers long visual briefs in multiple CLIP-sized chunks",()=>{
+  assert.match(source,/def chunk_text/);
+  assert.match(source,/def chunked_similarity/);
+  assert.match(source,/semantic_brief_min_chunk/);
+  assert.match(source,/semantic_brief_chunks/);
+  assert.doesNotMatch(source,/scores\["semantic_brief"\]\s*=\s*sim01\(image,\s*text_embedding\([^\n]*brief\)/);
+});

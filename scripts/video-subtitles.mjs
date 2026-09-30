@@ -57,12 +57,21 @@ export function subtitleExecutionPolicy(contract){
     publication_authorized:false
   };
 }
+function timelineRoutesScreenText(scene){
+  const screenText=String(scene?.screen_text||"").trim();
+  if(!screenText) return false;
+  const timeline=scene?.timeline;
+  if(!Array.isArray(timeline?.events)) return false;
+  if(timeline.events.some(event=>["text","callout"].includes(String(event?.type||"").toLowerCase())&&
+      String(event?.text||"").trim())) return true;
+  return timeline.screen_text_routed_by_diagram===true&&timeline.events.some(event=>
+    event?.type==="diagram"&&(event?.diagram?.nodes||[]).some(node=>
+      String(node?.label||"").trim()===screenText));
+}
 export function subtitleRoutingAudit(contract){
   const rows=(contract.scenes||[]).map(scene=>{
     const screenText=String(scene?.screen_text||"").trim();
-    const timelineRouted=Boolean(screenText)&&Array.isArray(scene?.timeline?.events)&&scene.timeline.events.some(
-      event=>["text","callout"].includes(String(event?.type||"").toLowerCase())&&String(event?.text||"").trim()
-    );
+    const timelineRouted=timelineRoutesScreenText(scene);
     const assRouted=Boolean(screenText)&&!timelineRouted;
     return {
       scene_id:String(scene?.scene_id||""),
@@ -94,7 +103,7 @@ export function buildAss(contract,{font=defaultSubtitleFont(),fontSize=54,margin
     const text=scene.narration_text||scene.breath_unit||"";
     if(!String(text).trim()) fail(`${scene.scene_id}: subtitle text missing`);
     const shortText=String(scene.screen_text||"").trim();
-    const timelineHasText=Array.isArray(scene?.timeline?.events) && scene.timeline.events.some(event=>["text","callout"].includes(String(event?.type||"").toLowerCase()));
+    const timelineHasText=timelineRoutesScreenText(scene);
     if(shortText&&!timelineHasText){
       const beats=shortText.split("/").map(x=>x.trim()).filter(Boolean);
       const beatCount=Math.max(1,beats.length);

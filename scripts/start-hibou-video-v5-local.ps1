@@ -14,6 +14,9 @@ $Verifier = Join-Path $SourceRoot "scripts\video-airtable-sync.mjs"
 $OcrScript = Join-Path $SourceRoot "scripts\video-generated-text-qc.py"
 $Node = (Get-Command node -ErrorAction Stop).Source
 $OcrPython = [Environment]::GetEnvironmentVariable("HIBOU_OCR_PYTHON", "User")
+$CreativePython = [Environment]::GetEnvironmentVariable("HIBOU_PYTHON", "User")
+$CreativeModel = [Environment]::GetEnvironmentVariable("HIBOU_CREATIVE_QC_MODEL", "User")
+if (-not $CreativeModel) { $CreativeModel = "openai/clip-vit-base-patch32" }
 $Token = [Environment]::GetEnvironmentVariable("HIBOU_LOCAL_REPORT_TOKEN", "User")
 if (-not $Binding) { $Binding = [Environment]::GetEnvironmentVariable("HIBOU_VIDEO_BINDING", "User") }
 if (-not $Binding) { $Binding = Join-Path $env:USERPROFILE "Documents\Codex\HibouVideo\comfyui-binding.json" }
@@ -26,6 +29,26 @@ if (-not $OcrPython -or -not (Test-Path -LiteralPath $OcrPython -PathType Leaf))
 }
 & $OcrPython -c "import rapidocr_onnxruntime"
 if ($LASTEXITCODE -ne 0) { throw "RapidOCR ne démarre pas dans HIBOU_OCR_PYTHON." }
+
+if (-not $CreativePython -or -not (Test-Path -LiteralPath $CreativePython -PathType Leaf)) {
+  throw "HIBOU_PYTHON introuvable pour le QC créatif V5. Exécuter video:doctor:windows puis -InstallCreativeQc."
+}
+$CreativeProbe = @'
+from transformers import CLIPModel, CLIPProcessor
+import sys
+model_id = sys.argv[1]
+CLIPProcessor.from_pretrained(model_id, local_files_only=True)
+CLIPModel.from_pretrained(model_id, local_files_only=True)
+print("HIBOU_CREATIVE_QC_READY")
+'@
+$CreativeProbePath = Join-Path $env:TEMP "hibou-v5-creative-qc-probe.py"
+$CreativeProbe | Set-Content -LiteralPath $CreativeProbePath -Encoding UTF8
+& $CreativePython $CreativeProbePath $CreativeModel | Out-Null
+$CreativeProbeStatus = $LASTEXITCODE
+Remove-Item -LiteralPath $CreativeProbePath -Force -ErrorAction SilentlyContinue
+if ($CreativeProbeStatus -ne 0) {
+  throw "QC créatif V5 indisponible localement. Exécuter video:doctor:windows puis video-local-install-windows.ps1 -InstallCreativeQc."
+}
 foreach ($File in @($Worker, $Master, $Verifier)) {
   & $Node --check $File
   if ($LASTEXITCODE -ne 0) { throw "Contrôle syntaxique échoué : $File" }
@@ -83,6 +106,9 @@ $Report = [ordered]@{
   queue_compatible = [bool]$QueueCompatible
   pending_jobs_missing_snapshots = $MissingSnapshots.Count
   snapshot_preflight = $SnapshotPreflight
+  creative_qc_python = $CreativePython
+  creative_qc_model = $CreativeModel
+  creative_qc_local_ready = $true
   current_worker_pid = if ($Health) { $Health.worker_pid } else { $null }
   current_worker_idle = [bool]$Idle
   already_local = [bool]$AlreadyLocal

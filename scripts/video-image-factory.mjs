@@ -99,6 +99,132 @@ function runPerceptual(techPath,outPath,reference=""){
   if(r.status!==0) fail("perceptual QC failed: "+String(r.stderr||r.stdout||"").slice(-3000));
   return load(outPath);
 }
+
+function envFlag(name){
+  return String(process.env[name]||"").trim().toLowerCase()==="true";
+}
+function creativePython(){
+  const python=String(process.env.HIBOU_PYTHON||"").trim();
+  if(!python){
+    fail("HIBOU_PYTHON missing for candidate Creative QC; run video:doctor:windows");
+  }
+  runChecked(
+    python,
+    ["-c","import torch, transformers, PIL; from transformers import CLIPModel, CLIPProcessor"],
+    "Creative QC dependency probe"
+  );
+  return python;
+}
+function candidateCreativeEnabled(storyboard){
+  return storyboard?.features?.video_creative_qc_v1===true&&envFlag("HIBOU_VIDEO_CREATIVE_QC_V1");
+}
+function cumulativeBrief(scene){
+  return [String(scene?.image_prompt||"").trim(),String(scene?.visual_idea||"").trim()]
+    .filter(Boolean).join("\n");
+}
+function candidateCreativeManifest(storyboard,plan,perceptual){
+  const sceneMap=new Map((storyboard?.scenes||[]).map(scene=>[String(scene?.scene_id||""),scene]));
+  const scenes=(perceptual?.rows||[])
+    .filter(row=>row?.status==="PASS"&&row?.candidate_id&&row?.path)
+    .map(row=>{
+      const scene=sceneMap.get(String(row.scene_id||""))||{};
+      return {
+        scene_id:String(row.scene_id||""),
+        candidate_id:String(row.candidate_id||""),
+        image:String(row.path||""),
+        brief:cumulativeBrief(scene),
+        style_prompt:String(storyboard?.creative?.style_lock||""),
+        expected_hibou:false,
+        hibou_composited_later:Boolean(scene?.framing?.hibou),
+        allow_postproduction_text:false
+      };
+    });
+  return {
+    schema:"HIBOU_CANDIDATE_CREATIVE_QC_INPUT_V1",
+    prompt_contract_ref:structuredClone(plan?.prompt_contract_ref||null),
+    thresholds:storyboard?.creative?.creative_qc?.thresholds||{},
+    canonical_hibou:null,
+    scenes
+  };
+}
+export function applyCandidateCreativeQc(perceptual,creativeReport){
+  const out=structuredClone(perceptual||{});
+  const creativeByCandidate=new Map(
+    (creativeReport?.scenes||[]).map(row=>[String(row?.candidate_id||""),row])
+  );
+  for(const row of out.rows||[]){
+    if(row?.status!=="PASS") continue;
+    const creative=creativeByCandidate.get(String(row?.candidate_id||""));
+    row.creative_qc=creative?structuredClone(creative):null;
+    row.creative_semantic_score=Number.isFinite(Number(creative?.scores?.semantic_brief))
+      ?Number(creative.scores.semantic_brief)
+      :null;
+    if(!creative||creative.pass!==true){
+      row.status="REJECT";
+      row.reasons=[...new Set([...(row.reasons||[]),"creative_semantic_reject"])];
+    }
+  }
+  const grouped={};
+  for(const row of out.rows||[]){
+    (grouped[row.scene_id]??=[]).push(row);
+  }
+  const sceneSummary={};
+  for(const [sceneId,items] of Object.entries(grouped)){
+    const passes=items.filter(row=>row.status==="PASS").sort((a,b)=>{
+      const aSemantic=Number.isFinite(Number(a.creative_semantic_score))?Number(a.creative_semantic_score):-1;
+      const bSemantic=Number.isFinite(Number(b.creative_semantic_score))?Number(b.creative_semantic_score):-1;
+      if(aSemantic!==bSemantic) return bSemantic-aSemantic;
+      const aPerceptual=Number.isFinite(Number(a.perceptual_score))?Number(a.perceptual_score):-1;
+      const bPerceptual=Number.isFinite(Number(b.perceptual_score))?Number(b.perceptual_score):-1;
+      if(aPerceptual!==bPerceptual) return bPerceptual-aPerceptual;
+      return Number(a.candidate||999)-Number(b.candidate||999);
+    });
+    const reasonCounts={};
+    const warningCounts={};
+    for(const item of items){
+      for(const reason of item.reasons||[]) reasonCounts[reason]=(reasonCounts[reason]||0)+1;
+      for(const warning of item.warnings||[]) warningCounts[warning]=(warningCounts[warning]||0)+1;
+    }
+    sceneSummary[sceneId]={
+      pass:passes.length,
+      reject:items.length-passes.length,
+      total:items.length,
+      selected_candidate_id:passes[0]?.candidate_id||null,
+      selected_score:passes[0]?.perceptual_score??null,
+      selected_creative_semantic_score:passes[0]?.creative_semantic_score??null,
+      needs_regeneration:passes.length===0,
+      reason_counts:reasonCounts,
+      warning_counts:warningCounts
+    };
+  }
+  out.scene_summary=sceneSummary;
+  out.all_scenes_have_candidate=
+    Object.keys(sceneSummary).length>0&&Object.values(sceneSummary).every(summary=>!summary.needs_regeneration);
+  out.candidate_creative_qc={
+    schema:"HIBOU_CANDIDATE_CREATIVE_QC_APPLICATION_V1",
+    applied:true,
+    candidate_count:(creativeReport?.scenes||[]).length,
+    rejected_candidate_count:(creativeReport?.scenes||[]).filter(row=>row?.pass!==true).length
+  };
+  return out;
+}
+function runCandidateCreative(storyboard,plan,perceptual,root){
+  const input=candidateCreativeManifest(storyboard,plan,perceptual);
+  if(!input.scenes.length){
+    return {report:{schema:"HIBOU_CREATIVE_QC_V1",status:"REJECT",scenes:[]},perceptual};
+  }
+  const inputPath=resolve(root,"candidate-creative-qc-input.json");
+  const reportPath=resolve(root,"candidate-creative-qc.json");
+  write(inputPath,input);
+  const python=creativePython();
+  const args=[resolve(SCRIPT_DIR,"video-creative-qc.py"),inputPath,"--output",reportPath];
+  const model=String(storyboard?.creative?.creative_qc?.model||"").trim();
+  if(model) args.push("--model",model);
+  const r=spawnSync(python,args,{encoding:"utf8",windowsHide:true,shell:false,maxBuffer:32*1024*1024});
+  if(r.status!==0) fail("candidate Creative QC failed: "+String(r.stderr||r.stdout||"").slice(-5000));
+  const report=load(reportPath);
+  return {report,perceptual:applyCandidateCreativeQc(perceptual,report)};
+}
 function provisionalSelections(qc,manifest){
   const rows=qc.rows||[];
   const out={};
@@ -280,12 +406,22 @@ async function main(){
   const qcOptions=qcOptionsFromPlan(plan);
   let tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
   let perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
+  const semanticCandidatesEnabled=candidateCreativeEnabled(storyboard);
+  let candidateCreativeReport=null;
+  if(semanticCandidatesEnabled){
+    const creativeRun=runCandidateCreative(storyboard,plan,perceptual,root);
+    candidateCreativeReport=creativeRun.report;
+    perceptual=creativeRun.perceptual;
+    write(perceptualPath,perceptual);
+  }
+  const reviewRequests=[...(plan.requests||[])];
 
   const regenRuns=[];
   for(let attempt=1;attempt<=policy.max_regeneration_attempts&&!perceptual.all_scenes_have_candidate;attempt++){
     const regen=buildTargetedRegeneration(plan,perceptual,{attempt});
     if(!regen.requests.length) break;
     const regenPath=resolve(root,"regen-plan-"+attempt+".json"); write(regenPath,regen);
+    reviewRequests.push(...(regen.requests||[]));
     const regenBatch=await executeImagePlan(regen,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
     generationRuns.push({
       phase:"regeneration",
@@ -298,13 +434,20 @@ async function main(){
     manifest=load(manifestPath);
     tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
     perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
+    if(semanticCandidatesEnabled){
+      const creativeRun=runCandidateCreative(storyboard,{...plan,requests:reviewRequests},perceptual,root);
+      candidateCreativeReport=creativeRun.report;
+      perceptual=creativeRun.perceptual;
+      write(perceptualPath,perceptual);
+    }
     regenRuns.push({attempt,failed_scenes:regen.regeneration.failed_scenes,requests:regen.requests.length});
   }
 
   const selections=provisionalSelections(perceptual,manifest);
   write(resolve(root,"selections.provisional.json"),selections);
+  const reviewPlan={...plan,requests:reviewRequests,request_count:reviewRequests.length};
   const candidateReview=buildCandidateReview({
-    plan,
+    plan:reviewPlan,
     perceptualQc:perceptual,
     provisionalSelections:selections
   });
@@ -341,6 +484,13 @@ async function main(){
       qc_options:qcOptions
     },
     perceptual_qc:aggregatePerceptual(perceptual),
+    candidate_creative_qc:{
+      enabled:semanticCandidatesEnabled,
+      status:candidateCreativeReport?.status||"DISABLED",
+      candidate_count:(candidateCreativeReport?.scenes||[]).length,
+      semantic_filter_applied:Boolean(perceptual?.candidate_creative_qc?.applied),
+      rejected_candidate_count:Number(perceptual?.candidate_creative_qc?.rejected_candidate_count||0)
+    },
     provisional_selections:selections,
     candidate_review:{
       schema:candidateReview.schema,

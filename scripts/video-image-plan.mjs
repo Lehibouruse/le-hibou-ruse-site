@@ -61,7 +61,14 @@ function scrubOverlayCharacterClause(clause){
     .replace(/\s+(?:zone|espace|place)\s+[^,;.!?]*?\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
     .replace(/\s+(?:avec\s+)?(?:une?\s+)?(?:zone|espace|place)\s+[^,;.!?]*?\s+pour\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"");
 
-  if(CHARACTER_TOKEN_RE.test(value)) return "";
+  // Never discard an otherwise useful financial/mechanical clause merely
+  // because it still mentions the character. Replace only the character
+  // reference; the deterministic Hibou is composited later.
+  value=value
+    .replace(/\b(?:le|la|un|une|the|an|a)\s+(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"la zone centrale réservée")
+    .replace(/\bl[’'](?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"la zone centrale réservée")
+    .replace(/\b(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,"zone centrale réservée");
+  if(CHARACTER_TOKEN_RE.test(value)) fail("character scrub failed to remove overlay token");
   value=value
     .replace(/\b(?:prévoir|garder|réserver)\s*[.!?]*$/iu,"")
     .replace(/\s{2,}/g," ")

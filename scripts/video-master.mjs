@@ -9,6 +9,18 @@ function fail(message){ throw new Error(message); }
 function sha256(path){ return createHash("sha256").update(readFileSync(path)).digest("hex"); }
 function json(path){ return JSON.parse(readFileSync(resolve(path),"utf8")); }
 function writeJson(path,value){ mkdirSync(dirname(resolve(path)),{recursive:true}); writeFileSync(resolve(path),JSON.stringify(value,null,2)+"\n"); }
+function lastRunPointerPath(){
+  const base=String(process.env.LOCALAPPDATA||process.env.HOME||".").trim()||".";
+  return resolve(base,"LeHibou","last-video-run.json");
+}
+function writeLastRunPointer(root,statePath){
+  writeJson(lastRunPointerPath(),{
+    schema:"HIBOU_LAST_VIDEO_RUN_V1",
+    root:resolve(root),
+    state_path:resolve(statePath),
+    updated_at:new Date().toISOString()
+  });
+}
 function envFlag(name){ return String(process.env[name]||"").trim().toLowerCase()==="true"; }
 function contractFeature(contract,name,envName){ return contract?.features?.[name]===true && envFlag(envName); }
 function localRuntimeOverrideSource(repoPath,marker){
@@ -813,6 +825,9 @@ export async function main(){
   if(!outputArg) fail("--output=<dir> required");
   if(!bindingArg) fail("--binding=<comfyui-binding.json> required");
   if(Boolean(contentId)===Boolean(storyboardArg)) fail("provide exactly one of --content=<Airtable record> or --storyboard=<json>");
+  if(contentId&&!String(process.env.AIRTABLE_TOKEN||"").trim()){
+    fail("AIRTABLE_TOKEN missing; cannot export Airtable storyboard. Load the token into this PowerShell session or Windows user environment before video:master.");
+  }
   if(sourceSnapshotArg&&!storyboardArg) fail("--source-snapshot requires --storyboard=<json>; it does not replace Airtable export");
   if(sourceSnapshotArg&&!existsSync(resolve(sourceSnapshotArg))) fail("source snapshot file missing");
   if(!existsSync(resolve(bindingArg))) fail("binding file missing");
@@ -853,6 +868,7 @@ export async function main(){
   };
   state.path=statePath;
   writeJson(statePath,state);
+  writeLastRunPointer(root,statePath);
 
   if(planOnly){
     process.stdout.write(JSON.stringify({ok:true,mode:"plan_only",root,inputs,stages:[

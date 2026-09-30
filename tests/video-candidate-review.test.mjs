@@ -32,6 +32,16 @@ function fixtures() {
         scene_id: "S01",
         candidate: 1,
         seed: 101,
+        request:{
+          overrides:{"6":{text:"SCENE_IMAGE_PROMPT: two financing routes converge toward one asset"}},
+          prompt_application:{
+            schema:"HIBOU_IMAGE_PROMPT_APPLICATION_V2",
+            prompt_node_id:"6",
+            prompt_input:"text",
+            compiled_prompt_sha256:"c".repeat(64),
+            specific_sha256:"1".repeat(64)
+          }
+        }
       },
       {
         candidate_id: "S01-C2",
@@ -120,6 +130,9 @@ test("candidate review keeps machine recommendation separate from human choice",
   assert.equal(scene.human_decision, "PENDING");
   assert.equal(scene.ranking_is_advisory, true);
   assert.equal(scene.candidates.every((x) => x.human_approved === false), true);
+  const bound=scene.candidates.find((x)=>x.candidate_id==="S01-C1");
+  assert.match(bound.effective_prompt,/two financing routes converge/);
+  assert.equal(bound.compiled_prompt_sha256,"c".repeat(64));
 });
 
 test("candidate review preserves all candidates and sorts PASS before REJECT", () => {
@@ -190,6 +203,8 @@ test("contact sheet keeps recommendation machine visibly advisory", () => {
   assert.match(html, /Décision humaine : <strong>EN ATTENTE<\/strong>/);
   assert.match(html, /S01-C1/);
   assert.match(html, /S01-C2/);
+  assert.match(html, /Brief effectif envoyé à ComfyUI/);
+  assert.match(html, /two financing routes converge/);
   assert.doesNotMatch(html, /publication_authorized=true/);
 });
 
@@ -258,4 +273,13 @@ test("near-tied candidates inside configured margin remain ambiguous", () => {
   assert.equal(scene.machine_recommended_candidate_id, null);
   assert.equal(scene.machine_recommendation_status, "AMBIGUOUS");
   assert.equal(scene.machine_recommendation_score_gap, 1.5);
+});
+
+test("candidate review fingerprint becomes stale when the effective compiled prompt changes",()=>{
+  const first=buildCandidateReview(fixtures());
+  const changed=fixtures();
+  changed.plan.requests[0].request.overrides["6"].text="SCENE_IMAGE_PROMPT: a different financial mechanism";
+  changed.plan.requests[0].request.prompt_application.compiled_prompt_sha256="d".repeat(64);
+  const second=buildCandidateReview(changed);
+  assert.notEqual(first.review_fingerprint_sha256,second.review_fingerprint_sha256);
 });

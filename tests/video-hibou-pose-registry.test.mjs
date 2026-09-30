@@ -35,6 +35,26 @@ test("pose can be applied statically or as an intra-scene timed event",()=>{
  assert.equal(timed.timeline.events[0].start_s,2);
 });
 
+test("canonical fallback is smaller and alternates side placement to avoid repetitive center blocking",()=>{
+ const contract={
+   contract_version:"HIBOU_VIDEO_CONTRACT_V1",
+   creative:{
+     reference_mode:"deterministic_character_overlay",
+     reference_image_local:"C:/tmp/hibou.webp",
+     reference_image_sha256:"abc"
+   },
+   scenes:[
+     {scene_id:"S01",order:1,pose_request:"missing",framing:{hibou:true}},
+     {scene_id:"S02",order:2,pose_request:"missing",framing:{hibou:true}}
+   ]
+ };
+ const out=applyPoseRegistryToContract(contract,registry,{registryPath:"/tmp/poses/registry.json"});
+ assert.equal(out.scenes[0].composition.character_pose.width,300);
+ assert.equal(out.scenes[0].composition.character_pose.anchor,"bottom-left");
+ assert.equal(out.scenes[1].composition.character_pose.anchor,"bottom-right");
+ assert.equal(out.scenes[0].pose_registry_resolution.status,"CANONICAL_FALLBACK");
+});
+
 test("contract application reuses only ready poses and never generates planned ones",()=>{
  const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",scenes:[
    {scene_id:"S01",pose_request:"pointe"},

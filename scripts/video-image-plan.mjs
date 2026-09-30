@@ -134,7 +134,10 @@ function removeTextRiskSentences(text){
   return withoutTextInstructions
     .replace(/\b20\d{2}\b/g,"abstract timeline milestone")
     .replace(/[+-]?\d+(?:[.,]\d+)?\s*%/g,"abstract percentage marker")
-    .replace(/\b\d[\d\s.,]*\s*€\b/g,"abstract currency marker")
+    .replace(/\b\d[\d\s.,]*\s*[€$£¥]\b/g,"abstract currency marker")
+    .replace(/\b\d[\d\s.,]*\b/g,"abstract unlabeled value marker")
+    .replace(/[€$£¥]/g,"")
+    .replace(/\b[A-ZÀ-ÖØ-Þ]{4,}\b/g,"unlabeled concept")
     .replace(/\s{2,}/g," ")
     .trim();
 }
@@ -358,9 +361,12 @@ export function buildImagePlan(contract,binding){
     )
   );
   const textFreeLock=creativeLockEnabled?[
+    "STRICT_GLYPH_FREE_LOCK:",
     "CLEAN_SURFACE_LOCK:",
-    "Keep plaques, paper surfaces, walls, screens and decorative panels blank and unmarked.",
-    "Use clean geometric shapes and simple material details only."
+    "Absolutely no readable or pseudo-readable text anywhere in the generated image.",
+    "No letters, words, digits, dates, prices, percentages, labels, logos, signs, bank names, captions, currency glyphs, watermarks or typography-like marks.",
+    "If the concept requires a number, date, name or financial label, represent it only with unlabeled geometric markers, blank cards, bars, dots or abstract icons; exact text and numbers are composited later.",
+    "Keep plaques, paper surfaces, walls, screens and decorative panels blank and unmarked."
   ].join(" "):"";
   const modeCandidates=productionMode==="preview"
     ?Number(production.preview_candidates_per_scene??1)

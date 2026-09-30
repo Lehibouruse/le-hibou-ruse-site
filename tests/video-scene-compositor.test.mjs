@@ -43,7 +43,7 @@ test("fallback camera motion is visible and alternates pan anchor when no timeli
     framing:{anchor:"center"},
   };
   const plan=buildSceneCompositePlan(scene,{duration:5,width:1080,height:1920,fps:30});
-  assert.match(plan.filter_complex,/1\.03200/);
+  assert.match(plan.filter_complex,/1\.04200/);
   assert.match(plan.filter_complex,/iw-\(iw\/zoom\)/);
 });
 
@@ -59,6 +59,19 @@ test("explicit camera beat interpolates zoom instead of jumping instantly",()=>{
   const plan=buildSceneCompositePlan(scene,{duration:4,width:1080,height:1920,fps:30});
   assert.match(plan.filter_complex,/max\(0,min\(1,\(on-/);
   assert.match(plan.filter_complex,/1\+0\.04000\*/);
+});
+
+test("timeline title text is placed in the top safe zone rather than the subtitle zone",()=>{
+  const scene={
+    scene_id:"TITLE",
+    image:{selected:"bg.png"},
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"title",type:"text",start_s:0,end_s:1.8,text:"TITLE"}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:3,width:1080,height:1920,fps:30});
+  assert.match(plan.filter_complex,/drawtext=.*y='120\+0'/);
+  assert.doesNotMatch(plan.filter_complex,/main_h-text_h-220/);
 });
 
 test("ffmpeg plan composes transparent layers, text and camera transform before render",()=>{

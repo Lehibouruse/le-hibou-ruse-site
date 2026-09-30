@@ -108,14 +108,15 @@ export function applyPoseRegistryToContract(contract, registry, {registryPath=""
       const deterministicOverlay=String(out?.creative?.reference_mode||"")==="deterministic_character_overlay";
       const hibouRequired=Boolean(scene?.framing?.hibou);
       if(deterministicOverlay&&hibouRequired&&canonical){
+        const order=Math.max(1,Number(scene?.order||1));
         resolvedPose={
           id:"canonical_fallback",
           category:"canonical_fallback",
           status:"ready",
           asset_ref:canonical,
           sha256:out?.creative?.reference_image_sha256||null,
-          anchor:"bottom-center",
-          default_width:430,
+          anchor:order%2===0?"bottom-right":"bottom-left",
+          default_width:300,
           remove_background:true
         };
         resolutionStatus="CANONICAL_FALLBACK";

@@ -401,7 +401,7 @@ export function materializeSpecificActionTimelines(contract){
         beat_kind:"MICRO_ZOOM",
         start_s:0.1,
         end_s:firstEnd,
-        zoom_percent:reveal?4:3.4,
+        zoom_percent:reveal?4.8:4.4,
         anchor
       },
       {
@@ -420,7 +420,7 @@ export function materializeSpecificActionTimelines(contract){
         beat_kind:"MICRO_ZOOM",
         start_s:Number(Math.max(0.8,duration*0.52).toFixed(3)),
         end_s:Number(Math.max(1.5,duration-0.15).toFixed(3)),
-        zoom_percent:4,
+        zoom_percent:5.2,
         anchor:"right"
       });
     }

@@ -198,7 +198,8 @@ test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free charact
  assert.match(promptWithHibou,/SCENE_IMAGE_PROMPT: prompt one/);
  assert.match(promptWithHibou,/SCENE_VISUAL_INTENT: v1/);
  assert.doesNotMatch(promptWithHibou,/ABSOLUTELY AVOID/);
- assert.match(promptWithHibou,/CLEAN_SURFACE_LOCK/);
+ assert.match(promptWithHibou,/STRICT_GLYPH_FREE_LOCK/);
+ assert.match(promptWithHibou,/No letters, words, digits/);
  assert.equal(p.creative_routing.global_negative_policy_present,true);
  assert.equal(p.creative_routing.global_negative_policy_injected_as_literal_tokens,false);
  assert.match(promptWithHibou,/FRAMING_LOCK/);
@@ -335,6 +336,31 @@ test("split-screen framing is routed and literal years are abstracted",()=>{
  assert.doesNotMatch(prompt,/1\.5\s*%/);
  assert.match(prompt,/abstract timeline milestone/);
  assert.match(prompt,/abstract percentage marker/);
+});
+
+test("text-free image compilation strips literal amounts and uppercase financial labels while preserving the mechanism",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: premium editorial illustration",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[{
+   scene_id:"VALUE",
+   image_prompt:"Portefeuille valorisé 100 000 € avec contrat LOMBARD et repère 2029.",
+   visual_idea:"Comparer 100 000 € aujourd'hui à 120 000 € plus tard.",
+   framing:{hibou:false,type:"schéma",anchor:"center"}
+ }];
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.doesNotMatch(prompt,/100\s*000|120\s*000|2029|LOMBARD/);
+ assert.match(prompt,/abstract currency marker|abstract unlabeled value marker/);
+ assert.match(prompt,/abstract timeline milestone/);
+ assert.match(prompt,/STRICT_GLYPH_FREE_LOCK/);
 });
 
 test("diagram framing compiles to flat diagrammatic composition",()=>{

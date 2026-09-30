@@ -161,7 +161,7 @@ export function normalizeSceneTimeline(scene,{duration}={}){
     if(type==="text"||type==="callout"){
       if(!String(event?.text||"").trim()) fail(`timeline event ${base.id}: text required`);
       return {...base,text:String(event.text),style:normalizeTextLayer({...event,text:event.text},type==="callout"?"timeline_callout":"timeline_text",{
-        z:base.z,font_size:type==="callout"?92:58,anchor:type==="callout"?"top-center":"bottom-center",box:type!=="callout"
+        z:base.z,font_size:type==="callout"?92:64,anchor:"top-center",box:type!=="callout"
       })};
     }
     if(type==="object"||type==="pose"){
@@ -298,7 +298,7 @@ export function normalizeSceneComposition(scene){
   }
 
   const camera=c.camera_transform||{};
-  const zoomPercent=Math.min(4,Math.max(0,num(camera.zoom_percent,scene?.zoom_percent??3)));
+  const zoomPercent=Math.min(5.5,Math.max(0,num(camera.zoom_percent,scene?.zoom_percent??3)));
   const cameraAnchor=String(camera.anchor||scene?.framing?.anchor||scene?.anchor||"center");
   const safeZones={
     top:num(c.safe_zones?.top,120),
@@ -446,7 +446,7 @@ export function buildSceneCompositePlan(scene,{duration,width=1080,height=1920,f
   const frames=Math.max(1,Math.round(d*fps));
   const cameraEvents=timeline.events.filter(x=>x.type==="camera");
   const requestedZoomPercent=c.camera_transform.zoom_percent;
-  const zoomPercent=cameraEvents.length?requestedZoomPercent:Math.max(3.2,requestedZoomPercent);
+  const zoomPercent=cameraEvents.length?requestedZoomPercent:Math.max(4.2,requestedZoomPercent);
   const maxZoom=1+zoomPercent/100;
   const increment=(maxZoom-1)/frames;
   const rawAnchor=String(c.camera_transform.anchor||"center").toLowerCase();

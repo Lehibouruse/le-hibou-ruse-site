@@ -35,7 +35,7 @@ function fixture(){
     image_prompt:"diagram with four options",planned_duration_s:4
   }]});
   put("pipeline-run.json",{stages:Object.fromEntries(
-    ["images","generated_text_qc","technical_selection","creative_qc","render","master_qc"].map(name=>[name,{status:"PASS"}])
+    ["images","generated_text_qc","technical_selection","creative_qc","master_semantic_qc","render","master_qc"].map(name=>[name,{status:"PASS"}])
   )});
   put("airtable-source-freshness.json",{pass:true,live_at_run:false});
   put("prompt-propagation.json",{pass:true});
@@ -57,6 +57,7 @@ function fixture(){
   ]});
   put("images/generated-text-qc.json",{schema:"HIBOU_GENERATED_TEXT_BATCH_QC_V1",pass:true,candidate_count:2});
   put("creative-qc.json",{status:"PASS"});
+  put("master-semantic-qc.json",{status:"PASS"});
   put("master-qc.json",{status:"PASS"});
   put("human-review.json",{human_approved:true,eligible_for_final_approval:true});
   put("semantic-review.json",{pass:true,reviewer:"editor",scenes:[{scene_id:"S01",status:"PASS"}]});
@@ -78,6 +79,10 @@ test("PROMPT_CONTRACT_PASS needs current source, prompt preservation, montage, v
     }});
     put("images/generated-text-qc.json",{schema:"HIBOU_GENERATED_TEXT_BATCH_QC_V1",pass:false,candidate_count:2});
     assert.equal(evaluatePromptContractRun(root).checks.generated_background_text_qc_pass,false);
+    put("images/generated-text-qc.json",{schema:"HIBOU_GENERATED_TEXT_BATCH_QC_V1",pass:true,candidate_count:2});
+    put("master-semantic-qc.json",{status:"REJECT"});
+    assert.equal(evaluatePromptContractRun(root).checks.post_render_semantic_qc_pass,false);
+    put("master-semantic-qc.json",{status:"PASS"});
     put("images/generated-text-qc.json",{schema:"HIBOU_GENERATED_TEXT_BATCH_QC_V1",pass:true,candidate_count:2});
     put("airtable-source-freshness.json",{pass:false});
     assert.equal(evaluatePromptContractRun(root).checks.airtable_source_verified,false);

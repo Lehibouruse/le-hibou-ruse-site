@@ -7,11 +7,12 @@ const starter=readFileSync(new URL("../scripts/video-start-comfyui-windows.ps1",
 
 test("video local installer defaults to diagnostic-only",()=>{
   assert.match(installer,/Diagnostic uniquement\. Aucun paquet, modele ou service n'a ete installe\/demarre/);
-  assert.match(installer,/if \(-not \(\$InstallVoice -or \$InstallComfyUI -or \$InstallFluxSchnell -or \$StartComfyUI\)\)/);
+  assert.match(installer,/if \(-not \(\$InstallVoice -or \$InstallCreativeQc -or \$InstallComfyUI -or \$InstallFluxSchnell -or \$StartComfyUI\)\)/);
 });
 
 test("heavy installs require explicit switches and preflight",()=>{
   assert.match(installer,/if \(\$InstallVoice\)/);
+  assert.match(installer,/if \(\$InstallCreativeQc\)/);
   assert.match(installer,/if \(\$InstallComfyUI\)/);
   assert.match(installer,/if \(\$InstallFluxSchnell\)/);
   assert.match(installer,/Require-GpuAndDisk 30/);
@@ -44,4 +45,12 @@ test("installer records no paid fallback or automatic start",()=>{
   assert.match(installer,/paid_fallback = \$false/);
   assert.match(installer,/automatic_model_download = \$false/);
   assert.match(installer,/automatic_service_start = \$false/);
+});
+
+test("Creative QC is an explicit staged install and caches CLIP for local-only production",()=>{
+  assert.match(installer,/CreativeQcModel = "openai\/clip-vit-base-patch32"/);
+  assert.match(installer,/transformers>=4\.45,<5/);
+  assert.match(installer,/CLIPProcessor\.from_pretrained\(m\)/);
+  assert.match(installer,/CLIPModel\.from_pretrained\(m, local_files_only=True\)/);
+  assert.match(installer,/local_files_only = \$true/);
 });

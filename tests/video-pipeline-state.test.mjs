@@ -57,3 +57,25 @@ test("video-pipeline-state CLI prints JSON through a portable file URL entrypoin
     assert.equal(parsed.gate,"EXPORT_REQUIRED");
   }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+test("pipeline status stops at final-frame semantic review after a technically valid master",()=>{
+  const root=mkdtempSync(join(tmpdir(),"hibou-state-semantic-"));
+  try{
+    put(root,"storyboard.json",{scenes:[{scene_id:"S01"}]});
+    put(root,"voice/contract-audio-ready.json",{ok:true});
+    put(root,"voice/contract-mastered.json",{ok:true});
+    put(root,"subtitles.ass","[Script Info]\n");
+    put(root,"images/image-plan.json",{scene_count:1,requests:[],skipped_full_reuse:["S01"]});
+    put(root,"images/batch-manifest.json",{results:{}});
+    put(root,"images/image-perceptual-qc.json",{all_scenes_have_candidate:true});
+    put(root,"images/selections.json",{S01:{selected:"bg.png"}});
+    put(root,"render-ready.json",{ok:true});
+    put(root,"master.mp4","video");
+    put(root,"master-qc.json",{status:"PASS"});
+    put(root,"creative-qc.json",{status:"PASS"});
+    put(root,"master-semantic-qc.json",{status:"REJECT"});
+    const status=inspectPipeline(root);
+    assert.equal(status.gate,"MASTER_SEMANTIC_REVIEW");
+    assert.equal(status.artifacts.master_semantic_qc,"REJECT");
+  }finally{rmSync(root,{recursive:true,force:true});}
+});

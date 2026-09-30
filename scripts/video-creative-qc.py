@@ -125,6 +125,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
     style = str(scene.get("style_prompt") or "premium editorial flat illustration, clean vector-like shapes, ivory background, dark navy, teal and restrained gold accents").strip()
     expected_hibou = scene.get("expected_hibou")
     hibou_composited_later = bool(scene.get("hibou_composited_later"))
+    allow_postproduction_text = bool(scene.get("allow_postproduction_text"))
     if hibou_composited_later:
         expected_hibou = False
     scores = {}
@@ -180,7 +181,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
         )
     if expected_hibou is True and "canonical_identity" in scores and scores["canonical_identity"] < min_identity:
         reasons.append(f"canonical Hibou drift: {scores['canonical_identity']:.3f} < {min_identity:.3f}")
-    if scores["text_artifact_risk"] > max_text_risk:
+    if not allow_postproduction_text and scores["text_artifact_risk"] > max_text_risk:
         reasons.append(f"possible parasitic/fake text: {scores['text_artifact_risk']:.3f} > {max_text_risk:.3f}")
 
     return {
@@ -189,6 +190,7 @@ def evaluate_scene(scene, model, processor, device, torch, canonical_embedding=N
         "pass": not reasons,
         "scores": {k: round(v, 4) for k, v in scores.items()},
         "text_coverage": text_coverage,
+        "allow_postproduction_text": allow_postproduction_text,
         "reasons": reasons,
         "thresholds": {
             "semantic_brief_min": min_semantic,

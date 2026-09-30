@@ -1,9 +1,7 @@
 param(
   [switch]$Activate,
   [string]$Storyboard = "",
-  [string]$SourceSnapshot = "",
-  [string]$Binding = "",
-  [string]$QueueUrl = "https://d4d5d6.com/api/local-worker-queue"
+  [string]$SourceSnapshot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,10 +10,18 @@ $Worker = Join-Path $SourceRoot "scripts\hibou-github-worker.mjs"
 $Master = Join-Path $SourceRoot "scripts\video-master.mjs"
 $Verifier = Join-Path $SourceRoot "scripts\video-airtable-sync.mjs"
 $OcrScript = Join-Path $SourceRoot "scripts\video-generated-text-qc.py"
+$QueueUrl = "https://d4d5d6.com/api/local-worker-queue"
 $Node = (Get-Command node -ErrorAction Stop).Source
 $OcrPython = [Environment]::GetEnvironmentVariable("HIBOU_OCR_PYTHON", "User")
 $Token = [Environment]::GetEnvironmentVariable("HIBOU_LOCAL_REPORT_TOKEN", "User")
-if (-not $Binding) { $Binding = [Environment]::GetEnvironmentVariable("HIBOU_VIDEO_BINDING", "User") }
+$AirtableToken = [Environment]::GetEnvironmentVariable("AIRTABLE_TOKEN", "Process")
+if ([string]::IsNullOrWhiteSpace($AirtableToken)) {
+  $AirtableToken = [Environment]::GetEnvironmentVariable("AIRTABLE_TOKEN", "User")
+}
+$AirtableTokenAvailable = -not [string]::IsNullOrWhiteSpace($AirtableToken)
+if ($AirtableTokenAvailable) { $env:AIRTABLE_TOKEN = $AirtableToken }
+Remove-Variable AirtableToken
+$Binding = [Environment]::GetEnvironmentVariable("HIBOU_VIDEO_BINDING", "User")
 if (-not $Binding) { $Binding = Join-Path $env:USERPROFILE "Documents\Codex\HibouVideo\comfyui-binding.json" }
 
 foreach ($File in @($Worker, $Master, $Verifier, $OcrScript, $Binding)) {
@@ -72,7 +78,7 @@ $HealthMatchesProcess = (-not $Health -and $WorkerProcesses.Count -eq 0) -or
   ($Health -and $CurrentWorker -and $WorkerProcesses.Count -eq 1)
 $Idle = $HealthMatchesProcess -and
   (-not $Health -or (-not $Health.current_job -and -not $Health.render_pid))
-$Ready = $QueueCompatible -and $MissingSnapshots.Count -eq 0 -and $Idle
+$Ready = $QueueCompatible -and $MissingSnapshots.Count -eq 0 -and $Idle -and $AirtableTokenAvailable
 
 $Report = [ordered]@{
   schema = "HIBOU_VIDEO_V5_LOCAL_LAUNCH_READINESS_V1"
@@ -81,6 +87,7 @@ $Report = [ordered]@{
   source_master_sha256 = (Get-FileHash -LiteralPath $Master -Algorithm SHA256).Hash.ToLowerInvariant()
   queue_snapshot_contract = [string]$Queue.source_snapshot_contract
   queue_compatible = [bool]$QueueCompatible
+  airtable_token_available = [bool]$AirtableTokenAvailable
   pending_jobs_missing_snapshots = $MissingSnapshots.Count
   snapshot_preflight = $SnapshotPreflight
   current_worker_pid = if ($Health) { $Health.worker_pid } else { $null }
@@ -95,15 +102,9 @@ if (-not $Activate) {
   return
 }
 if (-not $Ready) {
-  throw ("Activation V5 refusée : queue_compatible={0}, jobs_sans_snapshot={1}, worker_inactif={2}." -f `
-    $QueueCompatible, $MissingSnapshots.Count, $Idle)
+  throw ("Activation V5 refusée : queue_compatible={0}, jobs_sans_snapshot={1}, worker_inactif={2}, airtable_token_disponible={3}." -f `
+    $QueueCompatible, $MissingSnapshots.Count, $Idle, $AirtableTokenAvailable)
 }
-if ($AlreadyLocal) {
-  $Report.activated = $true
-  $Report | ConvertTo-Json -Depth 5
-  return
-}
-
 $InstallDir = Join-Path $env:LOCALAPPDATA "LeHibou"
 $OldLauncher = Join-Path $InstallDir "start-hibou-video-stack.runtime.ps1"
 $StartupCmd = Join-Path ([Environment]::GetFolderPath("Startup")) "LeHibouWorker.cmd"
@@ -127,6 +128,9 @@ try {
   $env:HIBOU_WORKER_SELF_UPDATE_ENABLED = "false"
   $env:HIBOU_LOCAL_EXECUTION_ENABLED = "true"
   $env:HIBOU_VIDEO_RENDER_ENABLED = "true"
+  $env:HIBOU_VIDEO_QUEUE_URL = $QueueUrl
+  $env:HIBOU_VIDEO_TIMELINE_V1 = "true"
+  $env:HIBOU_VIDEO_PROSODY_V1 = "true"
   $env:HIBOU_VIDEO_BINDING = $Binding
   $env:HIBOU_OCR_PYTHON = $OcrPython
   $LocalProcess = Start-Process -FilePath $Node -ArgumentList ('"' + $Worker + '"') `

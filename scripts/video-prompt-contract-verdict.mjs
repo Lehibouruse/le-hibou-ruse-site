@@ -1,11 +1,20 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  negativePolicyCoveragePass,
+  negativePolicyRequestPass,
+  negativePolicyHumanReviewPass,
+} from "./video-negative-policy-coverage.mjs";
 
 function readJson(path){
   if(!existsSync(path)) return null;
   try{ return JSON.parse(readFileSync(path,"utf8")); }catch{return null;}
+}
+function fileSha256(path){
+  return existsSync(path)?createHash("sha256").update(readFileSync(path)).digest("hex"):null;
 }
 
 function preserved(request){
@@ -40,6 +49,7 @@ export function evaluatePromptContractRun(root){
   const imagePlan=file("images/image-plan.json");
   const imageQc=file("images/image-perceptual-qc.json");
   const generatedTextQc=file("images/generated-text-qc.json");
+  const selectedTextQc=file("selected-background-text-qc.json");
   const selections=file("images/selections.json");
   const creative=file("creative-qc.json");
   const masterQc=file("master-qc.json");
@@ -47,6 +57,10 @@ export function evaluatePromptContractRun(root){
   const semantic=file("semantic-review.json");
   const timing=file("composition-timing-qc.json");
   const requests=Array.isArray(imagePlan?.requests)?imagePlan.requests:[];
+  const negativeCoverage=imagePlan?.negative_policy_coverage;
+  const negativeCoverageValid=negativePolicyCoveragePass(
+    negativeCoverage,storyboard?.creative?.negative_prompt
+  );
   const expectedCandidates=Math.max(1,Number(storyboard?.production?.final_candidates_per_scene||
     storyboard?.creative?.production_defaults?.candidates_per_scene||2));
   const imageThreshold=Number(storyboard?.creative?.production_defaults?.image_qc_threshold||85);
@@ -81,6 +95,13 @@ export function evaluatePromptContractRun(root){
     effective_image_prompts_preserved:requests.length>0&&requests.every(item=>
       preserved(item?.request)&&(!item?.fallback_request||preserved(item.fallback_request))
     ),
+    global_negative_policy_coverage_verified:negativeCoverageValid&&
+      imagePlan?.creative_contract_enforced===true,
+    global_negative_policy_prompt_routing_verified:negativeCoverageValid&&requests.length>0&&
+      requests.every(item=>negativePolicyRequestPass(item?.request,negativeCoverage)&&
+        (!item?.fallback_request||negativePolicyRequestPass(item.fallback_request,negativeCoverage))),
+    global_negative_policy_human_review_pass:negativeCoverageValid&&
+      negativePolicyHumanReviewPass(human,negativeCoverage),
     candidate_coverage_complete:scenes.length>0&&scenes.every(scene=>
       new Set(requests.filter(item=>item?.scene_id===scene.scene_id)
         .map(item=>String(item?.candidate_id||""))).size>=expectedCandidates
@@ -89,6 +110,15 @@ export function evaluatePromptContractRun(root){
     generated_background_text_qc_pass:stage("generated_text_qc")&&
       generatedTextQc?.schema==="HIBOU_GENERATED_TEXT_BATCH_QC_V1"&&
       generatedTextQc?.pass===true&&Number(generatedTextQc?.candidate_count)>0,
+    rendered_background_text_qc_pass:stage("selected_background_text_qc")&&
+      selectedTextQc?.schema==="HIBOU_SELECTED_BACKGROUND_TEXT_QC_V1"&&
+      selectedTextQc?.pass===true&&
+      Number(selectedTextQc?.scene_count)===scenes.length&&
+      scenes.every(scene=>{
+        const rows=(selectedTextQc?.rows||[]).filter(row=>row?.scene_id===scene.scene_id);
+        return rows.length===1&&rows[0].status==="PASS"&&
+          Boolean(rows[0].sha256)&&fileSha256(rows[0].path)===rows[0].sha256;
+      }),
     selected_images_meet_qc_threshold:scenes.length>0&&scenes.every(scene=>{
       const selected=String(selections?.[scene.scene_id]?.selected||"");
       const row=imageRows.find(item=>item?.scene_id===scene.scene_id&&item?.path===selected);

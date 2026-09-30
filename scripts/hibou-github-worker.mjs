@@ -2866,16 +2866,40 @@ async function processVideoRender(job, processed) {
     completed_at: new Date().toISOString(),
   };
 
-  writeFileSync(
-    path.join(dir, "_hibou_video_result.json"),
-    JSON.stringify(result, null, 2) + "\n",
-    "utf8",
-  );
+  const promptContractComplete =
+    promptContractVerdict?.PROMPT_CONTRACT_PASS === true &&
+    promptContractVerdict.failed.length === 0;
+  if (!promptContractComplete) {
+    const reviewPending = {
+      ...result,
+      schema: "HIBOU_VIDEO_RENDER_REVIEW_PENDING_V1",
+      prompt_contract_pass: false,
+      human_review_required: true,
+      paused_at: new Date().toISOString(),
+    };
+    writeFileSync(path.join(dir, "_hibou_video_result.json"),
+      JSON.stringify(reviewPending, null, 2) + "\n", "utf8");
+    await reportVideoProgress(job, "Paused", {
+      local_path: masterPath,
+      result_sha256: resultSha256,
+      result: reviewPending,
+    });
+    processed.add(job.id);
+    saveProcessed(processed);
+    state.current_job = null;
+    state.render_pid = null;
+    state.render_client_id = null;
+    log("VIDEO_RENDER awaiting semantic and human review", {
+      job: job.id, content_id: contentId,
+      failed_checks: promptContractVerdict?.failed || [],
+    });
+    return;
+  }
 
+  writeFileSync(path.join(dir, "_hibou_video_result.json"),
+    JSON.stringify(result, null, 2) + "\n", "utf8");
   await reportVideoProgress(job, "Completed", {
-    local_path: masterPath,
-    result_sha256: resultSha256,
-    result,
+    local_path: masterPath, result_sha256: resultSha256, result,
   });
 
   processed.add(job.id);

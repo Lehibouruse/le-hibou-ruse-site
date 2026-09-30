@@ -186,6 +186,7 @@ const IMAGE_RUNTIME_FILES=[
   ["video-image-batch.mjs","runImageGen","scripts/video-image-batch.mjs"],
   ["video-local-adapters.mjs","ComfyUI /prompt returned no prompt_id","scripts/video-local-adapters.mjs"],
   ["video-image-plan.mjs","HIBOU_IMAGE_PLAN_V1","scripts/video-image-plan.mjs"],
+  ["video-negative-policy-coverage.mjs","HIBOU_GLOBAL_NEGATIVE_COVERAGE_V1","scripts/video-negative-policy-coverage.mjs"],
   ["video-image-qc.mjs","HIBOU_IMAGE_BATCH_V1","scripts/video-image-qc.mjs"],
   ["video-image-regenerate.mjs","buildTargetedRegeneration","scripts/video-image-regenerate.mjs"],
   ["video-candidate-review.mjs","HIBOU_CANDIDATE_REVIEW_V1","scripts/video-candidate-review.mjs"],
@@ -227,6 +228,7 @@ const POST_RUNTIME_FILES=[
   ["video-visual-event-metrics.mjs","HIBOU_VISUAL_EVENT_RATE_V1"],
   ["video-artifact-registry.mjs","HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"],
   ["video-human-review-package.mjs","HIBOU_HUMAN_REVIEW_PACKAGE_V1"],
+  ["video-negative-policy-coverage.mjs","HIBOU_GLOBAL_NEGATIVE_COVERAGE_V1"],
   ["video-factual-gate.mjs","HIBOU_VIDEO_FACTUAL_GATE_V1"],
   ["video-review-diff.mjs","HIBOU_INCREMENTAL_REVIEW_DIFF_V1"],
   ["video-durable-storage-plan.mjs","HIBOU_DURABLE_STORAGE_PLAN_V1"],
@@ -388,7 +390,8 @@ export function unverifiedSpecificMontageActions(motionPlan){
       const expectedDiagrams=expected?.events||[];
       const actualDiagrams=(actual?.events||[]).filter(event=>event?.type==="diagram");
       if(expected&&actual?.specific_montage?.source_visual_sha256===expected.specific_montage.source_visual_sha256&&
-         JSON.stringify(actualDiagrams)===JSON.stringify(expectedDiagrams)) return [];
+         JSON.stringify(actualDiagrams)===JSON.stringify(expectedDiagrams)&&
+         specificMontageSemanticGaps(scene,actualDiagrams).length===0) return [];
       return [{scene_id:String(scene.scene_id||""),cues,specific_v2_montage_required:true,
         reason:"box spread V2 typed montage plan missing or changed"}];
     }
@@ -432,15 +435,26 @@ function boxspreadMontageTimeline(scene){
   }else if(order===6){
     add("LE CIRCUIT LOMBARD",[market,bank,you],[diagramLink("→",360,805),diagramLink("→",675,805)]);
     add("LA BANQUE SORT DU CIRCUIT",[
-      diagramNode("market","MARCHÉ",110,730,270,115),
-      diagramNode("options","4 OPTIONS",425,730,270,115,"0xA2814E@0.97"),
-      diagramNode("cash","CASH",740,730,220,115)
-    ],[diagramLink("→",390,745),diagramLink("→",700,745)],{operation:"remove",target_layer_id:"bank",before:"market-bank-you",after:"market-options-cash"});
+      diagramNode("market","MARCHÉ",90,835,210,110),
+      diagramNode("hibou","LE HIBOU",430,835,220,110,"0xA2814E@0.97",34),
+      diagramNode("cash","CASH",800,835,190,110),
+      diagramNode("option_1","OPTION 1",340,610,180,92,"0xA2814E@0.97",27),
+      diagramNode("option_2","OPTION 2",560,610,180,92,"0xA2814E@0.97",27),
+      diagramNode("option_3","OPTION 3",340,1070,180,92,"0xA2814E@0.97",27),
+      diagramNode("option_4","OPTION 4",560,1070,180,92,"0xA2814E@0.97",27)
+    ],[diagramLine(300,886,130,6),diagramLine(650,886,132,6),diagramLink(">",772,853,54),
+      diagramLink("PASSAGE OUVERT",348,742,30)],
+      {operation:"remove",target_layer_id:"bank",effect:"open_passage",actor_layer_id:"hibou",
+        before:"market-bank-you",after:"market-hibou-options-cash"});
   }else if(order===7){
-    const options=[1,2,3,4].map((n,i)=>diagramNode(`option_${n}`,`OPTION ${n}`,105,610+i*158,300,112,"0xA2814E@0.97"));
-    const funding=diagramNode("funding","FINANCEMENT",625,820,350,130);
-    add("QUATRE OPTIONS DISTINCTES",[...options,funding]);
-    add("UN SEUL FINANCEMENT",[...options,funding],[
+    const options=[1,2,3,4].map((n,i)=>diagramNode(`option_${n}`,
+      `JAMBE ${n} · PRIX ${i<2?"A":"B"}`,90,600+i*158,345,112,
+      i<2?"0xA2814E@0.97":"0x668493@0.97",30));
+    const funding=diagramNode("funding","CASH REÇU",625,820,350,130,"0xA2814E@0.97",34);
+    add("2 PAIRES · MÊME ÉCHÉANCE",[...options,funding]);
+    add("4 JAMBES → UN FINANCEMENT",[...options,funding,
+      diagramNode("seller_note","BOX VENDU · CASH EN ESPÈCES",235,1250,610,80,"0x102331@0.0",29)],
+      [
       ...options.map((_,i)=>diagramLine(405,665+i*158,115,6)),
       diagramLine(517,665,6,480),diagramLine(520,882,85,6),diagramLink(">",590,852,56)
     ]);
@@ -448,55 +462,151 @@ function boxspreadMontageTimeline(scene){
     const today=diagramNode("today","AUJOURD’HUI",90,675,410,120);
     const cash=diagramNode("cash","CASH REÇU",90,870,410,125,"0xA2814E@0.97");
     const maturity=diagramNode("maturity","À L'ÉCHÉANCE",580,675,410,120);
-    const repay=diagramNode("repayment","REMBOURSEMENT CONNU",580,870,410,125,"0xA2814E@0.97",31);
-    add("DU CASH MAINTENANT",[today,cash],[diagramLink("↓",265,790)]);
-    add("UN REMBOURSEMENT CONNU",[today,cash,maturity,repay],[diagramLink("↓",265,790),diagramLink("→",515,840),diagramLink("↓",755,790)]);
+    const repay=diagramNode("repayment","MONTANT CONNU",580,870,410,125,"0xA2814E@0.97",34);
+    add("MÊME BOX · CASH MAINTENANT",[today,cash],[diagramLink("↓",265,790)]);
+    add("MÊME BOX · ÉCHÉANCE",[today,cash,maturity,repay],[diagramLink("↓",265,790),diagramLink("→",515,840),diagramLink("↓",755,790)]);
   }else if(order===9){
-    const rate=diagramNode("rate","TAUX DE MARCHÉ",95,690,420,115);
-    const margin=diagramNode("bank_margin","MARGE BANQUE",95,905,420,115,"0x81593F@0.97");
-    const box=diagramNode("box_rate","TAUX IMPLICITE MARCHÉ",565,795,430,125,"0xA2814E@0.97",33);
-    add("LOMBARD : TAUX + MARGE",[rate,margin],[diagramLink("+",265,820)]);
-    add("BOX : SANS COUCHE BANCAIRE",[rate,margin,box],[diagramLink("+",265,820),diagramLink("→",510,820)],{operation:"remove",target_layer_id:"bank_margin",before:"lombard_rate_plus_margin",after:"box_market_rate_no_bank_margin"});
+    const rate=diagramNode("lombard_rate","TAUX DE MARCHÉ",80,745,430,112);
+    const margin=diagramNode("lombard_margin","MARGE BANQUE",80,950,430,112,"0x81593F@0.97");
+    const box=diagramNode("box_rate","TAUX IMPLICITE MARCHÉ",565,745,430,112,"0xA2814E@0.97",30);
+    const copy=diagramNode("box_margin_copy","COPIE MARGE À RETIRER",565,950,430,112,"0x668493@0.72",26);
+    add("LOMBARD                     BOX",[rate,margin,box,copy],[diagramLink("+",275,875,46)]);
+    add("LOMBARD                     BOX",[rate,margin,box,
+      diagramNode("cost_note","FRAIS ET GARANTIES POSSIBLES",185,1190,710,75,"0x102331@0.0",32)
+    ],[diagramLink("+",275,875,46)],
+      {operation:"remove",target_layer_id:"box_margin_copy",before:"box_margin_copy_visible",after:"box_market_rate_only"});
   }else if(order===10){
     const years=[2026,2027,2028,2029];
     years.forEach((year,index)=>{
-      const nodes=years.slice(0,index+1).map((y,i)=>diagramNode(`year_${y}`,`${y} BOX`,100+i*240,760,160,125,i===index?"0xA2814E@0.97":"0x224054@0.96",28));
-      const links=years.slice(0,index).map((_,i)=>diagramLink("→",280+i*240,790,42));
-      add(`RENOUVELLEMENT ${index+1} / 4`,nodes,links,index?{operation:"renew",target_layer_id:`year_${year}`,before:`year_${years[index-1]}`,after:`year_${year}`}:null);
+      const markers=years.map((y,i)=>diagramNode(`year_${y}`,String(y),110+i*220,630,170,100,
+        i===index?"0xA2814E@0.97":"0x224054@0.96",30));
+      const condition=diagramNode("current_terms",`CONDITIONS DU JOUR ${year}`,280,1050,520,100,"0x224054@0.96",29);
+      const box=diagramNode("box_current",`${year} BOX`,345,835,390,155,"0xA2814E@0.97",47);
+      const note=index===3?[
+        diagramNode("new_rate_note","NOUVEAU TAUX",150,1190,780,70,"0x102331@0.0",34),
+        diagramNode("new_rate_note_2","À CHAQUE RENOUVELLEMENT",150,1260,780,70,"0x102331@0.0",32)
+      ]:[];
+      const links=years.slice(1).map((_,i)=>diagramLink("→",290+i*220,650,38));
+      add(`RENOUVELLEMENT ${index+1} / 4`,[...markers,condition,...note,box],links,index?{
+        operation:"renew",target_layer_id:"box_current",before:`${years[index-1]} BOX`,after:`${year} BOX`
+      }:null);
     });
   }else if(order===11){
     const left=[diagramNode("left_market","MARCHÉ",80,660,280,108),diagramNode("left_bank","BANQUE",80,830,280,108,"0x81593F@0.97"),diagramNode("left_you","TOI",80,1000,280,108)];
-    const right=[diagramNode("right_market","MARCHÉ",670,720,300,108),diagramNode("right_you","TOI",670,1000,300,108)];
+    const right=[diagramNode("right_market","FINANCEMENT MARCHÉ",625,720,360,108,"0x224054@0.96",29),
+      diagramNode("right_you","TOI",670,1000,300,108)];
     add("LOMBARD : TROIS NŒUDS",left,[diagramLink("↓",190,780),diagramLink("↓",190,950),diagramLink("MARGE",400,855,34)]);
-    add("BOX : DEUX NŒUDS",[...left,...right],[diagramLink("↓",190,780),diagramLink("↓",190,950),diagramLink("MARGE",400,855,34),diagramLink("↓",800,845)]);
+    add("BOX : DEUX NŒUDS",[...left,...right,
+      diagramNode("broker_note","EXÉCUTION VIA COURTIER",225,1210,660,70,"0x102331@0.0",31),
+      diagramNode("broker_note_2","GARANTIES POSSIBLES",225,1280,660,70,"0x102331@0.0",31)],
+      [diagramLink("↓",190,780),diagramLink("↓",190,950),diagramLink("MARGE",400,855,34),diagramLink("↓",800,845)]);
   }else if(order===12){
-    add("AVEC L’INTERMÉDIAIRE",[market,bank,you],[diagramLink("→",360,805),diagramLink("→",675,805)]);
-    add("UN INTERMÉDIAIRE DE MOINS",[diagramNode("market","MARCHÉ",160,790,290,115),diagramNode("you","TOI",670,790,250,115)],[diagramLink("→",505,805,65)],{operation:"remove",target_layer_id:"bank",before:"market-bank-you",after:"market-you"});
+    add("BANQUE PRÊTEUSE AU MILIEU",[market,bank,you,
+      diagramNode("hibou","LE HIBOU",410,1040,260,95,"0xA2814E@0.97",32)],
+      [diagramLink("→",360,805),diagramLink("→",675,805)]);
+    add("CIRCUIT SIMPLIFIÉ",[market,you,
+      diagramNode("hibou","LE HIBOU",410,1040,260,95,"0xA2814E@0.97",32)],
+      [diagramLink("→",490,805)],
+      {operation:"remove",target_layer_id:"bank",actor_layer_id:"hibou",before:"market-bank-you",after:"market-you"});
+    add("",[diagramNode("primary_message",String(scene?.screen_text||"UN INTERMÉDIAIRE DE MOINS.").trim(),
+      85,790,910,180,"0x102331@0.0",49)],[]);
   }
+  const weights=order===10?[2.4,1.8,1.5,1.3]:order===12?[1.4,1.1,1.5]:states.map(()=>duration/states.length);
+  const boundaries=[0];
+  for(const weight of weights){boundaries.push(boundaries.at(-1)+weight*(order===10?duration/7:order===12?duration/4:1));}
   const events=states.map((state,index)=>({
     id:`boxspread-v2-s${String(order).padStart(2,"0")}-beat-${index+1}`,
     type:"diagram",
     beat_kind:index&&state.action?"BEFORE_AFTER":"MINI_DIAGRAM",
-    start_s:Number((duration*index/states.length).toFixed(3)),
-    end_s:index===states.length-1?duration:Number((duration*(index+1)/states.length).toFixed(3)),
+    composition_unit_id:`unit-${duration<=5?1:states.length===4?Math.floor(index/2)+1:index+1}`,
+    start_s:Number(boundaries[index].toFixed(3)),
+    end_s:index===states.length-1?duration:Number(boundaries[index+1].toFixed(3)),
     diagram:{title:state.title,nodes:state.nodes,links:state.links},
     action:state.action
   }));
+  const visualUnits=[];
+  for(const event of events){
+    let unit=visualUnits.find(row=>row.id===event.composition_unit_id);
+    if(!unit){
+      unit={id:event.composition_unit_id,index:visualUnits.length+1,start_s:event.start_s,
+        end_s:event.end_s,duration_s:0,event_ids:[],composition_identity:"persistent_diagram_panel"};
+      visualUnits.push(unit);
+    }
+    unit.end_s=event.end_s;
+    unit.duration_s=Number((unit.end_s-unit.start_s).toFixed(3));
+    unit.event_ids.push(event.id);
+  }
   return {
     schema:"HIBOU_SCENE_TIMELINE_V1",
     source:"boxspread_specific_v2_montage",
+    ...(order===12?{screen_text_routed_by_diagram:true}:{}),
     specific_montage:{
       schema:"HIBOU_SPECIFIC_MONTAGE_PLAN_V1",
       template:"boxspread_v2",
       source_visual_sha256:montageHash(scene.visual_idea),
-      visual_units:Array.from({length:Math.max(1,Math.ceil(duration/5))},(_,index)=>({
-        index:index+1,
-        duration_s:Number((duration/Math.max(1,Math.ceil(duration/5))).toFixed(3))
-      })),
+      visual_units:visualUnits,
       render_execution_verified:false
     },
     events
   };
+}
+
+function specificMontageSemanticGaps(scene,diagrams){
+  const gaps=[];
+  const nodeIds=event=>(event?.diagram?.nodes||[]).map(node=>String(node.id||""));
+  for(let index=1;index<diagrams.length;index+=1){
+    const prior=diagrams[index-1],current=diagrams[index],action=current?.action;
+    if(action?.operation==="remove"){
+      const target=String(action.target_layer_id||"");
+      if(!target||!nodeIds(prior).includes(target)||nodeIds(current).includes(target)) gaps.push("remove_not_visible");
+    }
+    if(action?.operation==="renew"){
+      const target=String(action.target_layer_id||"");
+      const before=prior?.diagram?.nodes?.find(node=>node.id===target)?.label;
+      const after=current?.diagram?.nodes?.find(node=>node.id===target)?.label;
+      if(!target||!before||!after||before===after||before!==action.before||after!==action.after){
+        gaps.push("renew_not_visible");
+      }
+    }
+  }
+  const order=Number(scene?.order),final=diagrams.at(-1);
+  if(order===6){
+    const ids=new Set(nodeIds(final));
+    if(!["hibou","option_1","option_2","option_3","option_4"].every(id=>ids.has(id))||
+       final?.action?.effect!=="open_passage"||ids.has("bank")) gaps.push("hibou_passage_four_options_missing");
+  }
+  if(order===9&&nodeIds(final).includes("bank_margin")) gaps.push("bank_margin_still_visible");
+  if(order===9){
+    const ids=new Set(nodeIds(final));
+    if(!ids.has("lombard_rate")||!ids.has("lombard_margin")||!ids.has("box_rate")||
+       !ids.has("cost_note")||ids.has("box_margin_copy")){
+      gaps.push("lombard_margin_or_box_removal_invalid");
+    }
+  }
+  if(order===10){
+    const labels=diagrams.map(event=>event?.diagram?.nodes?.find(node=>node.id==="box_current")?.label);
+    const terms=diagrams.map(event=>event?.diagram?.nodes?.find(node=>node.id==="current_terms")?.label);
+    const durations=diagrams.map(event=>Number(event.end_s)-Number(event.start_s));
+    if(JSON.stringify(labels)!==JSON.stringify(["2026 BOX","2027 BOX","2028 BOX","2029 BOX"])||
+       JSON.stringify(terms)!==JSON.stringify([2026,2027,2028,2029].map(year=>`CONDITIONS DU JOUR ${year}`))||
+       !nodeIds(final).includes("new_rate_note")||!nodeIds(final).includes("new_rate_note_2")||
+       !durations.every((value,index)=>index===0||value<durations[index-1])){
+      gaps.push("roll_recreation_or_acceleration_missing");
+    }
+  }
+  if(order===12){
+    const middle=diagrams[1];
+    const middleIds=new Set(nodeIds(middle));
+    const nodes=final?.diagram?.nodes||[];
+    if(diagrams.length!==3||!middleIds.has("market")||!middleIds.has("you")||
+       !middleIds.has("hibou")||middleIds.has("bank")||
+       nodes.length!==1||nodes[0].id!=="primary_message"||
+       nodes[0].label!==String(scene?.screen_text||"UN INTERMÉDIAIRE DE MOINS.").trim()||
+       (final?.diagram?.links||[]).length!==0||String(final?.diagram?.title||"")!==""){
+      gaps.push("single_primary_message_missing");
+    }
+  }
+  return gaps;
 }
 
 function boxspreadAuxiliaryTimeline(scene){
@@ -513,9 +623,12 @@ function boxspreadAuxiliaryTimeline(scene){
       ],links:[diagramLink("→",515,845)]}
     ];
     return {schema:"HIBOU_SCENE_TIMELINE_V1",source:"boxspread_scene_03_timing",
-      timing_visual_units:[{index:1,duration_s:3},{index:2,duration_s:3}],
+      timing_visual_units:[
+        {id:"unit-1",index:1,start_s:0,end_s:3,duration_s:3,event_ids:["boxspread-s03-visual-1"]},
+        {id:"unit-2",index:2,start_s:3,end_s:6,duration_s:3,event_ids:["boxspread-s03-visual-2"]}
+      ],
       events:states.map((state,index)=>({id:`boxspread-s03-visual-${index+1}`,type:"diagram",beat_kind:"MINI_DIAGRAM",
-        start_s:index*3,end_s:(index+1)*3,diagram:state,action:null}))};
+        composition_unit_id:`unit-${index+1}`,start_s:index*3,end_s:(index+1)*3,diagram:state,action:null}))};
   }
   if(Number(scene?.order)===13&&duration>=3&&duration<=6){
     const ctaStart=Number((duration-3).toFixed(3));
@@ -539,13 +652,50 @@ export function buildCompositionTimingQc(contract){
   const min=Number(target[0]),max=Number(target[1]);
   const scenes=(contract?.scenes||[]).map(scene=>{
     const duration=Number(scene?.planned_duration_s);
+    const events=(scene?.timeline?.events||[]).filter(event=>event?.type==="diagram")
+      .sort((a,b)=>Number(a.start_s)-Number(b.start_s));
+    const declared=scene?.timeline?.specific_montage?.visual_units||scene?.timeline?.timing_visual_units||null;
+    const derived=[];
+    for(const event of events){
+      let unit=derived.find(row=>row.id===event.composition_unit_id);
+      if(!unit){
+        unit={id:event.composition_unit_id,index:derived.length+1,start_s:Number(event.start_s),
+          end_s:Number(event.end_s),duration_s:0,event_ids:[]};
+        derived.push(unit);
+      }
+      unit.end_s=Number(event.end_s);
+      unit.duration_s=Number((unit.end_s-unit.start_s).toFixed(3));
+      unit.event_ids.push(event.id);
+    }
+    const metadataPass=!declared||JSON.stringify(derived)===JSON.stringify(declared.map(unit=>({
+      id:unit.id,index:unit.index,start_s:unit.start_s,end_s:unit.end_s,
+      duration_s:unit.duration_s,event_ids:unit.event_ids
+    })));
     const units=duration<=max&&duration>=min?
-      [{index:1,duration_s:duration}]:
-      (scene?.timeline?.specific_montage?.visual_units||scene?.timeline?.timing_visual_units||[]);
+      [{index:1,start_s:0,end_s:duration,duration_s:duration,event_ids:events.map(event=>event.id)}]:derived;
     const sum=units.reduce((total,unit)=>total+Number(unit?.duration_s||0),0);
-    const status=units.length&&units.every(unit=>Number(unit?.duration_s)>=min&&Number(unit?.duration_s)<=max)&&
-      Math.abs(sum-duration)<0.1?"PASS":"FAIL";
-    return {scene_id:scene.scene_id,planned_duration_s:duration,visual_units:units,status};
+    const eventDurations=events.map(event=>Number((Number(event.end_s)-Number(event.start_s)).toFixed(3)));
+    const contiguous=events.every((event,index)=>index===0?
+      Math.abs(Number(event.start_s))<0.01:
+      Math.abs(Number(event.start_s)-Number(events[index-1].end_s))<0.01)&&
+      (!events.length||Math.abs(Number(events.at(-1).end_s)-duration)<0.01);
+    const accelerando=Number(scene?.order)===10&&events.length===4&&
+      eventDurations[0]>=2&&eventDurations.at(-1)>=1.2&&
+      eventDurations.every((value,index)=>index===0||value<eventDurations[index-1]);
+    const removeReveal=Number(scene?.order)===12&&events.length===3&&
+      events[1]?.action?.operation==="remove"&&
+      eventDurations.every(value=>value>=1&&value<=2);
+    const beatPass=!events.length||contiguous&&(
+      accelerando||removeReveal||eventDurations.every(value=>value>=2&&value<=max));
+    const unitPass=units.length&&units.every(unit=>Number(unit?.duration_s)>=min-0.001&&
+      Number(unit?.duration_s)<=max+0.001)&&Math.abs(sum-duration)<0.1;
+    const status=metadataPass&&unitPass&&beatPass?"PASS":"FAIL";
+    return {scene_id:scene.scene_id,planned_duration_s:duration,visual_units:units,
+      rendered_beats:events.map((event,index)=>({id:event.id,start_s:event.start_s,end_s:event.end_s,
+        duration_s:eventDurations[index],composition_unit_id:event.composition_unit_id})),
+      beat_policy:{status:beatPass?"PASS":"FAIL",mode:accelerando?"boxspread_v2_roll_accelerando":
+        removeReveal?"boxspread_v2_remove_then_reveal":"2_to_5_second_rendered_beats",
+        contiguous},unit_metadata_pass:metadataPass,status};
   });
   const cta=(contract?.scenes||[]).find(scene=>Number(scene?.order)===13);
   const ctaWindow=cta?.timeline?.cta_window||null;
@@ -698,6 +848,21 @@ export async function verifySpecificMontageRenderReceipt({root,storyboard,compos
        JSON.stringify((timeline?.events||[]).filter(event=>event?.type==="diagram"))!==JSON.stringify(expected.events)){
       fail("specific montage render contract changed: "+scene.scene_id);
     }
+    const diagrams=(timeline?.events||[]).filter(event=>event?.type==="diagram");
+    const semanticGaps=specificMontageSemanticGaps(scene,diagrams);
+    if(semanticGaps.length){
+      fail("specific montage semantic state mismatch: "+scene.scene_id+" "+semanticGaps.join(","));
+    }
+    for(let index=1;index<diagrams.length;index+=1){
+      const action=diagrams[index]?.action;
+      if(action?.operation!=="remove") continue;
+      const target=String(action.target_layer_id||"");
+      const before=(diagrams[index-1]?.diagram?.nodes||[]).some(node=>node.id===target);
+      const after=(diagrams[index]?.diagram?.nodes||[]).some(node=>node.id===target);
+      if(!target||!before||after){
+        fail("specific montage removal is not visually applied: "+scene.scene_id+" "+target);
+      }
+    }
     const clip=resolve(row.clip_path||"");
     if(!existsSync(clip)||row.clip_sha256!==sha256(clip)) fail("specific montage clip hash mismatch: "+scene.scene_id);
     const plan=compositor.buildSceneCompositePlan(rendered,{
@@ -827,6 +992,7 @@ export async function main(){
   const root=resolve(outputArg);
   mkdirSync(root,{recursive:true});
   const storyboard=resolve(root,"storyboard.json");
+  const sourceStoryboard=resolve(root,"source-storyboard.json");
   const statePath=resolve(root,"pipeline-run.json");
   const inputs={
     source:contentId?{type:"airtable",content_id:contentId}:{type:"file",path:resolve(storyboardArg),sha256:sha256(resolve(storyboardArg))},
@@ -863,38 +1029,50 @@ export async function main(){
 
   stage(state,"storyboard",()=>{
     if(contentId){
-      run(process.execPath,[resolve("scripts/video-airtable-sync.mjs"),"export",contentId,storyboard]);
+      run(process.execPath,[resolve("scripts/video-airtable-sync.mjs"),"export",contentId,sourceStoryboard]);
     }else{
       const source=resolve(storyboardArg);
       const data=json(source);
       if(data.contract_version!=="HIBOU_VIDEO_CONTRACT_V1"||data.contract_state!=="storyboard") fail("storyboard contract required");
-      writeJson(storyboard,data);
+      writeJson(sourceStoryboard,data);
     }
-    const sb=json(storyboard);
+    const sb=json(sourceStoryboard);
     if((sb.scenes||[]).length>policy.max_scenes) fail("storyboard exceeds --max-scenes policy");
+    writeJson(storyboard,sb);
+    state.source_storyboard={path:sourceStoryboard,sha256:sha256(sourceStoryboard),immutable:true};
   });
 
+  if(!state.source_storyboard?.immutable||
+     state.source_storyboard.path!==sourceStoryboard||
+     !existsSync(sourceStoryboard)||
+     state.source_storyboard.sha256!==sha256(sourceStoryboard)){
+    fail("immutable source storyboard missing or changed; use a new run directory");
+  }
+  const sourceStoryboardData=json(sourceStoryboard);
   const storyboardData=json(storyboard);
-  if(sourceSnapshotArg&&storyboardData?.content?.source!=="airtable"){
+  if(sourceSnapshotArg&&sourceStoryboardData?.content?.source!=="airtable"){
     fail("--source-snapshot requires storyboard content.source=airtable");
   }
   if(contentId&&(
-    storyboardData?.content?.source!=="airtable"||
-    storyboardData?.content?.content_id!==contentId
+    sourceStoryboardData?.content?.source!=="airtable"||
+    sourceStoryboardData?.content?.content_id!==contentId
   )) fail("Airtable master source does not match --content");
-  if(storyboardData?.content?.source==="airtable"){
+  if(sourceStoryboardData?.content?.source==="airtable"){
     const freshnessPath=resolve(root,"airtable-source-freshness.json");
     try{
       const verifierOutput=run(process.execPath,[
         resolve("scripts/video-airtable-sync.mjs"),
         "verify",
-        storyboard,
+        sourceStoryboard,
         ...(sourceSnapshotArg?[`--source-snapshot=${resolve(sourceSnapshotArg)}`]:[])
       ]);
       const receipt=JSON.parse(verifierOutput.trim());
       if(receipt.pass!==true) fail("Airtable source verification did not pass");
       state.airtable_source_freshness={
         ...receipt,
+        verified_storyboard_path:sourceStoryboard,
+        verified_storyboard_sha256:state.source_storyboard.sha256,
+        immutable_source:true,
         ...(sourceSnapshotArg?{source_snapshot_path:resolve(sourceSnapshotArg),source_snapshot_sha256:sha256(resolve(sourceSnapshotArg))}:{})
       };
       writeJson(freshnessPath,state.airtable_source_freshness);
@@ -1687,8 +1865,10 @@ export async function main(){
     }
     const manifest=json(resolve(imageDir,"batch-manifest.json"));
     const completed=Object.entries(manifest?.results||{}).filter(([,row])=>row?.status==="completed");
-    if(!completed.length) fail("generated text OCR has no completed image candidates");
     const plannedIds=(json(resolve(imageDir,"image-plan.json")).requests||[]).map(item=>String(item?.candidate_id||""));
+    const fullReuseCount=Number(json(assetResolved)?.asset_resolution?.full_reuse_scenes?.length||0);
+    const allScenesFullReuse=plannedIds.length===0&&fullReuseCount===(storyboardData.scenes||[]).length;
+    if(!completed.length&&!allScenesFullReuse) fail("generated text OCR has no completed image candidates");
     if(completed.length!==new Set(plannedIds).size||
        plannedIds.some(id=>manifest?.results?.[id]?.status!=="completed")){
       fail("generated text OCR candidate coverage differs from image plan");
@@ -1942,7 +2122,9 @@ export async function main(){
       const specific=String(scene?.screen_text||"").trim();
       if(!specific) return {scene_id:scene.scene_id,routed:true,route:"NONE"};
       const timelineRouted=Array.isArray(scene?.timeline?.events)&&scene.timeline.events.some(
-        event=>["text","callout"].includes(String(event?.type||"").toLowerCase())&&String(event?.text||"").trim()
+        event=>(["text","callout"].includes(String(event?.type||"").toLowerCase())&&String(event?.text||"").trim())||
+          (scene?.timeline?.screen_text_routed_by_diagram===true&&event?.type==="diagram"&&
+            (event?.diagram?.nodes||[]).some(node=>String(node?.label||"").trim()===specific))
       );
       return {scene_id:scene.scene_id,routed:true,route:timelineRouted?"TIMELINE":"ASS_SCREEN_TEXT"};
     });
@@ -1958,6 +2140,62 @@ export async function main(){
       branded_scenes:brandedScenes,
       screen_text_routes:screenTextRoutes
     });
+  });
+
+  const selectedBackgroundAuditPath=resolve(root,"selected-background-text-qc.json");
+  // Human-selection resumes may reuse stage state. Recheck the files that will
+  // actually be rendered every time, including FULL_REUSE backgrounds.
+  delete state.stages.selected_background_text_qc;
+  writeJson(statePath,state);
+  stage(state,"selected_background_text_qc",()=>{
+    const ocrPython=String(process.env.HIBOU_OCR_PYTHON||"").trim();
+    const ocrScript=resolve("scripts/video-generated-text-qc.py");
+    if(!ocrPython||!existsSync(resolve(ocrPython))||!existsSync(ocrScript)){
+      fail("selected background OCR requires HIBOU_OCR_PYTHON and video-generated-text-qc.py");
+    }
+    const promoted=json(renderReady);
+    const scenes=Array.isArray(promoted?.scenes)?promoted.scenes:[];
+    if(!scenes.length) fail("selected background OCR has no rendered scenes");
+    const receiptDir=resolve(root,"selected-background-text-qc");
+    mkdirSync(receiptDir,{recursive:true});
+    const rows=[];
+    for(const scene of scenes){
+      const ref=String(scene?.composition?.background||scene?.image?.selected||"").trim();
+      if(!ref||!/\.(png|jpe?g|webp)$/i.test(ref)) fail("selected background image missing: "+scene.scene_id);
+      const path=isAbsolute(ref)?resolve(ref):resolve(root,ref);
+      if(!existsSync(path)) fail("selected background file missing: "+scene.scene_id);
+      const receiptPath=resolve(receiptDir,String(scene.scene_id||"").replace(/[^a-zA-Z0-9_-]/g,"_")+".json");
+      const result=spawnSync(ocrPython,[ocrScript,path,receiptPath],{
+        cwd:resolve("."),encoding:"utf8",windowsHide:true,shell:false,maxBuffer:8*1024*1024
+      });
+      if(!existsSync(receiptPath)) fail("selected background OCR produced no receipt: "+scene.scene_id+
+        "; "+String(result.stderr||result.stdout||"").slice(-1000));
+      const receipt=json(receiptPath);
+      if(receipt?.schema!=="HIBOU_GENERATED_TEXT_QC_V1"||receipt.sha256!==sha256(path)){
+        fail("selected background OCR receipt invalid: "+scene.scene_id);
+      }
+      rows.push({scene_id:scene.scene_id,path,sha256:receipt.sha256,receipt_path:receiptPath,
+        asset_resolution_status:scene?.asset_resolution?.status||null,status:receipt.status,
+        findings:receipt.findings||[]});
+    }
+    const rejected=rows.filter(row=>row.status!=="PASS");
+    const previous=existsSync(selectedBackgroundAuditPath)?json(selectedBackgroundAuditPath):null;
+    const previousHashes=(previous?.rows||[]).map(row=>[row.scene_id,row.sha256]);
+    const currentHashes=rows.map(row=>[row.scene_id,row.sha256]);
+    if(previous&&JSON.stringify(previousHashes)!==JSON.stringify(currentHashes)){
+      delete state.stages.render;
+      delete state.stages.master_qc;
+      writeJson(statePath,state);
+    }
+    writeJson(selectedBackgroundAuditPath,{schema:"HIBOU_SELECTED_BACKGROUND_TEXT_QC_V1",
+      pass:rejected.length===0,scene_count:rows.length,rejected_scene_ids:rejected.map(row=>row.scene_id),
+      rows,publication_authorized:false});
+    if(rejected.length) fail("selected background OCR rejected "+rejected.length+" rendered backgrounds; see "+selectedBackgroundAuditPath);
+    state.selected_background_text_qc={pass:true,path:selectedBackgroundAuditPath,scene_count:rows.length};
+    writeJson(statePath,state);
+    auditPromptApplication("selected_background_text_qc",{
+      every_rendered_background_ocr_pass:true,source_images_hash_bound:true
+    },{audit_path:selectedBackgroundAuditPath,scene_count:rows.length});
   });
 
   const master=resolve(root,"master.mp4");
@@ -2020,6 +2258,7 @@ export async function main(){
     "compositor_execution",
     "render",
     "specific_montage_render_execution",
+    "selected_background_text_qc",
     "master_qc"
   ];
   const missingPromptAudits=requiredPromptAuditStages.filter(name=>promptStageAudits?.[name]?.pass!==true);

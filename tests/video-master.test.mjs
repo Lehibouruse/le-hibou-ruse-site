@@ -123,11 +123,34 @@ test("Box Spread V2 scenes receive typed post-production diagrams with verified 
  }
  const removeScene=contract.scenes.find(scene=>scene.scene_id==="S12");
  assert(removeScene.timeline.events.some(event=>event.action?.operation==="remove"&&event.action.target_layer_id==="bank"));
+ assert.equal(removeScene.timeline.events.length,3);
+ assert.deepEqual(removeScene.timeline.events[1].diagram.nodes.map(node=>node.id),["market","you","hibou"]);
+ assert.deepEqual(removeScene.timeline.events.at(-1).diagram.nodes.map(node=>node.id),["primary_message"]);
+ assert.equal(removeScene.timeline.screen_text_routed_by_diagram,true);
+ const reveal=contract.scenes.find(scene=>scene.scene_id==="S06").timeline.events.at(-1);
+ assert.deepEqual(reveal.diagram.nodes.filter(node=>node.id.startsWith("option_")).map(node=>node.id),
+   ["option_1","option_2","option_3","option_4"]);
+ assert(reveal.diagram.nodes.some(node=>node.id==="hibou"));
+ assert(!reveal.diagram.nodes.some(node=>node.id==="bank"));
+ assert(reveal.diagram.links.some(link=>link.text==="PASSAGE OUVERT"));
+ const marginFinal=contract.scenes.find(scene=>scene.scene_id==="S09").timeline.events.at(-1);
+ assert(marginFinal.diagram.nodes.some(node=>node.id==="lombard_margin"));
+ assert(!marginFinal.diagram.nodes.some(node=>node.id==="box_margin_copy"));
+ assert(marginFinal.diagram.nodes.some(node=>node.id==="cost_note"));
  const roll=contract.scenes.find(scene=>scene.scene_id==="S10");
  assert.deepEqual(roll.timeline.events.filter(event=>event.type==="diagram").map(event=>event.diagram.nodes.at(-1).label),
    ["2026 BOX","2027 BOX","2028 BOX","2029 BOX"]);
+ assert(roll.timeline.events.every(event=>event.diagram.nodes.filter(node=>node.id==="box_current").length===1));
+ assert(roll.timeline.events.every((event,index)=>event.diagram.nodes.some(node=>
+   node.id==="current_terms"&&node.label===`CONDITIONS DU JOUR ${2026+index}`)));
+ assert(roll.timeline.events.at(-1).diagram.nodes.some(node=>node.id==="new_rate_note"));
+ const rollDurations=roll.timeline.events.map(event=>event.end_s-event.start_s);
+ assert(rollDurations.every((duration,index)=>index===0||duration<rollDurations[index-1]));
  const fourOptions=contract.scenes.find(scene=>scene.scene_id==="S07");
  assert.equal(fourOptions.timeline.events.at(-1).diagram.links.filter(link=>link.kind==="line").length,6);
+ assert.deepEqual(fourOptions.timeline.events.at(-1).diagram.nodes.filter(node=>node.id.startsWith("option_"))
+   .map(node=>node.label),["JAMBE 1 · PRIX A","JAMBE 2 · PRIX A","JAMBE 3 · PRIX B","JAMBE 4 · PRIX B"]);
+ assert.equal(fourOptions.timeline.events.at(-1).diagram.nodes.find(node=>node.id==="funding")?.label,"CASH REÇU");
  assert.equal(materializeSpecificActionTimelines(contract).changed_scene_count,0);
  contract.scenes[7].timeline.events.find(event=>event.type==="diagram").diagram.nodes[1].label="FAUX";
  assert.equal(unverifiedSpecificMontageActions(contract)[0].scene_id,"S12");
@@ -143,9 +166,25 @@ test("Box Spread timing audit divides long scenes and limits final CTA to three 
  const report=buildCompositionTimingQc(contract);
  assert.equal(report.pass,true);
  assert.deepEqual(report.scenes.map(scene=>scene.visual_units.length),[2,2,1]);
+ assert.deepEqual(report.scenes[1].rendered_beats.map(beat=>beat.duration_s),[2.25,2.25,2.25,2.25]);
+ assert.equal(report.scenes[1].visual_units[0].duration_s,4.5);
  assert.equal(report.cta.active_duration_s,3);
  assert.equal(contract.scenes[2].timeline.events[1].start_s,2);
  contract.scenes[2].timeline.cta_window.active_duration_s=4;
+ assert.equal(buildCompositionTimingQc(contract).pass,false);
+});
+
+test("timing receipt rejects invented visual units and a non-accelerating roll",()=>{
+ const contract={content:{content_id:"rec8lgQT8jXreflmt"},creative:{pacing:{scene_duration_target_s:[2.8,5]}},scenes:[
+   {scene_id:"S10",order:10,planned_duration_s:7,
+     visual_idea:"[ADDITIF SPÉCIFIQUE V2 — MONTAGE] Scène 10 : roll accéléré."}
+ ]};
+ materializeSpecificActionTimelines(contract);
+ assert.equal(buildCompositionTimingQc(contract).pass,true);
+ contract.scenes[0].timeline.specific_montage.visual_units[0].duration_s=3.5;
+ assert.equal(buildCompositionTimingQc(contract).pass,false);
+ contract.scenes[0].timeline.specific_montage.visual_units[0].duration_s=4.2;
+ contract.scenes[0].timeline.events[0].end_s=1.75;
  assert.equal(buildCompositionTimingQc(contract).pass,false);
 });
 

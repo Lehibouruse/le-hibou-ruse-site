@@ -391,7 +391,7 @@ test("V2 financial montage survives glyph-free compilation",()=>{
  specific.content={...specific.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
  specific.creative={
    style_lock:"STYLE: illustration éditoriale 2D. ADDITIF V4.4 — préserver les relations financières, les couches et les séquences.",
-   negative_prompt:"no generated lettering",
+   negative_prompt:"no critical baked-in text",
    character_lock:"canonical character",
    content_brief:"ADDITIF SPÉCIFIQUE V2",
    reference_mode:"deterministic_character_overlay",
@@ -412,4 +412,29 @@ test("V2 financial montage survives glyph-free compilation",()=>{
  assert.match(prompt,/IMAGE_FINANCIAL_MECHANIC_LOCK/);
  assert.doesNotMatch(prompt,/2026|2027|2028|2029|ROULER LE FINANCEMENT/);
  assert.equal(request.prompt_application.preservation.status,"PASS");
+});
+
+test("long GLOBAL methodology is summarized for the encoder while SPECIFIC leads the effective prompt",()=>{
+ const specific=structuredClone(contract);
+ specific.content={...specific.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ specific.creative={style_lock:"STYLE: premium 2D illustration.\nADDITIF V4.4\n"+
+   "non-image methodology archive ".repeat(400),negative_prompt:"no critical baked-in text",
+   character_lock:"canonical character",content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",text_in_generated_images:false};
+ specific.scenes=[{scene_id:"S09",image_prompt:"A blank two-panel financial comparison with distinct layers",
+   visual_idea:"One blank margin layer stays left; its copy disappears on the right.",
+   framing:{hibou:false,type:"schéma",anchor:"center"}}];
+ const request=buildImagePlan(specific,binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert(prompt.indexOf("SCENE_IMAGE_PROMPT:")<prompt.indexOf("IMAGE_STYLE_LOCK:"));
+ assert.match(prompt,/SCENE_VISUAL_INTENT:/);
+ assert.match(prompt,/IMAGE_FINANCIAL_MECHANIC_LOCK:/);
+ assert.match(prompt,/STRICT_GLYPH_FREE_LOCK:/);
+ assert.doesNotMatch(prompt,/non-image methodology archive/);
+ assert(prompt.length<=4096);
+ assert.equal(request.prompt_application.effective_prompt_chars,prompt.length);
+ assert.equal(request.prompt_application.specific_prompt_prefix_preserved,true);
+ assert.equal(request.prompt_application.glyph_free_lock_present,true);
+ specific.scenes[0].visual_idea="very long concrete instruction ".repeat(200);
+ assert.throws(()=>buildImagePlan(specific,binding),/effective FLUX prompt.*exceeds/);
 });

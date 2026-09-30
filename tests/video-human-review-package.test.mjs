@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildNegativePolicyCoverage } from "../scripts/video-negative-policy-coverage.mjs";
 import {
   buildHumanReviewPackage,
   HUMAN_REVIEW_SCHEMA,
@@ -291,4 +292,30 @@ test("invalid incremental review diff schema never narrows review scope", () => 
   );
   assert.equal(review.previous_human_approval_auto_reused, undefined);
   assert.equal(review.human_approved, false);
+});
+
+test("Airtable negative policy requires the current source and explicit pending review for each category", () => {
+  const input=base();
+  const negativePrompt="no humans, no camera shake, no critical baked-in text";
+  const coverage=buildNegativePolicyCoverage(negativePrompt);
+  input.storyboard={content:{source:"airtable"},creative:{negative_prompt:negativePrompt}};
+  const missing=buildHumanReviewPackage(input);
+  assert.equal(missing.eligible_for_final_approval,false);
+  input.imagePlan={creative_contract_enforced:true,negative_policy_coverage:coverage};
+  const review=buildHumanReviewPackage(input);
+  assert.equal(review.eligible_for_final_approval,true);
+  assert.equal(review.negative_policy_clause_count,3);
+  assert.equal(review.negative_policy_review_check_ids.length,3);
+  for(const group of coverage.groups){
+    const item=review.checklist.find(item=>item.id===group.human_review_check_id);
+    assert.deepEqual(item.source_exclusions,group.clauses);
+    assert.equal(item.negative_policy_source_sha256,coverage.source_sha256);
+    assert.equal(item.status,"PENDING_HUMAN");
+    assert.equal(item.human_pass,null);
+  }
+  input.storyboard.creative.negative_prompt+=", no duplicated branding";
+  const stale=buildHumanReviewPackage(input);
+  assert.equal(stale.eligible_for_final_approval,false);
+  assert.equal(stale.negative_policy_clause_count,0);
+  assert.equal(stale.checklist.some(item=>item.id.startsWith("negative_")),false);
 });

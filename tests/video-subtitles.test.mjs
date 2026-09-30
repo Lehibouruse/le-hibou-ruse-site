@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAss, splitSubtitleGroups } from "../scripts/video-subtitles.mjs";
+import { buildAss, splitSubtitleGroups, subtitleRoutingAudit } from "../scripts/video-subtitles.mjs";
 
 function contract(screenText,timeline=null){
   return {
@@ -37,6 +37,19 @@ test("structured timeline text suppresses fallback whole-scene screen text",()=>
   assert.equal(screen.length,0);
   assert.doesNotMatch(ass,/FALLBACK/);
   assert.match(ass,/Texte narration\./);
+});
+
+test("diagram routed main phrase appears only in its visual beat",()=>{
+ const c=contract("UN INTERMÉDIAIRE DE MOINS.",{
+   schema:"HIBOU_SCENE_TIMELINE_V1",screen_text_routed_by_diagram:true,
+   events:[{type:"diagram",start_s:2,end_s:6,diagram:{nodes:[
+     {id:"primary_message",label:"UN INTERMÉDIAIRE DE MOINS."}
+   ]}}]
+ });
+ assert.equal(subtitleRoutingAudit(c).rows[0].route,"TIMELINE");
+ assert.equal(buildAss(c).split("\n").filter(line=>line.includes(",ScreenText,")).length,0);
+ c.scenes[0].timeline.events[0].diagram.nodes[0].label="DIFFERENT";
+ assert.equal(subtitleRoutingAudit(c).rows[0].route,"ASS_SCREEN_TEXT");
 });
 
 

@@ -33,6 +33,16 @@ if ([string]::IsNullOrWhiteSpace($Token) -or $Token.Length -lt 32) {
   throw "HIBOU_LOCAL_REPORT_TOKEN absent ou invalide dans les variables utilisateur Windows."
 }
 
+$AirtableToken = [Environment]::GetEnvironmentVariable("AIRTABLE_TOKEN", "Process")
+if ([string]::IsNullOrWhiteSpace($AirtableToken)) {
+  $AirtableToken = Get-UserEnv "AIRTABLE_TOKEN"
+}
+if ([string]::IsNullOrWhiteSpace($AirtableToken)) {
+  throw "AIRTABLE_TOKEN absent des variables utilisateur/processus Windows."
+}
+$env:AIRTABLE_TOKEN = $AirtableToken
+Remove-Variable AirtableToken
+
 if (-not (Test-Path $ProjectRoot)) {
   throw "Depot Hibou introuvable : $ProjectRoot"
 }
@@ -46,6 +56,18 @@ if ([string]::IsNullOrWhiteSpace($VoicePython)) {
 }
 if (-not (Test-Path $VoicePython)) {
   throw "Python Chatterbox introuvable : $VoicePython"
+}
+
+$OcrPython = Get-UserEnv "HIBOU_OCR_PYTHON"
+if ([string]::IsNullOrWhiteSpace($OcrPython)) {
+  $OcrPython = Join-Path $env:LOCALAPPDATA "LeHibou\video\ocr\venv\Scripts\python.exe"
+}
+if (-not (Test-Path $OcrPython)) {
+  throw "Python OCR introuvable : $OcrPython"
+}
+& $OcrPython -c "import rapidocr_onnxruntime"
+if ($LASTEXITCODE -ne 0) {
+  throw "Moteur OCR RapidOCR indisponible : $OcrPython"
 }
 
 $ComfyPortable = Join-Path $env:LOCALAPPDATA "LeHibou\video\comfyui\ComfyUI_windows_portable"
@@ -70,6 +92,7 @@ Set-UserEnv "HIBOU_PROJECT_ROOT" $ProjectRoot
 Set-UserEnv "HIBOU_VIDEO_BINDING" $Binding
 Set-UserEnv "HIBOU_VIDEO_OUTPUT_ROOT" $OutputRoot
 Set-UserEnv "HIBOU_PYTHON" $VoicePython
+Set-UserEnv "HIBOU_OCR_PYTHON" $OcrPython
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 

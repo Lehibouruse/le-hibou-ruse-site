@@ -1,0 +1,54 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync } from "node:fs";
+
+const route = readFileSync(
+  new URL("../app/api/local-worker-queue/route.js", import.meta.url),
+  "utf8",
+);
+const worker = readFileSync(
+  new URL("../scripts/hibou-github-worker.mjs", import.meta.url),
+  "utf8",
+);
+
+test("queue validates reuse lineage before dispatching a VIDEO_RENDER job", () => {
+  assert.match(route, /validateReuseLineage/);
+  assert.match(route, /TABLES\.localWorkerQueue/);
+  assert.match(route, /reuseValidationReason/);
+  assert.match(route, /reuse_parent_lookup_failed/);
+  assert.match(route, /\^reuse_\[a-z0-9_\]\+\$/i);
+  assert.match(route, /ancestorJobIds/);
+  assert.match(route, /reuse_lineage_too_deep/);
+  assert.match(route, /reuse_lineage_cycle_detected/);
+  assert.match(route, /lineage_depth: ancestorJobIds\.length/);
+  assert.match(route, /lineage_complete: true/);
+  assert.match(route, /reuse_parent_worker_missing/);
+  assert.match(route, /reuse_target_worker_mismatch/);
+  assert.match(route, /lineageWorker !== pollWorker/);
+  assert.match(route, /target_worker = lineageWorker/);
+  assert.match(route, /reuse_parent_local_state/);
+});
+
+test("worker persists production and incremental lineage in the final result", () => {
+  assert.match(worker, /HIBOU_VIDEO_RENDER_RESULT_V2/);
+  assert.match(worker, /production_mode: productionMode/);
+  assert.match(worker, /candidates_per_scene: candidatesPerScene/);
+  assert.match(worker, /reuse_from_job_id: reuseFromJobId \|\| null/);
+  assert.match(worker, /reuse_lineage: job\.reuse_lineage \|\| null/);
+  assert.match(worker, /reuse_integrity: reuseIntegrity/);
+  assert.match(worker, /VIDEO_RENDER reuse parent belongs to another worker/);
+  assert.match(worker, /VIDEO_RENDER reuse parent result identity mismatch/);
+  assert.match(worker, /VIDEO_RENDER reuse parent result has invalid master hash/);
+  assert.match(worker, /VIDEO_RENDER reuse parent master hash mismatch/);
+  assert.match(worker, /_hibou_video_result\.json/);
+  assert.match(worker, /result_job_match/);
+  assert.match(worker, /result_content_match/);
+  assert.match(worker, /airtable_hash_verified/);
+  assert.match(worker, /previousRoot,\s*"master\.mp4"/s);
+  assert.match(worker, /sha256\(previousMasterPath\)/);
+  assert.match(worker, /result_hash_verified/);
+  assert.match(worker, /file_hash_verified/);
+  assert.match(worker, /incremental_retouch: incrementalRetouch/);
+  assert.match(worker, /incremental-retouch-plan\.json/);
+  assert.match(worker, /plan_sha256: sha256\(incrementalPlanPath\)/);
+});

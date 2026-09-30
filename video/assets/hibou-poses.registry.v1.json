@@ -1,0 +1,195 @@
+{
+  "schema": "HIBOU_POSE_REGISTRY_V1",
+  "identity": "HIBOU_CANONICAL_V1",
+  "canonical_reference": "video/assets/hibou-canonical-512.webp.b64",
+  "policy": {
+    "generate_on_lookup": false,
+    "paid_fallback": false,
+    "preserve_identity": true,
+    "require_human_review_for_new_pose": true
+  },
+  "poses": [
+    {
+      "id": "neutral",
+      "category": "neutral",
+      "label": "Neutre",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "neutral"
+      ]
+    },
+    {
+      "id": "explique",
+      "category": "explique",
+      "label": "Explique",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "explique"
+      ]
+    },
+    {
+      "id": "pointe",
+      "category": "pointe",
+      "label": "Pointe",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "pointe"
+      ]
+    },
+    {
+      "id": "contrat",
+      "category": "contrat",
+      "label": "Tient un contrat",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "contrat"
+      ]
+    },
+    {
+      "id": "regarde_gauche",
+      "category": "regarde_gauche",
+      "label": "Regarde gauche",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "regarde_gauche"
+      ]
+    },
+    {
+      "id": "regarde_droite",
+      "category": "regarde_droite",
+      "label": "Regarde droite",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "regarde_droite"
+      ]
+    },
+    {
+      "id": "reflechit",
+      "category": "reflechit",
+      "label": "Réfléchit",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "reflechit"
+      ]
+    },
+    {
+      "id": "mefiant_amusement",
+      "category": "mefiant_amusement",
+      "label": "Méfiant / amusement",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "mefiant_amusement"
+      ]
+    },
+    {
+      "id": "revele",
+      "category": "revele",
+      "label": "Révèle quelque chose",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "revele"
+      ]
+    },
+    {
+      "id": "efface",
+      "category": "efface",
+      "label": "Efface / supprime un élément",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "efface"
+      ]
+    },
+    {
+      "id": "graphique",
+      "category": "graphique",
+      "label": "Présente un graphique",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "graphique"
+      ]
+    },
+    {
+      "id": "guide",
+      "category": "guide",
+      "label": "Tient / présente un guide",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "guide"
+      ]
+    },
+    {
+      "id": "alerte_stop",
+      "category": "alerte_stop",
+      "label": "Alerte / STOP",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "alerte_stop"
+      ]
+    },
+    {
+      "id": "conclusion_cta",
+      "category": "conclusion_cta",
+      "label": "Conclusion / CTA",
+      "status": "planned",
+      "asset_ref": null,
+      "sha256": null,
+      "anchor": "bottom-center",
+      "default_width": 430,
+      "tags": [
+        "conclusion_cta"
+      ]
+    }
+  ]
+}

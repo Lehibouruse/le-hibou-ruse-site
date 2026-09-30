@@ -1,0 +1,824 @@
+{
+  "schema": "HIBOU_VIDEO_METHODOLOGY_COVERAGE_V1",
+  "method_version": "VIDEO_METHOD_V4.3",
+  "source": "Airtable Méthodologie vidéo + Video Studio V5",
+  "policy": {
+    "coverage_is_static_evidence_only": true,
+    "e2e_status_is_separate": true,
+    "code_presence_does_not_activate_feature": true,
+    "publication_authorized": false,
+    "activation_status_is_explicit_per_step": true,
+    "e2e_links_must_reference_audited_plan": true
+  },
+  "steps": [
+    {
+      "id": "0.4-0.5",
+      "label": "Architecture GLOBAL + SPÉCIFIQUE / socle benchmark",
+      "code": [
+        {
+          "path": "scripts/video-layer-guard.mjs",
+          "markers": [
+            "HIBOU_GLOBAL_SPECIFIC_GUARD_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-airtable-sync.mjs",
+          "markers": [
+            "VIDEO_METHOD_V4.3",
+            "features:{"
+          ]
+        },
+        {
+          "path": "scripts/video-prompt-graph.mjs",
+          "markers": [
+            "HIBOU_VIDEO_PROMPT_GRAPH_V1",
+            "GLOBAL_STYLE_BIBLE",
+            "HEAD_IDENTITY_LOCK",
+            "ATTENTION_BEATS",
+            "editorial_primitives",
+            "roadmap_profiles_require_e2e_before_runtime"
+          ]
+        },
+        {
+          "path": "scripts/video-planning-manifest.mjs",
+          "markers": [
+            "HIBOU_VIDEO_PLANNING_MANIFEST_V1",
+            "scene_prompt_receipts",
+            "all_scene_sources_must_match_prompt_graph",
+            "planning_manifest_sha256"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-layer-guard.test.mjs",
+        "tests/video-airtable-sync.test.mjs",
+        "tests/video-prompt-graph.test.mjs",
+        "tests/video-planning-manifest.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "1",
+      "label": "Script verrouillé / verbatim",
+      "code": [
+        {
+          "path": "scripts/video-airtable-sync.mjs",
+          "markers": [
+            "script_sha256",
+            "does not reconstruct"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-airtable-sync.test.mjs"
+      ],
+      "e2e_pending": false,
+      "e2e_step_ids": [],
+      "e2e_status": "not_required",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "2",
+      "label": "Storyboard / BREATH_UNIT_FIRST / attention beats",
+      "code": [
+        {
+          "path": "scripts/video-scene-compositor.mjs",
+          "markers": [
+            "HIBOU_SCENE_TIMELINE_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-airtable-sync.mjs",
+          "markers": [
+            "breath_unit",
+            "timeline"
+          ]
+        },
+        {
+          "path": "scripts/video-continuity-plan.mjs",
+          "markers": [
+            "HIBOU_VISUAL_CONTINUITY_PLAN_V1",
+            "visual_group_must_be_explicit",
+            "no_prompt_text_heuristics",
+            "duplicate asset requirement slot"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-scene-timeline-v1.test.mjs",
+        "tests/video-scene-compositor.test.mjs",
+        "tests/video-continuity-plan.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-01",
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "3",
+      "label": "Préflight machine / modèles",
+      "code": [
+        {
+          "path": "scripts/video-local-preflight.mjs"
+        },
+        {
+          "path": "scripts/video-e2e-plan-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_V5_E2E_PLAN_AUDIT_V1",
+            "local_idle_confirmation_required",
+            "manual_start_is_always_required",
+            "audit_never_starts_e2e"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-local-preflight.test.mjs",
+        "tests/video-hardware-profile.test.mjs",
+        "tests/video-e2e-plan-audit.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-00"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "4",
+      "label": "Carte prosodique / unités de souffle",
+      "code": [
+        {
+          "path": "scripts/video-prosody-plan.mjs",
+          "markers": [
+            "HIBOU_PROSODY_PLAN_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-voice-duration-qc.mjs",
+          "markers": [
+            "HIBOU_VOICE_DURATION_QC_V1",
+            "duration_far_above_expected_speech_rate"
+          ]
+        },
+        {
+          "path": "scripts/video-voice-density-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_VOICE_DENSITY_PLAN_V1",
+            "RELENTLESS",
+            "EXPLAINER_DENSE",
+            "deliberate_pause_soft_limit_ms",
+            "prosody_mutation:false"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-prosody-plan.test.mjs",
+        "tests/video-voice-density-plan.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-04"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "5",
+      "label": "Voix / mastering / verbatim",
+      "code": [
+        {
+          "path": "scripts/video-audio-master.mjs"
+        },
+        {
+          "path": "scripts/chatterbox-storyboard-batch.py",
+          "markers": [
+            "HIBOU_VOICE_DURATION_RETRY",
+            "duration_retry_seed_offset"
+          ]
+        },
+        {
+          "path": "scripts/video-voice-duration-qc.mjs",
+          "markers": [
+            "HIBOU_VOICE_DURATION_QC_V1",
+            "duration_far_above_expected_speech_rate"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-voice-qc.test.mjs",
+        "tests/video-voice-low-vram.test.mjs",
+        "tests/video-voice-duration-qc.test.mjs",
+        "tests/video-voice-duration-retry.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-04",
+        "E2E-05"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "6",
+      "label": "Image plan / ComfyUI local",
+      "code": [
+        {
+          "path": "scripts/video-image-plan.mjs",
+          "markers": [
+            "HIBOU_IMAGE_PLAN_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-image-batch.mjs",
+          "markers": [
+            "elapsed_ms",
+            "mean_generated_candidate_elapsed_ms"
+          ]
+        },
+        {
+          "path": "scripts/video-image-factory.mjs",
+          "markers": [
+            "HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
+            "estimated_generation_seconds"
+          ]
+        },
+        {
+          "path": "scripts/video-asset-readiness.mjs",
+          "markers": [
+            "HIBOU_ASSET_GRAPH_READINESS_V1",
+            "ready_for_activation",
+            "reusable_assets_require_sha256",
+            "reusable_asset_sha256_invalid"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-image-plan.test.mjs",
+        "tests/video-image-batch.test.mjs",
+        "tests/comfy-prompt-id.test.mjs",
+        "tests/video-image-factory.test.mjs",
+        "tests/video-asset-readiness.test.mjs",
+        "tests/video-airtable-sync.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-02",
+        "E2E-06"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "7",
+      "label": "Ranking assisté + sélection humaine",
+      "code": [
+        {
+          "path": "scripts/video-candidate-review.mjs",
+          "markers": [
+            "HIBOU_CANDIDATE_REVIEW_V1",
+            "review_fingerprint_sha256",
+            "machine_recommendation_status",
+            "AMBIGUOUS",
+            "technical_provisional_candidate_id"
+          ]
+        },
+        {
+          "path": "scripts/video-candidate-selection-apply.mjs",
+          "markers": [
+            "HIBOU_HUMAN_IMAGE_SELECTION_V1",
+            "review fingerprint mismatch"
+          ]
+        },
+        {
+          "path": "app/api/local-worker-queue/route.js",
+          "markers": [
+            "autoResumeHumanSelection",
+            "human_selection_fingerprint_mismatch"
+          ]
+        },
+        {
+          "path": "scripts/hibou-github-worker.mjs",
+          "markers": [
+            "remote human selection fingerprint mismatch",
+            "candidate-decisions.json"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-candidate-review.test.mjs",
+        "tests/video-candidate-selection-apply.test.mjs",
+        "tests/video-queue-auto-activation-chain.test.mjs",
+        "tests/video-studio-v5-orchestration.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-08"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "8",
+      "label": "Captions + texte écran",
+      "code": [
+        {
+          "path": "scripts/video-subtitles.mjs",
+          "markers": [
+            "defaultSubtitleFont",
+            "Arial"
+          ]
+        },
+        {
+          "path": "scripts/video-scene-compositor.mjs"
+        },
+        {
+          "path": "scripts/video-attach-subtitles.mjs",
+          "markers": [
+            "font_family"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-scene-timeline-v1.test.mjs",
+        "tests/video-local-render.test.mjs",
+        "tests/video-subtitles-font.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-01",
+        "E2E-07"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "9",
+      "label": "Promotion render-ready / hashes",
+      "code": [
+        {
+          "path": "scripts/video-storyboard-promote.mjs",
+          "markers": [
+            "promoteStoryboard",
+            "publication_authorized:false"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-storyboard-promote.test.mjs",
+        "tests/video-preview-publication-guard.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "10",
+      "label": "Rendu FFmpeg / BEAT_VARIATION_POLICY",
+      "code": [
+        {
+          "path": "scripts/video-local-render.mjs",
+          "markers": [
+            "renderVideoContract",
+            "buildSubtitleFontRuntime",
+            "FONTCONFIG_FILE",
+            "fontsdir"
+          ]
+        },
+        {
+          "path": "scripts/video-scene-compositor.mjs",
+          "markers": [
+            "HIBOU_BEAT_VARIATION_POLICY_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-subtitles.mjs",
+          "markers": [
+            "defaultSubtitleFont",
+            "Arial"
+          ]
+        },
+        {
+          "path": "scripts/video-attach-subtitles.mjs",
+          "markers": [
+            "font_family"
+          ]
+        },
+        {
+          "path": "scripts/video-motion-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_MOTION_PLAN_V1",
+            "CUT_DOMINANT",
+            "HYBRID_BEATS",
+            "INTRA_SCENE_MOTION",
+            "STATIC_SCENE",
+            "ANIMATED_SCENE",
+            "automatic_timeline_mutation:false"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-local-render.test.mjs",
+        "tests/video-scene-timeline-v1.test.mjs",
+        "tests/video-subtitles-font.test.mjs",
+        "tests/video-motion-plan.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-01",
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "10.5",
+      "label": "PREVIEW + retouches incrémentales",
+      "code": [
+        {
+          "path": "scripts/video-iteration-plan.mjs",
+          "markers": [
+            "HIBOU_INCREMENTAL_RETOUCH_PLAN_V1"
+          ]
+        },
+        {
+          "path": "scripts/video-review-diff.mjs",
+          "markers": [
+            "HIBOU_INCREMENTAL_REVIEW_DIFF_V1",
+            "execution_summary",
+            "forced_regeneration_counts",
+            "cache_reuse_subject_to_fingerprint",
+            "reason_codes"
+          ]
+        },
+        {
+          "path": "scripts/video-resume-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_PLAN_V1",
+            "execution_performed: false",
+            "preserve_caches_and_revalidate_by_fingerprint"
+          ]
+        },
+        {
+          "path": "scripts/hibou-github-worker.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+            "_hibou_video_resume_plan.json",
+            "resume_execution_performed: false",
+            "heartbeatUnitProgress",
+            "stage_progress: progress.stage_progress",
+            "visual_ready",
+            "stage_elapsed_seconds",
+            "stage_progress",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "_hibou_video_resume_apply_receipt.json",
+            "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+            "requires_separate_render_start: true",
+            "_hibou_video_remote_repair_prepared.json",
+            "reportVideoProgress(job, \"Paused\""
+          ]
+        },
+        {
+          "path": "scripts/video-image-batch.mjs",
+          "markers": [
+            "elapsed_ms",
+            "mean_generated_candidate_elapsed_ms"
+          ]
+        },
+        {
+          "path": "scripts/video-image-factory.mjs",
+          "markers": [
+            "HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
+            "estimated_generation_seconds"
+          ]
+        },
+        {
+          "path": "scripts/video-master.mjs",
+          "markers": [
+            "stage_history",
+            "duration_ms",
+            "event:\"ERROR\""
+          ]
+        },
+        {
+          "path": "app/api/local-worker-queue/route.js",
+          "markers": [
+            "rawStageProgress",
+            "stage_progress: stageProgress",
+            "stage_elapsed_seconds",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1",
+            "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1",
+            "isRepairResumePreparedPause",
+            "repair_resume_request: null",
+            "requires_separate_render_start: repairPrepared"
+          ]
+        },
+        {
+          "path": "scripts/video-resume-state.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
+            "HIBOU_VIDEO_RESUME_APPLY_ENABLED=true required",
+            "pipeline state fingerprint mismatch",
+            "caches_deleted: false",
+            "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+            "VIDEO_STAGE_ORDER",
+            "canonical suffix from resume_stage",
+            "atomicWriteJson"
+          ]
+        },
+        {
+          "path": "scripts/video-run-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RUN_AUDIT_V1",
+            "filesystem_mutation_performed: false",
+            "process_started: false",
+            "auditVideoRun",
+            "resumePreparationSummary",
+            "resume_prepared_waiting_explicit_start",
+            "execution_started",
+            "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+            "repair_start_receipt_invalid"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-iteration-plan.test.mjs",
+        "tests/video-incremental-reuse.test.mjs",
+        "tests/video-review-diff.test.mjs",
+        "tests/video-resume-plan.test.mjs",
+        "tests/video-worker-failure-resume-diagnostic.test.mjs",
+        "tests/video-image-batch.test.mjs",
+        "tests/video-image-factory.test.mjs",
+        "tests/video-pipeline-stage-history.test.mjs",
+        "tests/video-worker-heartbeat-progress.test.mjs",
+        "tests/video-resume-state.test.mjs",
+        "tests/video-remote-repair-resume.test.mjs",
+        "tests/video-run-audit.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-07"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "11",
+      "label": "QC technique avancé",
+      "code": [
+        {
+          "path": "scripts/video-master-qc.mjs",
+          "markers": [
+            "HIBOU_MASTER_QC_V3"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-master.test.mjs",
+        "tests/video-smoke-one-scene.test.mjs",
+        "tests/video-master-qc.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-11",
+        "E2E-12"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "12",
+      "label": "Revue éditoriale humaine V4",
+      "code": [
+        {
+          "path": "scripts/video-human-review-package.mjs",
+          "markers": [
+            "HIBOU_HUMAN_REVIEW_PACKAGE_V1",
+            "PENDING_HUMAN_REVIEW",
+            "scene_review_queue",
+            "review_diff_available",
+            "incremental_review_diff_not_available",
+            "unchanged_scenes_auto_approved: false"
+          ]
+        },
+        {
+          "path": "scripts/video-review-diff.mjs",
+          "markers": [
+            "execution_summary",
+            "forced_regeneration_counts",
+            "cache_reuse_subject_to_fingerprint",
+            "reason_codes"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-human-review-package.test.mjs",
+        "tests/video-studio-v5-orchestration.test.mjs",
+        "tests/video-review-diff.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-08",
+        "E2E-11"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "13",
+      "label": "Registre + remontée Airtable",
+      "code": [
+        {
+          "path": "scripts/video-artifact-registry.mjs",
+          "markers": [
+            "HIBOU_VIDEO_ARTIFACT_REGISTRY_V2"
+          ]
+        },
+        {
+          "path": "scripts/video-airtable-sync.mjs"
+        },
+        {
+          "path": "scripts/video-durable-storage-plan.mjs",
+          "markers": [
+            "HIBOU_DURABLE_STORAGE_PLAN_V1",
+            "upload_performed:false",
+            "immutableObjectKey",
+            "transfer_summary",
+            "VERIFY_EXISTING_ELSE_COPY",
+            "local_paths_cannot_be_declared_durable"
+          ]
+        },
+        {
+          "path": "scripts/video-resume-plan.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_PLAN_V1",
+            "execution_performed: false",
+            "preserve_caches_and_revalidate_by_fingerprint"
+          ]
+        },
+        {
+          "path": "scripts/hibou-github-worker.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+            "_hibou_video_resume_plan.json",
+            "resume_execution_performed: false",
+            "heartbeatUnitProgress",
+            "stage_progress: progress.stage_progress",
+            "visual_ready",
+            "stage_elapsed_seconds",
+            "stage_progress",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "_hibou_video_resume_apply_receipt.json",
+            "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+            "requires_separate_render_start: true",
+            "_hibou_video_remote_repair_prepared.json",
+            "reportVideoProgress(job, \"Paused\""
+          ]
+        },
+        {
+          "path": "scripts/video-master.mjs",
+          "markers": [
+            "stage_history",
+            "duration_ms",
+            "event:\"ERROR\""
+          ]
+        },
+        {
+          "path": "app/api/local-worker-queue/route.js",
+          "markers": [
+            "rawStageProgress",
+            "stage_progress: stageProgress",
+            "stage_elapsed_seconds",
+            "HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED",
+            "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1",
+            "HIBOU_VIDEO_RENDER_REPAIR_RESUME_SCHEDULED_V1",
+            "isRepairResumePreparedPause",
+            "repair_resume_request: null",
+            "requires_separate_render_start: repairPrepared"
+          ]
+        },
+        {
+          "path": "scripts/video-resume-state.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
+            "HIBOU_VIDEO_RESUME_APPLY_ENABLED=true required",
+            "pipeline state fingerprint mismatch",
+            "caches_deleted: false",
+            "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+            "VIDEO_STAGE_ORDER",
+            "canonical suffix from resume_stage",
+            "atomicWriteJson"
+          ]
+        },
+        {
+          "path": "scripts/video-run-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_RUN_AUDIT_V1",
+            "filesystem_mutation_performed: false",
+            "process_started: false",
+            "auditVideoRun",
+            "resumePreparationSummary",
+            "resume_prepared_waiting_explicit_start",
+            "execution_started",
+            "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+            "repair_start_receipt_invalid"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-airtable-smoke-report.test.mjs",
+        "tests/video-airtable-sync.test.mjs",
+        "tests/video-durable-storage-plan.test.mjs",
+        "tests/video-resume-plan.test.mjs",
+        "tests/video-worker-failure-resume-diagnostic.test.mjs",
+        "tests/video-pipeline-stage-history.test.mjs",
+        "tests/video-worker-heartbeat-progress.test.mjs",
+        "tests/video-resume-state.test.mjs",
+        "tests/video-remote-repair-resume.test.mjs",
+        "tests/video-run-audit.test.mjs"
+      ],
+      "e2e_pending": true,
+      "e2e_step_ids": [
+        "E2E-12"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    },
+    {
+      "id": "14",
+      "label": "Publication + apprentissage",
+      "code": [
+        {
+          "path": "scripts/video-artifact-registry.mjs",
+          "markers": [
+            "publication_authorized:false"
+          ]
+        },
+        {
+          "path": "scripts/video-human-review-package.mjs",
+          "markers": [
+            "publication_authorized: false"
+          ]
+        },
+        {
+          "path": "scripts/video-publication-lock-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_PUBLICATION_LOCK_AUDIT_V1",
+            "publication_authorized_true",
+            "automatic_publication_signal_true",
+            "preview_full_master_allowed"
+          ]
+        },
+        {
+          "path": "scripts/video-e2e-plan-audit.mjs",
+          "markers": [
+            "HIBOU_VIDEO_V5_E2E_PLAN_AUDIT_V1",
+            "local_idle_confirmation_required",
+            "manual_start_is_always_required",
+            "audit_never_starts_e2e"
+          ]
+        }
+      ],
+      "tests": [
+        "tests/video-preview-publication-guard.test.mjs",
+        "tests/video-human-review-package.test.mjs",
+        "tests/video-publication-lock-audit.test.mjs",
+        "tests/video-e2e-plan-audit.test.mjs"
+      ],
+      "e2e_pending": true,
+      "activation_policy": "publication remains intentionally outside automatic production",
+      "e2e_step_ids": [
+        "E2E-12"
+      ],
+      "e2e_status": "pending",
+      "activation_status": "inactive",
+      "activation_requires_explicit_human_action": true
+    }
+  ]
+}

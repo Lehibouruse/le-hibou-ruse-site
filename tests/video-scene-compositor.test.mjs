@@ -36,6 +36,44 @@ test("layered composition keeps assets independently replaceable and ordered by 
   assert.equal(c.camera_transform.zoom_percent,2.5);
 });
 
+test("fallback camera motion respects the active 1.5–3.5 percent zoom profile",()=>{
+  const scene={
+    scene_id:"S02B",order:2,zoom_percent:1.2,
+    image:{selected:"bg.png"},
+    framing:{anchor:"center"},
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:5,width:1080,height:1920,fps:30});
+  assert.match(plan.filter_complex,/1\.01500/);
+  assert.match(plan.filter_complex,/iw-\(iw\/zoom\)/);
+});
+
+test("explicit camera beat interpolates zoom instead of jumping instantly",()=>{
+  const scene={
+    scene_id:"S02C",order:1,zoom_percent:2,
+    image:{selected:"bg.png"},
+    framing:{anchor:"center"},
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"z",type:"camera",beat_kind:"MICRO_ZOOM",start_s:1,end_s:3,zoom_percent:4,anchor:"center"}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:4,width:1080,height:1920,fps:30});
+  assert.match(plan.filter_complex,/max\(0,min\(1,\(on-/);
+  assert.match(plan.filter_complex,/1\+0\.03500\*/);
+});
+
+test("timeline title text is placed in the top safe zone rather than the subtitle zone",()=>{
+  const scene={
+    scene_id:"TITLE",
+    image:{selected:"bg.png"},
+    timeline:{schema:"HIBOU_SCENE_TIMELINE_V1",events:[
+      {id:"title",type:"text",start_s:0,end_s:1.8,text:"TITLE"}
+    ]}
+  };
+  const plan=buildSceneCompositePlan(scene,{duration:3,width:1080,height:1920,fps:30});
+  assert.match(plan.filter_complex,/drawtext=.*y='120\+0'/);
+  assert.doesNotMatch(plan.filter_complex,/main_h-text_h-220/);
+});
+
 test("ffmpeg plan composes transparent layers, text and camera transform before render",()=>{
   const scene={
     scene_id:"S03",
@@ -50,6 +88,7 @@ test("ffmpeg plan composes transparent layers, text and camera transform before 
   };
   const plan=buildSceneCompositePlan(scene,{duration:2.4,width:1080,height:1920,fps:30});
   assert.deepEqual(plan.input_refs,["bg.png","owl.webp","paper.png"]);
+  assert.match(plan.filter_complex,/tpad=stop_mode=clone:stop_duration=2\.400/);
   assert.match(plan.filter_complex,/overlay=/);
   assert.match(plan.filter_complex,/drawtext=/);
   assert.match(plan.filter_complex,/zoompan=/);

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { visualEventMetrics } from "./video-visual-event-metrics.mjs";
 
 function fail(message){ throw new Error(message); }
 function sha256(path){ return createHash("sha256").update(readFileSync(path)).digest("hex"); }
@@ -196,7 +197,18 @@ async function main(){
   const cuts=detectScenes(input,{threshold:0.30});
   const attentionEvents=detectScenes(input,{threshold:0.12});
   const scene=sceneMetrics(media.duration_s,cuts);
-  const attention=attentionMetrics(media.duration_s,attentionEvents,{threshold:0.12});
+  const visualEventRate=visualEventMetrics(media.duration_s,attentionEvents,cuts,{
+    sensitiveThreshold:0.12,
+    hardCutThreshold:0.30
+  });
+  const attention={
+    ...attentionMetrics(media.duration_s,attentionEvents,{threshold:0.12}),
+    visual_event_rate:visualEventRate,
+    hard_cuts_per_minute:visualEventRate.hard_cuts_per_minute,
+    subtle_events_per_minute:visualEventRate.subtle_events_per_minute,
+    visual_events_per_minute:visualEventRate.visual_events_per_minute,
+    thirds:visualEventRate.thirds
+  };
   const wav=resolve(out,"audio.wav");
   extractAudio(input,wav);
   const voice=audioMetrics(wav,media.duration_s);

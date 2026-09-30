@@ -29,6 +29,11 @@ test("eligible transient errors are requeued as Pending without terminal timesta
   assert.match(route, /HIBOU_VIDEO_RENDER_TRANSIENT_RETRY_V1/);
   assert.match(route, /status === "Error" && !retry\.retry/);
   assert.match(route, /local_backoff_seconds: 60/);
+  assert.match(route, /transient_retry_worker_provenance_mismatch/);
+  assert.match(route, /retryWorker !== activeWorker/);
+  assert.match(route, /retrySession !== activeSession/);
+  assert.match(route, /target_worker_reason: "transient_retry_local_state"/);
+  assert.match(route, /transient_retry_worker_session/);
 });
 
 test("completed jobs still chain while retried errors never do", () => {

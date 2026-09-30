@@ -8,7 +8,7 @@ const source = readFileSync(
 );
 
 test("ComfyUI image adapter lets the server generate prompt_id", () => {
-  assert.match(source, /body: JSON\.stringify\(\{ prompt: workflow, client_id: "hibou-local-worker" \}\)/);
+  assert.match(source, /client_id:\s*String\(process\.env\.HIBOU_VIDEO_CLIENT_ID \|\| "hibou-local-worker"\)/);
   assert.doesNotMatch(source, /prompt_id:\s*promptId/);
 });
 

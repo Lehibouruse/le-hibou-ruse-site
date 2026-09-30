@@ -25,9 +25,9 @@ test("every known paid-AI entry point gates OpenAI", async () => {
 
 test("worker cannot bypass policy through an already-claimed response job", async () => {
   const source = await readFile(new URL("../app/api/agent-worker/route.js", import.meta.url), "utf8");
-  assert.match(source, /async function openaiStep\(body\) \{\n  if \(PAID_AI_DISABLED_BY_POLICY\)/);
-  assert.match(source, /async function openaiStepStatus\(body\) \{\n  if \(PAID_AI_DISABLED_BY_POLICY\)/);
-  assert.match(source, /async function claim\(body = \{\}\) \{\n  if \(PAID_AI_DISABLED_BY_POLICY\)/);
+  assert.match(source, /async function openaiStep\(body\) \{\r?\n  if \(PAID_AI_DISABLED_BY_POLICY\)/);
+  assert.match(source, /async function openaiStepStatus\(body\) \{\r?\n  if \(PAID_AI_DISABLED_BY_POLICY\)/);
+  assert.match(source, /async function claim\(body = \{\}\) \{\r?\n  if \(PAID_AI_DISABLED_BY_POLICY\)/);
 });
 
 test("wake can still select deterministic work while refusing paid-AI-only queues", async () => {

@@ -31,9 +31,27 @@ const VIDEO_RENDER_ENABLED =
     .trim()
     .toLowerCase() === "true";
 
+const VIDEO_REMOTE_CANCEL_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_CANCEL_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
+const VIDEO_REMOTE_REPAIR_RESUME_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_REPAIR_RESUME_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
+const VIDEO_REMOTE_REPAIR_START_ENABLED =
+  String(process.env.HIBOU_VIDEO_REMOTE_REPAIR_START_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
+const VIDEO_CANCEL_GRACE_MS = Math.max(
+  1000,
+  Math.min(30000, Number(process.env.HIBOU_VIDEO_CANCEL_GRACE_MS || 5000)),
+);
+
 const WORKER_SELF_UPDATE_SCHEMA = "HIBOU_GITHUB_WORKER_SELF_UPDATE_V2";
 const WORKER_BUILD_MARKER = "HIBOU_WORKER_BUILD_20260927_V2";
 const WORKER_SELF_UPDATE_ENABLED =
+  !String(process.env.HIBOU_VIDEO_LOCAL_SOURCE_ROOT || "").trim() &&
   String(process.env.HIBOU_WORKER_SELF_UPDATE_ENABLED || "true")
     .trim()
     .toLowerCase() !== "false";
@@ -65,6 +83,10 @@ const VIDEO_OUTPUT_ROOT =
 const VIDEO_MASTER_SCRIPT =
   String(process.env.HIBOU_VIDEO_MASTER_SCRIPT || "").trim() ||
   path.join(PROJECT_ROOT, "scripts", "video-master.mjs");
+
+// The source checkout is opt-in and never installed over the commit-pinned runtime.
+const VIDEO_LOCAL_SOURCE_ROOT =
+  String(process.env.HIBOU_VIDEO_LOCAL_SOURCE_ROOT || "").trim();
 
 const CHATTERBOX_BATCH_SCRIPT =
   String(process.env.HIBOU_CHATTERBOX_BATCH_SCRIPT || "").trim() ||
@@ -439,16 +461,41 @@ async function ensureCanonicalVideoRuntimes(job) {
     throw new Error("VIDEO_RENDER runtime_commit missing or invalid");
   }
 
+  const diagnosticRuntimeDir = path.join(
+    LOG_DIR,
+    "diagnostic-runtime",
+    commit,
+  );
+  const resumePlanScript = path.join(
+    diagnosticRuntimeDir,
+    "video-resume-plan.mjs",
+  );
+  const voiceDurationQcScript = path.join(
+    diagnosticRuntimeDir,
+    "video-voice-duration-qc.mjs",
+  );
+  const resumeStateScript = path.join(
+    diagnosticRuntimeDir,
+    "video-resume-state.mjs",
+  );
+
   if (
     state.runtime_commit === commit &&
     existsSync(VIDEO_MASTER_SCRIPT) &&
-    existsSync(CHATTERBOX_BATCH_SCRIPT)
+    existsSync(CHATTERBOX_BATCH_SCRIPT) &&
+    existsSync(resumePlanScript) &&
+    existsSync(voiceDurationQcScript) &&
+    existsSync(resumeStateScript)
   ) {
+    state.runtime_resume_plan_path = resumePlanScript;
+    state.runtime_resume_state_path = resumeStateScript;
     return {
       commit,
-      master: VIDEO_MASTER_SCRIPT,
+      master: localVideoMasterPath(),
       voice: CHATTERBOX_BATCH_SCRIPT,
       comfy_start: COMFYUI_START_SCRIPT,
+      resume_plan: resumePlanScript,
+      resume_state: resumeStateScript,
       refreshed: false,
     };
   }
@@ -483,10 +530,45 @@ async function ensureCanonicalVideoRuntimes(job) {
     ],
   );
 
+  const voiceDurationQc = await installPinnedRuntime(
+    commit,
+    "scripts/video-voice-duration-qc.mjs",
+    voiceDurationQcScript,
+    [
+      "HIBOU_VOICE_DURATION_QC_V1",
+      "auditVoiceDurations",
+    ],
+  );
+
+  const resumePlan = await installPinnedRuntime(
+    commit,
+    "scripts/video-resume-plan.mjs",
+    resumePlanScript,
+    [
+      "HIBOU_VIDEO_RESUME_PLAN_V1",
+      "execution_performed: false",
+    ],
+  );
+
+  const resumeState = await installPinnedRuntime(
+    commit,
+    "scripts/video-resume-state.mjs",
+    resumeStateScript,
+    [
+      "HIBOU_VIDEO_RESUME_STATE_PREP_V1",
+      "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1",
+    ],
+  );
+
   state.runtime_commit = commit;
   state.runtime_master_sha256 = master.sha256;
   state.runtime_voice_sha256 = voice.sha256;
   state.runtime_comfy_start_sha256 = comfyStart.sha256;
+  state.runtime_voice_duration_qc_sha256 = voiceDurationQc.sha256;
+  state.runtime_resume_plan_sha256 = resumePlan.sha256;
+  state.runtime_resume_plan_path = resumePlan.path;
+  state.runtime_resume_state_sha256 = resumeState.sha256;
+  state.runtime_resume_state_path = resumeState.path;
 
   log("VIDEO_RENDER runtimes refreshed", {
     commit,
@@ -496,15 +578,35 @@ async function ensureCanonicalVideoRuntimes(job) {
     voice_sha256: voice.sha256,
     comfy_start: comfyStart.path,
     comfy_start_sha256: comfyStart.sha256,
+    resume_plan: resumePlan.path,
+    resume_plan_sha256: resumePlan.sha256,
+    resume_state: resumeState.path,
+    resume_state_sha256: resumeState.sha256,
   });
 
   return {
     commit,
-    master: master.path,
+    master: localVideoMasterPath(),
     voice: voice.path,
     comfy_start: comfyStart.path,
+    resume_plan: resumePlan.path,
+    resume_state: resumeState.path,
     refreshed: true,
   };
+}
+
+function localVideoMasterPath() {
+  if (!VIDEO_LOCAL_SOURCE_ROOT) return VIDEO_MASTER_SCRIPT;
+  const candidate = path.resolve(VIDEO_LOCAL_SOURCE_ROOT, "scripts", "video-master.mjs");
+  if (!existsSync(candidate)) {
+    throw new Error("HIBOU_VIDEO_LOCAL_SOURCE_ROOT has no video-master.mjs");
+  }
+  const source = readFileSync(candidate, "utf8");
+  if (!source.includes("sourceSnapshotArg") ||
+      !source.includes("specific-action-montage-audit.json")) {
+    throw new Error("local video-master lacks source and montage guards");
+  }
+  return candidate;
 }
 
 function stableStoryboard(value) {
@@ -539,6 +641,190 @@ function pipelineFailureDetail(dir) {
   }
 }
 
+function buildVideoFailureDiagnostic(job, errorMessage) {
+  const jobId = String(job?.id || "").trim();
+  const dir = jobId
+    ? path.join(VIDEO_OUTPUT_ROOT, safePart(jobId))
+    : null;
+  const generatedAt = new Date().toISOString();
+  const diagnostic = {
+    schema: "HIBOU_VIDEO_RENDER_FAILURE_DIAGNOSTIC_V1",
+    job: jobId || null,
+    content_id: String(job?.options?.content_id || "") || null,
+    worker: WORKER_ID,
+    worker_session: state.worker_session,
+    generated_at: generatedAt,
+    error: String(errorMessage || "").slice(0, 12000),
+    local_root: dir,
+    resume_plan_path: null,
+    resume_plan: null,
+    resume_planner_executed: false,
+    resume_execution_performed: false,
+    human_review_required: true,
+    publication_authorized: false,
+    paid_fallback: false,
+  };
+
+  if (!dir || !existsSync(path.join(dir, "pipeline-run.json"))) {
+    return diagnostic;
+  }
+
+  const planner = String(state.runtime_resume_plan_path || "").trim();
+  if (!planner || !existsSync(planner)) {
+    diagnostic.resume_plan_error = "commit-pinned resume planner unavailable";
+    return diagnostic;
+  }
+
+  const output = path.join(dir, "_hibou_video_resume_plan.json");
+  const planned = spawnSync(
+    process.execPath,
+    [planner, dir, output, `--platform=${process.platform}`],
+    {
+      cwd: PROJECT_ROOT,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+      maxBuffer: 8 * 1024 * 1024,
+    },
+  );
+  diagnostic.resume_planner_executed = true;
+
+  if (planned.status !== 0 || !existsSync(output)) {
+    diagnostic.resume_plan_error =
+      String(planned.stderr || planned.stdout || "resume planner failed")
+        .slice(-4000);
+    return diagnostic;
+  }
+
+  try {
+    const plan = JSON.parse(readFileSync(output, "utf8"));
+    diagnostic.resume_plan_path = output;
+    diagnostic.resume_plan_sha256 = sha256(output);
+    diagnostic.resume_plan = {
+      schema: plan.schema || null,
+      resume_required: Boolean(plan.resume_required),
+      resume_stage: plan.resume_stage || null,
+      source_state_sha256: String(plan.source_state_sha256 || "") || null,
+      failed_stages: Array.isArray(plan.failed_stages)
+        ? plan.failed_stages.slice(0, 30)
+        : [],
+      inferred_invalidations: Array.isArray(plan.inferred_invalidations)
+        ? plan.inferred_invalidations.slice(0, 30)
+        : [],
+      stages_to_reset: Array.isArray(plan.stages_to_reset)
+        ? plan.stages_to_reset.slice(0, 40)
+        : [],
+      preservable_artifacts: plan.preservable_artifacts || null,
+      required_runtime_capabilities:
+        Array.isArray(plan.required_runtime_capabilities)
+          ? plan.required_runtime_capabilities.slice(0, 30)
+          : [],
+      execution_performed: false,
+      publication_authorized: false,
+    };
+  } catch (error) {
+    diagnostic.resume_plan_error =
+      "resume plan unreadable: " + String(error?.message || error);
+  }
+
+  try {
+    writeFileSync(
+      path.join(dir, "_hibou_video_failure_diagnostic.json"),
+      JSON.stringify(diagnostic, null, 2) + "\n",
+      "utf8",
+    );
+  } catch {}
+
+  return diagnostic;
+}
+
+function heartbeatUnitProgress(dir, stage, sceneCount) {
+  const totalScenes = Math.max(0, Number(sceneCount || 0));
+
+  if (stage === "images") {
+    const planPath = path.join(dir, "images", "image-plan.json");
+    const manifestPath = path.join(dir, "images", "batch-manifest.json");
+    let total = 0;
+    let completed = 0;
+    let failed = 0;
+    try {
+      if (existsSync(planPath)) {
+        const plan = JSON.parse(readFileSync(planPath, "utf8"));
+        total = Number(plan.request_count || plan.requests?.length || 0);
+      }
+      if (existsSync(manifestPath)) {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+        const rows = Object.values(manifest.results || {});
+        completed = rows.filter((row) => row?.status === "completed").length;
+        failed = rows.filter((row) => row?.status === "error").length;
+      }
+    } catch {}
+    return {
+      stage,
+      unit: "image_candidate",
+      completed_units: completed,
+      failed_units: failed,
+      total_units: total || null,
+      percent: total > 0
+        ? Math.min(100, Math.round((completed / total) * 1000) / 10)
+        : null,
+    };
+  }
+
+  if (stage === "voice") {
+    const sceneDir = path.join(dir, "voice", "voice-scenes");
+    let completed = 0;
+    try {
+      if (existsSync(sceneDir)) {
+        completed = readdirSync(sceneDir)
+          .filter((name) => /\.wav$/i.test(name))
+          .length;
+      }
+    } catch {}
+    return {
+      stage,
+      unit: "voice_scene",
+      completed_units: completed,
+      failed_units: 0,
+      total_units: totalScenes || null,
+      percent: totalScenes > 0
+        ? Math.min(100, Math.round((completed / totalScenes) * 1000) / 10)
+        : null,
+    };
+  }
+
+  if (stage === "render") {
+    const cacheDir = path.join(dir, ".video-render-cache");
+    let clips = 0;
+    let visualReady = false;
+    try {
+      if (existsSync(cacheDir)) {
+        const names = readdirSync(cacheDir);
+        clips = names.filter(
+          (name) => /^scene-\d{2}-[0-9a-f]+\.mp4$/i.test(name),
+        ).length;
+        visualReady = names.some(
+          (name) => /^visual-[0-9a-f]+\.mp4$/i.test(name),
+        );
+      }
+    } catch {}
+    return {
+      stage,
+      unit: "scene_clip",
+      completed_units: clips,
+      failed_units: 0,
+      total_units: totalScenes || null,
+      percent: totalScenes > 0
+        ? Math.min(100, Math.round((clips / totalScenes) * 1000) / 10)
+        : null,
+      visual_ready: visualReady,
+    };
+  }
+
+  return null;
+}
+
 function pipelineHeartbeatSnapshot(dir) {
   const statePath = path.join(dir, "pipeline-run.json");
   if (!existsSync(statePath)) {
@@ -546,6 +832,9 @@ function pipelineHeartbeatSnapshot(dir) {
       current_stage: "starting",
       completed_stages: [],
       failed_stages: [],
+      stage_started_at: null,
+      stage_elapsed_seconds: null,
+      stage_progress: null,
     };
   }
   try {
@@ -557,16 +846,39 @@ function pipelineHeartbeatSnapshot(dir) {
     const lastKnown = [...entries].reverse().find(([, info]) =>
       ["PASS", "ERROR", "RUNNING"].includes(info?.status)
     );
+    const current = running || lastKnown || ["starting", {}];
+    const currentStage = current[0];
+    const currentInfo = current[1] || {};
+    const startedAt = String(currentInfo.started_at || "") || null;
+    const startedMs = startedAt ? Date.parse(startedAt) : NaN;
+    let sceneCount = 0;
+    try {
+      const storyboardPath = path.join(dir, "storyboard.json");
+      if (existsSync(storyboardPath)) {
+        const storyboard = JSON.parse(readFileSync(storyboardPath, "utf8"));
+        sceneCount = Array.isArray(storyboard.scenes)
+          ? storyboard.scenes.length
+          : 0;
+      }
+    } catch {}
     return {
-      current_stage: running?.[0] || lastKnown?.[0] || "starting",
+      current_stage: currentStage,
       completed_stages: passed.map(([name]) => name),
       failed_stages: failed.map(([name]) => name),
+      stage_started_at: startedAt,
+      stage_elapsed_seconds: Number.isFinite(startedMs)
+        ? Math.max(0, Math.round((Date.now() - startedMs) / 100) / 10)
+        : null,
+      stage_progress: heartbeatUnitProgress(dir, currentStage, sceneCount),
     };
   } catch {
     return {
       current_stage: "unknown",
       completed_stages: [],
       failed_stages: [],
+      stage_started_at: null,
+      stage_elapsed_seconds: null,
+      stage_progress: null,
     };
   }
 }
@@ -761,6 +1073,188 @@ async function fetchVideoQueue() {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchVideoControl(jobId) {
+  if (!VIDEO_REMOTE_CANCEL_ENABLED || !REPORT_TOKEN) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const separator = VIDEO_QUEUE_URL.includes("?") ? "&" : "?";
+    const response = await fetch(
+      `${VIDEO_QUEUE_URL}${separator}control_job_id=${encodeURIComponent(jobId)}&t=${Date.now()}`,
+      {
+        headers: {
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+          Authorization: `Bearer ${REPORT_TOKEN}`,
+          "X-Hibou-Worker": WORKER_ID,
+          "X-Hibou-Worker-Session": state.worker_session,
+        },
+        signal: controller.signal,
+      },
+    );
+    if (!response.ok) throw new Error(`Video control HTTP ${response.status}`);
+    const data = await response.json();
+    const controls = Array.isArray(data?.controls) ? data.controls : [];
+    return controls.find((control) =>
+      control?.job_id === jobId
+      && ["cancel_requested", "supersede_requested"].includes(control?.state)
+    ) || null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function cancellationMatchesOwnedChild(job, child, control) {
+  if (!VIDEO_REMOTE_CANCEL_ENABLED || !job?.id || !child?.pid || !control) return false;
+  if (control.schema !== "HIBOU_VIDEO_RENDER_CONTROL_V1") return false;
+  if (String(control.job_id || "") !== String(job.id)) return false;
+  if (state.current_job !== job.id || Number(state.render_pid) !== Number(child.pid)) return false;
+
+  const requestId = String(control.request_id || "").trim();
+  const requestedAt = String(control.requested_at || "").trim();
+  const requestedAtMs = Date.parse(requestedAt);
+  if (!requestId || requestId.length > 240 || !Number.isFinite(requestedAtMs)) return false;
+
+  const expectedSession = String(control.expected_worker_session || "").trim();
+  if (!expectedSession || expectedSession !== state.worker_session) return false;
+  const expectedWorker = String(control.expected_worker || "").trim();
+  if (!expectedWorker || expectedWorker !== WORKER_ID) return false;
+
+  const renderStartedAtMs = Date.parse(String(state.render_started_at || ""));
+  if (!Number.isFinite(renderStartedAtMs)) return false;
+  if (requestedAtMs < renderStartedAtMs - (10 * 60 * 1000)) return false;
+  if (requestedAtMs > Date.now() + (5 * 60 * 1000)) return false;
+
+  return child.exitCode === null;
+}
+
+function comfyQueueClient(item) {
+  if (Array.isArray(item)) {
+    const extra = item[3];
+    return String(extra?.client_id || extra?.extra_data?.client_id || "");
+  }
+  return String(item?.client_id || item?.extra_data?.client_id || "");
+}
+
+function comfyQueuePromptId(item) {
+  if (Array.isArray(item)) return String(item[1] || "");
+  return String(item?.prompt_id || item?.id || "");
+}
+
+async function cancelOwnedComfyPrompts(clientId) {
+  const id = String(clientId || "").trim();
+  if (!id) return { checked: false, reason: "client_id_missing", running: 0, pending: 0 };
+  const endpoint = comfyEndpointFromBinding();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(new URL("/queue", endpoint), {
+      headers: { "User-Agent": "Le-Hibou-ROG-Worker/1.0" },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return { checked: false, reason: `queue_http_${response.status}`, running: 0, pending: 0 };
+    }
+    const queue = await response.json();
+    const running = (Array.isArray(queue?.queue_running) ? queue.queue_running : [])
+      .filter((item) => comfyQueueClient(item) === id);
+    const pending = (Array.isArray(queue?.queue_pending) ? queue.queue_pending : [])
+      .filter((item) => comfyQueueClient(item) === id);
+    const pendingIds = pending.map(comfyQueuePromptId).filter(Boolean);
+
+    if (running.length) {
+      await fetch(new URL("/interrupt", endpoint), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        },
+        body: "{}",
+      }).catch(() => null);
+    }
+    if (pendingIds.length) {
+      await fetch(new URL("/queue", endpoint), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Le-Hibou-ROG-Worker/1.0",
+        },
+        body: JSON.stringify({ delete: pendingIds }),
+      }).catch(() => null);
+    }
+    return {
+      checked: true,
+      client_id: id,
+      running: running.length,
+      pending: pendingIds.length,
+      deleted_prompt_ids: pendingIds,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function terminateOwnedRender(job, child, control) {
+  if (!cancellationMatchesOwnedChild(job, child, control)) {
+    return { terminated: false, reason: "scope_mismatch" };
+  }
+  const pid = Number(child.pid);
+  state.cancel_request = {
+    job_id: job.id,
+    request_id: String(control.request_id || ""),
+    state: control.state,
+    render_pid: pid,
+    requested_at: control.requested_at || null,
+  };
+  log("VIDEO_RENDER cancellation accepted", state.cancel_request);
+
+  const comfyCancellation = await cancelOwnedComfyPrompts(state.render_client_id)
+    .catch((error) => ({
+      checked: false,
+      reason: "cancel_failed",
+      error: String(error?.message || error).slice(0, 1000),
+    }));
+
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(pid), "/T"], {
+      encoding: "utf8", windowsHide: true, shell: false,
+    });
+  } else {
+    try { child.kill("SIGTERM"); } catch {}
+  }
+
+  const deadline = Date.now() + VIDEO_CANCEL_GRACE_MS;
+  while (Date.now() < deadline && child.exitCode === null && pidAlive(pid)) {
+    await sleep(200);
+  }
+
+  let forced = false;
+  if (
+    child.exitCode === null
+    && pidAlive(pid)
+    && state.current_job === job.id
+    && Number(state.render_pid) === pid
+  ) {
+    forced = true;
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+        encoding: "utf8", windowsHide: true, shell: false,
+      });
+    } else {
+      try { child.kill("SIGKILL"); } catch {}
+    }
+  }
+
+  return {
+    terminated: true,
+    forced,
+    job_id: job.id,
+    render_pid: pid,
+    request_id: String(control.request_id || ""),
+    state: control.state,
+    comfy: comfyCancellation,
+  };
 }
 
 async function reportVideoProgress(job, status, data = {}) {
@@ -998,6 +1492,13 @@ async function processVideoRender(job, processed) {
     throw new Error(`Queue rejected storyboard: ${job.queue_error}`);
   }
 
+  const targetWorker = String(job.options?.target_worker || "").trim();
+  if (targetWorker && targetWorker !== WORKER_ID) {
+    throw new Error(
+      `VIDEO_RENDER target worker mismatch: expected ${targetWorker}; current ${WORKER_ID}`,
+    );
+  }
+
   if (!job.storyboard || typeof job.storyboard !== "object") {
     throw new Error("VIDEO_RENDER storyboard missing");
   }
@@ -1012,26 +1513,7 @@ async function processVideoRender(job, processed) {
     throw new Error(`HIBOU project root missing: ${PROJECT_ROOT}`);
   }
 
-  if (!existsSync(VIDEO_BINDING)) {
-    throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
-  }
-
   const runtime = await ensureCanonicalVideoRuntimes(job);
-  const masterScript = VIDEO_MASTER_SCRIPT;
-
-  const preflightScript = path.join(
-    PROJECT_ROOT,
-    "scripts",
-    "video-local-preflight.mjs",
-  );
-
-  if (!existsSync(masterScript)) {
-    throw new Error(`video-master missing: ${masterScript}`);
-  }
-
-  if (!existsSync(preflightScript)) {
-    throw new Error(`video preflight missing: ${preflightScript}`);
-  }
 
   const dir = path.join(
     VIDEO_OUTPUT_ROOT,
@@ -1072,6 +1554,613 @@ async function processVideoRender(job, processed) {
     "utf8",
   );
 
+  let sourceSnapshotPath = null;
+  if (incomingStoryboard?.content?.source === "airtable") {
+    const snapshot = job.source_snapshot;
+    if (!snapshot || snapshot.schema !== "HIBOU_AIRTABLE_SOURCE_SNAPSHOT_V1" ||
+        snapshot.capture_method !== "server_airtable_live" ||
+        snapshot.base_id !== "appWyUX7TYPNrDbyP" ||
+        snapshot.content_id !== contentId ||
+        snapshot.profile_record_id !== incomingStoryboard?.content?.profile_record_id) {
+      throw new Error("VIDEO_RENDER fresh Airtable source snapshot missing or mismatched");
+    }
+    const capturedMs = Date.parse(snapshot.captured_at);
+    if (!Number.isFinite(capturedMs) ||
+        Date.now() - capturedMs > 3_600_000 ||
+        Date.now() - capturedMs < -60_000) {
+      throw new Error("VIDEO_RENDER Airtable source snapshot expired");
+    }
+    sourceSnapshotPath = path.join(dir, "airtable-source-snapshot.json");
+    writeFileSync(sourceSnapshotPath, JSON.stringify(snapshot, null, 2) + "\n", "utf8");
+  }
+
+  const remoteRepairResume =
+    job.options?.repair_resume_request &&
+    typeof job.options.repair_resume_request === "object" &&
+    !Array.isArray(job.options.repair_resume_request)
+      ? job.options.repair_resume_request
+      : null;
+  const remoteRepairStart =
+    job.options?.repair_start_request &&
+    typeof job.options.repair_start_request === "object" &&
+    !Array.isArray(job.options.repair_start_request)
+      ? job.options.repair_start_request
+      : null;
+  if (remoteRepairResume && remoteRepairStart) {
+    throw new Error(
+      "VIDEO_RENDER repair prepare and repair start cannot be requested together",
+    );
+  }
+  let repairResumeApplied = null;
+  let repairStartApplied = null;
+
+  if (remoteRepairResume) {
+    if (!VIDEO_REMOTE_REPAIR_RESUME_ENABLED) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume is disabled locally",
+      );
+    }
+    if (
+      remoteRepairResume.schema !==
+      "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume schema invalid",
+      );
+    }
+    if (remoteRepairResume.human_confirmed !== true) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume requires human confirmation",
+      );
+    }
+    if (String(remoteRepairResume.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER remote repair resume content mismatch",
+      );
+    }
+    if (!existsSync(pipelineStatePath)) {
+      throw new Error(
+        "VIDEO_RENDER local pipeline state missing for repair resume",
+      );
+    }
+
+    const planPath = path.join(
+      dir,
+      "_hibou_video_resume_plan.json",
+    );
+    if (!existsSync(planPath)) {
+      throw new Error(
+        "VIDEO_RENDER local resume plan missing for repair resume",
+      );
+    }
+
+    const requestedPlanSha = String(
+      remoteRepairResume.resume_plan_sha256 || "",
+    ).trim().toLowerCase();
+    const actualPlanSha = sha256(planPath).toLowerCase();
+    if (
+      !/^[0-9a-f]{64}$/.test(requestedPlanSha) ||
+      requestedPlanSha !== actualPlanSha
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume plan hash mismatch",
+      );
+    }
+
+    let localPlan;
+    try {
+      localPlan = JSON.parse(readFileSync(planPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER local resume plan unreadable: ${error?.message || error}`,
+      );
+    }
+    if (localPlan?.schema !== "HIBOU_VIDEO_RESUME_PLAN_V1") {
+      throw new Error(
+        "VIDEO_RENDER local resume plan schema invalid",
+      );
+    }
+
+    const requestedStateSha = String(
+      remoteRepairResume.source_state_sha256 || "",
+    ).trim().toLowerCase();
+    const localStateSha = String(
+      localPlan.source_state_sha256 || "",
+    ).trim().toLowerCase();
+    if (
+      !/^[0-9a-f]{64}$/.test(requestedStateSha) ||
+      requestedStateSha !== localStateSha
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume source-state hash mismatch",
+      );
+    }
+
+    const requestedResumeStage = String(
+      remoteRepairResume.resume_stage || "",
+    ).trim();
+    if (
+      !requestedResumeStage ||
+      requestedResumeStage !== String(localPlan.resume_stage || "").trim()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume stage mismatch",
+      );
+    }
+    if (
+      localPlan.analysis_only !== true ||
+      localPlan.execution_performed === true ||
+      localPlan.resume_required !== true ||
+      localPlan.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER local resume plan is not eligible for guarded apply",
+      );
+    }
+
+    const resumeStateScript = String(runtime.resume_state || "").trim();
+    if (!resumeStateScript || !existsSync(resumeStateScript)) {
+      throw new Error(
+        "VIDEO_RENDER commit-pinned resume-state runtime missing",
+      );
+    }
+
+    const applied = spawnSync(
+      process.execPath,
+      [
+        resumeStateScript,
+        dir,
+        planPath,
+        "--apply",
+        `--confirm-plan-sha256=${actualPlanSha}`,
+      ],
+      {
+        cwd: PROJECT_ROOT,
+        encoding: "utf8",
+        windowsHide: true,
+        shell: false,
+        env: {
+          ...process.env,
+          HIBOU_VIDEO_RESUME_APPLY_ENABLED: "true",
+        },
+        maxBuffer: 8 * 1024 * 1024,
+      },
+    );
+    if (applied.status !== 0) {
+      throw new Error(
+        "VIDEO_RENDER guarded repair resume apply failed: " +
+        String(applied.stderr || applied.stdout || "unknown error").slice(-4000),
+      );
+    }
+
+    const receiptPath = path.join(
+      dir,
+      "_hibou_video_resume_apply_receipt.json",
+    );
+    if (!existsSync(receiptPath)) {
+      throw new Error(
+        "VIDEO_RENDER repair resume apply receipt missing",
+      );
+    }
+
+    let receipt;
+    try {
+      receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER repair resume receipt unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      receipt?.schema !== "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1" ||
+      String(receipt.plan_sha256 || "").toLowerCase() !== actualPlanSha ||
+      String(receipt.source_state_sha256 || "").toLowerCase() !== localStateSha ||
+      receipt.execution_started === true ||
+      receipt.artifacts_deleted === true ||
+      receipt.caches_deleted === true ||
+      receipt.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume receipt validation failed",
+      );
+    }
+    if (
+      !Array.isArray(receipt.reset_stages) ||
+      receipt.reset_stages[0] !== requestedResumeStage
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair resume receipt reset-stage mismatch",
+      );
+    }
+
+    repairResumeApplied = {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      prepared_at: new Date().toISOString(),
+      resume_stage: requestedResumeStage,
+      plan_path: planPath,
+      plan_sha256: actualPlanSha,
+      source_state_sha256: localStateSha,
+      receipt_path: receiptPath,
+      receipt_sha256: sha256(receiptPath),
+      reset_stages: receipt.reset_stages.slice(0, 50),
+      backup_path: receipt.backup_path || null,
+      backup_sha256: receipt.backup_sha256 || null,
+      prepared_state_sha256: receipt.prepared_state_sha256 || null,
+      state_file_sha256: receipt.state_file_sha256 || null,
+      artifacts_deleted: false,
+      caches_deleted: false,
+      execution_started_by_reset: false,
+      execution_started: false,
+      requires_separate_render_start: true,
+      human_confirmed: true,
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    };
+
+    const failedJobs = loadFailedJobs();
+    delete failedJobs[job.id];
+    saveFailedJobs(failedJobs);
+
+    log("VIDEO_RENDER guarded repair resume state prepared", {
+      job: job.id,
+      content_id: contentId,
+      resume_stage: requestedResumeStage,
+      plan_sha256: actualPlanSha,
+      receipt_sha256: repairResumeApplied.receipt_sha256,
+      reset_stages: repairResumeApplied.reset_stages,
+      requires_separate_render_start: true,
+    });
+
+    const preparedMarkerPath = path.join(
+      dir,
+      "_hibou_video_remote_repair_prepared.json",
+    );
+    writeFileSync(
+      preparedMarkerPath,
+      JSON.stringify(repairResumeApplied, null, 2) + "\n",
+      "utf8",
+    );
+
+    state.current_job = job.id;
+    await reportVideoProgress(job, "Paused", {
+      local_path: dir,
+      result: repairResumeApplied,
+    });
+    state.current_job = null;
+    state.status = "paused";
+
+    log("VIDEO_RENDER remote repair preparation paused before execution", {
+      job: job.id,
+      content_id: contentId,
+      receipt_sha256: repairResumeApplied.receipt_sha256,
+    });
+    return {
+      prepared_only: true,
+      result: repairResumeApplied,
+    };
+  }
+
+  if (remoteRepairStart) {
+    if (!VIDEO_REMOTE_REPAIR_START_ENABLED) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start is disabled locally",
+      );
+    }
+    if (
+      remoteRepairStart.schema !==
+      "HIBOU_VIDEO_REPAIR_START_REQUEST_V1"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start schema invalid",
+      );
+    }
+    if (remoteRepairStart.human_confirmed !== true) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start requires human confirmation",
+      );
+    }
+    if (String(remoteRepairStart.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER remote repair start content mismatch",
+      );
+    }
+    if (!existsSync(pipelineStatePath)) {
+      throw new Error(
+        "VIDEO_RENDER prepared pipeline state missing for repair start",
+      );
+    }
+
+    const markerPath = path.join(
+      dir,
+      "_hibou_video_remote_repair_prepared.json",
+    );
+    if (!existsSync(markerPath)) {
+      throw new Error(
+        "VIDEO_RENDER local prepared-repair marker missing",
+      );
+    }
+
+    let marker;
+    try {
+      marker = JSON.parse(readFileSync(markerPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER prepared-repair marker unreadable: ${error?.message || error}`,
+      );
+    }
+
+    if (
+      marker?.schema !== "HIBOU_VIDEO_REMOTE_REPAIR_PREPARED_V1" ||
+      marker.requires_separate_render_start !== true ||
+      marker.execution_started !== false ||
+      marker.publication_authorized !== false
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared-repair marker is not startable",
+      );
+    }
+
+    const expectedFields = [
+      ["plan_sha256", "repair start plan hash mismatch"],
+      ["source_state_sha256", "repair start source-state hash mismatch"],
+      ["receipt_sha256", "repair start receipt hash mismatch"],
+      ["state_file_sha256", "repair start prepared-state hash mismatch"],
+    ];
+    for (const [field, message] of expectedFields) {
+      const requested = String(remoteRepairStart?.[field] || "")
+        .trim().toLowerCase();
+      const local = String(marker?.[field] || "")
+        .trim().toLowerCase();
+      if (
+        !/^[0-9a-f]{64}$/.test(requested) ||
+        requested !== local
+      ) {
+        throw new Error("VIDEO_RENDER " + message);
+      }
+    }
+
+    const requestedResumeStage = String(
+      remoteRepairStart.resume_stage || "",
+    ).trim();
+    if (
+      !requestedResumeStage ||
+      requestedResumeStage !== String(marker.resume_stage || "").trim()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER repair start resume-stage mismatch",
+      );
+    }
+    if (String(marker.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER prepared-repair marker content mismatch",
+      );
+    }
+
+    const receiptPath = path.join(
+      dir,
+      "_hibou_video_resume_apply_receipt.json",
+    );
+    if (!existsSync(receiptPath)) {
+      throw new Error(
+        "VIDEO_RENDER prepared repair receipt missing at start",
+      );
+    }
+    if (
+      sha256(receiptPath).toLowerCase() !==
+      String(remoteRepairStart.receipt_sha256).toLowerCase()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared repair receipt bytes changed before start",
+      );
+    }
+
+    let receipt;
+    try {
+      receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER prepared repair receipt unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      receipt?.schema !== "HIBOU_VIDEO_RESUME_APPLY_RECEIPT_V1" ||
+      String(receipt.plan_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.plan_sha256).toLowerCase() ||
+      String(receipt.source_state_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.source_state_sha256).toLowerCase() ||
+      String(receipt.state_file_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.state_file_sha256).toLowerCase() ||
+      receipt.execution_started === true ||
+      receipt.artifacts_deleted === true ||
+      receipt.caches_deleted === true ||
+      receipt.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared repair receipt invalid at start",
+      );
+    }
+
+    const currentPreparedStateSha = sha256(pipelineStatePath).toLowerCase();
+    if (
+      currentPreparedStateSha !==
+      String(remoteRepairStart.state_file_sha256).toLowerCase()
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared pipeline state changed before explicit start",
+      );
+    }
+
+    let preparedState;
+    try {
+      preparedState = JSON.parse(
+        readFileSync(pipelineStatePath, "utf8"),
+      );
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER prepared pipeline state unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      preparedState?.schema !== "HIBOU_VIDEO_MASTER_RUN_V1" ||
+      preparedState.pipeline_status !== "RESUME_PREPARED" ||
+      preparedState?.resume_prepared?.execution_started !== false ||
+      String(preparedState?.resume_prepared?.plan_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.plan_sha256).toLowerCase() ||
+      String(preparedState?.resume_prepared?.source_state_sha256 || "").toLowerCase() !==
+        String(remoteRepairStart.source_state_sha256).toLowerCase() ||
+      String(preparedState?.resume_prepared?.resume_stage || "") !==
+        requestedResumeStage ||
+      preparedState?.resume_prepared?.publication_authorized === true
+    ) {
+      throw new Error(
+        "VIDEO_RENDER prepared pipeline state is not eligible for explicit start",
+      );
+    }
+
+    const startedAt = new Date().toISOString();
+    const markerBeforeSha = sha256(markerPath).toLowerCase();
+    preparedState.pipeline_status = "REPAIR_EXECUTION_STARTED";
+    preparedState.resume_prepared.execution_started = true;
+    preparedState.resume_prepared.execution_started_at = startedAt;
+    preparedState.repair_execution = {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_EXECUTION_V1",
+      started_at: startedAt,
+      resume_stage: requestedResumeStage,
+      plan_sha256: String(remoteRepairStart.plan_sha256).toLowerCase(),
+      source_state_sha256:
+        String(remoteRepairStart.source_state_sha256).toLowerCase(),
+      receipt_sha256: String(remoteRepairStart.receipt_sha256).toLowerCase(),
+      prepared_state_sha256:
+        String(remoteRepairStart.state_file_sha256).toLowerCase(),
+      human_confirmed: true,
+      publication_authorized: false,
+    };
+
+    const stateTemp = pipelineStatePath + ".repair-start-" + process.pid;
+    writeFileSync(
+      stateTemp,
+      JSON.stringify(preparedState, null, 2) + "\n",
+      "utf8",
+    );
+    renameSync(stateTemp, pipelineStatePath);
+    const executionStateSha = sha256(pipelineStatePath).toLowerCase();
+
+    marker.execution_started = true;
+    marker.execution_started_at = startedAt;
+    marker.requires_separate_render_start = false;
+    marker.execution_state_sha256 = executionStateSha;
+    marker.start_request = {
+      schema: remoteRepairStart.schema,
+      plan_sha256: String(remoteRepairStart.plan_sha256).toLowerCase(),
+      source_state_sha256:
+        String(remoteRepairStart.source_state_sha256).toLowerCase(),
+      receipt_sha256: String(remoteRepairStart.receipt_sha256).toLowerCase(),
+      state_file_sha256:
+        String(remoteRepairStart.state_file_sha256).toLowerCase(),
+      human_confirmed: true,
+      publication_authorized: false,
+    };
+
+    const markerTemp = markerPath + ".repair-start-" + process.pid;
+    writeFileSync(
+      markerTemp,
+      JSON.stringify(marker, null, 2) + "\n",
+      "utf8",
+    );
+    renameSync(markerTemp, markerPath);
+    const markerAfterSha = sha256(markerPath).toLowerCase();
+
+    const startedReceiptPath = path.join(
+      dir,
+      "_hibou_video_remote_repair_started.json",
+    );
+    const startedReceipt = {
+      schema: "HIBOU_VIDEO_REMOTE_REPAIR_STARTED_V1",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      started_at: startedAt,
+      resume_stage: requestedResumeStage,
+      plan_sha256: String(remoteRepairStart.plan_sha256).toLowerCase(),
+      source_state_sha256:
+        String(remoteRepairStart.source_state_sha256).toLowerCase(),
+      receipt_sha256: String(remoteRepairStart.receipt_sha256).toLowerCase(),
+      prepared_state_sha256:
+        String(remoteRepairStart.state_file_sha256).toLowerCase(),
+      execution_state_sha256: executionStateSha,
+      prepared_marker_before_sha256: markerBeforeSha,
+      prepared_marker_after_sha256: markerAfterSha,
+      artifacts_deleted: false,
+      caches_deleted: false,
+      human_confirmed: true,
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    };
+    writeFileSync(
+      startedReceiptPath,
+      JSON.stringify(startedReceipt, null, 2) + "\n",
+      "utf8",
+    );
+
+    repairStartApplied = {
+      ...startedReceipt,
+      receipt_path: startedReceiptPath,
+      start_receipt_sha256: sha256(startedReceiptPath).toLowerCase(),
+    };
+
+    log("VIDEO_RENDER explicit repair execution start accepted", {
+      job: job.id,
+      content_id: contentId,
+      resume_stage: requestedResumeStage,
+      execution_state_sha256: executionStateSha,
+      start_receipt_sha256: repairStartApplied.start_receipt_sha256,
+    });
+  }
+
+  if (!existsSync(VIDEO_BINDING)) {
+    throw new Error(`ComfyUI binding missing: ${VIDEO_BINDING}`);
+  }
+
+  const masterScript = runtime.master;
+  const runtimeProjectRoot = VIDEO_LOCAL_SOURCE_ROOT || PROJECT_ROOT;
+  const preflightScript = path.join(
+    runtimeProjectRoot,
+    "scripts",
+    "video-local-preflight.mjs",
+  );
+  if (!existsSync(masterScript)) {
+    throw new Error(`video-master missing: ${masterScript}`);
+  }
+  if (sourceSnapshotPath && !readFileSync(masterScript, "utf8").includes("sourceSnapshotArg")) {
+    throw new Error("VIDEO_RENDER runtime lacks Airtable source freshness guard");
+  }
+  if (sourceSnapshotPath) {
+    const verifier = path.join(runtimeProjectRoot, "scripts", "video-airtable-sync.mjs");
+    if (!existsSync(verifier)) throw new Error("VIDEO_RENDER source verifier missing");
+    const checked = spawnSync(process.execPath, [verifier, "verify", storyboardPath,
+      `--source-snapshot=${sourceSnapshotPath}`], {
+      cwd: runtimeProjectRoot,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: process.env,
+    });
+    if (checked.status !== 0) {
+      throw new Error("VIDEO_RENDER Airtable source verification failed: " +
+        String(checked.stderr || checked.stdout || "unknown").slice(-3000));
+    }
+  }
+  if (!existsSync(preflightScript)) {
+    throw new Error(`video preflight missing: ${preflightScript}`);
+  }
+
   if (existsSync(pipelineStatePath) && existingStoryboard) {
     try {
       const pipeline = JSON.parse(
@@ -1105,6 +2194,90 @@ async function processVideoRender(job, processed) {
     }
   }
 
+  const productionMode = job.options?.preview_mode === true
+    ? "preview"
+    : "final";
+
+  const remoteHumanDecisions =
+    job.options?.human_candidate_decisions &&
+    typeof job.options.human_candidate_decisions === "object" &&
+    !Array.isArray(job.options.human_candidate_decisions)
+      ? job.options.human_candidate_decisions
+      : null;
+  let humanSelectionResume = false;
+
+  if (remoteHumanDecisions) {
+    if (productionMode !== "final") {
+      throw new Error(
+        "VIDEO_RENDER human candidate decisions require FINAL mode",
+      );
+    }
+    if (
+      remoteHumanDecisions.schema !==
+      "HIBOU_HUMAN_IMAGE_SELECTION_V1"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER human candidate decisions schema invalid",
+      );
+    }
+    if (String(remoteHumanDecisions.content_id || "") !== contentId) {
+      throw new Error(
+        "VIDEO_RENDER human candidate decisions content mismatch",
+      );
+    }
+
+    const reviewPath = path.join(
+      dir,
+      "images",
+      "candidate-review.json",
+    );
+    if (!existsSync(reviewPath)) {
+      throw new Error(
+        "VIDEO_RENDER local candidate review missing for resume",
+      );
+    }
+    const localReview = JSON.parse(readFileSync(reviewPath, "utf8"));
+    const localFingerprint = String(
+      localReview?.review_fingerprint_sha256 || "",
+    ).trim().toLowerCase();
+    const suppliedFingerprint = String(
+      remoteHumanDecisions.review_fingerprint_sha256 || "",
+    ).trim().toLowerCase();
+
+    if (
+      !/^[0-9a-f]{64}$/.test(localFingerprint) ||
+      suppliedFingerprint !== localFingerprint
+    ) {
+      throw new Error(
+        "VIDEO_RENDER remote human selection fingerprint mismatch",
+      );
+    }
+
+    const decisionsPath = path.join(
+      dir,
+      "images",
+      "candidate-decisions.json",
+    );
+    writeFileSync(
+      decisionsPath,
+      JSON.stringify(remoteHumanDecisions, null, 2) + "\n",
+      "utf8",
+    );
+    humanSelectionResume = true;
+    log("VIDEO_RENDER remote human candidate decisions staged", {
+      job: job.id,
+      content_id: contentId,
+      review_fingerprint_sha256: localFingerprint,
+      decisions_path: decisionsPath,
+    });
+  }
+  const candidatesPerScene = productionMode === "preview"
+    ? 1
+    : Math.max(
+        1,
+        Math.min(3, Number(job.options?.candidates_per_scene || 3)),
+      );
+
   state.current_job = job.id;
 
   log("VIDEO_RENDER started", {
@@ -1113,18 +2286,28 @@ async function processVideoRender(job, processed) {
     dir,
     binding: VIDEO_BINDING,
     runtime_commit: runtime.commit,
+    runtime_source: VIDEO_LOCAL_SOURCE_ROOT ? "local_v5_override" : "commit_pinned",
     runtime_refreshed: runtime.refreshed,
+    production_mode: productionMode,
+    candidates_per_scene: candidatesPerScene,
+    repair_resume_applied: Boolean(repairResumeApplied),
+    repair_resume_stage: repairResumeApplied?.resume_stage || null,
+    repair_start_applied: Boolean(repairStartApplied),
+    repair_start_stage: repairStartApplied?.resume_stage || null,
   });
 
   await reportVideoProgress(job, "Running", {
     local_path: dir,
+    ...(repairStartApplied
+      ? { result: repairStartApplied }
+      : {}),
   });
 
   const preflight = spawnSync(
     process.execPath,
     [preflightScript, "--require-ready"],
     {
-      cwd: PROJECT_ROOT,
+      cwd: runtimeProjectRoot,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
@@ -1137,8 +2320,6 @@ async function processVideoRender(job, processed) {
       `video preflight failed with status ${preflight.status}`,
     );
   }
-
-  await ensureComfyUIReady();
 
   const maxScenes = Math.max(
     1,
@@ -1153,10 +2334,13 @@ async function processVideoRender(job, processed) {
   const args = [
     masterScript,
     `--storyboard=${storyboardPath}`,
+    ...(sourceSnapshotPath ? [`--source-snapshot=${sourceSnapshotPath}`] : []),
     `--binding=${VIDEO_BINDING}`,
     `--output=${dir}`,
     `--max-scenes=${maxScenes}`,
     `--regen-attempts=${regenAttempts}`,
+    `--production-mode=${productionMode}`,
+    `--candidates-per-scene=${candidatesPerScene}`,
   ];
 
   const stylePath = String(
@@ -1175,16 +2359,200 @@ async function processVideoRender(job, processed) {
     args.push(`--asset-graph=${assetGraphPath}`);
   }
 
-  const renderStatus = await new Promise((resolveRender, rejectRender) => {
+  const reuseFromJobId = String(
+    job.options?.reuse_from_job_id || "",
+  ).trim();
+  const reuseIntegrity = {
+    requested: Boolean(reuseFromJobId),
+    parent_worker: job.reuse_lineage?.parent_worker || null,
+    current_worker: WORKER_ID,
+    worker_match: null,
+    expected_master_sha256: job.reuse_lineage?.parent_result_sha256 || null,
+    result_declared_master_sha256: null,
+    actual_master_sha256: null,
+    result_job_match: false,
+    result_content_match: false,
+    result_hash_verified: false,
+    file_hash_verified: false,
+    airtable_hash_verified: null,
+    hash_verified: false,
+  };
+  if (reuseFromJobId) {
+    if (
+      !/^rec[A-Za-z0-9]{14}$/.test(reuseFromJobId) ||
+      reuseFromJobId === String(job.id)
+    ) {
+      throw new Error("Invalid VIDEO_RENDER reuse_from_job_id");
+    }
+
+    const expectedParentWorker = String(
+      job.reuse_lineage?.parent_worker || "",
+    ).trim();
+    if (expectedParentWorker) {
+      reuseIntegrity.worker_match = expectedParentWorker === WORKER_ID;
+      if (!reuseIntegrity.worker_match) {
+        throw new Error(
+          `VIDEO_RENDER reuse parent belongs to another worker: ${expectedParentWorker}`,
+        );
+      }
+    }
+
+    const previousRoot = path.join(
+      VIDEO_OUTPUT_ROOT,
+      safePart(reuseFromJobId),
+    );
+    if (!existsSync(previousRoot)) {
+      throw new Error(
+        `VIDEO_RENDER reuse-from output missing: ${previousRoot}`,
+      );
+    }
+
+    const expectedParentHash = String(
+      job.reuse_lineage?.parent_result_sha256 || "",
+    ).trim().toLowerCase();
+
+    const previousResultPath = path.join(
+      previousRoot,
+      "_hibou_video_result.json",
+    );
+    if (!existsSync(previousResultPath)) {
+      throw new Error(
+        `VIDEO_RENDER reuse parent result missing for integrity verification: ${previousResultPath}`,
+      );
+    }
+
+    let previousResult;
+    try {
+      previousResult = JSON.parse(
+        readFileSync(previousResultPath, "utf8"),
+      );
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER reuse parent result unreadable: ${error?.message || error}`,
+      );
+    }
+
+    reuseIntegrity.result_job_match =
+      String(previousResult?.job || "") === reuseFromJobId;
+    reuseIntegrity.result_content_match =
+      String(previousResult?.content_id || "") === contentId;
+    if (
+      !reuseIntegrity.result_job_match ||
+      !reuseIntegrity.result_content_match
+    ) {
+      throw new Error(
+        "VIDEO_RENDER reuse parent result identity mismatch",
+      );
+    }
+
+    const declaredParentHash = String(
+      previousResult?.master_sha256 || "",
+    ).trim().toLowerCase();
+    reuseIntegrity.result_declared_master_sha256 =
+      declaredParentHash || null;
+    if (!/^[0-9a-f]{64}$/.test(declaredParentHash)) {
+      throw new Error(
+        "VIDEO_RENDER reuse parent result has invalid master hash",
+      );
+    }
+
+    const previousMasterPath = path.join(
+      previousRoot,
+      "master.mp4",
+    );
+    if (!existsSync(previousMasterPath)) {
+      throw new Error(
+        `VIDEO_RENDER reuse parent master missing for integrity verification: ${previousMasterPath}`,
+      );
+    }
+    const actualParentHash = sha256(previousMasterPath).toLowerCase();
+    reuseIntegrity.actual_master_sha256 = actualParentHash;
+    reuseIntegrity.result_hash_verified =
+      declaredParentHash === actualParentHash;
+    reuseIntegrity.file_hash_verified =
+      reuseIntegrity.result_hash_verified;
+
+    if (expectedParentHash) {
+      reuseIntegrity.airtable_hash_verified =
+        expectedParentHash === actualParentHash &&
+        expectedParentHash === declaredParentHash;
+    }
+
+    reuseIntegrity.hash_verified =
+      reuseIntegrity.result_hash_verified &&
+      reuseIntegrity.airtable_hash_verified !== false;
+
+    if (!reuseIntegrity.hash_verified) {
+      throw new Error(
+        "VIDEO_RENDER reuse parent master hash mismatch",
+      );
+    }
+
+    args.push(`--reuse-from=${previousRoot}`);
+    log("VIDEO_RENDER incremental reuse requested", {
+      job: job.id,
+      reuse_from_job_id: reuseFromJobId,
+      previous_root: previousRoot,
+      production_mode: productionMode,
+      reuse_integrity: reuseIntegrity,
+    });
+  }
+
+  if (sourceSnapshotPath) {
+    if (!readFileSync(masterScript, "utf8").includes('flag("preflight-only")')) {
+      throw new Error("VIDEO_RENDER runtime lacks pre-GPU montage preflight");
+    }
+    const preflightArgs = args.map(value => value === `--output=${dir}`
+      ? `--output=${path.join(dir, "_preflight")}` : value);
+    const preflightRun = spawnSync(process.execPath, [...preflightArgs, "--preflight-only"], {
+      cwd: runtimeProjectRoot,
+      encoding: "utf8",
+      windowsHide: true,
+      shell: false,
+      env: {
+        ...process.env,
+        ...(VIDEO_LOCAL_SOURCE_ROOT ? {
+          HIBOU_LOCAL_RUNTIME_OVERRIDE: "true",
+          HIBOU_LOCAL_REPO_ROOT: VIDEO_LOCAL_SOURCE_ROOT,
+        } : {}),
+      },
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    if (preflightRun.status !== 0) {
+      throw new Error("VIDEO_RENDER prompt contract preflight failed: " +
+        String(preflightRun.stderr || preflightRun.stdout || "unknown").slice(-4000));
+    }
+  }
+
+  if (!humanSelectionResume) {
+    await ensureComfyUIReady();
+  } else {
+    log("VIDEO_RENDER human-selection resume skips ComfyUI wake-up", {
+      job: job.id,
+      content_id: contentId,
+    });
+  }
+
+  const renderOutcome = await new Promise((resolveRender, rejectRender) => {
+    const renderClientId = `hibou:${job.id}:${state.worker_session}`;
     const child = spawn(process.execPath, args, {
-      cwd: PROJECT_ROOT,
+      cwd: runtimeProjectRoot,
       stdio: "inherit",
       windowsHide: true,
       shell: false,
-      env: process.env,
+      env: {
+        ...process.env,
+        ...(VIDEO_LOCAL_SOURCE_ROOT ? {
+          HIBOU_LOCAL_RUNTIME_OVERRIDE: "true",
+          HIBOU_LOCAL_REPO_ROOT: VIDEO_LOCAL_SOURCE_ROOT,
+        } : {}),
+        HIBOU_VIDEO_CLIENT_ID: renderClientId,
+        HIBOU_VIDEO_QUEUE_JOB_ID: job.id,
+      },
     });
 
     state.render_pid = child.pid || null;
+    state.render_client_id = renderClientId;
     state.render_started_at = new Date().toISOString();
     state.last_video_heartbeat_at = state.render_started_at;
 
@@ -1202,9 +2570,13 @@ async function processVideoRender(job, processed) {
           worker_session: state.worker_session,
           worker_pid: process.pid,
           render_pid: child.pid || null,
-          current_stage: progress.current_stage,
+          render_client_id: state.render_client_id || null,
+          current_stage: state.cancel_request ? "cancelling" : progress.current_stage,
           completed_stages: progress.completed_stages,
           failed_stages: progress.failed_stages,
+          stage_started_at: progress.stage_started_at,
+          stage_elapsed_seconds: progress.stage_elapsed_seconds,
+          stage_progress: progress.stage_progress,
         },
       }).catch((error) => {
         log("VIDEO_RENDER heartbeat failed", {
@@ -1214,29 +2586,188 @@ async function processVideoRender(job, processed) {
       });
     }, 30000);
 
+    let cancellation = null;
+    let cancellationCheckInFlight = false;
+    const controls = setInterval(async () => {
+      if (!VIDEO_REMOTE_CANCEL_ENABLED || cancellation || cancellationCheckInFlight) return;
+      cancellationCheckInFlight = true;
+      try {
+        const control = await fetchVideoControl(job.id);
+        if (control && cancellationMatchesOwnedChild(job, child, control)) {
+          cancellation = {
+            control,
+            termination: await terminateOwnedRender(job, child, control),
+          };
+        }
+      } catch (error) {
+        log("VIDEO_RENDER control check failed", {
+          job: job.id,
+          error: String(error?.message || error).slice(0, 1000),
+        });
+      } finally {
+        cancellationCheckInFlight = false;
+      }
+    }, 5000);
+
     child.once("error", (error) => {
       clearInterval(heartbeat);
+      clearInterval(controls);
       state.render_pid = null;
       state.render_started_at = null;
+      state.render_client_id = null;
       rejectRender(error);
     });
     child.once("exit", (code, signal) => {
       clearInterval(heartbeat);
+      clearInterval(controls);
       state.render_pid = null;
       state.render_started_at = null;
+      if (cancellation) {
+        state.render_client_id = null;
+        resolveRender({ code: Number(code ?? 1), signal: signal || null, cancellation });
+        return;
+      }
       if (signal) {
+        state.render_client_id = null;
         rejectRender(new Error(`video-master terminated by signal ${signal}`));
         return;
       }
-      resolveRender(Number(code ?? 1));
+      state.render_client_id = null;
+      resolveRender({ code: Number(code ?? 1), signal: null, cancellation: null });
     });
   });
 
+  if (renderOutcome.cancellation) {
+    const control = renderOutcome.cancellation.control;
+    const finalStatus = control.state === "supersede_requested" ? "Superseded" : "Cancelled";
+    const result = {
+      schema: "HIBOU_VIDEO_RENDER_CANCELLATION_V1",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      request_id: String(control.request_id || ""),
+      requested_state: control.state,
+      termination: renderOutcome.cancellation.termination,
+      cancelled_at: new Date().toISOString(),
+      human_review_required: true,
+      publication_authorized: false,
+      paid_fallback: false,
+    };
+    writeFileSync(
+      path.join(dir, "_hibou_video_cancelled.json"),
+      JSON.stringify(result, null, 2) + "\n",
+      "utf8",
+    );
+    await reportVideoProgress(job, finalStatus, { local_path: dir, result });
+    processed.add(job.id);
+    saveProcessed(processed);
+    const failedJobs = loadFailedJobs();
+    delete failedJobs[job.id];
+    saveFailedJobs(failedJobs);
+    state.current_job = null;
+    state.cancel_request = null;
+    log("VIDEO_RENDER cancellation completed", {
+      job: job.id,
+      status: finalStatus,
+      request_id: result.request_id,
+      forced: Boolean(result.termination?.forced),
+    });
+    return;
+  }
+
+  const renderStatus = Number(renderOutcome.code ?? 1);
   if (renderStatus !== 0) {
     const detail = pipelineFailureDetail(dir);
     throw new Error(
       `video-master failed with status ${renderStatus};${detail || " stage=unknown"}`,
     );
+  }
+
+  const waitingSelectionPath = path.join(
+    dir,
+    "awaiting-human-selection.json",
+  );
+  if (existsSync(waitingSelectionPath)) {
+    let waiting;
+    try {
+      waiting = JSON.parse(
+        readFileSync(waitingSelectionPath, "utf8"),
+      );
+    } catch (error) {
+      throw new Error(
+        `VIDEO_RENDER human-selection checkpoint unreadable: ${error?.message || error}`,
+      );
+    }
+    if (
+      waiting?.schema !== "HIBOU_VIDEO_MASTER_WAITING_HUMAN_SELECTION_V1" ||
+      waiting?.status !== "WAITING_HUMAN_SELECTION"
+    ) {
+      throw new Error(
+        "VIDEO_RENDER invalid human-selection checkpoint schema",
+      );
+    }
+
+    const candidateReviewPath = String(
+      waiting.candidate_review || "",
+    ).trim();
+    let reviewFingerprint = null;
+    if (candidateReviewPath && existsSync(candidateReviewPath)) {
+      try {
+        const review = JSON.parse(
+          readFileSync(candidateReviewPath, "utf8"),
+        );
+        reviewFingerprint =
+          /^[0-9a-f]{64}$/i.test(
+            String(review?.review_fingerprint_sha256 || ""),
+          )
+            ? String(review.review_fingerprint_sha256).toLowerCase()
+            : null;
+      } catch {}
+    }
+
+    const pausedResult = {
+      schema: "HIBOU_VIDEO_RENDER_WAITING_HUMAN_SELECTION_V1",
+      status: "WAITING_HUMAN_SELECTION",
+      job: job.id,
+      content_id: contentId,
+      worker: WORKER_ID,
+      worker_session: state.worker_session,
+      local_root: dir,
+      candidate_review: candidateReviewPath || null,
+      candidate_review_html: waiting.candidate_review_html || null,
+      review_fingerprint_sha256: reviewFingerprint,
+      decisions_path: waiting.decisions_path || null,
+      scene_count: Number(waiting.scene_count || 0),
+      resume_same_job: true,
+      images_will_be_reused: true,
+      human_review_required: true,
+      publication_authorized: false,
+      paused_at: new Date().toISOString(),
+    };
+
+    await reportVideoProgress(job, "Paused", {
+      local_path: dir,
+      result: pausedResult,
+    });
+
+    const failedJobs = loadFailedJobs();
+    delete failedJobs[job.id];
+    saveFailedJobs(failedJobs);
+
+    state.current_job = null;
+    state.render_pid = null;
+    state.render_client_id = null;
+    state.cancel_request = null;
+
+    log("VIDEO_RENDER waiting for human candidate selection", {
+      job: job.id,
+      content_id: contentId,
+      scene_count: pausedResult.scene_count,
+      candidate_review: pausedResult.candidate_review,
+      decisions_path: pausedResult.decisions_path,
+    });
+    return;
   }
 
   if (!existsSync(masterPath)) {
@@ -1252,9 +2783,61 @@ async function processVideoRender(job, processed) {
   }
 
   const resultSha256 = sha256(masterPath);
+  const verdictPath = path.join(dir, "prompt-contract-verdict.json");
+  let promptContractVerdict = null;
+  if (sourceSnapshotPath) {
+    if (!existsSync(verdictPath)) {
+      throw new Error("VIDEO_RENDER completed without prompt contract verdict");
+    }
+    try {
+      promptContractVerdict = JSON.parse(readFileSync(verdictPath, "utf8"));
+    } catch (error) {
+      throw new Error("VIDEO_RENDER prompt contract verdict unreadable: " +
+        String(error?.message || error));
+    }
+    if (promptContractVerdict?.schema !== "HIBOU_PROMPT_CONTRACT_VERDICT_V1" ||
+        promptContractVerdict?.master !== masterPath ||
+        !Array.isArray(promptContractVerdict.failed)) {
+      throw new Error("VIDEO_RENDER prompt contract verdict invalid");
+    }
+  }
+
+  let incrementalRetouch = {
+    requested: Boolean(reuseFromJobId),
+    reuse_from_job_id: reuseFromJobId || null,
+    plan_available: false,
+    changed_scene_ids: [],
+    invalidated_stages: [],
+    cache_seed: null,
+  };
+  const incrementalPlanPath = path.join(dir, "incremental-retouch-plan.json");
+  if (existsSync(incrementalPlanPath)) {
+    try {
+      const plan = JSON.parse(readFileSync(incrementalPlanPath, "utf8"));
+      incrementalRetouch = {
+        ...incrementalRetouch,
+        plan_available: true,
+        plan_sha256: sha256(incrementalPlanPath),
+        changed_scene_ids: Array.isArray(plan.changed_scene_ids)
+          ? plan.changed_scene_ids.slice(0, 50)
+          : [],
+        invalidated_stages: Array.isArray(plan.invalidated_stages)
+          ? plan.invalidated_stages.slice(0, 50)
+          : [],
+      };
+    } catch {}
+  }
+  
+  if (existsSync(pipelineStatePath)) {
+    try {
+      const pipeline = JSON.parse(readFileSync(pipelineStatePath, "utf8"));
+      incrementalRetouch.cache_seed =
+        pipeline?.incremental_retouch?.cache_seed || null;
+    } catch {}
+  }
 
   const result = {
-    schema: "HIBOU_VIDEO_RENDER_RESULT_V1",
+    schema: "HIBOU_VIDEO_RENDER_RESULT_V2",
     job: job.id,
     content_id: contentId,
     worker: WORKER_ID,
@@ -1262,24 +2845,61 @@ async function processVideoRender(job, processed) {
     master_path: masterPath,
     master_sha256: resultSha256,
     master_bytes: masterStat.size,
+    production_mode: productionMode,
+    candidates_per_scene: candidatesPerScene,
+    reuse_from_job_id: reuseFromJobId || null,
+    reuse_lineage: job.reuse_lineage || null,
+    reuse_integrity: reuseIntegrity,
+    incremental_retouch: incrementalRetouch,
+    repair_resume: repairResumeApplied,
+    repair_start: repairStartApplied,
     human_review_required: true,
     publication_authorized: false,
     runtime_commit: runtime.commit,
-    runtime_master_sha256: state.runtime_master_sha256 || "",
+    runtime_source: VIDEO_LOCAL_SOURCE_ROOT ? "local_v5_override" : "commit_pinned",
+    runtime_master_sha256: sha256(masterScript),
+    airtable_source_snapshot_sha256: sourceSnapshotPath ? sha256(sourceSnapshotPath) : null,
+    prompt_contract_pass: promptContractVerdict?.PROMPT_CONTRACT_PASS === true,
+    prompt_contract_failed_checks: promptContractVerdict?.failed || null,
+    prompt_contract_verdict_path: promptContractVerdict ? verdictPath : null,
     runtime_voice_sha256: state.runtime_voice_sha256 || "",
     completed_at: new Date().toISOString(),
   };
 
-  writeFileSync(
-    path.join(dir, "_hibou_video_result.json"),
-    JSON.stringify(result, null, 2) + "\n",
-    "utf8",
-  );
+  const promptContractComplete =
+    promptContractVerdict?.PROMPT_CONTRACT_PASS === true &&
+    promptContractVerdict.failed.length === 0;
+  if (!promptContractComplete) {
+    const reviewPending = {
+      ...result,
+      schema: "HIBOU_VIDEO_RENDER_REVIEW_PENDING_V1",
+      prompt_contract_pass: false,
+      human_review_required: true,
+      paused_at: new Date().toISOString(),
+    };
+    writeFileSync(path.join(dir, "_hibou_video_result.json"),
+      JSON.stringify(reviewPending, null, 2) + "\n", "utf8");
+    await reportVideoProgress(job, "Paused", {
+      local_path: masterPath,
+      result_sha256: resultSha256,
+      result: reviewPending,
+    });
+    processed.add(job.id);
+    saveProcessed(processed);
+    state.current_job = null;
+    state.render_pid = null;
+    state.render_client_id = null;
+    log("VIDEO_RENDER awaiting semantic and human review", {
+      job: job.id, content_id: contentId,
+      failed_checks: promptContractVerdict?.failed || [],
+    });
+    return;
+  }
 
+  writeFileSync(path.join(dir, "_hibou_video_result.json"),
+    JSON.stringify(result, null, 2) + "\n", "utf8");
   await reportVideoProgress(job, "Completed", {
-    local_path: masterPath,
-    result_sha256: resultSha256,
-    result,
+    local_path: masterPath, result_sha256: resultSha256, result,
   });
 
   processed.add(job.id);
@@ -1383,6 +3003,12 @@ async function tick() {
   const retryEligible = (job) => {
     if (!job?.id || processed.has(job.id)) return false;
 
+    const repairResume =
+      VIDEO_REMOTE_REPAIR_RESUME_ENABLED &&
+      job?.options?.repair_resume_request?.schema ===
+        "HIBOU_VIDEO_REPAIR_RESUME_REQUEST_V1";
+    if (repairResume) return true;
+
     const info = failed[job.id];
 
     if (!info) return true;
@@ -1447,10 +3073,14 @@ async function tick() {
       error: message,
     });
 
+    let failureDiagnostic = null;
     try {
       if (job?.type === "VIDEO_RENDER") {
+        failureDiagnostic = buildVideoFailureDiagnostic(job, message);
         await reportVideoProgress(job, "Error", {
           error: message,
+          local_path: failureDiagnostic.local_root || undefined,
+          result: failureDiagnostic,
         });
       } else {
         await reportProgress(job, "Error", {
@@ -1474,6 +3104,9 @@ async function tick() {
       attempts,
       last_error: message.slice(0, 1500),
       failed_at: new Date().toISOString(),
+      resume_stage: failureDiagnostic?.resume_plan?.resume_stage || null,
+      resume_plan_path: failureDiagnostic?.resume_plan_path || null,
+      resume_execution_performed: false,
       retry_after:
         Date.now() +
         (attempts >= 2
@@ -1501,6 +3134,9 @@ function healthServer() {
       report_token_present: Boolean(REPORT_TOKEN),
       video_queue_url: VIDEO_QUEUE_URL,
       video_render_enabled: VIDEO_RENDER_ENABLED,
+      video_remote_cancel_enabled: VIDEO_REMOTE_CANCEL_ENABLED,
+      video_cancel_grace_ms: VIDEO_CANCEL_GRACE_MS,
+      cancel_request: state.cancel_request || null,
       video_autostart_comfyui: VIDEO_AUTOSTART_COMFYUI,
       video_project_root: PROJECT_ROOT,
       video_binding: VIDEO_BINDING,
@@ -1519,6 +3155,14 @@ function healthServer() {
       worker_source_sha256: state.worker_source_sha256 || null,
       runtime_master_sha256: state.runtime_master_sha256 || null,
       runtime_voice_sha256: state.runtime_voice_sha256 || null,
+      runtime_comfy_start_sha256: state.runtime_comfy_start_sha256 || null,
+      runtime_voice_duration_qc_sha256: state.runtime_voice_duration_qc_sha256 || null,
+      runtime_resume_plan_sha256: state.runtime_resume_plan_sha256 || null,
+      runtime_resume_plan_path: state.runtime_resume_plan_path || null,
+      runtime_resume_state_sha256: state.runtime_resume_state_sha256 || null,
+      runtime_resume_state_path: state.runtime_resume_state_path || null,
+      video_remote_repair_resume_enabled: VIDEO_REMOTE_REPAIR_RESUME_ENABLED,
+      video_remote_repair_start_enabled: VIDEO_REMOTE_REPAIR_START_ENABLED,
       poll_ms: POLL_MS,
       execution_enabled: EXECUTION_ENABLED,
       approved_job_id: APPROVED_JOB_ID || null,

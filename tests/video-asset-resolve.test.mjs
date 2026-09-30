@@ -22,8 +22,8 @@ test("asset resolution composes a full reusable scene and exposes no generation 
   ]};
   const out=applyAssetResolution(contract,graph,{graphPath:"/tmp/graph/asset-graph.json"});
   assert.equal(out.scenes[0].asset_resolution.status,"FULL_REUSE");
-  assert.match(out.scenes[0].composition.background,/assets\/bg\.png$/);
-  assert.match(out.scenes[0].composition.character_pose.path,/assets\/owl\.png$/);
+  assert.match(out.scenes[0].composition.background,/assets[\\/]bg\.png$/);
+  assert.match(out.scenes[0].composition.character_pose.path,/assets[\\/]owl\.png$/);
   assert.equal(out.scenes[0].composition.object_layers.length,1);
   assert.equal(out.asset_resolution.generation_slots.length,0);
   assert.deepEqual(out.asset_resolution.full_reuse_scenes,["S01"]);

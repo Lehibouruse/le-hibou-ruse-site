@@ -19,3 +19,12 @@ test("canonical Hibou runtime no longer depends on a default public site URL", (
   assert.match(sync, /HIBOU_REFERENCE_IMAGE_URL\|\|""/);
   assert.doesNotMatch(sync, /le-hibou-ruse-site\.vercel\.app\/hibou-monocle\.webp/);
 });
+
+
+test("canonical Hibou can be sourced from an explicit local pinned worktree before network fallback", () => {
+  assert.match(master, /HIBOU_LOCAL_REPO_ROOT/);
+  assert.match(master, /localAssetPath/);
+  assert.match(master, /existsSync\(localAssetPath\)/);
+  assert.match(master, /readFileSync\(localAssetPath,"utf8"\)/);
+  assert.match(master, /raw\.githubusercontent\.com\/Lehibouruse\/le-hibou-ruse-site/);
+});

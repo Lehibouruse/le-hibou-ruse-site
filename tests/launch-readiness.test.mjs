@@ -8,7 +8,7 @@ function legal(valid = true) {
 
 function chapters(count = 16, ready = true) {
   return Array.from({ length: count }, (_, index) => ({ fields: {
-    Chapitre: `Chapitre ${index + 1}`,
+    Chapitre: `${index + 1} — Chapitre ${index + 1}`,
     "Contenu V1": "contenu",
     "Validation humaine": ready,
     "Prêt export": ready,
@@ -25,6 +25,9 @@ function readyInput() {
       lemon_checkout_status: "LIVE_PUBLIC",
       commerce_launch_authorized: "true",
       commerce_readiness_mode: "strict",
+      digital_supply_consent_checkout_mode: "live",
+      digital_supply_consent_durable_confirmation_tested: "true",
+      commerce_end_to_end_tested: "true",
       book_current_edition: "V1.0-2026-09",
       public_site_url: "https://d4d5d6.com",
       public_site_host_expected: "d4d5d6.com",
@@ -106,6 +109,27 @@ test("le kill switch bloque même une configuration technique complète", () => 
   assert.equal(result.ready, false);
   assert.equal(result.checkoutUrl, "");
   assert.ok(result.blockers.some((item) => item.key === "launch_authorized"));
+});
+
+test("le checkout reste fermé tant que consentement et livraison ne sont pas prouvés", () => {
+  const input = readyInput();
+  input.config.commerce_readiness_mode = "early_access";
+  input.config.digital_supply_consent_checkout_mode = "disabled";
+  input.config.digital_supply_consent_durable_confirmation_tested = "false";
+  input.config.commerce_end_to_end_tested = "false";
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.equal(result.checkoutUrl, "");
+  assert.deepEqual(result.blockers.filter((item) => item.key.startsWith("consent_") || item.key === "commerce_end_to_end").map((item) => item.key), ["consent_checkout_live", "consent_durable_confirmation", "commerce_end_to_end"]);
+});
+
+test("une édition sans texte livrable ferme le checkout même en early access", () => {
+  const input = readyInput();
+  input.config.commerce_readiness_mode = "early_access";
+  input.chapters = [{ fields: { Chapitre: "12 — Vide", "Contenu V1": "" } }];
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.key === "book_content_available"));
 });
 
 test("un domaine non vérifié bloque toute ouverture commerciale", () => {

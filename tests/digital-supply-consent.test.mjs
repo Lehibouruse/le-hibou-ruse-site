@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   DIGITAL_SUPPLY_CONSENT_VERSION,
   digitalSupplyCustomData,
+  consentCheckoutCustomData,
   validDigitalSupplyCustomData,
 } from "../lib/digital-supply-consent.mjs";
 
@@ -25,6 +26,17 @@ test("le consentement est invalide si une preuve manque, est fausse ou d’une a
   assert.equal(validDigitalSupplyCustomData({ ...base, immediate_supply_consent: "false" }), false);
   assert.equal(validDigitalSupplyCustomData({ ...base, withdrawal_loss_ack: "false" }), false);
   assert.equal(validDigitalSupplyCustomData({ ...base, consent_version: "OLD" }), false);
+});
+
+test("le checkout reçoit la même session et les UTM nettoyées que la visite", () => {
+  const custom = consentCheckoutCustomData(
+    { consentId: "consent-123", consentAt: "2026-09-22T20:30:00.000Z" },
+    { session_id: "session-abc", utm_source: "  google  ", utm_campaign: "x".repeat(200) },
+  );
+  assert.equal(custom.session_id, "session-abc");
+  assert.equal(custom.utm_source, "google");
+  assert.equal(custom.utm_campaign.length, 120);
+  assert.equal(validDigitalSupplyCustomData(custom), true);
 });
 
 test("la route est désactivée par défaut et sépare TEST et LIVE", () => {

@@ -127,13 +127,13 @@ test("une commande test ne peut jamais passer en livraison", () => {
   assert.match(lemon, /commande Lemon en mode test: livraison bloquée/);
 });
 
-test("le consentement devient un gate de livraison uniquement lorsque le mode live est activé", () => {
+test("une commande live ne peut être livrée sans parcours et preuve de consentement", () => {
   const lemon = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
   assert.match(lemon, /validDigitalSupplyCustomData/);
   assert.match(lemon, /const consentValid = validDigitalSupplyCustomData/);
-  assert.match(lemon, /const consentSatisfied = !commerce\.consentRequired \|\| consentValid/);
+  assert.match(lemon, /const consentSatisfied = commerce\.consentMode === "live" && consentValid/);
   assert.match(lemon, /&& consentSatisfied/);
-  assert.match(lemon, /commerce\.consentRequired && !consentValid/);
+  assert.match(lemon, /parcours de consentement LIVE désactivé: livraison bloquée/);
   assert.match(lemon, /consentement fourniture immédiate absent\/invalide: livraison bloquée/);
 });
 

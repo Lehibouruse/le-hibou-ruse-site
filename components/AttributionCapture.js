@@ -2,13 +2,12 @@
 
 import { useEffect } from "react";
 import { track } from "@vercel/analytics";
-import { captureAttribution } from "../lib/attribution.mjs";
-import { sendConversionEvent } from "../lib/conversion-client.mjs";
+import { currentAttribution, sendConversionEvent } from "../lib/conversion-client.mjs";
 
 export default function AttributionCapture() {
   useEffect(() => {
     try {
-      const attribution = captureAttribution({
+      const attribution = currentAttribution({
         search: window.location.search,
         href: window.location.href,
         referrer: document.referrer,
@@ -20,8 +19,8 @@ export default function AttributionCapture() {
           campaign: attribution.utm_campaign || "unknown",
           content: attribution.utm_content || "unknown",
         });
-        sendConversionEvent("landing", attribution, { dedupeKey: "landing" });
       }
+      sendConversionEvent("landing", attribution, { dedupeKey: "landing" });
     } catch {}
   }, []);
 

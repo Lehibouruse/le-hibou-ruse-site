@@ -1,13 +1,13 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Conditions générales de vente" };
+export const metadata = { title: "Conditions générales de vente", description: "Conditions applicables à la vente du guide numérique Le Hibou Rusé.", robots: { index: false, follow: true } };
 
 export default function Page() {
   return <LegalPage title="Conditions générales de vente">
     <p><strong>Version en vigueur : 20 septembre 2026.</strong></p>
 
     <h2>1. Produit</h2>
-    <p>Le produit vendu est le guide numérique <strong>Le Hibou Rusé</strong>. L’achat donne accès immédiatement à <strong>l’édition numérique disponible au moment de la commande</strong>. Le contenu peut faire l’objet de mises à jour, corrections ou enrichissements ultérieurs sans que cela remette en cause la fourniture de l’édition achetée.</p>
+    <p>Le produit vendu est le guide numérique <strong>Le Hibou Rusé</strong>. L’achat donne accès à <strong>l’édition numérique disponible au moment de la commande</strong>, une version en accès anticipé incomplète. Les sections sans texte ne sont pas incluses. Lorsqu’une version enrichie du même guide sera publiée, elle remplacera cette édition dans le même accès, sans nouvel achat. Aucune date ni quantité de nouveaux chapitres n’est garantie.</p>
     <p>Le guide fournit une information générale et pédagogique. Il ne constitue pas un conseil juridique, fiscal, comptable, financier ou patrimonial individualisé.</p>
 
     <h2>2. Structure éditoriale</h2>
@@ -17,7 +17,7 @@ export default function Page() {
     <p>Le prix du guide est de <strong>29 € en paiement unique</strong>, sous réserve du montant total et des taxes affichés dans le checkout. La transaction est traitée par <strong>Lemon Squeezy</strong>, qui agit comme <em>Merchant of Record</em>.</p>
 
     <h2>4. Fourniture</h2>
-    <p>Après confirmation du paiement, un accès nominatif au guide est créé pour l’adresse e-mail utilisée lors de la commande via un lecteur sécurisé, actuellement Digify. Le téléchargement et l’impression peuvent être désactivés.</p>
+    <p>Après confirmation du paiement, un accès nominatif au guide est créé pour l’adresse e-mail utilisée lors de la commande via le lecteur sécurisé du Hibou Rusé, accessible depuis la page de confirmation et le lien du reçu. Le téléchargement et l’impression sont désactivés dans ce lecteur.</p>
 
     <h2>5. Fourniture immédiate et droit de rétractation</h2>
     <p>Le guide est un contenu numérique fourni sans support matériel. Le parcours de commande est conçu pour recueillir, lorsque les conditions légales sont réunies, le <strong>consentement exprès au commencement immédiat de la fourniture avant l’expiration du délai de rétractation</strong> ainsi que la <strong>reconnaissance de la perte du droit de rétractation</strong>, avec confirmation correspondante sur support durable.</p>

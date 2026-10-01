@@ -3,7 +3,8 @@ import WithdrawalForm from "../../components/WithdrawalForm";
 
 export const metadata = {
   title: "Rétractation",
-  robots: { index: true, follow: true },
+  description: "Informations et formulaire relatifs à la rétractation du guide numérique Le Hibou Rusé.",
+  robots: { index: false, follow: true },
 };
 
 export default function Page() {

@@ -36,6 +36,20 @@ test("une vente sans UTM reste visible comme non attribuée même si Lemon est l
   assert.equal(summary.by_source[0].key, "non_attribué");
 });
 
+test("les arrivées directes et Google entrent dans le total des sessions, Google reste identifiable", () => {
+  const events = [
+    { fields: { Event: "landing", "Session ID": "direct", "Landing Page": "/" } },
+    { fields: { Event: "landing", "Session ID": "organic", "Landing Page": "/guide", Referrer: "https://www.google.fr" } },
+    { fields: { Event: "checkout_click", "Session ID": "organic", Referrer: "https://www.google.fr" } },
+  ];
+  const summary = funnelSummary([], events);
+  assert.equal(summary.all_visitors, 2);
+  assert.equal(summary.all_checkout_sessions, 1);
+  assert.equal(summary.all_visitor_to_checkout, 0.5);
+  assert.equal(summary.attributed_visitors, 1);
+  assert.equal(summary.by_source.find((row) => row.key === "Google organique").visitors, 1);
+});
+
 test("calcule le funnel par vidéo à partir des sessions first-party et des ventes", () => {
   const events = [
     { fields: { Event: "landing", "Session ID": "s1", "UTM Source": "tiktok", Campaign: "launch", "UTM Content": "video-01" } },

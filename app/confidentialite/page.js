@@ -1,6 +1,6 @@
 import LegalPage from "../../components/LegalPage";
 
-export const metadata = { title: "Confidentialité" };
+export const metadata = { title: "Confidentialité", description: "Informations sur les données personnelles traitées par Le Hibou Rusé.", robots: { index: false, follow: true } };
 
 export default function Page() {
   return <LegalPage title="Confidentialité">

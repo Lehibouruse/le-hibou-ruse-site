@@ -1,7 +1,8 @@
 import { getAllRecords, getRecord, TABLES } from "../../lib/airtable";
-import { renderBookDocument } from "../../lib/book-renderer.mjs";
+import { chapterContent, renderBookDocument } from "../../lib/book-renderer.mjs";
 import { saleIsRefunded } from "../../lib/commerce.mjs";
 import { verifyReaderToken } from "../../lib/secure-reader.mjs";
+import { bookEditionManifest } from "../../lib/book-edition-manifest.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,12 +96,16 @@ export async function GET(request) {
   }
 
   const chapters = await getAllRecords(TABLES.book, { maxRecords: 200 });
-  if (!chapters.length) return denied("Le guide est temporairement indisponible.", 503);
+  if (!chapters.some((record) => Boolean(chapterContent(record.fields)))) return denied("Le guide est temporairement indisponible.", 503);
+  const originalManifestHash = String(fields.Notes || "").match(/(?:^|; )edition_manifest_sha256=([a-f0-9]{64})/)?.[1] || "";
+  const currentManifest = bookEditionManifest(chapters, edition);
 
   const html = renderBookDocument({
     chapters,
     edition,
     generatedAt: new Date().toISOString(),
+    publishedReader: true,
+    updatedSincePurchase: Boolean(originalManifestHash && currentManifest.sha256 !== originalManifestHash),
   });
   const secured = protectHtml(html, {
     email: String(fields["Email client"] || "").trim().toLowerCase(),

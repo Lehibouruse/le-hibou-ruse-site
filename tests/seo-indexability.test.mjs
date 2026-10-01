@@ -19,15 +19,17 @@ test("robots autorise l'indexation publique et expose le sitemap canonique", () 
   assert.equal(value.sitemap, "https://d4d5d6.com/sitemap.xml");
 });
 
-test("le sitemap contient les pages publiques principales sur d4d5d6.com", () => {
-  const entries = sitemap();
+test("le sitemap contient les pages publiques indexables sur d4d5d6.com", async () => {
+  const entries = await sitemap();
   assert.ok(entries.every((entry) => entry.url.startsWith("https://d4d5d6.com")));
   assert.ok(entries.every((entry) => !entry.url.includes("vercel.app")));
   const urls = entries.map((entry) => new URL(entry.url).pathname);
   assert.ok(urls.includes("/"));
-  assert.ok(urls.includes("/mentions-legales"));
-  assert.ok(urls.includes("/cgv"));
-  assert.ok(urls.includes("/confidentialite"));
+  assert.ok(urls.includes("/guide"));
+  assert.ok(!urls.includes("/mentions-legales"));
+  assert.ok(!urls.includes("/cgv"));
+  assert.ok(!urls.includes("/confidentialite"));
+  assert.ok(entries.every((entry) => entry.lastModified === undefined || entry.lastModified instanceof Date));
 });
 
 test("les métadonnées de marque restent indexables et contiennent un WebSite JSON-LD", () => {

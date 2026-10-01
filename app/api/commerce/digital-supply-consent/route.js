@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { configMap, createRecord, queryAllRecords, queryRecords, TABLES } from "../../../../lib/airtable";
 import { createLiveLemonCheckout, createTestLemonCheckout } from "../../../../lib/lemon-api.mjs";
-import { DIGITAL_SUPPLY_CONSENT_VERSION, digitalSupplyCustomData } from "../../../../lib/digital-supply-consent.mjs";
+import { DIGITAL_SUPPLY_CONSENT_VERSION, consentCheckoutCustomData } from "../../../../lib/digital-supply-consent.mjs";
 import { escapeFormula } from "../../../../lib/commerce.mjs";
+import { vercelDeploymentOrigin } from "../../../../lib/vercel-deployment-origin.mjs";
+import { bookEditionManifest } from "../../../../lib/book-edition-manifest.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ export const maxDuration = 30;
 
 const MAX_BODY_BYTES = 4_000;
 const ALLOWED_ORIGINS = new Set(["https://d4d5d6.com", "https://www.d4d5d6.com", "https://le-hibou-ruse-site.vercel.app"]);
+if (vercelDeploymentOrigin()) ALLOWED_ORIGINS.add(vercelDeploymentOrigin());
 const RECEIPT_CONFIRMATION = "Vous avez demandé le commencement immédiat de la fourniture du guide numérique et reconnu la conséquence de cette demande sur votre droit de rétractation lorsque les conditions légales applicables sont réunies. Conservez cet e-mail et votre référence de commande.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -48,9 +51,12 @@ async function existingConsentRequest(requestId) {
   });
   if (!records.length) return null;
   const fields = records[0].fields || {};
+  const notes = clean(fields.Notes);
   return {
     checkoutUrl: safeCheckoutUrl(fields["URL résultat"]),
     consentAt: clean(fields["Dernière exécution"]),
+    mode: clean(notes.match(/(?:^|;\s*)checkout_mode=([^;]*)/)?.[1]).toLowerCase(),
+    version: clean(notes.match(/(?:^|;\s*)consent_version=([^;]*)/)?.[1]),
   };
 }
 
@@ -88,8 +94,25 @@ export async function POST(request) {
   }
 
   try {
+    // A retry must respect the current launch state before exposing a cached
+    // checkout. The journal is evidence of a prior request, not authorization.
+    const config = await state();
+    const mode = clean(config.digital_supply_consent_checkout_mode).toLowerCase();
+    if (!["test","live"].includes(mode)) return NextResponse.json({ ok: false, error: "Parcours de consentement désactivé" }, { status: 409 });
+    const version = clean(config.digital_supply_consent_version) || DIGITAL_SUPPLY_CONSENT_VERSION;
+    if (version !== DIGITAL_SUPPLY_CONSENT_VERSION) throw new Error(`Version de consentement non prise en charge: ${version}`);
+    if (mode === "live") {
+      if (!truthy(config.commerce_launch_authorized)) throw new Error("commerce_launch_authorized=false");
+      if (!truthy(config.digital_supply_consent_durable_confirmation_tested)) throw new Error("preuve durable du parcours de consentement non validée");
+      if (!truthy(config.commerce_end_to_end_tested)) throw new Error("parcours de paiement et livraison non validé de bout en bout");
+      const currentBook = await queryAllRecords(TABLES.book, {}, { maxRecords: 200 });
+      if (!bookEditionManifest(currentBook, config.book_current_edition).chapter_count) throw new Error("aucun texte du guide disponible pour la vente");
+    }
     const existing = await existingConsentRequest(requestId);
     if (existing?.checkoutUrl) {
+      if (existing.mode !== mode || existing.version !== version) {
+        return NextResponse.json({ ok: false, error: "Cette demande de consentement appartient à un autre mode ou à une autre version." }, { status: 409 });
+      }
       return NextResponse.json({
         ok: true,
         deduplicated: true,
@@ -97,15 +120,9 @@ export async function POST(request) {
         checkout_url: existing.checkoutUrl,
       }, { status: 200 });
     }
-    const config = await state();
-    const mode = clean(config.digital_supply_consent_checkout_mode).toLowerCase();
-    if (!["test","live"].includes(mode)) return NextResponse.json({ ok: false, error: "Parcours de consentement désactivé" }, { status: 409 });
-    const version = clean(config.digital_supply_consent_version) || DIGITAL_SUPPLY_CONSENT_VERSION;
-    if (version !== DIGITAL_SUPPLY_CONSENT_VERSION) throw new Error(`Version de consentement non prise en charge: ${version}`);
-
     const consentId = requestId;
     const consentAt = new Date().toISOString();
-    const checkoutCustomData = digitalSupplyCustomData({ consentId, consentAt, version });
+    const checkoutCustomData = consentCheckoutCustomData({ consentId, consentAt, version }, body.attribution || {});
     const base = publicBase(config);
     const common = {
       productName: clean(config.lemon_product_name) || "Guide du Hibou Rusé",
@@ -127,8 +144,6 @@ export async function POST(request) {
         variantId: clean(config.lemon_test_variant_id),
       }, { apiKey });
     } else {
-      if (!truthy(config.commerce_launch_authorized)) throw new Error("commerce_launch_authorized=false");
-      if (!truthy(config.digital_supply_consent_durable_confirmation_tested)) throw new Error("preuve durable du parcours de consentement non validée");
       checkout = await createLiveLemonCheckout({
         ...common,
         storeId: clean(config.lemon_store_id),

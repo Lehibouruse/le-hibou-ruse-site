@@ -51,3 +51,17 @@ test("missing advanced metrics stay null and never fabricate observations",()=>{
  assert.equal(p.production_profile.assets.target_reuse_rate,null);
  assert.equal(p.production_profile.voice.target_wpm,null);
 });
+
+
+test("style compiler consumes visual event rate separately from hard cuts",()=>{
+ const enriched=[
+  {competitor:"A",source:"a",media:{duration_s:60},scene:{cut_count:12},voice:{},attention:{visual_event_rate:{hard_cuts_per_minute:12,subtle_events_per_minute:18,visual_events_per_minute:30,thirds:[{visual_events_per_minute:42},{visual_events_per_minute:24},{visual_events_per_minute:30}]}}},
+  {competitor:"B",source:"b",media:{duration_s:60},scene:{cut_count:18},voice:{},attention:{visual_event_rate:{hard_cuts_per_minute:18,subtle_events_per_minute:12,visual_events_per_minute:30,thirds:[{visual_events_per_minute:36},{visual_events_per_minute:24},{visual_events_per_minute:30}]}}}
+ ];
+ const p=compileStyleProfile(enriched,{minSources:2});
+ assert.equal(p.overall.hard_cuts_per_minute.median,15);
+ assert.equal(p.overall.subtle_events_per_minute.median,15);
+ assert.equal(p.overall.visual_events_per_minute.median,30);
+ assert.deepEqual(p.production_profile.visual_cadence.visual_events_per_minute_by_third,[39,24,30]);
+ assert.equal(p.production_profile.visual_cadence.visual_events_per_minute,30);
+});

@@ -74,6 +74,19 @@
         },
         "preset": {
           "type": "string"
+        },
+        "crf": {
+          "type": "number",
+          "minimum": 14,
+          "maximum": 24
+        },
+        "preview_preset": {
+          "type": "string"
+        },
+        "preview_crf": {
+          "type": "number",
+          "minimum": 18,
+          "maximum": 30
         }
       }
     },
@@ -232,8 +245,155 @@
               },
               "intent": {
                 "type": "string"
+              },
+              "verbatim": {
+                "type": "boolean"
+              },
+              "prosody_cues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phrase": {
+                      "type": "string"
+                    },
+                    "pause_before_ms": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "pause_after_ms": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "relative_speed_pct": {
+                      "type": "number",
+                      "minimum": 85,
+                      "maximum": 115
+                    },
+                    "emphasis": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
+          },
+          "timeline": {
+            "$ref": "./video-scene-timeline-v1.schema.json"
+          },
+          "pose_request": {
+            "type": "string"
+          },
+          "visual_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset_requirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "slot",
+                "kind"
+              ],
+              "properties": {
+                "slot": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "optional_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "scene_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "motion_mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "STATIC_SCENE",
+              "ANIMATED_SCENE",
+              null
+            ]
+          },
+          "persona_case": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualify": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disqualify": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "risk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jurisdiction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "factual_required": {
+            "type": "boolean"
           }
         }
       }
@@ -260,6 +420,83 @@
         "render_ready",
         "rendered"
       ]
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "video_timeline_v1": {
+          "type": "boolean"
+        },
+        "video_creative_qc_v1": {
+          "type": "boolean"
+        },
+        "video_pose_registry_v1": {
+          "type": "boolean"
+        },
+        "video_prosody_v1": {
+          "type": "boolean"
+        },
+        "video_music_mix_v1": {
+          "type": "boolean"
+        },
+        "video_incremental_retouch_v1": {
+          "type": "boolean"
+        },
+        "video_human_candidate_selection_v1": {
+          "type": "boolean"
+        },
+        "video_prompt_graph_v1": {
+          "type": "boolean"
+        },
+        "video_planning_audit_v1": {
+          "type": "boolean"
+        },
+        "video_factual_gate_v1": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "production": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "final"
+          ]
+        },
+        "candidates_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "preview_candidates_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "final_candidates_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        }
+      },
+      "additionalProperties": true
+    },
+    "factual_gate": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "declared_only",
+            "all_scenes"
+          ]
+        }
+      },
+      "additionalProperties": true
     }
   }
 }

@@ -48,3 +48,128 @@ test("storyboard still rejects pathological scene duration above 12 seconds",()=
  const scenes=parts.map((p,i)=>fakeScene(i+1,p,i===2?12.1:4));
  assert.throws(()=>buildStoryboardContract(content,scenes),/duration must be 1\.5\.\.12 s/);
 });
+
+
+test("Airtable export remains FINAL and incremental-off before the prepared migration is applied",()=>{
+ const parts=Array.from({length:8},(_,i)=>`safe${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ const c=buildStoryboardContract(content,scenes,{fields:{}});
+ assert.equal(c.production.mode,"final");
+ assert.equal(c.production.preview_candidates_per_scene,1);
+ assert.equal(c.features.video_incremental_retouch_v1,false);
+ assert.equal(c.features.video_human_candidate_selection_v1,false);
+ assert.equal(c.validation.publication_authorized,false);
+});
+
+test("Airtable profile can prepare preview mode without authorizing publication",()=>{
+ const parts=Array.from({length:8},(_,i)=>`preview${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ const profile={fields:{
+   "Mode production par défaut":"preview",
+   "Retouches incrémentales V1":true,
+   "Sélection humaine candidats V1":true,
+   "Candidats par scène":3
+ }};
+ const c=buildStoryboardContract(content,scenes,profile);
+ assert.equal(c.production.mode,"preview");
+ assert.equal(c.production.final_candidates_per_scene,3);
+ assert.equal(c.production.preview_candidates_per_scene,1);
+ assert.equal(c.features.video_incremental_retouch_v1,true);
+ assert.equal(c.features.video_human_candidate_selection_v1,true);
+ assert.equal(c.validation.publication_authorized,false);
+});
+
+
+test("Airtable export carries continuity and roadmap metadata without activating runtime behavior",()=>{
+ const parts=Array.from({length:8},(_,i)=>`meta${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>{
+   const scene=fakeScene(i+1,p,4);
+   if(i<3) scene.fields["Groupe visuel"]="office-a";
+   if(i===0){
+     scene.fields["Exigences assets JSON"]=JSON.stringify([{slot:"background",kind:"background",required_tags:["office"]}]);
+     scene.fields["Timeline JSON"]=JSON.stringify({schema:"HIBOU_SCENE_TIMELINE_V1",events:[{type:"text",start_s:0.5,end_s:1.2,text:"HOOK"}]});
+     scene.fields["Prosodie JSON"]=JSON.stringify([{phrase:p,pause_after_ms:100}]);
+     scene.fields["Pose Hibou"]="neutral";
+   }
+   return scene;
+ });
+ const profile={fields:{
+   "Profil densité voix":{name:"EXPLAINER_DENSE"},
+   "Profil mouvement":{name:"HYBRID_BEATS"},
+   "Courbe cadence":{name:"HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST"},
+   "Prompt Graph V1":false
+ }};
+ const c=buildStoryboardContract(content,scenes,profile);
+ assert.equal(c.scenes[0].visual_group,"office-a");
+ assert.equal(c.scenes[0].asset_requirements[0].slot,"background");
+ assert.equal(c.scenes[0].timeline.events[0].type,"text");
+ assert.equal(c.scenes[0].voice.prosody_cues[0].pause_after_ms,100);
+ assert.equal(c.audio.density_profile,"EXPLAINER_DENSE");
+ assert.equal(c.creative.movement_profile,"HYBRID_BEATS");
+ assert.equal(c.creative.curve_profile,"HOOK_FAST_BODY_ADAPTIVE_CTA_OPTIONAL_BOOST");
+ assert.equal(c.features.video_prompt_graph_v1,false);
+ assert.equal(c.validation.publication_authorized,false);
+});
+
+test("malformed V5 JSON fails closed instead of silently disappearing",()=>{
+ const parts=Array.from({length:8},(_,i)=>`json${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ scenes[0].fields["Timeline JSON"]="{bad";
+ assert.throws(()=>buildStoryboardContract(content,scenes,{fields:{}}),/Timeline JSON contains invalid JSON/);
+ scenes[0].fields["Timeline JSON"]="";
+ scenes[0].fields["Exigences assets JSON"]="{not-an-array}";
+ assert.throws(()=>buildStoryboardContract(content,scenes,{fields:{}}),/Exigences assets JSON/);
+});
+
+
+test("GLOBAL voice profile and sand branding are exported from Airtable into the storyboard",()=>{
+ const parts=Array.from({length:8},(_,i)=>`voice${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" "),"Prompt / consignes":"specific brief"}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ const profile={fields:{
+   Profil:"HIBOU_VIRAL_V1",
+   Version:"2.5-V4.3",
+   "Style lock":"global style",
+   "Negative prompt":"no humans",
+   "Character lock Hibou":"canonical owl",
+   "Voix":"VOICE_V4_ORIGINAL — warm natural French male voice"
+ }};
+ const c=buildStoryboardContract(content,scenes,profile);
+ assert.equal(c.creative.branding.color,"sand");
+ assert.equal(c.audio.voice_profile_id,"VOICE_V4_ORIGINAL");
+ assert.match(c.audio.voice_profile_text,/warm natural/);
+ assert.equal(c.creative.content_brief,"specific brief");
+});
+
+
+test("editorial primitives flow from Airtable scenes into the Prompt Graph-ready contract",()=>{
+ const parts=Array.from({length:8},(_,i)=>`fact${i+1}`);
+ const content={id:"recContent",fields:{Script:parts.join(" ")}};
+ const scenes=parts.map((p,i)=>fakeScene(i+1,p,4));
+ Object.assign(scenes[0].fields,{
+   "Persona case":"Paul, dirigeant de PME",
+   Qualify:"Pertinent si la société dégage une trésorerie récurrente",
+   Disqualify:"Pas pour une activité sans trésorerie",
+   Condition:"Respecter les conditions légales applicables",
+   Risk:"Risque d'abus si le montage est artificiel",
+   "Source label":"CGI",
+   Jurisdiction:"FR",
+   "As of date":"2026-09-28"
+ });
+ const c=buildStoryboardContract(content,scenes,{fields:{"Planning audit V1":false}});
+ const s=c.scenes[0];
+ assert.equal(s.persona_case,"Paul, dirigeant de PME");
+ assert.match(s.qualify,/trésorerie/);
+ assert.match(s.disqualify,/Pas pour/);
+ assert.match(s.condition,/conditions légales/);
+ assert.match(s.risk,/abus/);
+ assert.equal(s.source_label,"CGI");
+ assert.equal(s.jurisdiction,"FR");
+ assert.equal(s.as_of_date,"2026-09-28");
+ assert.equal(c.features.video_planning_audit_v1,false);
+ assert.equal(c.validation.publication_authorized,false);
+});

@@ -39,3 +39,55 @@ test("automation preserves human review, no publication and no paid fallback", (
   assert.ok(occurrences >= 3);
   assert.ok(paid >= 3);
 });
+
+
+test("human-selection resume requires explicit fingerprint-bound decisions", () => {
+  assert.match(route, /function humanSelectionResumePayload/);
+  assert.match(route, /resume_human_selection !== true/);
+  assert.match(route, /HIBOU_HUMAN_IMAGE_SELECTION_V1/);
+  assert.match(route, /human_selection_fingerprint_mismatch/);
+  assert.match(route, /human_selection_content_mismatch/);
+  assert.match(route, /human_selection_decision_row_invalid/);
+});
+
+test("human-selection resume is unique, queue-safe and never confused with ordinary auto-start", () => {
+  assert.match(route, /async function autoResumeHumanSelection/);
+  assert.match(route, /ambiguous_human_selection_resume_jobs/);
+  assert.match(route, /HUMAN_SELECTION_RESUME_SCHEDULED/);
+  assert.match(route, /const human_selection_resume = await autoResumeHumanSelection/);
+  assert.ok(
+    route.indexOf("autoResumeHumanSelection(request)") <
+      route.indexOf("autoActivateWhenWorkerReady(request)"),
+  );
+  assert.match(route, /isHumanSelectionPause\(record\)/);
+  assert.match(route, /isRepairResumePreparedPause\(record\)/);
+});
+
+test("queue forwards human decisions only after a validated resume scheduling record", () => {
+  assert.match(route, /human_candidate_decisions:/);
+  assert.match(route, /HIBOU_VIDEO_RENDER_HUMAN_SELECTION_RESUME_V1/);
+  assert.match(route, /options\.human_candidate_decisions/);
+  assert.match(route, /publication_authorized: false/);
+});
+
+
+test("resume normalizes human decisions before forwarding them", () => {
+  assert.match(route, /const normalizedRows = \{\}/);
+  assert.match(route, /candidate_id: candidateId/);
+  assert.match(route, /note: cut\(decision\.note \|\| "", 1000\)/);
+  assert.match(route, /publication_authorized: false/);
+  assert.match(route, /normalized_options:/);
+  assert.match(route, /\.\.\.decision\.normalized_options/);
+  assert.match(route, /target_worker: worker/);
+  assert.match(route, /human_selection_local_state/);
+});
+
+
+test("prepared repair pause is excluded from worker-ready and success-chain automation", () => {
+  assert.match(route, /function isRepairResumePreparedPause/);
+  const occurrences = (
+    route.match(/isRepairResumePreparedPause\(record\)/g) || []
+  ).length;
+  assert.ok(occurrences >= 2);
+  assert.match(route, /requires_separate_render_start === true/);
+});

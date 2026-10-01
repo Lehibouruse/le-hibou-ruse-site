@@ -1,0 +1,144 @@
+{
+  "schema": "HIBOU_AIRTABLE_MIGRATION_PLAN_V1",
+  "id": "video-studio-v5-profile-fields",
+  "applied": true,
+  "tables": [
+    {
+      "logical_table": "Video Global Profile",
+      "add_fields": [
+        [
+          "Timeline intra-scène V1",
+          "checkbox"
+        ],
+        [
+          "QC créatif V1",
+          "checkbox"
+        ],
+        [
+          "Registry poses V1",
+          "checkbox"
+        ],
+        [
+          "Prosodie V1",
+          "checkbox"
+        ],
+        [
+          "Mix musique V1",
+          "checkbox"
+        ],
+        [
+          "Modèle QC créatif",
+          "singleLineText"
+        ],
+        [
+          "QC créatif bloquant",
+          "checkbox"
+        ],
+        [
+          "Seuils QC créatif JSON",
+          "longText"
+        ],
+        [
+          "Musique activée",
+          "checkbox"
+        ],
+        [
+          "Piste musique locale",
+          "singleLineText"
+        ],
+        [
+          "Licence musique",
+          "singleLineText"
+        ],
+        [
+          "Preuve licence musique",
+          "longText"
+        ],
+        [
+          "Niveau musique dB",
+          "number"
+        ],
+        [
+          "Ducking seuil",
+          "number"
+        ],
+        [
+          "Ducking ratio",
+          "number"
+        ],
+        [
+          "Musique fade-in s",
+          "number"
+        ],
+        [
+          "Musique fade-out s",
+          "number"
+        ],
+        [
+          "Retouches incrémentales V1",
+          "checkbox"
+        ],
+        [
+          "Sélection humaine candidats V1",
+          "checkbox"
+        ],
+        [
+          "Mode production par défaut",
+          "singleSelect"
+        ],
+        [
+          "Profil densité voix",
+          "singleSelect"
+        ],
+        [
+          "Profil mouvement",
+          "singleSelect"
+        ],
+        [
+          "Courbe cadence",
+          "singleSelect"
+        ],
+        [
+          "Prompt Graph V1",
+          "checkbox"
+        ]
+      ],
+      "defaults": "all feature checkboxes false; do not modify the active profile"
+    },
+    {
+      "logical_table": "Video Scenes",
+      "add_fields": [
+        [
+          "Timeline JSON",
+          "longText"
+        ],
+        [
+          "Prosodie JSON",
+          "longText"
+        ],
+        [
+          "Pose Hibou",
+          "singleLineText"
+        ],
+        [
+          "Groupe visuel",
+          "singleLineText"
+        ],
+        [
+          "Exigences assets JSON",
+          "longText"
+        ]
+      ]
+    }
+  ],
+  "rollout": "Schema applied only. New V5 fields remain opt-in/blank on the active profile. Activate feature-by-feature only after dedicated CPU/Windows/GPU E2E and human review; publication remains separate.",
+  "applied_scope": "schema_only",
+  "activation_applied": false,
+  "applied_at": "2026-09-28",
+  "applied_notes": [
+    "Airtable schema presence was re-verified read-only on 2026-09-28.",
+    "Existing records are not rewritten by this branch.",
+    "Active-profile V5 runtime flags remain an explicit activation step after E2E.",
+    "No publication authorization is introduced by schema presence."
+  ]
+}

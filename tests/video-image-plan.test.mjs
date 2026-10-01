@@ -3,7 +3,8 @@ import test from "node:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildImagePlan, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
+import { buildImagePlan as buildImagePlanSource, normalizeProductionMode, normalizeSizeBinding } from "../scripts/video-image-plan.mjs";
+import { buildPromptContractV2 } from "../scripts/video-layer-guard.mjs";
 
 const contract={contract_version:"HIBOU_VIDEO_CONTRACT_V1",contract_state:"storyboard",content:{content_id:"recX"},scenes:[
  {scene_id:"S01",image_prompt:"prompt one",visual_idea:"v1"},
@@ -18,6 +19,15 @@ writeFileSync(workflowPath,JSON.stringify({
   "9":{class_type:"SaveImage",inputs:{}}
 }));
 const binding={workflow_path:workflowPath,prompt:{node_id:"6",input:"text"},seed:{node_id:"25",input:"noise_seed"},size:{node_id:"5",width_input:"width",height_input:"height",batch_input:"batch_size"},profile:{width:768,height:1344,batch_size:1},fallback_profile:{width:640,height:1136,batch_size:1},output_node_ids:["9"],style_prefix:"Hibou"};
+function buildImagePlan(input,bindingArg=binding){
+ const strict=structuredClone(input);
+ delete strict.prompt_contract_v2;
+ strict.prompt_contract_v2=buildPromptContractV2(strict);
+ return buildImagePlanSource(strict,bindingArg);
+}
+test("image plan fails closed without Prompt Contract V2",()=>{
+ assert.throws(()=>buildImagePlanSource(contract,binding),/strict prompt_contract_v2 required/);
+});
 test("image plan creates exactly 3 deterministic candidates per scene",()=>{
  const a=buildImagePlan(contract,binding); const b=buildImagePlan(contract,binding);
  assert.equal(a.request_count,6); assert.equal(a.candidates_per_scene,3);
@@ -28,7 +38,19 @@ test("image plan creates exactly 3 deterministic candidates per scene",()=>{
 test("image plan binds only declared workflow prompt and seed inputs",()=>{
  const p=buildImagePlan(contract,binding);
  const r=p.requests[0].request;
- assert.equal(r.overrides["6"].text,"Hibou prompt one");
+ assert.match(r.overrides["6"].text,/Hibou/);
+ assert.match(r.overrides["6"].text,/SCENE_IMAGE_PROMPT: prompt one/);
+ assert.match(r.overrides["6"].text,/SCENE_VISUAL_INTENT: v1/);
+ assert.equal(r.prompt_application.schema,"HIBOU_IMAGE_PROMPT_APPLICATION_V2");
+ assert.equal(r.prompt_application.prompt_node_id,"6");
+ assert.equal(r.prompt_application.prompt_input,"text");
+ assert.equal(r.prompt_application.image_prompt_component_included,true);
+ assert.equal(r.prompt_application.visual_idea_component_included,true);
+ assert.equal(r.prompt_application.preservation.status,"PASS");
+ assert.equal(r.prompt_application.preservation.image_prompt_retention_ratio,1);
+ assert.equal(r.prompt_application.preservation.visual_idea_retention_ratio,1);
+ assert.equal(typeof r.prompt_application.compiled_image_prompt_sha256,"string");
+ assert.equal(typeof r.prompt_application.compiled_visual_idea_sha256,"string");
  assert.equal(typeof r.overrides["25"].noise_seed,"number");
  assert.equal(r.endpoint,"http://127.0.0.1:8188");
 });
@@ -96,4 +118,323 @@ test("image plan preserves an already-valid vertical custom profile",()=>{
  const normalized=normalizeSizeBinding(custom);
  assert.deepEqual(normalized.profile,{width:704,height:1216,batch_size:1});
  assert.equal(normalized.profile_migrated,false);
+});
+
+
+test("PREVIEW defaults to one candidate per scene and the lower local profile",()=>{
+ const preview=structuredClone(contract);
+ preview.production={mode:"preview"};
+ const p=buildImagePlan(preview,binding);
+ assert.equal(p.production_mode,"preview");
+ assert.equal(p.candidates_per_scene,1);
+ assert.equal(p.request_count,2);
+ assert.equal(p.profile.width,640);
+ assert.equal(p.profile.height,1136);
+ assert.equal(p.fallback_profile,null);
+ assert.equal(p.preview_profile_applied,true);
+});
+
+test("FINAL keeps the premium local profile and multi-candidate policy",()=>{
+ const final=structuredClone(contract);
+ final.production={mode:"final"};
+ const p=buildImagePlan(final,binding);
+ assert.equal(p.production_mode,"final");
+ assert.equal(p.candidates_per_scene,3);
+ assert.equal(p.request_count,6);
+ assert.equal(p.profile.width,768);
+ assert.equal(p.fallback_profile.width,640);
+ assert.equal(p.preview_profile_applied,false);
+});
+
+test("unknown production modes fail closed",()=>{
+ assert.throws(()=>normalizeProductionMode("turbo"),/preview or final/);
+});
+
+
+test("Airtable renders fail closed when the GLOBAL + SPECIFIC creative contract is missing",()=>{
+ const bad=structuredClone(contract);
+ bad.content={
+   ...bad.content,
+   source:"airtable",
+   method_version:"VIDEO_METHOD_V4.3",
+   profile_version:"2.5-V4.3"
+ };
+ assert.throws(
+   ()=>buildImagePlan(bad,binding),
+   /Airtable creative contract incomplete; refusing generic render/
+ );
+});
+
+test("Airtable renders inject GLOBAL locks, SPECIFIC brief and text-free character-overlay rules into FLUX",()=>{
+ const good=structuredClone(contract);
+ good.content={
+   ...good.content,
+   source:"airtable",
+   method_version:"VIDEO_METHOD_V4.3",
+   profile_version:"2.5-V4.3"
+ };
+ good.creative={
+   style_lock:"GLOBAL_STYLE_LOCK premium editorial cartoon",
+   negative_prompt:"NO humans, no photorealism, no identity drift",
+   character_lock:"CHARACTER_BIBLE canonical dandy owl with yellow eyes and gold monocle",
+   content_brief:"SPECIFIC_BRIEF Lombard vs Box Spread",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes[0].framing={hibou:true};
+ good.scenes[1].framing={hibou:false};
+ const p=buildImagePlan(good,binding);
+ assert.equal(p.creative_contract_enforced,true);
+ const promptWithHibou=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.match(promptWithHibou,/ENVIRONMENT_ONLY_COMPOSITION/);
+ assert.match(promptWithHibou,/GLOBAL_STYLE_LOCK premium editorial cartoon/);
+ assert.doesNotMatch(promptWithHibou,/\b(?:hibou|owl|bird|animal|mascot|mascotte)\b/i);
+ assert.doesNotMatch(promptWithHibou,/SPECIFIC_BRIEF Lombard vs Box Spread/);
+ assert.equal(p.creative_routing.specific_content_brief_present,true);
+ assert.equal(p.creative_routing.specific_payload_authoritative,true);
+ assert.equal(p.creative_routing.scene_image_prompt_applied,true);
+ assert.equal(p.creative_routing.visual_idea_compiled_as_supplement,true);
+ assert.equal(p.creative_routing.compiled_prompt_hash_bound,true);
+ assert.match(promptWithHibou,/SCENE_IMAGE_PROMPT: prompt one/);
+ assert.match(promptWithHibou,/SCENE_VISUAL_INTENT: v1/);
+ assert.doesNotMatch(promptWithHibou,/ABSOLUTELY AVOID/);
+ assert.match(promptWithHibou,/STRICT_GLYPH_FREE_LOCK/);
+ assert.match(promptWithHibou,/No letters, words, digits/);
+ assert.equal(p.creative_routing.global_negative_policy_present,true);
+ assert.equal(p.creative_routing.global_negative_policy_injected_as_literal_tokens,false);
+ assert.match(promptWithHibou,/FRAMING_LOCK/);
+ assert.match(promptWithHibou,/STYLE_RENDERING_GUIDE: flat vector-like 2D editorial illustration/);
+ const promptWithoutHibou=p.requests.find(x=>x.scene_id==="S02").request.overrides["6"].text;
+ assert.match(promptWithoutHibou,/OBJECTS_AND_ENVIRONMENT_COMPOSITION/);
+});
+
+test("Airtable renders reject a legacy VIDEO_METHOD_V3 storyboard even when scene prompts exist",()=>{
+ const bad=structuredClone(contract);
+ bad.content={
+   ...bad.content,
+   source:"airtable",
+   method_version:"VIDEO_METHOD_V3",
+   profile_version:"HIBOU_VIRAL_V1@2.0"
+ };
+ bad.creative={
+   style_lock:"style",
+   negative_prompt:"negative",
+   character_lock:"character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ assert.throws(()=>buildImagePlan(bad,binding),/VIDEO_METHOD_V4\.3/);
+});
+
+
+test("visual idea is compiled with image prompt and remains sufficient when image prompt is absent",()=>{
+ const both=buildImagePlan(contract,binding);
+ const bothPrompt=both.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.match(bothPrompt,/SCENE_IMAGE_PROMPT: prompt one/);
+ assert.match(bothPrompt,/SCENE_VISUAL_INTENT: v1/);
+ const fallback=structuredClone(contract);
+ fallback.scenes[0].image_prompt="";
+ const p=buildImagePlan(fallback,binding);
+ const prompt=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.doesNotMatch(prompt,/SCENE_IMAGE_PROMPT:/);
+ assert.match(prompt,/SCENE_VISUAL_INTENT: v1/);
+ assert.equal(p.creative_routing.visual_idea_compiled_as_supplement,true);
+});
+
+
+test("deterministic character overlay preserves scene mechanics instead of dropping the whole SPECIFIC sentence",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[
+   {
+     scene_id:"REMOVE_BANK",
+     image_prompt:"Schéma très épuré avec un intermédiaire bancaire au centre d’un flux ; prévoir le Hibou canonique en train de retirer cet intermédiaire. Fond très sobre pour permettre une grande punchline ajoutée en post-production.",
+     visual_idea:"",
+     framing:{hibou:true,type:"schéma",anchor:"centre"}
+   },
+   {
+     scene_id:"CTA",
+     image_prompt:"Décor final premium récurrent de la marque : bureau-bibliothèque financier sobre, guide posé sur le bureau, espace central réservé au Hibou canonique. Prévoir des zones propres pour trois textes successifs ajoutés en post-production.",
+     visual_idea:"",
+     framing:{hibou:true,type:"plan moyen",anchor:"centre"}
+   }
+ ];
+ const p=buildImagePlan(good,binding);
+ const removePrompt=p.requests.find(x=>x.scene_id==="REMOVE_BANK").request.overrides["6"].text;
+ assert.match(removePrompt,/intermédiaire bancaire au centre d’un flux/i);
+ assert.match(removePrompt,/retirer cet intermédiaire/i);
+ assert.doesNotMatch(removePrompt,/\bhibou\b/i);
+ const ctaPrompt=p.requests.find(x=>x.scene_id==="CTA").request.overrides["6"].text;
+ assert.match(ctaPrompt,/bureau-bibliothèque financier sobre/i);
+ assert.match(ctaPrompt,/guide posé sur le bureau/i);
+ assert.doesNotMatch(ctaPrompt,/\bhibou\b/i);
+});
+
+test("preview never selects a vertical profile below the technical QC floor",()=>{
+ const tiny=structuredClone(binding);
+ tiny.profile={width:384,height:640,batch_size:1};
+ tiny.fallback_profile={width:384,height:640,batch_size:1};
+ const preview=structuredClone(contract);
+ preview.production={mode:"preview"};
+ const p=buildImagePlan(preview,tiny);
+ assert.ok(p.profile.width>=512);
+ assert.ok(p.profile.height>=896);
+ assert.equal(p.profile.width,640);
+ assert.equal(p.profile.height,1136);
+});
+
+
+test("macro framing is routed into the FLUX prompt",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes[0].framing={hibou:true,type:"macro",anchor:"left"};
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests.find(x=>x.scene_id==="S01").request.overrides["6"].text;
+ assert.match(prompt,/FRAMING_LOCK: tight macro close-up/);
+ assert.match(prompt,/overlay-safe area toward left/);
+});
+
+
+test("split-screen framing is routed and literal years are abstracted",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[{
+   scene_id:"SPLIT",
+   image_prompt:"Split screen timeline 2026 2027 2028 2029 with +1.5 % marker",
+   visual_idea:"",
+   framing:{hibou:false,type:"split-screen",anchor:"centre"}
+ }];
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.match(prompt,/strict two-panel split-screen composition/);
+ assert.doesNotMatch(prompt,/2026|2027|2028|2029/);
+ assert.doesNotMatch(prompt,/1\.5\s*%/);
+ assert.match(prompt,/four ordered blank timeline milestones linked in sequence/);
+ assert.match(prompt,/abstract percentage marker/);
+});
+
+test("text-free image compilation strips literal amounts and uppercase financial labels while preserving the mechanism",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: premium editorial illustration",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[{
+   scene_id:"VALUE",
+   image_prompt:"Portefeuille valorisé 100 000 € avec contrat LOMBARD et repère 2029.",
+   visual_idea:"Comparer 100 000 € aujourd'hui à 120 000 € plus tard.",
+   framing:{hibou:false,type:"schéma",anchor:"center"}
+ }];
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.doesNotMatch(prompt,/100\s*000|120\s*000|2029|LOMBARD/);
+ assert.match(prompt,/abstract currency marker|abstract unlabeled value marker/);
+ assert.match(prompt,/abstract timeline milestone/);
+ assert.match(prompt,/STRICT_GLYPH_FREE_LOCK/);
+});
+
+test("diagram framing compiles to flat diagrammatic composition",()=>{
+ const good=structuredClone(contract);
+ good.content={...good.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ good.creative={
+   style_lock:"STYLE: illustration éditoriale 2D premium",
+   negative_prompt:"no photorealism",
+   character_lock:"canonical character",
+   content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ good.scenes=[{
+   scene_id:"DIAG",
+   image_prompt:"Four abstract finance blocks and arrows",
+   visual_idea:"",
+   framing:{hibou:false,type:"schéma",anchor:"center"}
+ }];
+ const p=buildImagePlan(good,binding);
+ const prompt=p.requests[0].request.overrides["6"].text;
+ assert.match(prompt,/flat diagrammatic editorial composition/);
+ assert.match(prompt,/simplified blocks, arrows and icons/);
+});
+
+test("V2 financial montage survives glyph-free compilation",()=>{
+ const specific=structuredClone(contract);
+ specific.content={...specific.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ specific.creative={
+   style_lock:"STYLE: illustration éditoriale 2D. ADDITIF V4.4 — préserver les relations financières, les couches et les séquences.",
+   negative_prompt:"no critical baked-in text",
+   character_lock:"canonical character",
+   content_brief:"ADDITIF SPÉCIFIQUE V2",
+   reference_mode:"deterministic_character_overlay",
+   text_in_generated_images:false
+ };
+ specific.scenes=[{
+   scene_id:"S10",
+   image_prompt:"Une timeline financière avec quatre carrés box",
+   visual_idea:"SCÈNE 10 — quatre jalons 2026→2027→2028→2029 ; apparitions successives des box ; accélération par succession des beats, pas par un simple zoom ; texte « ROULER LE FINANCEMENT » ajouté en post-production.",
+   framing:{hibou:false,type:"schéma",anchor:"center"}
+ }];
+ const plan=buildImagePlan(specific,binding);
+ const request=plan.requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert.match(prompt,/four ordered blank timeline milestones linked in sequence/);
+ assert.match(prompt,/apparitions successives des box/);
+ assert.match(prompt,/succession des beats/);
+ assert.match(prompt,/IMAGE_FINANCIAL_MECHANIC_LOCK/);
+ assert.doesNotMatch(prompt,/2026|2027|2028|2029|ROULER LE FINANCEMENT/);
+ assert.equal(request.prompt_application.preservation.status,"PASS");
+});
+
+test("long GLOBAL methodology is summarized for the encoder while SPECIFIC leads the effective prompt",()=>{
+ const specific=structuredClone(contract);
+ specific.content={...specific.content,source:"airtable",method_version:"VIDEO_METHOD_V4.3",profile_version:"2.5-V4.3"};
+ specific.creative={style_lock:"STYLE: premium 2D illustration.\nADDITIF V4.4\n"+
+   "non-image methodology archive ".repeat(400),negative_prompt:"no critical baked-in text",
+   character_lock:"canonical character",content_brief:"specific",
+   reference_mode:"deterministic_character_overlay",text_in_generated_images:false};
+ specific.scenes=[{scene_id:"S09",image_prompt:"A blank two-panel financial comparison with distinct layers",
+   visual_idea:"One blank margin layer stays left; its copy disappears on the right.",
+   framing:{hibou:false,type:"schéma",anchor:"center"}}];
+ const request=buildImagePlan(specific,binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert(prompt.indexOf("SCENE_IMAGE_PROMPT:")<prompt.indexOf("IMAGE_STYLE_LOCK:"));
+ assert.match(prompt,/SCENE_VISUAL_INTENT:/);
+ assert.match(prompt,/IMAGE_FINANCIAL_MECHANIC_LOCK:/);
+ assert.match(prompt,/STRICT_GLYPH_FREE_LOCK:/);
+ assert.doesNotMatch(prompt,/non-image methodology archive/);
+ assert(prompt.length<=4096);
+ assert.equal(request.prompt_application.effective_prompt_chars,prompt.length);
+ assert.equal(request.prompt_application.specific_prompt_prefix_preserved,true);
+ assert.equal(request.prompt_application.glyph_free_lock_present,true);
+ specific.scenes[0].visual_idea="very long concrete instruction ".repeat(200);
+ assert.throws(()=>buildImagePlan(specific,binding),/effective FLUX prompt.*exceeds/);
 });

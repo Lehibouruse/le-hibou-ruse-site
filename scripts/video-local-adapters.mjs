@@ -37,7 +37,7 @@ export function validateImageRequest(request) {
   if (request.engine !== "comfyui") fail("IMAGE_GEN_V1 currently supports comfyui only");
   safeId(request.content_id, "content_id");
   safeId(request.scene_id, "scene_id");
-  const endpoint = String(request.endpoint || "http://127.0.0.1:8188");
+  const endpoint = String(process.env.HIBOU_COMFY_ENDPOINT_OVERRIDE || request.endpoint || "http://127.0.0.1:8188");
   if (!isLoopback(endpoint)) fail("ComfyUI endpoint must be loopback/local");
   if (!request.workflow_path) fail("workflow_path required");
   if (!Array.isArray(request.output_node_ids) || request.output_node_ids.length < 1) fail("output_node_ids required");
@@ -128,7 +128,10 @@ export async function runImageGen(rawRequest) {
       const submitted = await fetchJson(new URL("/prompt", request.endpoint), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: workflow, client_id: "hibou-local-worker" }),
+        body: JSON.stringify({
+          prompt: workflow,
+          client_id: String(process.env.HIBOU_VIDEO_CLIENT_ID || "hibou-local-worker"),
+        }),
       });
       const promptId = String(submitted?.prompt_id || "").trim();
       if (!promptId) fail("ComfyUI /prompt returned no prompt_id");
@@ -140,7 +143,13 @@ export async function runImageGen(rawRequest) {
         if (history?.outputs) break;
         await sleep(1000);
       }
-      if (!history?.outputs) fail("ComfyUI timeout waiting for history");
+      if (!history?.outputs) {
+        try {
+          await fetch(new URL("/interrupt", request.endpoint), { method: "POST" });
+          await sleep(750);
+        } catch {}
+        fail("ComfyUI timeout waiting for history");
+      }
 
       const outputs = [];
       for (const nodeId of request.output_node_ids.map(String)) {

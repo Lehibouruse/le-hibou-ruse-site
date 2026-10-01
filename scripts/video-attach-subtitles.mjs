@@ -10,7 +10,10 @@ export function attachSubtitles(contractPath,assPath,outPath){
  if(c.contract_state!=="storyboard") fail("attach subtitles before promotion while contract is storyboard");
  const outRoot=dirname(resolve(outPath)); const abs=resolve(assPath);
  let ref=relative(outRoot,abs).replaceAll("\\","/"); if(!ref||ref.startsWith("..")) ref=abs;
- c.subtitles={status:"ready",format:"ass",reference:ref,sha256:sha256(abs),source:"audio_reference scene spans",burn_in:true};
+ const ass=readFileSync(abs,"utf8");
+ const fontMatch=ass.match(/^Style:\s*Narration,([^,]+),/m);
+ const fontFamily=fontMatch?String(fontMatch[1]).trim():null;
+ c.subtitles={status:"ready",format:"ass",reference:ref,sha256:sha256(abs),source:"audio_reference scene spans",burn_in:true,font_family:fontFamily};
  writeFileSync(resolve(outPath),JSON.stringify(c,null,2)); return {output:resolve(outPath),reference:ref};
 }
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

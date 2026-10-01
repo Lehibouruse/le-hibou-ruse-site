@@ -29,15 +29,19 @@ test("scene QC summary records reject reasons and warning counts", () => {
 });
 
 test("targeted regeneration mutates actual ComfyUI seed and prompt overrides", () => {
+  const contractRef={schema:"HIBOU_PROMPT_CONTRACT_REF_V2",contract_sha256:"a".repeat(64),global_sha256:"b".repeat(64),scene_count:1};
+  const sceneRef={...contractRef,specific_sha256:"c".repeat(64),combined_sha256:"d".repeat(64),scene_id:"scene-1"};
   const plan = {
     schema: "HIBOU_IMAGE_PLAN_V1",
     content_id: "content",
+    prompt_contract_ref: contractRef,
     requests: [{
       candidate_id: "scene-1-C1",
       scene_id: "scene-1",
       candidate: 1,
       seed: 123,
       request: {
+        prompt_contract_ref: sceneRef,
         overrides: {
           "6": { text: "original visual prompt" },
           "25": { noise_seed: 123 },
@@ -45,6 +49,7 @@ test("targeted regeneration mutates actual ComfyUI seed and prompt overrides", (
         }
       },
       fallback_request: {
+        prompt_contract_ref: sceneRef,
         overrides: {
           "6": { text: "original visual prompt" },
           "25": { noise_seed: 123 },

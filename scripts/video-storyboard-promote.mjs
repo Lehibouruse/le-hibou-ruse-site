@@ -11,6 +11,41 @@ function safeId(value) {
   if(!/^[A-Za-z0-9._-]+$/.test(text)) fail(`unsafe scene id: ${text}`);
   return text;
 }
+function brandColor(value){
+  const raw=String(value||"sand").trim().toLowerCase();
+  if(raw==="sand"||raw==="sable"||raw==="gold") return "#C7A65A";
+  if(raw==="ink"||raw==="encre") return "#172331";
+  if(/^#[0-9a-f]{6}$/i.test(raw)) return raw;
+  return "#C7A65A";
+}
+function cameraAnchor(value){
+  const raw=String(value||"").trim().toLowerCase();
+  if(raw==="centre") return "center";
+  if(["left","right","center","top","bottom","top-left","top-right","bottom-left","bottom-right"].includes(raw)) return raw;
+  return "";
+}
+function materializeFallbackCameraMotion(scene){
+  const timelineEvents=Array.isArray(scene?.timeline?.events)?scene.timeline.events:[];
+  if(timelineEvents.some(event=>String(event?.type||"").toLowerCase()==="camera")) return scene;
+  const existing=scene?.composition?.camera_transform||{};
+  const rawZoom=Number(existing.zoom_percent??scene?.zoom_percent??2.5);
+  const zoomPercent=Math.min(3.5,Math.max(1.5,Number.isFinite(rawZoom)?rawZoom:2.5));
+  const requestedAnchor=cameraAnchor(existing.anchor||scene?.framing?.anchor);
+  const fallbackAnchors=["left","right","center"];
+  const anchor=requestedAnchor&&requestedAnchor!=="center"
+    ?requestedAnchor
+    :fallbackAnchors[(Math.max(1,Number(scene?.order||1))-1)%fallbackAnchors.length];
+  scene.composition={
+    ...(scene.composition||{}),
+    camera_transform:{
+      ...existing,
+      zoom_percent:zoomPercent,
+      anchor,
+      source:"global_fallback_micro_motion_v2",
+    }
+  };
+  return scene;
+}
 
 export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPathArg) {
   const contractPath=resolve(contractPathArg);
@@ -21,6 +56,8 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
   const targetRoot=dirname(outputPath);
   const contract=JSON.parse(readFileSync(contractPath,"utf8"));
   const selections=JSON.parse(readFileSync(selectionsPath,"utf8"));
+  const productionMode=String(contract?.production?.mode||"final").toLowerCase()==="preview"?"preview":"final";
+  const previewOnly=productionMode==="preview";
 
   if(contract.contract_version!=="HIBOU_VIDEO_CONTRACT_V1") fail("unsupported contract version");
   if(contract.contract_state!=="storyboard") fail("input contract must still be storyboard");
@@ -90,20 +127,32 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         selected_sha256:sha256(target),
       };
     }
+    if(Array.isArray(scene?.timeline?.events)){
+      scene.timeline.events=scene.timeline.events.map((event,index)=>{
+        if(!["object","pose"].includes(String(event?.type||""))) return event;
+        const copied=copyCompositionAsset(sceneId,`timeline-${index+1}`,event);
+        return {...event,...copied};
+      });
+    }
+    const brandText=String(contract?.creative?.branding?.text||"Le Hibou Rusé");
+    const screenText=String(scene.screen_text||"");
+    const alreadyBrandsScene=screenText.toLowerCase().includes(brandText.toLowerCase());
     scene.composition={
       ...(scene.composition||{}),
-      brand_signature:{
-        text:String(contract?.creative?.branding?.text||"Le Hibou Rusé"),
-        anchor:String(contract?.creative?.branding?.position||"bottom-center"),
-        font_size:28,
-        font_color:"#172331",
-        offset_y:150,
-        z:95
-      }
+      ...(alreadyBrandsScene?{}:{
+        brand_signature:{
+          text:brandText,
+          anchor:String(contract?.creative?.branding?.position||"bottom-center"),
+          font_size:28,
+          font_color:brandColor(contract?.creative?.branding?.color),
+          offset_y:150,
+          z:95
+        }
+      })
     };
 
     const canonicalCharacter=String(contract?.creative?.reference_image_local||"").trim();
-    if(canonicalCharacter && scene?.framing?.hibou){
+    if(canonicalCharacter && scene?.framing?.hibou && !scene?.composition?.character_pose){
       scene.composition={
         ...(scene.composition||{}),
         character_pose:copyCompositionAsset(sceneId,"character-pose",{
@@ -120,6 +169,8 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
         })
       };
     }
+
+    materializeFallbackCameraMotion(scene);
 
     if(scene.narration_exact?.mode!=="audio_reference") fail(`${sceneId}: audio_reference required before promotion`);
     if(scene.narration_exact.sha256!==contract.audio.sha256) fail(`${sceneId}: narration/audio hash mismatch`);
@@ -141,9 +192,32 @@ export function promoteStoryboard(contractPathArg, selectionsPathArg, outputPath
   }
   contract.contract_state="render_ready";
   contract.qc={...(contract.qc||{}),status:"PENDING_RENDER"};
-  contract.validation={...(contract.validation||{}),human_required:true,publication_authorized:false,status:"READY_FOR_RENDER_NOT_PUBLICATION"};
+  contract.validation={
+    ...(contract.validation||{}),
+    human_required:true,
+    publication_authorized:false,
+    preview_only:previewOnly,
+    full_master_allowed:!previewOnly,
+    status:previewOnly?"PREVIEW_RENDER_ONLY":"READY_FOR_RENDER_NOT_PUBLICATION"
+  };
+  contract.delivery={
+    ...(contract.delivery||{}),
+    production_mode:productionMode,
+    class:previewOnly?"preview":"final_candidate",
+    preview_only:previewOnly,
+    human_review_required:true,
+    publication_authorized:false
+  };
   writeFileSync(outputPath,JSON.stringify(contract,null,2));
-  return {output:outputPath,scene_count:contract.scenes.length,audio_sha256:contract.audio.sha256,subtitles_burn_in:Boolean(contract.subtitles?.burn_in)};
+  return {
+    output:outputPath,
+    scene_count:contract.scenes.length,
+    audio_sha256:contract.audio.sha256,
+    subtitles_burn_in:Boolean(contract.subtitles?.burn_in),
+    production_mode:productionMode,
+    preview_only:previewOnly,
+    publication_authorized:false
+  };
 }
 
 if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

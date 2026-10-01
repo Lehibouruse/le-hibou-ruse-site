@@ -7,6 +7,7 @@ import { buildImagePlan } from "./video-image-plan.mjs";
 import { executeImagePlan } from "./video-image-batch.mjs";
 import { qcImageBatch } from "./video-image-qc.mjs";
 import { buildTargetedRegeneration } from "./video-image-regenerate.mjs";
+import { buildCandidateDecisionTemplate, buildCandidateReview, renderCandidateReviewHtml } from "./video-candidate-review.mjs";
 
 function fail(m){throw new Error(m);}
 const SCRIPT_DIR=dirname(fileURLToPath(import.meta.url));
@@ -157,7 +158,41 @@ export function factoryPolicy({maxScenes=1,maxRegenerationAttempts=1}={}){
   if(!Number.isInteger(attempts)||attempts<0||attempts>2) fail("maxRegenerationAttempts must be 0..2");
   return {max_scenes:scenes,max_regeneration_attempts:attempts,paid_fallback:false,human_review_required:true};
 }
+
+export function summarizeGenerationRuns(runs,{sceneCount=0}={}){
+  const rows=Array.isArray(runs)?runs:[];
+  const generated=rows.reduce((sum,row)=>sum+Number(row?.generated_candidate_count||0),0);
+  const candidateElapsedMs=rows.reduce(
+    (sum,row)=>sum+Number(row?.timing?.generated_candidate_elapsed_ms||0),
+    0
+  );
+  const batchElapsedMs=rows.reduce(
+    (sum,row)=>sum+Number(row?.timing?.elapsed_ms||0),
+    0
+  );
+  const cacheHits=rows.reduce((sum,row)=>sum+Number(row?.cache_hits||0),0);
+  const meanMs=generated?candidateElapsedMs/generated:null;
+  const estimate=(count)=>meanMs==null?null:Math.round((meanMs*Math.max(0,Number(sceneCount)||0)*count)/100)/10;
+  return {
+    schema:"HIBOU_IMAGE_GENERATION_THROUGHPUT_V1",
+    run_count:rows.length,
+    scene_count:Number(sceneCount)||0,
+    generated_candidate_count:generated,
+    cache_hits:cacheHits,
+    generated_candidate_elapsed_ms:candidateElapsedMs,
+    batch_elapsed_ms:batchElapsedMs,
+    mean_generated_candidate_elapsed_ms:meanMs,
+    estimated_generation_seconds:{
+      one_candidate_per_scene:estimate(1),
+      two_candidates_per_scene:estimate(2),
+      three_candidates_per_scene:estimate(3)
+    },
+    estimate_basis:"observed generated candidates in this factory execution; excludes cache hits",
+    publication_authorized:false
+  };
+}
 async function main(){
+  const factoryStartedMs=Date.now();
   const [storyboardArg,bindingArg,outArg]=process.argv.slice(2).filter(x=>!x.startsWith("--"));
   if(!storyboardArg||!bindingArg||!outArg) fail("usage: video-image-factory.mjs storyboard.json binding.json output_dir [--max-scenes=1] [--regen-attempts=1] [--reference=path]");
   const policy=factoryPolicy({
@@ -185,9 +220,33 @@ async function main(){
     write(manifestPath,emptyManifest);
     write(selectionTemplate,{});
     write(resolve(root,"selections.provisional.json"),{});
+    const emptyCandidateReview={
+      schema:"HIBOU_CANDIDATE_REVIEW_V1",
+      content_id:plan.content_id||null,
+      prompt_contract_ref:structuredClone(plan.prompt_contract_ref||null),
+      scene_count:0,
+      blocking_scene_count:0,
+      all_scenes_reviewable:true,
+      scenes:[],
+      generation_skipped_reason:"all_scenes_full_reuse",
+      policy:{
+        machine_ranking_is_advisory_only:true,
+        human_selection_required:false,
+        no_candidate_is_auto_approved:true,
+        local_only:true,
+        paid_fallback:false,
+        publication_authorized:false
+      },
+      human_review_required:true,
+      publication_authorized:false
+    };
+    write(resolve(root,"candidate-review.json"),emptyCandidateReview);
+    write(resolve(root,"candidate-decisions.template.json"),buildCandidateDecisionTemplate(emptyCandidateReview));
+    writeFileSync(resolve(root,"candidate-review.html"),renderCandidateReviewHtml(emptyCandidateReview),"utf8");
+    const factoryFinishedMs=Date.now();
     const summary={
       schema:"HIBOU_IMAGE_FACTORY_RUN_V1",
-      generated_at:new Date().toISOString(),
+      generated_at:new Date(factoryFinishedMs).toISOString(),
       content_id:plan.content_id,
       scenes:[],
       reused_scenes:plan.skipped_full_reuse||[],
@@ -196,6 +255,12 @@ async function main(){
       all_scenes_have_candidate:true,
       provisional_selections:{},
       generation_skipped_reason:"all_scenes_full_reuse",
+      timing:{
+        factory_started_at:new Date(factoryStartedMs).toISOString(),
+        factory_finished_at:new Date(factoryFinishedMs).toISOString(),
+        factory_elapsed_ms:Math.max(0,factoryFinishedMs-factoryStartedMs),
+        generation:summarizeGenerationRuns([],{sceneCount:0})
+      },
       publication_authorized:false
     };
     write(resolve(root,"factory-run.json"),summary);
@@ -203,7 +268,14 @@ async function main(){
     return;
   }
 
-  await executeImagePlan(plan,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
+  const initialBatch=await executeImagePlan(plan,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
+  const generationRuns=[{
+    phase:"initial",
+    generated_candidate_count:initialBatch.generated_this_run,
+    cache_hits:initialBatch.cache_hits,
+    cache_invalidations:initialBatch.cache_invalidations,
+    timing:initialBatch.timing
+  }];
   let manifest=load(manifestPath);
   const qcOptions=qcOptionsFromPlan(plan);
   let tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
@@ -214,7 +286,15 @@ async function main(){
     const regen=buildTargetedRegeneration(plan,perceptual,{attempt});
     if(!regen.requests.length) break;
     const regenPath=resolve(root,"regen-plan-"+attempt+".json"); write(regenPath,regen);
-    await executeImagePlan(regen,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
+    const regenBatch=await executeImagePlan(regen,{manifestPath,selectionTemplatePath:selectionTemplate,maxScenes:policy.max_scenes});
+    generationRuns.push({
+      phase:"regeneration",
+      attempt,
+      generated_candidate_count:regenBatch.generated_this_run,
+      cache_hits:regenBatch.cache_hits,
+      cache_invalidations:regenBatch.cache_invalidations,
+      timing:regenBatch.timing
+    });
     manifest=load(manifestPath);
     tech=qcImageBatch(manifest,qcOptions); write(techPath,tech);
     perceptual=runPerceptual(techPath,perceptualPath,arg("reference",""));
@@ -223,9 +303,22 @@ async function main(){
 
   const selections=provisionalSelections(perceptual,manifest);
   write(resolve(root,"selections.provisional.json"),selections);
+  const candidateReview=buildCandidateReview({
+    plan,
+    perceptualQc:perceptual,
+    provisionalSelections:selections
+  });
+  write(resolve(root,"candidate-review.json"),candidateReview);
+  write(resolve(root,"candidate-decisions.template.json"),buildCandidateDecisionTemplate(candidateReview));
+  writeFileSync(resolve(root,"candidate-review.html"),renderCandidateReviewHtml(candidateReview),"utf8");
+  const factoryFinishedMs=Date.now();
+  const generationThroughput=summarizeGenerationRuns(
+    generationRuns,
+    {sceneCount:limitedScenes.length}
+  );
   const summary={
     schema:"HIBOU_IMAGE_FACTORY_RUN_V1",
-    generated_at:new Date().toISOString(),
+    generated_at:new Date(factoryFinishedMs).toISOString(),
     content_id:plan.content_id,
     scenes:limitedScenes,
     policy,
@@ -249,6 +342,21 @@ async function main(){
     },
     perceptual_qc:aggregatePerceptual(perceptual),
     provisional_selections:selections,
+    candidate_review:{
+      schema:candidateReview.schema,
+      scene_count:candidateReview.scene_count,
+      blocking_scene_count:candidateReview.blocking_scene_count,
+      all_scenes_reviewable:candidateReview.all_scenes_reviewable,
+      human_review_required:true,
+      publication_authorized:false
+    },
+    timing:{
+      factory_started_at:new Date(factoryStartedMs).toISOString(),
+      factory_finished_at:new Date(factoryFinishedMs).toISOString(),
+      factory_elapsed_ms:Math.max(0,factoryFinishedMs-factoryStartedMs),
+      generation_runs:generationRuns,
+      generation:generationThroughput
+    },
     publication_authorized:false
   };
   write(resolve(root,"factory-run.json"),summary);

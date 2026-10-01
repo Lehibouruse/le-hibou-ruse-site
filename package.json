@@ -44,6 +44,7 @@
     "video:asset-resolve": "node scripts/video-asset-resolve.mjs",
     "video:image:factory": "node scripts/video-image-factory.mjs",
     "video:master": "node scripts/video-master.mjs",
+    "video:prompt-contract:verdict": "node scripts/video-prompt-contract-verdict.mjs",
     "video:voice-qc": "node scripts/video-voice-qc.mjs",
     "video:voice-qc:run": "node scripts/video-voice-qc-run.mjs",
     "video:license:audit": "node scripts/video-license-audit.mjs",

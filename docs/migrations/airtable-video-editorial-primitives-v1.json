@@ -1,0 +1,74 @@
+{
+  "schema": "HIBOU_AIRTABLE_MIGRATION_V1",
+  "name": "video-editorial-primitives-v1",
+  "prepared_at": "2026-09-28",
+  "applied": false,
+  "activation_applied": false,
+  "purpose": "Add optional scene-level editorial primitives requested by the video roadmap without rewriting existing scenes.",
+  "operations": [
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Persona case",
+      "type": "longText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Qualify",
+      "type": "longText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Disqualify",
+      "type": "longText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Condition",
+      "type": "longText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Risk",
+      "type": "longText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Source label",
+      "type": "singleLineText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "Jurisdiction",
+      "type": "singleLineText"
+    },
+    {
+      "table": "Scènes vidéo",
+      "operation": "add_field",
+      "field": "As of date",
+      "type": "singleLineText"
+    }
+  ],
+  "contract_mapping": {
+    "Persona case": "scenes[].persona_case",
+    "Qualify": "scenes[].qualify",
+    "Disqualify": "scenes[].disqualify",
+    "Condition": "scenes[].condition",
+    "Risk": "scenes[].risk",
+    "Source label": "scenes[].source_label",
+    "Jurisdiction": "scenes[].jurisdiction",
+    "As of date": "scenes[].as_of_date"
+  },
+  "safety": [
+    "Prepared only: do not apply during an active render.",
+    "All fields are optional; existing scene records remain valid.",
+    "No factual assertion is created by these fields.",
+    "Publication remains human-gated."
+  ]
+}

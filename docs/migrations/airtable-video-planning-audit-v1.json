@@ -1,0 +1,26 @@
+{
+  "schema": "HIBOU_AIRTABLE_MIGRATION_V1",
+  "name": "video-planning-audit-v1",
+  "prepared_at": "2026-09-28",
+  "applied": false,
+  "activation_applied": false,
+  "purpose": "Expose the read-only planning audit gate in Profils vidéo without changing the active profile or existing jobs.",
+  "operations": [
+    {
+      "table": "Profils vidéo",
+      "operation": "add_field",
+      "field": "Planning audit V1",
+      "type": "checkbox",
+      "default": false
+    }
+  ],
+  "contract_mapping": {
+    "Planning audit V1": "features.video_planning_audit_v1"
+  },
+  "safety": [
+    "Do not apply during an active render.",
+    "Do not check the field on the active profile as part of the schema migration.",
+    "Runtime additionally requires HIBOU_VIDEO_PLANNING_AUDIT_V1=true.",
+    "The audit is read-only and cannot authorize publication."
+  ]
+}

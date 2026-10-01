@@ -51,9 +51,12 @@ async function existingConsentRequest(requestId) {
   });
   if (!records.length) return null;
   const fields = records[0].fields || {};
+  const notes = clean(fields.Notes);
   return {
     checkoutUrl: safeCheckoutUrl(fields["URL résultat"]),
     consentAt: clean(fields["Dernière exécution"]),
+    mode: clean(notes.match(/(?:^|;\s*)checkout_mode=([^;]*)/)?.[1]).toLowerCase(),
+    version: clean(notes.match(/(?:^|;\s*)consent_version=([^;]*)/)?.[1]),
   };
 }
 
@@ -91,8 +94,25 @@ export async function POST(request) {
   }
 
   try {
+    // A retry must respect the current launch state before exposing a cached
+    // checkout. The journal is evidence of a prior request, not authorization.
+    const config = await state();
+    const mode = clean(config.digital_supply_consent_checkout_mode).toLowerCase();
+    if (!["test","live"].includes(mode)) return NextResponse.json({ ok: false, error: "Parcours de consentement désactivé" }, { status: 409 });
+    const version = clean(config.digital_supply_consent_version) || DIGITAL_SUPPLY_CONSENT_VERSION;
+    if (version !== DIGITAL_SUPPLY_CONSENT_VERSION) throw new Error(`Version de consentement non prise en charge: ${version}`);
+    if (mode === "live") {
+      if (!truthy(config.commerce_launch_authorized)) throw new Error("commerce_launch_authorized=false");
+      if (!truthy(config.digital_supply_consent_durable_confirmation_tested)) throw new Error("preuve durable du parcours de consentement non validée");
+      if (!truthy(config.commerce_end_to_end_tested)) throw new Error("parcours de paiement et livraison non validé de bout en bout");
+      const currentBook = await queryAllRecords(TABLES.book, {}, { maxRecords: 200 });
+      if (!bookEditionManifest(currentBook, config.book_current_edition).chapter_count) throw new Error("aucun texte du guide disponible pour la vente");
+    }
     const existing = await existingConsentRequest(requestId);
     if (existing?.checkoutUrl) {
+      if (existing.mode !== mode || existing.version !== version) {
+        return NextResponse.json({ ok: false, error: "Cette demande de consentement appartient à un autre mode ou à une autre version." }, { status: 409 });
+      }
       return NextResponse.json({
         ok: true,
         deduplicated: true,
@@ -100,12 +120,6 @@ export async function POST(request) {
         checkout_url: existing.checkoutUrl,
       }, { status: 200 });
     }
-    const config = await state();
-    const mode = clean(config.digital_supply_consent_checkout_mode).toLowerCase();
-    if (!["test","live"].includes(mode)) return NextResponse.json({ ok: false, error: "Parcours de consentement désactivé" }, { status: 409 });
-    const version = clean(config.digital_supply_consent_version) || DIGITAL_SUPPLY_CONSENT_VERSION;
-    if (version !== DIGITAL_SUPPLY_CONSENT_VERSION) throw new Error(`Version de consentement non prise en charge: ${version}`);
-
     const consentId = requestId;
     const consentAt = new Date().toISOString();
     const checkoutCustomData = consentCheckoutCustomData({ consentId, consentAt, version }, body.attribution || {});
@@ -130,11 +144,6 @@ export async function POST(request) {
         variantId: clean(config.lemon_test_variant_id),
       }, { apiKey });
     } else {
-      if (!truthy(config.commerce_launch_authorized)) throw new Error("commerce_launch_authorized=false");
-      if (!truthy(config.digital_supply_consent_durable_confirmation_tested)) throw new Error("preuve durable du parcours de consentement non validée");
-      if (!truthy(config.commerce_end_to_end_tested)) throw new Error("parcours de paiement et livraison non validé de bout en bout");
-      const currentBook = await queryAllRecords(TABLES.book, {}, { maxRecords: 200 });
-      if (!bookEditionManifest(currentBook, config.book_current_edition).chapter_count) throw new Error("aucun texte du guide disponible pour la vente");
       checkout = await createLiveLemonCheckout({
         ...common,
         storeId: clean(config.lemon_store_id),

@@ -806,6 +806,35 @@ export function materializeSpecificActionTimelines(contract){
   };
 }
 
+export function assertResumeTimelineContinuity(contract,state,root){
+  const expected=new Map((contract?.scenes||[]).map(scene=>[
+    String(scene.scene_id),JSON.stringify(scene.timeline??null)
+  ]));
+  const artifacts=[
+    ["prosody","storyboard-prosody.json"],
+    ["voice","voice/contract-audio-ready.json"],
+    ["audio_attach","contract-mastered.json"],
+    ["subtitles","contract-captioned.json"],
+    ["style","contract-styled.json"],
+    ["pose_registry","contract-posed.json"],
+    ["asset_resolution","contract-assets-resolved.json"]
+  ];
+  for(const [stageName,name] of artifacts){
+    if(state?.stages?.[stageName]?.status!=="PASS") continue;
+    const path=resolve(root,name);
+    if(!existsSync(path)) fail("resume_timeline_continuity: "+stageName+" PASS contract missing: "+path);
+    const scenes=json(path).scenes||[];
+    const ids=new Set(scenes.map(scene=>String(scene.scene_id)));
+    const changed=scenes.filter(scene=>
+      expected.get(String(scene.scene_id))!==JSON.stringify(scene.timeline??null)
+    ).map(scene=>String(scene.scene_id));
+    if(changed.length||ids.size!==expected.size||scenes.length!==expected.size){
+      fail("resume_timeline_continuity: "+stageName+" PASS contract does not match current timeline"+
+        (changed.length?" for "+changed.join(","):" (scene set changed)")+"; verified voice artifacts were not modified");
+    }
+  }
+}
+
 export function buildTechnicalSelections(provisional){
   const out={};
   for(const [sceneId,pick] of Object.entries(provisional||{})){
@@ -1117,6 +1146,7 @@ export async function main(){
     writeJson(statePath,state);
   }
   const timelineEnabled=contractFeature(storyboardData,"video_timeline_v1","HIBOU_VIDEO_TIMELINE_V1");
+  let timelineChanged=false;
   if(!timelineEnabled){
     let stripped=0;
     for(const scene of storyboardData.scenes||[]){
@@ -1127,8 +1157,7 @@ export async function main(){
     }
     if(stripped){
       state.timeline_v1={enabled:false,stripped_scene_count:stripped,reason:"GLOBAL contract + runtime gate required"};
-      writeJson(storyboard,storyboardData);
-      writeJson(statePath,state);
+      timelineChanged=true;
     }
   }else{
     const specificMotionCompilation=materializeSpecificActionTimelines(storyboardData);
@@ -1137,11 +1166,11 @@ export async function main(){
       stripped_scene_count:0,
       specific_motion_compilation:specificMotionCompilation
     };
-    if(specificMotionCompilation.changed_scene_count>0){
-      writeJson(storyboard,storyboardData);
-    }
-    writeJson(statePath,state);
+    timelineChanged=specificMotionCompilation.changed_scene_count>0;
   }
+  assertResumeTimelineContinuity(storyboardData,state,root);
+  if(timelineChanged) writeJson(storyboard,storyboardData);
+  writeJson(statePath,state);
   const unverifiedMontageActions=unverifiedSpecificMontageActions(storyboardData);
   const montageAuditPath=resolve(root,"specific-action-montage-audit.json");
   writeJson(montageAuditPath,{

@@ -44,10 +44,40 @@ function extractStyleSection(styleLock){
 }
 
 const CHARACTER_TOKEN_RE=/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/iu;
+const PERSON_SUBJECT_RE=/^(?:(?:hook|subject|sujet)\s*:\s*)?(?:il|elle|he|she)\b/iu;
+const PERSON_POSE_RE=/^(?:expression|facial expression|regard|sourire|smile|smirk|pose|posture)\b/iu;
+const DISCLAIMER_NEGATION_RE=/\b(?:ne\s+(?:représente|signifie|supprime|retire|garantit)|n[’'](?:implique|élimine|assure)|does\s+not\s+(?:mean|remove|guarantee))\b/iu;
+
+function stationaryFinancialProp(value){
+  const held=String(value||"").match(/\b(?:tient|tenant|brandit|brandissant|porte|portant|holds?|holding|carries|carrying)\s+([^.;!?]+)/iu);
+  const prop=String(held?.[1]||"")
+    .replace(/\s+(?:dans|avec|in|with)\s+(?:(?:sa|son|ses|une?|the|his|her|their|an?|right|left|droite|gauche)\s+)*(?:mains?|hands?)\b.*$/iu,"")
+    .replace(/\s+(?:with|avec)\s+(?:(?:an?|une?)\s+)?(?:expression|regard|smile|smirk)\b.*$/iu,"")
+    .replace(/\b(?:his|her|their)\b/giu,"the")
+    .replace(/\bson\b/giu,"un").replace(/\bsa\b/giu,"une").replace(/\bses\b/giu,"des")
+    .trim();
+  // Retain meaningful finance props without leaving a subject, hands or a pose
+  // for the image model to invent. Costume/body details belong to the overlay.
+  if(!/\b(?:contrat|contract|dossier|folders?|portefeuille|portfolio|guide|calendrier|calendar|billets|cash|documents?|cartes?|cards?)\b/iu.test(prop)) return "";
+  if(CHARACTER_TOKEN_RE.test(prop)||/\b(?:mains?|hands?|visage|face|yeux|eyes|monocle|costume|suit)\b/iu.test(prop)) return "";
+  return `Objet financier posé dans le décor : ${prop}`;
+}
 
 function scrubOverlayCharacterClause(clause){
   let value=String(clause||"").trim();
   if(!value) return "";
+  // A negative financial disclaimer can refer to the preceding action as
+  // "elle". It is not an instruction to generate a person. Keep its scope.
+  if(PERSON_SUBJECT_RE.test(value)&&DISCLAIMER_NEGATION_RE.test(value)){
+    return value.replace(/^(?:il|elle)\b/iu,"Cette action");
+  }
+  value=value.replace(/\bla personne qui reçoit le cash est vendeuse du box\b/giu,
+    "la vente du box produit le flux de cash reçu");
+  value=value.replace(/\bvers\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,
+    "vers un nœud financier bénéficiaire");
+  if(PERSON_POSE_RE.test(value)) return "";
+  if(PERSON_SUBJECT_RE.test(value)) return stationaryFinancialProp(value);
+  value=value.replace(/^entrée rapide\s*(?:puis\s+)?/iu,"");
   if(!CHARACTER_TOKEN_RE.test(value)) return value;
 
   const action=value.match(/\b(retir(?:ant|er|e)|effa(?:çant|cer|ce)|supprim(?:ant|er|e)|élimin(?:ant|er|e))\s+([^.;!?]+)/iu);
@@ -58,11 +88,19 @@ function scrubOverlayCharacterClause(clause){
   }
 
   value=value
+    .replace(/\s+(?:reserved|intended|allocated|kept)\s+for\s+(?:(?:the|a|an|canonical|approved|fixed)\s+)*(?:hibou|owl|bird|animal|mascot|mascotte)\b[^,;.!?]*/giu,"")
     .replace(/\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
     .replace(/\s+(?:zone|espace|place)\s+[^,;.!?]*?\s+(?:réservé(?:e)?|destiné(?:e)?|prévu(?:e)?)\s+(?:pour|au|à)\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"")
     .replace(/\s+(?:avec\s+)?(?:une?\s+)?(?:zone|espace|place)\s+[^,;.!?]*?\s+pour\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b[^,;.!?]*/giu,"");
 
-  if(CHARACTER_TOKEN_RE.test(value)) return "";
+  if(CHARACTER_TOKEN_RE.test(value)){
+    const prop=stationaryFinancialProp(value);
+    const location=String(value.match(/\b(?:devant|dans|inside|in front of|behind)\s+([^.;!?]+)/iu)?.[1]||"").trim();
+    const environment=!CHARACTER_TOKEN_RE.test(location)
+      && /\b(?:banque|bank|établissement|bureau|office|desk|interior|lobby|bibliothèque|library|architecture)\b/iu.test(location)
+      ?`Décor : ${location}`:"";
+    return [environment,prop].filter(Boolean).join(". ");
+  }
   value=value
     .replace(/\b(?:prévoir|garder|réserver)\s*[.!?]*$/iu,"")
     .replace(/\s{2,}/g," ")
@@ -77,11 +115,17 @@ function removeOverlayCharacterSentences(text){
   return source
     .split(/(?<=[.!?])\s+/u)
     .flatMap(sentence=>sentence.split(/\s*;\s*/u))
+    // A single comma-separated scene description can mix architecture, props
+    // and an overlay reservation. Keep the independent visual fragments.
+    // Numeric commas (e.g. 1,5 %) remain part of their financial value.
+    .flatMap(clause=>DISCLAIMER_NEGATION_RE.test(clause)?[clause]:clause.split(/(?<!\d)\s*,\s*(?!\d)/u))
     .map(scrubOverlayCharacterClause)
     .filter(Boolean)
     .join(". ")
     .replace(/\bautour de (?:lui|elle)\b/giu,"autour d’une zone centrale")
     .replace(/\bvers (?:lui|elle)\b/giu,"vers une zone centrale")
+    .replace(/\baround (?:him|her)\b/giu,"around a central empty area")
+    .replace(/\btoward(?:s)? (?:him|her)\b/giu,"toward a central empty area")
     .replace(/\.\s*\./g,".")
     .trim();
 }
@@ -427,9 +471,22 @@ export function buildImagePlan(contract,binding){
       creativeLockEnabled
       && String(creative.reference_mode||"")==="deterministic_character_overlay"
       && Boolean(scene?.framing?.hibou);
+    const deterministicBackground=creativeLockEnabled
+      && String(creative.reference_mode||"")==="deterministic_character_overlay";
     const sceneWantsHibou=Boolean(scene?.framing?.hibou);
+    const environmentOnly=deterministicCharacterOverlay||(creativeLockEnabled&&!sceneWantsHibou);
+    // CLIP pools a short leading context. Put the two essential generation
+    // constraints before scene detail, then retain the detailed GLOBAL locks.
+    const safetyPrefix=creativeLockEnabled
+      ?environmentOnly
+        ?"IMAGE_SAFETY_PREFIX: Empty environment. No people, faces, characters, text or glyphs. Blank unmarked surfaces."
+        :"IMAGE_SAFETY_PREFIX: No text or glyphs. Blank unmarked surfaces."
+      :"";
     const compileVisual=(value)=>{
-      const characterSafe=deterministicCharacterOverlay
+      // Object-only scenes can still mention the canonical overlay in
+      // production guidance. Strip those references too, without rewriting
+      // unrelated character-free SPECIFIC descriptions (e.g. S05).
+      const characterSafe=deterministicBackground&&(deterministicCharacterOverlay||CHARACTER_TOKEN_RE.test(value))
         ?removeOverlayCharacterSentences(value)
         :String(value||"").trim();
       return creativeLockEnabled?removeTextRiskSentences(characterSafe):characterSafe;
@@ -443,24 +500,24 @@ export function buildImagePlan(contract,binding){
     if(!specificVisual) fail(`${scene.scene_id}: compiled scene visual prompt is empty`);
     const styleForImage=imageStylePrompt(styleLock,{backgroundOnly:creativeLockEnabled&&String(creative.reference_mode||"")==="deterministic_character_overlay"});
     const framingLock=framingPrompt(scene);
-    const compiledPrefix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(prefix)):removeTextRiskSentences(prefix);
-    const compiledSuffix=deterministicCharacterOverlay?removeOverlayCharacterSentences(removeTextRiskSentences(suffix)):removeTextRiskSentences(suffix);
+    const compiledPrefix=environmentOnly?removeOverlayCharacterSentences(removeTextRiskSentences(prefix)):removeTextRiskSentences(prefix);
+    const compiledSuffix=environmentOnly?removeOverlayCharacterSentences(removeTextRiskSentences(suffix)):removeTextRiskSentences(suffix);
     const compositionLock=deterministicCharacterOverlay
       ? [
           "ENVIRONMENT_ONLY_COMPOSITION:",
-          "Render an unoccupied environment with a clear empty foreground area reserved for a later graphic overlay.",
-          "Use architecture, furniture, objects and financial props only."
+          "Architecture, furniture and financial props only; clear empty foreground reserved for a later graphic overlay."
         ].join(" ")
       : creativeLockEnabled && !sceneWantsHibou
         ? [
             "OBJECTS_AND_ENVIRONMENT_COMPOSITION:",
-            "Render an unoccupied scene and communicate the idea with environment, objects, symbols and composition."
+            "Use environment, objects and blank symbols to explain the idea."
           ].join(" ")
         : creativeLockEnabled
           ? characterLock
           : "";
     const prompt=creativeLockEnabled
       ? [
+          safetyPrefix,
           compiledPrefix,
           specificVisual,
           styleForImage,
@@ -476,7 +533,7 @@ export function buildImagePlan(contract,binding){
     if(prompt.length>effectivePromptLimit){
       fail(`${scene.scene_id}: effective FLUX prompt has ${prompt.length} characters, exceeds ${effectivePromptLimit}; refusing silent image-encoder loss`);
     }
-    const leakedCharacterTokens=deterministicCharacterOverlay
+    const leakedCharacterTokens=deterministicBackground
       ?[...prompt.matchAll(/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/giu)].map(match=>String(match[0]).toLowerCase())
       :[];
     if(leakedCharacterTokens.length){
@@ -498,7 +555,11 @@ export function buildImagePlan(contract,binding){
       compiled_prompt_sha256:createHash("sha256").update(prompt).digest("hex"),
       effective_prompt_chars:prompt.length,
       effective_prompt_limit_chars:effectivePromptLimit,
-      specific_prompt_prefix_preserved:prompt.indexOf(specificVisual)<=compiledPrefix.length+1,
+      specific_prompt_prefix_preserved:prompt.startsWith(
+        (creativeLockEnabled?[safetyPrefix,compiledPrefix,specificVisual]:[prefix,specificVisual]).filter(Boolean).join("\n")
+      ),
+      safety_prefix_present:!creativeLockEnabled||prompt.startsWith(safetyPrefix),
+      safety_prefix_chars:safetyPrefix.length,
       glyph_free_lock_present:!creativeLockEnabled||prompt.includes("STRICT_GLYPH_FREE_LOCK:"),
       negative_policy_source_sha256:negativePolicyCoverage?.source_sha256||null,
       negative_policy_categories:(negativePolicyCoverage?.groups||[]).map(group=>group.id),
@@ -518,6 +579,7 @@ export function buildImagePlan(contract,binding){
         compiled_visual_idea_chars:compiledVisualIdea.length,
         visual_idea_retention_ratio:visualIdeaRetention,
         character_overlay_sanitized:deterministicCharacterOverlay,
+        background_character_tokens_forbidden:deterministicBackground,
         text_risk_sanitized:creativeLockEnabled,
         status:(
           (!sceneImagePrompt||sceneImagePrompt.length<24||compiledImagePrompt.length>=24)

@@ -94,7 +94,7 @@ function timelineWindow(event,duration){
 }
 
 function timelineEnable({start_s,end_s}){
-  return `between(t,${start_s.toFixed(3)},${end_s.toFixed(3)})`;
+  return `gte(t,${start_s.toFixed(3)})*lt(t,${end_s.toFixed(3)})`;
 }
 
 const BEAT_KINDS=new Set([
@@ -335,7 +335,8 @@ export function normalizeSceneComposition(scene){
   }
 
   const camera=c.camera_transform||{};
-  const zoomPercent=Math.min(3.5,Math.max(1.5,num(camera.zoom_percent,scene?.zoom_percent??3)));
+  const requestedZoom=num(camera.zoom_percent,scene?.zoom_percent??3);
+  const zoomPercent=requestedZoom<=0?0:Math.min(3.5,Math.max(1.5,requestedZoom));
   const cameraAnchor=String(camera.anchor||scene?.framing?.anchor||scene?.anchor||"center");
   const safeZones={
     top:num(c.safe_zones?.top,120),

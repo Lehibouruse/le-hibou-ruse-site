@@ -526,3 +526,60 @@ test("overlay sanitation preserves comma-separated financial relations and decim
  assert.match(prompt,/Arrows point toward a central empty area/);
  assert.doesNotMatch(prompt,/\b(?:hibou|he|him|his|hand)\b|Facial expression|1,5/iu);
 });
+
+const reviewedOverlayScenes=[{
+ scene_id:"lombard_box_v1_scene_07_four_options",
+ image_prompt:"Quatre cartes financières abstraites, distinctes mais simples, convergent vers une seule flèche de cash ou un flux financier central. Prévoir une zone d’arrivée pour le Hibou canonique. Ne représenter aucun jargon technique.",
+ visual_idea:"Quatre cartes/options distinctes convergent vers une seule flèche de cash dirigée vers le Hibou. Aucun call/put à l’écran.\n\n[ADDITIF SPÉCIFIQUE V2 — MONTAGE] SCÈNE 7 — Quatre jambes/options distinctes, coordonnées en deux paires partageant la même échéance, convergent vers un seul financement/cash. Pour le scénario illustré, la personne qui reçoit le cash est vendeuse du box ; ne pas confondre ce flux avec le box acheté. Les quatre jambes, leurs appariements et leur convergence doivent rester visibles sur téléphone sans jargon call/put à l'écran. Ce schéma pédagogique porte sur des options de type européen à règlement en espèces ; ne pas suggérer que quatre cartes arbitraires ou toutes les options produisent le même résultat.",
+ framing:{hibou:true,type:"schéma",anchor:"centre"}
+},{
+ scene_id:"lombard_box_v1_scene_08_today_maturity",
+ image_prompt:"Composition financière éditoriale 2D premium en split-screen vertical. Côté gauche : cash disponible aujourd’hui, représenté par une pile de billets ou une mallette de cash, avec espace propre pour un callout ajouté en post-production. Côté droit : échéance future clairement matérialisée par un calendrier/date et un montant de remboursement verrouillé/connu, reliés par une ligne temporelle simple. Aucun humain, aucun animal, aucun texte généré dans l’image.",
+ visual_idea:"Split-screen lisible : à gauche le cash encaissé aujourd’hui ; à droite une échéance future avec le montant de remboursement déjà connu. Une ligne temporelle relie les deux. Le Hibou n’est pas nécessaire dans cette scène : priorité à la compréhension immédiate du mécanisme.\n\n[ADDITIF SPÉCIFIQUE V2 — MONTAGE] SCÈNE 8 — Vrai comparatif temporel gauche/droite du même box : cash reçu aujourd'hui à gauche ; montant de remboursement connu à l'échéance à droite ; connexion temporelle explicite entre les deux. La certitude du montant s'applique au box illustré jusqu'à cette échéance, pas à un renouvellement ultérieur.",
+ framing:{hibou:false,type:"split-screen",anchor:"centre"}
+},{
+ scene_id:"lombard_box_v1_scene_12_one_less",
+ image_prompt:"Schéma très épuré avec un intermédiaire bancaire au centre d’un flux ; prévoir le Hibou canonique en train de retirer cet intermédiaire. Fond très sobre pour permettre une grande punchline ajoutée en post-production.",
+ visual_idea:"Le Hibou efface la banque située au milieu du schéma. Ensuite ne laisser que la phrase principale très grande, sans concurrence visuelle.\n\n[ADDITIF SPÉCIFIQUE V2 — MONTAGE] SCÈNE 12 — Le Hibou canonique retire graphiquement la banque prêteuse située au milieu du circuit de financement, devant le spectateur, puis le circuit se simplifie et la phrase « UN INTERMÉDIAIRE DE MOINS. » domine seule. L'action doit précéder l'état final ; elle ne représente pas la disparition du courtier, des frais, des garanties ou des risques.",
+ framing:{hibou:true,type:"schéma",anchor:"centre"}
+}];
+
+test("audited S12 preserves the negated disclaimer and its complete list rather than treating action as a person",()=>{
+ const input=overlayContract([reviewedOverlayScenes[2]]);
+ const before=structuredClone(input);
+ const request=buildImagePlan(input,binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert.match(prompt,/Cette action ne représente pas la disparition du courtier, des frais, des garanties ou des risques\./);
+ assert.match(prompt,/L'action doit précéder l'état final/);
+ assert.match(prompt,/retirer graphiquement la banque prêteuse située au milieu du circuit de financement/);
+ assert.doesNotMatch(prompt,/\b(?:hibou|elle)\b|\. des frais\. /iu);
+ assert.deepEqual(input,before,"the montage's authoritative disclaimer must remain unchanged at source");
+});
+
+test("audited S07 replaces the visible-person role with the sold-box cash relation while preserving paired legs",()=>{
+ const input=overlayContract([reviewedOverlayScenes[0]]);
+ const before=structuredClone(input);
+ const request=buildImagePlan(input,binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert.match(prompt,/Quatre cartes\/options distinctes convergent vers une seule flèche de cash dirigée vers un nœud financier bénéficiaire/);
+ assert.match(prompt,/la vente du box produit le flux de cash reçu/);
+ assert.match(prompt,/deux paires partageant la même échéance/);
+ assert.match(prompt,/ne pas confondre ce flux avec le box acheté/);
+ assert.match(prompt,/options de type européen à règlement en espèces/);
+ assert.doesNotMatch(prompt,/la personne|vendeuse|\b(?:hibou|owl)\b/iu);
+ assert.deepEqual(input,before,"the precise seller/recipient role remains authoritative for postproduction");
+});
+
+test("audited object-only S08 removes canonical character mentions despite framing.hibou false",()=>{
+ const input=overlayContract([reviewedOverlayScenes[1]]);
+ const request=buildImagePlan(input,binding).requests[0].request;
+ const prompt=request.overrides["6"].text;
+ assert.doesNotMatch(prompt,/\b(?:hibou|owl|bird|animal|mascot|mascotte)\b/iu);
+ assert.match(prompt,/cash encaissé aujourd’hui/);
+ assert.match(prompt,/échéance future avec le montant de remboursement déjà connu/);
+ assert.match(prompt,/connexion temporelle explicite entre les deux/);
+ assert.match(prompt,/pas à un renouvellement ultérieur/);
+ assert.match(prompt,/OBJECTS_AND_ENVIRONMENT_COMPOSITION/);
+ assert.equal(request.prompt_application.preservation.background_character_tokens_forbidden,true);
+ assert.equal(request.prompt_application.preservation.character_overlay_sanitized,false);
+});

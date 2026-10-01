@@ -46,6 +46,7 @@ function extractStyleSection(styleLock){
 const CHARACTER_TOKEN_RE=/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/iu;
 const PERSON_SUBJECT_RE=/^(?:(?:hook|subject|sujet)\s*:\s*)?(?:il|elle|he|she)\b/iu;
 const PERSON_POSE_RE=/^(?:expression|facial expression|regard|sourire|smile|smirk|pose|posture)\b/iu;
+const DISCLAIMER_NEGATION_RE=/\b(?:ne\s+(?:représente|signifie|supprime|retire|garantit)|n[’'](?:implique|élimine|assure)|does\s+not\s+(?:mean|remove|guarantee))\b/iu;
 
 function stationaryFinancialProp(value){
   const held=String(value||"").match(/\b(?:tient|tenant|brandit|brandissant|porte|portant|holds?|holding|carries|carrying)\s+([^.;!?]+)/iu);
@@ -65,6 +66,15 @@ function stationaryFinancialProp(value){
 function scrubOverlayCharacterClause(clause){
   let value=String(clause||"").trim();
   if(!value) return "";
+  // A negative financial disclaimer can refer to the preceding action as
+  // "elle". It is not an instruction to generate a person. Keep its scope.
+  if(PERSON_SUBJECT_RE.test(value)&&DISCLAIMER_NEGATION_RE.test(value)){
+    return value.replace(/^(?:il|elle)\b/iu,"Cette action");
+  }
+  value=value.replace(/\bla personne qui reçoit le cash est vendeuse du box\b/giu,
+    "la vente du box produit le flux de cash reçu");
+  value=value.replace(/\bvers\s+(?:le\s+)?(?:hibou|owl|bird|animal|mascot|mascotte)(?:\s+canonique)?\b/giu,
+    "vers un nœud financier bénéficiaire");
   if(PERSON_POSE_RE.test(value)) return "";
   if(PERSON_SUBJECT_RE.test(value)) return stationaryFinancialProp(value);
   value=value.replace(/^entrée rapide\s*(?:puis\s+)?/iu,"");
@@ -108,7 +118,7 @@ function removeOverlayCharacterSentences(text){
     // A single comma-separated scene description can mix architecture, props
     // and an overlay reservation. Keep the independent visual fragments.
     // Numeric commas (e.g. 1,5 %) remain part of their financial value.
-    .flatMap(clause=>clause.split(/(?<!\d)\s*,\s*(?!\d)/u))
+    .flatMap(clause=>DISCLAIMER_NEGATION_RE.test(clause)?[clause]:clause.split(/(?<!\d)\s*,\s*(?!\d)/u))
     .map(scrubOverlayCharacterClause)
     .filter(Boolean)
     .join(". ")
@@ -461,6 +471,8 @@ export function buildImagePlan(contract,binding){
       creativeLockEnabled
       && String(creative.reference_mode||"")==="deterministic_character_overlay"
       && Boolean(scene?.framing?.hibou);
+    const deterministicBackground=creativeLockEnabled
+      && String(creative.reference_mode||"")==="deterministic_character_overlay";
     const sceneWantsHibou=Boolean(scene?.framing?.hibou);
     const environmentOnly=deterministicCharacterOverlay||(creativeLockEnabled&&!sceneWantsHibou);
     // CLIP pools a short leading context. Put the two essential generation
@@ -471,7 +483,10 @@ export function buildImagePlan(contract,binding){
         :"IMAGE_SAFETY_PREFIX: No text or glyphs. Blank unmarked surfaces."
       :"";
     const compileVisual=(value)=>{
-      const characterSafe=deterministicCharacterOverlay
+      // Object-only scenes can still mention the canonical overlay in
+      // production guidance. Strip those references too, without rewriting
+      // unrelated character-free SPECIFIC descriptions (e.g. S05).
+      const characterSafe=deterministicBackground&&(deterministicCharacterOverlay||CHARACTER_TOKEN_RE.test(value))
         ?removeOverlayCharacterSentences(value)
         :String(value||"").trim();
       return creativeLockEnabled?removeTextRiskSentences(characterSafe):characterSafe;
@@ -518,7 +533,7 @@ export function buildImagePlan(contract,binding){
     if(prompt.length>effectivePromptLimit){
       fail(`${scene.scene_id}: effective FLUX prompt has ${prompt.length} characters, exceeds ${effectivePromptLimit}; refusing silent image-encoder loss`);
     }
-    const leakedCharacterTokens=deterministicCharacterOverlay
+    const leakedCharacterTokens=deterministicBackground
       ?[...prompt.matchAll(/(?:\bhibou\b|\bowl\b|\bbird\b|\banimal\b|\bmascot\b|\bmascotte\b)/giu)].map(match=>String(match[0]).toLowerCase())
       :[];
     if(leakedCharacterTokens.length){
@@ -564,6 +579,7 @@ export function buildImagePlan(contract,binding){
         compiled_visual_idea_chars:compiledVisualIdea.length,
         visual_idea_retention_ratio:visualIdeaRetention,
         character_overlay_sanitized:deterministicCharacterOverlay,
+        background_character_tokens_forbidden:deterministicBackground,
         text_risk_sanitized:creativeLockEnabled,
         status:(
           (!sceneImagePrompt||sceneImagePrompt.length<24||compiledImagePrompt.length>=24)

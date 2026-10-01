@@ -40,6 +40,8 @@ export function buildSceneRenderFingerprint({contract, plan, assetHashes, durati
     fps: contract.engine.fps,
     preset,
     crf,
+    compositor_version: plan.compositor_version || null,
+    executed_filter_complex: plan.filter_complex || null,
     composition: plan.normalized,
     timeline: plan.timeline,
     asset_sha256: assetHashes,

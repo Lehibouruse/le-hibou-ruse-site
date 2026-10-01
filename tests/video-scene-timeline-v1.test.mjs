@@ -22,7 +22,7 @@ test("timeline supports independent timed text without replacing the background"
   };
   const plan=buildSceneCompositePlan(scene,{duration:9});
   assert.deepEqual(plan.input_refs,["bg.png"]);
-  assert.match(plan.filter_complex,/between\(t,0\.000,3\.000\)/);
+  assert.match(plan.filter_complex,/gte\(t,0\.000\)\*lt\(t,3\.000\)/);
   assert.match(plan.filter_complex,/TAUX DE MARCHÉ/);
   assert.match(plan.filter_complex,/CHAQUE ANNÉE/);
   assert.equal(plan.timeline.events.length,4);
@@ -41,7 +41,7 @@ test("timeline pose/object assets are independent inputs and camera event change
   };
   const plan=buildSceneCompositePlan(scene,{duration:6,fps:30});
   assert.deepEqual(plan.input_refs,["bg.png","poses/pointe.webp","objects/chart.webp"]);
-  assert.match(plan.filter_complex,/overlay=.*enable='between\(t,1\.000,4\.000\)'/);
+  assert.match(plan.filter_complex,/overlay=.*enable='gte\(t,1\.000\)\*lt\(t,4\.000\)'/);
   assert.match(plan.filter_complex,/between\(on,91,180\)/);
   assert.match(plan.filter_complex,/1\+0\.03500\*\(max\(0,min\(1,\(on-91\)\/89\)\)\)/);
 });
@@ -70,7 +70,7 @@ test("visual accent compiles to a timed post-production overlay",()=>{
   const plan=buildSceneCompositePlan(scene,{duration:4});
   assert.match(plan.filter_complex,/drawbox=/);
   assert.match(plan.filter_complex,/0xC7A65A@0\.75/);
-  assert.match(plan.filter_complex,/between\(t,1\.500,2\.500\)/);
+  assert.match(plan.filter_complex,/gte\(t,1\.500\)\*lt\(t,2\.500\)/);
 });
 
 

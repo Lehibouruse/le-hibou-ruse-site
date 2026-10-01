@@ -649,6 +649,23 @@ function jsonEqual(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function buildVideoContractPreflightArgs(args, { dir, storyboardPath, existingStoryboardPath, sourceSnapshotPath }) {
+  if (!sourceSnapshotPath) {
+    throw new Error("VIDEO_RENDER contract preflight requires a fresh Airtable source snapshot");
+  }
+  const sourceStoryboardPath = existingStoryboardPath || storyboardPath;
+  const inputFingerprint = createHash("sha256").update(JSON.stringify({
+    snapshot_sha256: sha256(sourceSnapshotPath),
+    storyboard_path: path.resolve(sourceStoryboardPath),
+    storyboard_sha256: sha256(sourceStoryboardPath),
+  })).digest("hex");
+  const preflightRoot = path.join(dir, "_preflight", inputFingerprint);
+  return args.map(value => value === `--output=${dir}`
+    ? `--output=${preflightRoot}`
+    : value === `--storyboard=${storyboardPath}`
+      ? `--storyboard=${sourceStoryboardPath}` : value);
+}
+
 function pipelineFailureDetail(dir) {
   const statePath = path.join(dir, "pipeline-run.json");
   if (!existsSync(statePath)) return "";
@@ -2531,8 +2548,9 @@ async function processVideoRender(job, processed) {
     if (!readFileSync(masterScript, "utf8").includes('flag("preflight-only")')) {
       throw new Error("VIDEO_RENDER runtime lacks pre-GPU montage preflight");
     }
-    const preflightArgs = args.map(value => value === `--output=${dir}`
-      ? `--output=${path.join(dir, "_preflight")}` : value);
+    const preflightArgs = buildVideoContractPreflightArgs(args, {
+      dir, storyboardPath, existingStoryboardPath, sourceSnapshotPath,
+    });
     const preflightRun = spawnSync(process.execPath, [...preflightArgs, "--preflight-only"], {
       cwd: runtimeProjectRoot,
       encoding: "utf8",

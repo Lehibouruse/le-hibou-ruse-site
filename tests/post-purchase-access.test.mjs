@@ -72,6 +72,8 @@ test("le lecteur Hibou revérifie la vente et refuse les remboursements", () => 
   assert.match(reader, /getRecord\(TABLES\.sales/);
   assert.match(reader, /saleIsRefunded/);
   assert.match(reader, /deliveryStatus !== "reader_ready"/);
+  assert.match(reader, /fields\["Version livre livrée"\]/);
+  assert.doesNotMatch(reader, /identity\.edition/);
   assert.match(reader, /status, 410|status = 410|, 410\)/);
 });
 

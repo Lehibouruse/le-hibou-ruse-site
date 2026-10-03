@@ -37,7 +37,7 @@ export async function GET(request) {
     return denied("Cet accès n’est pas actif.", 403);
   }
 
-  const edition = String(fields["Version livre livrée"] || identity.edition || "").trim();
+  const edition = String(fields["Version livre livrée"] || "").trim();
   if (!edition || edition.toLowerCase().includes("draft")) {
     return denied("L’édition du guide n’est pas disponible.", 409);
   }

@@ -1,0 +1,58 @@
+name: Commerce checkout probe
+on:
+  push:
+    branches: [commerce-checkout-probe-2026-10-03]
+    paths: [.github/workflows/commerce-checkout-probe.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Create a live checkout without submitting a payment
+        shell: bash
+        run: |
+          set -euo pipefail
+          request_id=$(python3 - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )
+          body=$(python3 - <<PY
+          import json
+          print(json.dumps({
+            "request_id": "$request_id",
+            "immediate_supply_consent": True,
+            "withdrawal_loss_ack": True,
+            "attribution": {
+              "utm_source": "internal_qa",
+              "utm_medium": "server_probe",
+              "utm_campaign": "commerce_live_open_20261003"
+            }
+          }))
+          PY
+          )
+          response_file=$(mktemp)
+          http_code=$(curl --silent --show-error -o "$response_file" -w '%{http_code}' \
+            -X POST \
+            -H 'Origin: https://d4d5d6.com' \
+            -H 'Content-Type: application/json' \
+            --data "$body" \
+            'https://d4d5d6.com/api/commerce/digital-supply-consent')
+          python3 - "$response_file" "$http_code" <<'PY'
+          import json,sys,urllib.parse
+          data=json.load(open(sys.argv[1],encoding='utf-8'))
+          code=int(sys.argv[2])
+          assert code in (200,201), (code,data)
+          assert data.get('ok') is True
+          url=data.get('checkout_url','')
+          parsed=urllib.parse.urlparse(url)
+          assert parsed.scheme=='https'
+          assert parsed.hostname and (parsed.hostname=='lemonsqueezy.com' or parsed.hostname.endswith('.lemonsqueezy.com'))
+          print('checkout_probe_ok=true')
+          print('checkout_mode='+str(data.get('mode','')))
+          print('checkout_host='+parsed.hostname)
+          print('payment_submitted=false')
+          PY
+          rm -f "$response_file"

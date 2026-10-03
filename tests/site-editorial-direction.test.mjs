@@ -20,11 +20,17 @@ test('both named service offers are actually rendered on the storefront', () => 
   assert.match(form, /name="offer"/);
   assert.match(form, /pending\.current/);
 });
+test('no real book excerpt or full contents are published', () => {
+  assert.doesNotMatch(store, /markdownToBookHtml|BookPreview|BookContents|EXTRAIT DU LIVRE|Lire l’extrait|Ouvrez un vrai passage|Explorer le sommaire/);
+  assert.match(store, /QUELQUES MONTAGES COMPRIS DANS LE LIVRE/);
+  assert.match(store, /Le site ne publie ni le sommaire complet ni le texte du livre/);
+});
+
 test('no launch waitlist, monthly-price FAQ or repeated final pitch is rendered', () => {
   assert.doesNotMatch(store, /NotifyBook|#ouverture|store-launch|store-final|store-faq-section|Le prix est-il mensuel|Soyez prévenu|Être averti|Regardez votre argent/);
   assert.match(store, /Paiement unique/);
   assert.match(store, /Dois-je lire le livre dans l’ordre/);
-  assert.match(store, /accès anticipé et incomplète/);
+  assert.match(store, /Édition en accès anticipé/);
 });
 test('purchase CTAs use the internal consent page and never hardcode a Lemon bypass', () => {
   assert.match(store, /purchaseHref = offer\.purchaseUrl \|\| '\/achat-guide'/);

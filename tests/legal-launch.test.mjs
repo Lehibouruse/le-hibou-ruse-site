@@ -47,5 +47,5 @@ test("la landing expose un lien CGV et une description de l’édition", () => {
   assert.match(home, /<BookStore\b/);
   assert.match(storefront, /<StoreFooter\s*\//);
   assert.match(storefront, /href="\/cgv"/);
-  assert.match(storefront, /accès anticipé et incomplète/);
+  assert.match(storefront, /Édition en accès anticipé/);
 });

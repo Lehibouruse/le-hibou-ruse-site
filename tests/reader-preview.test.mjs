@@ -8,14 +8,22 @@ const reader = readFileSync(new URL("../app/lire/route.js", import.meta.url), "u
 const robots = readFileSync(new URL("../app/robots.js", import.meta.url), "utf8");
 
 test("l’aperçu exige une session QA signée créée après authentification propriétaire", () => {
-  assert.match(preview, /adminAuthorized/);
+  assert.match(preview, /adminCredentialsAuthorized/);
   assert.match(preview, /signReaderPreviewToken/);
   assert.match(preview, /verifyReaderPreviewToken/);
   assert.match(preview, /HttpOnly; Secure; SameSite=Strict/);
-  assert.match(preview, /WWW-Authenticate/);
-  assert.doesNotMatch(preview.match(/WWW-Authenticate[^\n]+/)?.[0] || "", /[^\x00-\x7F]/);
+  assert.match(preview, /<form method="post" action="\/apercu-lecteur"/);
+  assert.doesNotMatch(preview, /WWW-Authenticate/);
+  assert.match(preview, /form-action 'self'/);
   assert.match(preview, /Max-Age=/);
   assert.doesNotMatch(preview, /searchParams\.get\(["']token/);
+});
+
+test("le formulaire refuse les origines croisées et les corps surdimensionnés", () => {
+  assert.match(preview, /sameOrigin\(request\)/);
+  assert.match(preview, /contentLength > 4096/);
+  assert.match(preview, /status: 403/);
+  assert.match(preview, /status: 413/);
 });
 
 test("l’aperçu ne lit ni n’écrit aucune vente et reprend le même moteur protégé que le lecteur client", () => {

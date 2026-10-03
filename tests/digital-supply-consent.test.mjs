@@ -7,6 +7,7 @@ import {
   consentCheckoutCustomData,
   validDigitalSupplyCustomData,
 } from "../lib/digital-supply-consent.mjs";
+import { buildTestCheckoutPayload } from "../lib/lemon-api.mjs";
 
 test("le contrat de consentement produit des custom_data strictes et versionnées", () => {
   const data = digitalSupplyCustomData({ consentId: "consent-123", consentAt: "2026-09-22T20:30:00.000Z" });
@@ -71,4 +72,19 @@ test("la vitrine ouvre uniquement le parcours de consentement après validation 
   assert.match(form, /randomUUID/);
   assert.match(form, /request_id: requestId\.current/);
   assert.match(form, /type="checkbox" required/);
+});
+
+
+test("le checkout Lemon masque le contenu commercial optionnel", () => {
+  const payload = buildTestCheckoutPayload({
+    storeId: "1",
+    variantId: "2",
+    productName: "Guide du Hibou Rusé",
+    description: "Édition numérique disponible.",
+    redirectUrl: "https://d4d5d6.com/merci",
+  });
+  assert.equal(payload.data.attributes.checkout_options.media, false);
+  assert.equal(payload.data.attributes.checkout_options.desc, false);
+  assert.equal(payload.data.attributes.checkout_options.discount, false);
+  assert.equal(payload.data.attributes.checkout_options.logo, true);
 });

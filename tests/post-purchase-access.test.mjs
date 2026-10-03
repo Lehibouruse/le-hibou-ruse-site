@@ -6,6 +6,7 @@ const route = readFileSync(new URL("../app/api/commerce/access/route.js", import
 const page = readFileSync(new URL("../app/merci/page.js", import.meta.url), "utf8");
 const client = readFileSync(new URL("../components/PurchaseAccess.js", import.meta.url), "utf8");
 const reader = readFileSync(new URL("../app/lire/route.js", import.meta.url), "utf8");
+const readerResponse = readFileSync(new URL("../lib/reader-response.mjs", import.meta.url), "utf8");
 const readerTokens = readFileSync(new URL("../lib/secure-reader.mjs", import.meta.url), "utf8");
 
 test("l'accès post-achat exige un order_identifier Lemon de forme UUID", () => {
@@ -71,18 +72,21 @@ test("le lecteur Hibou revérifie la vente et refuse les remboursements", () => 
   assert.match(reader, /getRecord\(TABLES\.sales/);
   assert.match(reader, /saleIsRefunded/);
   assert.match(reader, /deliveryStatus !== "reader_ready"/);
+  assert.match(reader, /fields\["Version livre livrée"\]/);
+  assert.doesNotMatch(reader, /identity\.edition/);
   assert.match(reader, /status, 410|status = 410|, 410\)/);
 });
 
 test("le lecteur Hibou bloque les actions ordinaires de copie, impression et sauvegarde", () => {
-  assert.match(reader, /user-select:none/);
-  assert.match(reader, /"copy","cut","contextmenu","dragstart"/);
-  assert.match(reader, /"selectstart"/);
-  assert.match(reader, /\["c","x","s","p","u","a","f"\]/);
-  assert.match(reader, /@media print/);
-  assert.match(reader, /Content-Disposition": "inline"/);
-  assert.match(reader, /Cache-Control": "no-store/);
-  assert.match(reader, /X-Robots-Tag/);
+  assert.match(reader, /protectedReaderResponse/);
+  assert.match(readerResponse, /user-select:none/);
+  assert.match(readerResponse, /"copy","cut","contextmenu","dragstart"/);
+  assert.match(readerResponse, /"selectstart"/);
+  assert.match(readerResponse, /\["c","x","s","p","u","a","f"\]/);
+  assert.match(readerResponse, /@media print/);
+  assert.match(readerResponse, /"Content-Disposition": "inline"/);
+  assert.match(readerResponse, /"Cache-Control": "no-store/);
+  assert.match(readerResponse, /X-Robots-Tag/);
   assert.doesNotMatch(reader, /download_url/);
 });
 

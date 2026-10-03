@@ -1,0 +1,20 @@
+name: Commerce release inspection
+on:
+  push:
+    branches: [commerce-finish-2026-10-03]
+    paths: [.github/workflows/commerce-release-inspect.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Request the existing main-only read-only audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST repos/Lehibouruse/le-hibou-ruse-site/actions/workflows/lemon-readiness.yml/dispatches -f ref=main
+          echo 'Requested authenticated read-only Lemon audit on main; no payment or settings changed.'

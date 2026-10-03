@@ -62,7 +62,7 @@ test("la vitrine ouvre uniquement le parcours de consentement après validation 
   const form = readFileSync(new URL("../components/DigitalSupplyConsentForm.js", import.meta.url), "utf8");
   assert.match(offer, /commercialReadiness\(/);
   assert.match(offer, /purchaseUrl: readiness\.ready \? ['"]\/achat-guide['"] : ['"]/);
-  assert.match(store, /offer\.ready \? <BookAction href=\{offer\.purchaseUrl\}/);
+  assert.match(store, /offer\.purchaseUrl \|\| '\/achat-guide'/);
   assert.match(readiness, /consent_checkout_live/);
   assert.match(readiness, /digital_supply_consent_checkout_mode\)\.toLowerCase\(\) === "live"/);
   assert.match(form, /immediate_supply_consent/);

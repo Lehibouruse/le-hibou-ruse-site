@@ -1,0 +1,39 @@
+name: Prepare private PDF reader
+on:
+  push:
+    branches: [conversion-livre-2026-10-03]
+    paths: [.github/workflows/prepare-pdf-reader.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/conversion-livre-2026-10-03'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: conversion-livre-2026-10-03
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned dependencies and preserve existing scripts
+        run: |
+          npm install --save-exact --ignore-scripts pdf-lib@1.17.1 pdfjs-dist@6.3.289
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+          const prior=p.scripts.prebuild;
+          if (!String(prior || '').includes('copy-pdfjs.mjs')) p.scripts.prebuild=prior ? `${prior} && node scripts/copy-pdfjs.mjs` : 'node scripts/copy-pdfjs.mjs';
+          fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
+          NODE
+      - name: Commit dependency lock only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'build: lock private PDF renderer and self-hosted PDF.js'
+          git pull --rebase origin conversion-livre-2026-10-03
+          git push origin HEAD:conversion-livre-2026-10-03

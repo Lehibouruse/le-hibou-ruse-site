@@ -17,10 +17,10 @@ test("le site expose une identité publique non sensible pour diagnostiquer le d
 
 test("un domaine acheté mais non vérifié ne devient pas canonique SEO prématurément", () => {
   assert.match(layout, /metadataBase: new URL\(publicOrigin\)/);
-  assert.doesNotMatch(layout, /alternates: \{ canonical: "\/" \}/);
-  assert.match(home, /alternates: \{ canonical: "\/" \}/);
+  assert.doesNotMatch(layout, /alternates:\s*\{\s*canonical:\s*["']\/["']\s*\}/);
+  assert.match(home, /alternates:\s*\{\s*canonical:\s*["']\/["']\s*\}/);
   assert.match(legal, /index: false/);
   assert.match(layout, /index: true/);
   assert.match(layout, /follow: true/);
-  assert.doesNotMatch(layout, /metadataBase: new URL\("https:\/\/d4d5d6\.com"\)/);
+  assert.doesNotMatch(layout, /metadataBase: new URL\(["']https:\/\/d4d5d6\.com["']\)/);
 });

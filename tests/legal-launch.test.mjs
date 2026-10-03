@@ -6,6 +6,7 @@ const mentions = readFileSync(new URL("../app/mentions-legales/page.js", import.
 const privacy = readFileSync(new URL("../app/confidentialite/page.js", import.meta.url), "utf8");
 const cgv = readFileSync(new URL("../app/cgv/page.js", import.meta.url), "utf8");
 const home = readFileSync(new URL("../app/page.js", import.meta.url), "utf8");
+const storefront = readFileSync(new URL("../components/BookStore.js", import.meta.url), "utf8");
 
 test("les mentions légales early-access restent factuelles sur la structure non encore immatriculée", () => {
   assert.match(mentions, /Version en vigueur/);
@@ -42,7 +43,9 @@ test("les CGV décrivent l’édition numérique évolutive et préservent les d
   assert.match(cgv, /contact@d4d5d6\.fr/);
 });
 
-test("la landing expose un lien CGV sans vocabulaire PDF partiel dans le bloc d’achat", () => {
-  assert.match(home, /href="\/cgv"/);
-  assert.doesNotMatch(home, /Version partielle actuelle|PDF V1|en cours d’enrichissement/);
+test("la landing expose un lien CGV et une description de l’édition", () => {
+  assert.match(home, /<BookStore\b/);
+  assert.match(storefront, /<StoreFooter\s*\//);
+  assert.match(storefront, /href="\/cgv"/);
+  assert.match(storefront, /accès anticipé et incomplète/);
 });

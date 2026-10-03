@@ -9,10 +9,7 @@ import {
 } from "../lib/digital-supply-consent.mjs";
 
 test("le contrat de consentement produit des custom_data strictes et versionnées", () => {
-  const data = digitalSupplyCustomData({
-    consentId: "consent-123",
-    consentAt: "2026-09-22T20:30:00.000Z",
-  });
+  const data = digitalSupplyCustomData({ consentId: "consent-123", consentAt: "2026-09-22T20:30:00.000Z" });
   assert.equal(data.consent_version, DIGITAL_SUPPLY_CONSENT_VERSION);
   assert.equal(data.immediate_supply_consent, "true");
   assert.equal(data.withdrawal_loss_ack, "true");
@@ -56,12 +53,16 @@ test("la route est désactivée par défaut et sépare TEST et LIVE", () => {
   assert.doesNotMatch(route, /first_name|last_name|email/);
 });
 
-test("le site public active la page de consentement uniquement lorsque le feature flag est test ou live", () => {
-  const page = readFileSync(new URL("../app/page.js", import.meta.url), "utf8");
+test("la vitrine ouvre uniquement le parcours de consentement après validation commerciale", () => {
+  const offer = readFileSync(new URL("../lib/book-offer.js", import.meta.url), "utf8");
+  const store = readFileSync(new URL("../components/BookStore.js", import.meta.url), "utf8");
+  const readiness = readFileSync(new URL("../lib/launch-readiness.mjs", import.meta.url), "utf8");
   const form = readFileSync(new URL("../components/DigitalSupplyConsentForm.js", import.meta.url), "utf8");
-  assert.match(page, /consentEnabled = \["test", "live"\]\.includes\(consentMode\)/);
-  assert.match(page, /consentEnabled \? "\/achat-guide" : checkoutUrl/);
-  assert.match(page, /purchaseEvent = consentEnabled \? "purchase_consent_opened" : "checkout_opened"/);
+  assert.match(offer, /commercialReadiness\(/);
+  assert.match(offer, /purchaseUrl: readiness\.ready \? ['"]\/achat-guide['"] : ['"]/);
+  assert.match(store, /offer\.ready \? <BookAction href=\{offer\.purchaseUrl\}/);
+  assert.match(readiness, /consent_checkout_live/);
+  assert.match(readiness, /digital_supply_consent_checkout_mode\)\.toLowerCase\(\) === "live"/);
   assert.match(form, /immediate_supply_consent/);
   assert.match(form, /withdrawal_loss_ack/);
   assert.match(form, /requestId = useRef/);

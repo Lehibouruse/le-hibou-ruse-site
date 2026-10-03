@@ -2,6 +2,7 @@ import { adminCredentialsAuthorized, derivedCredentialsAuthorized } from "../../
 import { getAllRecords, queryRecords, TABLES } from "../../lib/airtable";
 import { chapterContent } from "../../lib/book-renderer.mjs";
 import { protectedReaderResponse, readerDeniedResponse, readerSecurityHeaders } from "../../lib/reader-response.mjs";
+import { sameOriginFormRequest } from "../../lib/request-origin.mjs";
 import { signReaderPreviewToken, verifyReaderPreviewToken } from "../../lib/secure-reader.mjs";
 
 export const runtime = "nodejs";
@@ -37,16 +38,6 @@ function loginResponse({ invalid = false, status = 200 } = {}) {
       "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     }),
   });
-}
-
-function sameOrigin(request) {
-  const origin = String(request.headers.get("origin") || "").trim();
-  if (!origin) return true;
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
 }
 
 function issuePreviewSession(request) {
@@ -102,7 +93,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  if (!sameOrigin(request)) return loginResponse({ invalid: true, status: 403 });
+  if (!sameOriginFormRequest(request)) return loginResponse({ invalid: true, status: 403 });
   const contentLength = Number(request.headers.get("content-length") || 0);
   if (contentLength > 4096) return loginResponse({ invalid: true, status: 413 });
 

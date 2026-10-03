@@ -23,7 +23,7 @@ test("l’aperçu exige une session QA signée créée après authentification p
 });
 
 test("le formulaire refuse les origines croisées et les corps surdimensionnés", () => {
-  assert.match(preview, /sameOrigin\(request\)/);
+  assert.match(preview, /sameOriginFormRequest\(request\)/);
   assert.match(preview, /contentLength > 4096/);
   assert.match(preview, /status: 403/);
   assert.match(preview, /status: 413/);

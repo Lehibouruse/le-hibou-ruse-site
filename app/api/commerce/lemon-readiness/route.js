@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { configMap, createRecord, queryRecords, TABLES } from "../../../../lib/airtable";
+import { configMap, createRecord, queryAllRecords, queryRecords, TABLES } from "../../../../lib/airtable";
 import { listLemonFiles, listLemonProducts, listLemonStores, listLemonVariants, lemonResourceId, lemonResourceName, summarizeLemonFiles } from "../../../../lib/lemon-api.mjs";
 import { resolveLemonWebhookSecret } from "../../../../lib/commerce.mjs";
 import { verifyGithubActionsToken } from "../../../../lib/github-oidc.mjs";
@@ -73,7 +73,7 @@ export async function POST(request) {
   }
 
   const [configuration, products] = await Promise.all([
-    queryRecords(TABLES.configuration, { pageSize: 100, priorityAware: false }),
+    queryAllRecords(TABLES.configuration, { priorityAware: false }, { maxRecords: 500 }),
     queryRecords(TABLES.products, { filterByFormula: "{Actif}=1", pageSize: 20, priorityAware: false }),
   ]);
   const config = configMap(configuration);

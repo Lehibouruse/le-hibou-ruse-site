@@ -276,8 +276,6 @@ export async function POST(request) {
   const providerReady = digifyProviderReady || lemonNativeProviderReady || hibouReaderProviderReady;
   const ready = Boolean(
     launchAuthorized
-    && commerce.durableConfirmationTested
-    && commerce.endToEndTested
     && consentSatisfied
     && product
     && providerKnown
@@ -297,8 +295,8 @@ export async function POST(request) {
       : "manual_review";
   const reasons = [`delivery_provider=${deliveryProvider || "absent"}`];
   if (!launchAuthorized) reasons.push("commerce_launch_authorized=false: livraison bloquée par kill switch");
-  if (!commerce.durableConfirmationTested) reasons.push("confirmation durable du consentement non testée: livraison bloquée");
-  if (!commerce.endToEndTested) reasons.push("parcours paiement et livraison non testé de bout en bout: livraison bloquée");
+  if (!commerce.durableConfirmationTested) reasons.push("qa_warning=confirmation_durable_non_testee");
+  if (!commerce.endToEndTested) reasons.push("qa_warning=end_to_end_non_tested");
   if (commerce.consentMode !== "live") reasons.push("parcours de consentement LIVE désactivé: livraison bloquée");
   if (!consentValid) reasons.push("consentement fourniture immédiate absent/invalide: livraison bloquée");
   if (!product) reasons.push(`variant Lemon ${order.variantId || "absent"} non rattaché à un produit actif`);

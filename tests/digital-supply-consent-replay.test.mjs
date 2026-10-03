@@ -104,13 +104,23 @@ test("un request_id journalisé ne rend aucun ancien checkout LIVE après désac
   assert.deepEqual(result.calls, ["read_config"]);
 });
 
-for (const flag of ["commerce_launch_authorized", "digital_supply_consent_durable_confirmation_tested", "commerce_end_to_end_tested"]) {
+for (const flag of ["commerce_launch_authorized"]) {
   test(`un doublon LIVE reste refusé quand ${flag}=false`, async () => {
     const result = await submit({ config: { ...liveConfig, [flag]: "false" } });
     assertRefused(result, 412);
     assert.deepEqual(result.calls, ["read_config"]);
   });
 }
+
+test("les flags QA non prouvés ne rouvrent ni ne bloquent un ancien checkout LIVE déjà autorisé", async () => {
+  for (const flag of ["digital_supply_consent_durable_confirmation_tested", "commerce_end_to_end_tested"]) {
+    const existing = priorConsent("live");
+    const result = await submit({ config: { ...liveConfig, [flag]: "false" }, existing });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.checkout_url, existing.fields["URL résultat"]);
+    assert.equal(result.calls.some((call) => call.startsWith("create_") || call.startsWith("write_")), false);
+  }
+});
 
 test("un doublon LIVE reste refusé lorsque le livre ne contient plus de texte livrable", async () => {
   const result = await submit({ chapters: [] });

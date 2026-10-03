@@ -26,12 +26,15 @@ test('no launch waitlist, monthly-price FAQ or repeated final pitch is rendered'
   assert.match(store, /Dois-je lire le livre dans l’ordre/);
   assert.match(store, /accès anticipé et incomplète/);
 });
-test('purchase CTAs point only to the internal consent page, without altering payment readiness', () => {
+test('purchase CTAs use the internal consent page and never hardcode a Lemon bypass', () => {
   assert.match(store, /purchaseHref = offer\.purchaseUrl \|\| '\/achat-guide'/);
   assert.match(read('lib/book-offer.js'), /commercialReadiness/);
   const endpoint = read('app/api/commerce/digital-supply-consent/route.js');
-  assert.match(endpoint, /commerce_end_to_end_tested/);
-  assert.match(endpoint, /digital_supply_consent_durable_confirmation_tested/);
+  const readiness = read('lib/launch-readiness.mjs');
+  assert.match(endpoint, /commerce_launch_authorized=false/);
+  assert.match(endpoint, /RECEIPT_CONFIRMATION/);
+  assert.match(readiness, /commerce_end_to_end/);
+  assert.match(readiness, /consent_durable_confirmation/);
   assert.doesNotMatch(store, /checkout\/buy|ready:\s*true/);
 });
 test('holding illustration covers both requested amounts without treating corporate cash as personal income', () => {

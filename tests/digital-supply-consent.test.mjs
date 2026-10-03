@@ -42,8 +42,10 @@ test("la route est désactivée par défaut et sépare TEST et LIVE", () => {
   assert.match(route, /\["test","live"\]\.includes\(mode\)/);
   assert.match(route, /LEMON_SQUEEZY_TEST_API_KEY/);
   assert.match(route, /commerce_launch_authorized=false/);
-  assert.match(route, /digital_supply_consent_durable_confirmation_tested/);
   assert.match(route, /checkoutCustomData/);
+  assert.match(route, /RECEIPT_CONFIRMATION/);
+  assert.doesNotMatch(route, /preuve durable du parcours de consentement non validée/);
+  assert.doesNotMatch(route, /parcours de paiement et livraison non validé de bout en bout/);
   assert.match(route, /immediate_supply_consent !== true/);
   assert.match(route, /withdrawal_loss_ack !== true/);
   assert.match(route, /request_id/);

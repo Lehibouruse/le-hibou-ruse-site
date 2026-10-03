@@ -111,7 +111,7 @@ test("le kill switch bloque même une configuration technique complète", () => 
   assert.ok(result.blockers.some((item) => item.key === "launch_authorized"));
 });
 
-test("le checkout reste fermé tant que consentement et livraison ne sont pas prouvés", () => {
+test("en early access seul le parcours LIVE reste bloquant; les flags QA restent visibles comme avertissements", () => {
   const input = readyInput();
   input.config.commerce_readiness_mode = "early_access";
   input.config.digital_supply_consent_checkout_mode = "disabled";
@@ -120,7 +120,28 @@ test("le checkout reste fermé tant que consentement et livraison ne sont pas pr
   const result = commercialReadiness(input);
   assert.equal(result.ready, false);
   assert.equal(result.checkoutUrl, "");
-  assert.deepEqual(result.blockers.filter((item) => item.key.startsWith("consent_") || item.key === "commerce_end_to_end").map((item) => item.key), ["consent_checkout_live", "consent_durable_confirmation", "commerce_end_to_end"]);
+  assert.deepEqual(result.blockers.filter((item) => item.key.startsWith("consent_") || item.key === "commerce_end_to_end").map((item) => item.key), ["consent_checkout_live"]);
+  assert.ok(result.warnings.some((item) => item.key === "consent_durable_confirmation"));
+  assert.ok(result.warnings.some((item) => item.key === "commerce_end_to_end"));
+});
+
+test("l’autorisation early access ouvre le checkout LIVE sans prétendre que les QA non exécutées sont réussies", () => {
+  const input = readyInput();
+  input.config.commerce_readiness_mode = "early_access";
+  input.config.digital_supply_consent_checkout_mode = "live";
+  input.config.digital_supply_consent_durable_confirmation_tested = "false";
+  input.config.commerce_end_to_end_tested = "false";
+  input.config.delivery_provider_mode = "hibou_reader";
+  input.config.lemon_downloadable_file_removed_verified = "true";
+  input.config.digify_api_status = "TRIAL_ENDED_NOT_DELIVERABLE";
+  delete input.product["Digify File GUID"];
+  delete input.env.DIGIFY_KEY_ID;
+  delete input.env.DIGIFY_SECRET;
+  const result = commercialReadiness(input);
+  assert.equal(result.ready, true);
+  assert.match(result.checkoutUrl, /^https:/);
+  assert.ok(result.warnings.some((item) => item.key === "consent_durable_confirmation" && item.ok === false));
+  assert.ok(result.warnings.some((item) => item.key === "commerce_end_to_end" && item.ok === false));
 });
 
 test("une édition sans texte livrable ferme le checkout même en early access", () => {

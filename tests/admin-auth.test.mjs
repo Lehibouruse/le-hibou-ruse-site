@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adminAuthorized, adminOrServiceAuthorized, serviceAuthorized } from "../lib/admin-auth.mjs";
+import { adminAuthorized, adminCredentialsAuthorized, adminOrServiceAuthorized, serviceAuthorized } from "../lib/admin-auth.mjs";
 
 function requestWithAuthorization(value) {
   return new Request("https://example.test", { headers: value ? { authorization: value } : {} });
@@ -25,4 +25,12 @@ test("adminOrServiceAuthorized accepte Basic admin ou Bearer service", () => {
   assert.equal(adminOrServiceAuthorized(requestWithAuthorization(`Basic ${basic}`), env), true);
   assert.equal(adminOrServiceAuthorized(requestWithAuthorization("Bearer svc"), env), true);
   assert.equal(adminOrServiceAuthorized(requestWithAuthorization("Bearer wrong"), env), false);
+});
+
+test("les identifiants admin soumis par un formulaire utilisent la même comparaison stricte", () => {
+  const env = { HIBOU_ADMIN_USER: "hibou", HIBOU_ADMIN_PASSWORD: "pw" };
+  assert.equal(adminCredentialsAuthorized("hibou", "pw", env), true);
+  assert.equal(adminCredentialsAuthorized("hibou", "wrong", env), false);
+  assert.equal(adminCredentialsAuthorized("wrong", "pw", env), false);
+  assert.equal(adminCredentialsAuthorized("hibou", "pw", {}), false);
 });

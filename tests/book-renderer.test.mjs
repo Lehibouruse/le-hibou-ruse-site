@@ -24,6 +24,13 @@ test("le document contient couverture, sommaire, édition et garde-fous d'impres
   assert.match(html, /V1-test/);
   assert.match(html, /@page/);
   assert.match(html, /noindex,nofollow,noarchive/);
+  assert.match(html, /href="#chapter-1"/);
+  assert.match(html, /id="sommaire"/);
+  assert.match(html, /data-reader-title="1 — Exemple"/);
+  assert.match(html, /--reader-font-size:17\.5px/);
+  assert.match(html, /Retour au sommaire/);
+  assert.match(html, /Contenu pédagogique et informatif\. Les règles évoluent\./);
+  assert.doesNotMatch(html, /class="folio"|Le Hibou Rusé · V1-test/);
 });
 
 test("le lecteur acheté sert le texte principal et la suite, sans sections vides ni doublon", () => {
@@ -57,7 +64,7 @@ test("la suite technique du chapitre 10 suit le texte principal dans une seule e
   assert.equal(published.length, 1);
   assert.equal(chapterContent(published[0].fields), "Texte principal.\n\nSuite technique propre.");
   const html = renderBookDocument({ chapters, edition: "V1.0-early-access-2026-09", publishedReader: true });
-  assert.equal(html.match(/<section class="chapter">/g)?.length, 1);
+  assert.equal(html.match(/<section class="chapter"/g)?.length, 1);
   assert.doesNotMatch(html, /Référentiel interne|brouillon/);
 });
 

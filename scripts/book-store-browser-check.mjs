@@ -22,6 +22,7 @@ try {
   writeFileSync(`${directory}/home-snapshot.txt`, browser('snapshot', '-i'));
   browser('open', `${base}/guide`);
   browser('wait', '--fn', "document.querySelector('.store-comparison') !== null");
+  assertPage("!document.body.innerText.includes('EXTRAIT DU LIVRE') && !document.body.innerText.includes('Explorer le sommaire du livre')", 'guide does not expose book excerpts or full contents');
   assertPage("document.querySelector('.store-result-number').textContent.replace(/\\D/g,'') === '68600'", 'personal result at 100000');
   browser('eval', "document.querySelector('.store-toggle button:last-child').click()");
   browser('wait', '--fn', "document.querySelector('.store-result-number').textContent.replace(/\\D/g,'') === '98750'");

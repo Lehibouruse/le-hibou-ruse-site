@@ -3,6 +3,9 @@ on:
   pull_request:
     branches: [main]
     paths: ['app/**', 'components/**', 'lib/book-marketing.mjs', 'lib/book-offer.js', 'scripts/book-store-browser-check.mjs', '.github/workflows/book-store-qc.yml']
+  push:
+    branches: [main]
+    paths: ['components/BookStore.js', 'components/HoldingLombard.js', 'components/book-store-voice.css', 'app/services/page.js', 'components/LeadForm.js', 'scripts/book-store-browser-check.mjs']
   workflow_dispatch:
     inputs:
       test_url:
@@ -27,15 +30,24 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
       - run: npm install --no-save --package-lock=false agent-browser@0.38.1
       - run: npx agent-browser install --with-deps
-      - name: Start and check local server
+      - name: Start local server
+        if: github.event_name != 'push'
         run: |
           npm run start > /tmp/hibou-book-store.log 2>&1 &
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/ >/dev/null && break || sleep 2; done
           curl -fsS http://127.0.0.1:3000/ >/dev/null
+      - name: Wait for the production revision
+        if: github.event_name == 'push'
+        run: |
+          for i in $(seq 1 40); do
+            if curl --max-time 20 -fsS https://d4d5d6.com/ -o /tmp/hibou-home.html && grep -q 'data-store-version="2026-10-03-marc"' /tmp/hibou-home.html; then exit 0; fi
+            sleep 5
+          done
+          echo 'Expected production revision not observed'; exit 1
       - name: Browser verification
         run: node scripts/book-store-browser-check.mjs
         env:
-          BOOK_TEST_URL: ${{ inputs.test_url }}
+          BOOK_TEST_URL: ${{ github.event_name == 'push' && 'https://d4d5d6.com' || inputs.test_url }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

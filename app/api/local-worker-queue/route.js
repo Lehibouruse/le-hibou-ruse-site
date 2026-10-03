@@ -873,6 +873,29 @@ async function autoActivateWhenWorkerReady(request) {
   };
 }
 
+function completedArtifactGate(body) {
+  const result = body?.result && typeof body.result === "object"
+    ? body.result
+    : {};
+  const schemaOk = result.schema === "HIBOU_VIDEO_RENDER_RESULT_V1";
+  const pathValue = String(body?.local_path || result.master_path || "").trim();
+  const hashValue = String(body?.result_sha256 || result.master_sha256 || "").trim();
+  const bytes = Number(result.master_bytes || 0);
+  const pathOk = /master\.mp4$/i.test(pathValue);
+  const hashOk = /^[0-9a-f]{64}$/i.test(hashValue);
+  const bytesOk = Number.isFinite(bytes) && bytes > 0;
+  return {
+    ok: schemaOk && pathOk && hashOk && bytesOk,
+    schema_ok: schemaOk,
+    path_ok: pathOk,
+    hash_ok: hashOk,
+    bytes_ok: bytesOk,
+    master_path: pathOk ? pathValue : null,
+    master_sha256: hashOk ? hashValue.toLowerCase() : null,
+    master_bytes: bytesOk ? bytes : null,
+  };
+}
+
 async function autoChainAfterSuccess(completedRecordId) {
   const active = await activeVideoJobs();
   if (active.length) {
@@ -1762,9 +1785,18 @@ export async function POST(request) {
       fields,
     );
 
-    const success_chain = status === "Completed"
+    const artifact_gate = status === "Completed"
+      ? completedArtifactGate(body)
+      : { ok: false, reason: "predecessor_not_completed" };
+
+    const success_chain = status === "Completed" && artifact_gate.ok
       ? await autoChainAfterSuccess(recordId)
-      : { activated: false, reason: "predecessor_not_completed" };
+      : {
+          activated: false,
+          reason: status === "Completed"
+            ? "completed_artifact_gate_failed"
+            : "predecessor_not_completed",
+        };
 
     return NextResponse.json({
       ok: true,
@@ -1772,6 +1804,7 @@ export async function POST(request) {
       reported_status: status,
       status: retry.retry ? "Pending" : status,
       retry,
+      artifact_gate,
       success_chain,
       repair_resume_prepared: repairPrepared,
       requires_separate_render_start: repairPrepared,

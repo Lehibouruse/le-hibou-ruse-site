@@ -40,7 +40,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           for i in $(seq 1 40); do
-            if curl --max-time 20 -fsS https://d4d5d6.com/ -o /tmp/hibou-home.html && grep -q 'data-store-version="2026-10-03-marc"' /tmp/hibou-home.html; then exit 0; fi
+            if curl --max-time 20 -fsS https://d4d5d6.com/ -o /tmp/hibou-home.html && grep -q 'data-store-version="2026-10-03-no-excerpts"' /tmp/hibou-home.html; then exit 0; fi
             sleep 5
           done
           echo 'Expected production revision not observed'; exit 1

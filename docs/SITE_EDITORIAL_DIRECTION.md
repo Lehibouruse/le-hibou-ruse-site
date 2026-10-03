@@ -15,3 +15,6 @@ Le caractère incomplet de l’édition peut être indiqué brièvement au bloc 
 Cas demandé : 100 000 € par défaut, option 500 000 €. Montrer la capitalisation dans la holding puis le projet de nantissement des titres détenus personnellement pour un financement personnel. Ne pas confondre ce prêt bancaire avec une distribution de la holding. L’acceptation de titres non cotés est une condition substantielle : pas une disponibilité universelle dans les offres lombard standard. Les sources et hypothèses détaillées sont dans le volet dépliable du cas.
 
 Source éditoriale des textes affichés : Airtable > Site CMS. Contenus du livre : Airtable > Livre. Ce fichier sert de contrainte de maintenance ; il ne remplace pas ces sources.
+
+
+Décision complémentaire du 03/10/2026 : ne publier sur le site ni extrait réel, ni passage du livre, ni sommaire exhaustif. Montrer seulement une sélection courte de thèmes sous forme d’accroches. L’exemple holding reste un exemple autonome, pas un extrait revendiqué du livre.

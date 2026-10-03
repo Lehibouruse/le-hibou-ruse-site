@@ -14,7 +14,8 @@ try {
   browser('wait', '--fn', "document.querySelector('.store-assertive') !== null");
   assertPage("document.body.innerText.length > 500 && !document.querySelector('[data-nextjs-dialog]')", 'homepage renders without an error overlay');
   assertPage("document.querySelector('.store-actions a').getAttribute('href') === '/achat-guide'", 'primary action enters the purchase flow, not a waitlist');
-  assertPage("document.querySelectorAll('#methode [data-level]').length === 3 && document.querySelector('#methode').getBoundingClientRect().top < document.querySelector('#extrait').getBoundingClientRect().top", 'D4 D5 D6 are above the example');
+  assertPage("document.querySelectorAll('#methode [data-level]').length === 3 && document.querySelector('#methode').getBoundingClientRect().top < document.querySelector('#exemple').getBoundingClientRect().top", 'D4 D5 D6 are above the example');
+  assertPage("!document.body.innerText.includes('EXTRAIT DU LIVRE') && !document.body.innerText.includes('Explorer le sommaire du livre') && document.body.innerText.includes('QUELQUES MONTAGES COMPRIS DANS LE LIVRE')", 'no real book excerpt or full contents are exposed');
   assertPage("document.querySelectorAll('#services .store-service-offer').length === 2 && document.querySelector('#services').innerText.includes('500 €') && document.querySelector('#services').innerText.includes('Sur devis')", 'both service offers are on the homepage');
   assertPage("!document.querySelector('#ouverture,.store-launch,.store-final') && !document.body.innerText.includes('Le prix est-il mensuel')", 'removed sections stay removed');
   browser('screenshot', `${directory}/home-desktop.png`, '--full');
@@ -46,6 +47,6 @@ try {
   browser('screenshot', `${directory}/services-mobile.png`, '--full');
   const errors = browser('errors');
   writeFileSync(`${directory}/browser-errors.txt`, errors);
-  writeFileSync(`${directory}/result.json`, JSON.stringify({ ok: true, base, version: '2026-10-03-marc', tested: ['homepage desktop', 'D4 D5 D6 order', 'restored services', 'no launch waitlist', 'holding 100000 and 500000', 'mobile 390 and 320', 'service form offer routing'], note: 'No purchase or form submission. Browser success is not proof that payment and delivery completed.' }, null, 2));
+  writeFileSync(`${directory}/result.json`, JSON.stringify({ ok: true, base, version: '2026-10-03-no-excerpts', tested: ['homepage desktop', 'D4 D5 D6 order', 'restored services', 'no launch waitlist', 'holding 100000 and 500000', 'mobile 390 and 320', 'service form offer routing'], note: 'No purchase or form submission. Browser success is not proof that payment and delivery completed.' }, null, 2));
   console.log('BOOK_STOREFRONT_BROWSER_QC_PASS');
 } finally { try { browser('close'); } catch {} }

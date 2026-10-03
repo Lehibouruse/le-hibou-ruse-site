@@ -57,6 +57,7 @@ test("les réponses du lecteur sont privées, non indexables et résistantes à 
   assert.match(protectedHtml, /Page 1 \/ 1/);
   assert.match(protectedHtml, /pinch-zoom/);
   assert.match(protectedHtml, /sessionStorage/);
+  assert.match(protectedHtml, /\.cover h1, \.frontmatter h2/);
   assert.doesNotMatch(protectedHtml, /rotate\(-28deg\)|hibou-reader-watermark/);
 
   const response = protectedReaderResponse({

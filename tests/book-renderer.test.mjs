@@ -28,6 +28,7 @@ test("le document contient couverture, sommaire, édition et garde-fous d'impres
   assert.match(html, /id="sommaire"/);
   assert.match(html, /data-reader-title="1 — Exemple"/);
   assert.match(html, /--reader-font-size:17\.5px/);
+  assert.match(html, /overflow-wrap:anywhere/);
   assert.match(html, /Retour au sommaire/);
   assert.match(html, /Contenu pédagogique et informatif\. Les règles évoluent\./);
   assert.doesNotMatch(html, /class="folio"|Le Hibou Rusé · V1-test/);

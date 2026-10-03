@@ -45,13 +45,19 @@ test("les réponses du lecteur sont privées, non indexables et résistantes à 
   assert.equal(denied.headers.get("referrer-policy"), "no-referrer");
   assert.equal(denied.headers.get("x-frame-options"), "DENY");
 
-  const protectedHtml = protectReaderHtml("<html><body><main class=\"book\">secret</main></body></html>", {
+  const protectedHtml = protectReaderHtml("<html><head></head><body><main class=\"book\">secret</main></body></html>", {
     watermark: "APERÇU QA PRIVÉ",
     edition: "V1-test",
   });
   assert.match(protectedHtml, /APERÇU QA PRIVÉ/);
   assert.match(protectedHtml, /user-select:none/);
   assert.match(protectedHtml, /@media print/);
+  assert.match(protectedHtml, /data-reader-size="up"/);
+  assert.match(protectedHtml, /hibou-reader-status/);
+  assert.match(protectedHtml, /Page 1 \/ 1/);
+  assert.match(protectedHtml, /pinch-zoom/);
+  assert.match(protectedHtml, /sessionStorage/);
+  assert.doesNotMatch(protectedHtml, /rotate\(-28deg\)|hibou-reader-watermark/);
 
   const response = protectedReaderResponse({
     chapters: [{ fields: { Chapitre: "1 — Test", "Contenu V1": "Contenu QA" } }],

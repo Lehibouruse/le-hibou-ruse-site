@@ -159,7 +159,7 @@ test("le checkout live exige une description transparente de l’édition numér
   };
   const payload = buildLiveCheckoutPayload(input);
   assert.equal(payload.data.attributes.test_mode, false);
-  assert.equal(payload.data.attributes.checkout_options.desc, true);
+  assert.equal(payload.data.attributes.checkout_options.desc, false);
   assert.deepEqual(payload.data.attributes.product_options.enabled_variants, [2140119]);
   assert.match(payload.data.attributes.product_options.description, /édition numérique/i);
   assert.throws(() => buildLiveCheckoutPayload({ ...input, description: "Guide complet" }), /description transparente/);

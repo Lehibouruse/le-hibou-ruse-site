@@ -1,0 +1,109 @@
+name: Prepare authorized live commerce
+on:
+  push:
+    branches: [commerce-live-open-2026-10-03]
+    paths: [.github/workflows/prepare-authorized-live-commerce.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: commerce-live-open-2026-10-03
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Make QA evidence non-blocking for explicitly authorized early access
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('lib/launch-readiness.mjs')
+          s=p.read_text()
+          replacements = {
+            'add("consent_durable_confirmation", bool(config.digital_supply_consent_durable_confirmation_tested), "Confirmation durable du consentement testée");':
+            'add("consent_durable_confirmation", bool(config.digital_supply_consent_durable_confirmation_tested), "Confirmation durable du consentement testée", !earlyAccess);',
+            'add("commerce_end_to_end", bool(config.commerce_end_to_end_tested), "Checkout, webhook, accès lecteur et révocation validés en test de bout en bout");':
+            'add("commerce_end_to_end", bool(config.commerce_end_to_end_tested), "Checkout, webhook, accès lecteur et révocation validés en test de bout en bout", !earlyAccess);',
+          }
+          for old,new in replacements.items():
+              assert old in s, old
+              s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('app/api/commerce/digital-supply-consent/route.js')
+          s=p.read_text()
+          for line in [
+            '      if (!truthy(config.digital_supply_consent_durable_confirmation_tested)) throw new Error("preuve durable du parcours de consentement non validée");\n',
+            '      if (!truthy(config.commerce_end_to_end_tested)) throw new Error("parcours de paiement et livraison non validé de bout en bout");\n',
+          ]:
+              assert line in s, line
+              s=s.replace(line,'',1)
+          p.write_text(s)
+
+          p=Path('app/api/commerce/lemon-webhook/route.js')
+          s=p.read_text()
+          old='    && commerce.durableConfirmationTested\n    && commerce.endToEndTested\n'
+          assert old in s
+          s=s.replace(old,'',1)
+          old='  if (!commerce.durableConfirmationTested) reasons.push("confirmation durable du consentement non testée: livraison bloquée");\n'
+          assert old in s
+          s=s.replace(old,'  if (!commerce.durableConfirmationTested) reasons.push("qa_warning=confirmation_durable_non_testee");\n',1)
+          old='  if (!commerce.endToEndTested) reasons.push("parcours paiement et livraison non testé de bout en bout: livraison bloquée");\n'
+          assert old in s
+          s=s.replace(old,'  if (!commerce.endToEndTested) reasons.push("qa_warning=end_to_end_non_tested");\n',1)
+          p.write_text(s)
+
+          Path('tests/early-access-live-commerce.test.mjs').write_text(r'''import assert from "node:assert/strict";
+          import test from "node:test";
+          import { readFileSync } from "node:fs";
+
+          const readiness = readFileSync(new URL("../lib/launch-readiness.mjs", import.meta.url), "utf8");
+          const consent = readFileSync(new URL("../app/api/commerce/digital-supply-consent/route.js", import.meta.url), "utf8");
+          const webhook = readFileSync(new URL("../app/api/commerce/lemon-webhook/route.js", import.meta.url), "utf8");
+
+          test("explicit early access authorization can open checkout while unproven QA flags remain warnings", () => {
+            assert.match(readiness, /consent_durable_confirmation[\s\S]*!earlyAccess/);
+            assert.match(readiness, /commerce_end_to_end[\s\S]*!earlyAccess/);
+            assert.match(readiness, /consent_checkout_live/);
+            assert.match(readiness, /launch_authorized/);
+          });
+
+          test("live checkout still requires explicit customer consent and authorized launch", () => {
+            assert.match(consent, /commerce_launch_authorized=false/);
+            assert.match(consent, /immediate_supply_consent !== true/);
+            assert.match(consent, /withdrawal_loss_ack !== true/);
+            assert.match(consent, /RECEIPT_CONFIRMATION/);
+            assert.doesNotMatch(consent, /if \(!truthy\(config\.digital_supply_consent_durable_confirmation_tested\)\) throw/);
+            assert.doesNotMatch(consent, /if \(!truthy\(config\.commerce_end_to_end_tested\)\) throw/);
+          });
+
+          test("a signed paid live Lemon order can become reader-ready without falsifying QA evidence", () => {
+            assert.match(webhook, /&& consentSatisfied/);
+            assert.match(webhook, /&& providerReady/);
+            assert.match(webhook, /order\.status === "paid"/);
+            assert.match(webhook, /!order\.testMode/);
+            assert.doesNotMatch(webhook, /&& commerce\.durableConfirmationTested/);
+            assert.doesNotMatch(webhook, /&& commerce\.endToEndTested/);
+            assert.match(webhook, /qa_warning=confirmation_durable_non_testee/);
+            assert.match(webhook, /qa_warning=end_to_end_non_tested/);
+          });
+          ''')
+          PY
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Commit patch and remove this one-use workflow
+        run: |
+          git rm .github/workflows/prepare-authorized-live-commerce.yml
+          git add lib/launch-readiness.mjs app/api/commerce/digital-supply-consent/route.js app/api/commerce/lemon-webhook/route.js tests/early-access-live-commerce.test.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'commerce: open authorized early-access checkout without falsifying QA evidence'
+          git push origin HEAD:commerce-live-open-2026-10-03

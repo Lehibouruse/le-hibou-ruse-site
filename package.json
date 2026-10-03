@@ -49,11 +49,14 @@
     "video:voice-qc:run": "node scripts/video-voice-qc-run.mjs",
     "video:license:audit": "node scripts/video-license-audit.mjs",
     "video:license:audit:runtime": "node scripts/video-license-audit.mjs --runtime",
-    "video:forensic:install:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-forensic-install-windows.ps1"
+    "video:forensic:install:windows": "powershell -ExecutionPolicy Bypass -File .\\\\scripts\\\\video-forensic-install-windows.ps1",
+    "prebuild": "node scripts/copy-pdfjs.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
     "next": "16.3.6",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "6.3.289",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   }

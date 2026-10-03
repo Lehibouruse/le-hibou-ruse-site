@@ -1,4 +1,4 @@
-import { getRecords, TABLES, configMap } from "../../../lib/airtable";
+import { getAllRecords, TABLES, configMap } from "../../../lib/airtable";
 import { renderBookDocument } from "../../../lib/book-renderer.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
@@ -31,8 +31,8 @@ export async function GET(request) {
 
   const draft = truthy(request.headers.get("x-hibou-book-draft"));
   const [chapters, configuration] = await Promise.all([
-    getRecords(TABLES.book, { pageSize: 100 }),
-    getRecords(TABLES.configuration, { pageSize: 100 }),
+    getAllRecords(TABLES.book),
+    getAllRecords(TABLES.configuration),
   ]);
   const config = configMap(configuration);
   const edition = config.book_current_edition || "V1.0-draft";

@@ -1,5 +1,5 @@
 import { adminAuthorized, adminUnauthorized } from "../../../lib/admin-auth.mjs";
-import { configMap, getRecords, queryRecords, TABLES } from "../../../lib/airtable";
+import { configMap, getAllRecords, getRecords, queryRecords, TABLES } from "../../../lib/airtable";
 import { githubInfrastructureStatus, systemHealthHeartbeat } from "../../../lib/infrastructure-observability.mjs";
 import { commerceTestReadiness, commercialReadiness } from "../../../lib/launch-readiness.mjs";
 
@@ -48,7 +48,7 @@ export async function GET(request) {
   if (!adminAuthorized(request)) return adminUnauthorized();
 
   const [configuration, products, chapters, legal, watchdogEvents, github] = await Promise.all([
-    getRecords(TABLES.configuration),
+    getAllRecords(TABLES.configuration),
     getRecords(TABLES.products),
     getRecords(TABLES.book),
     getRecords(TABLES.legal),

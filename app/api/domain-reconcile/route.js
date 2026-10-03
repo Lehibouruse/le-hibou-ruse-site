@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { getAllRecords, TABLES, updateRecord } from "../../../lib/airtable";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +50,7 @@ export async function GET(request) {
     return NextResponse.json({ ok: true, verified: false, promoted: false, identity });
   }
 
-  const configuration = await getRecords(TABLES.configuration);
+  const configuration = await getAllRecords(TABLES.configuration);
   await updateConfig(configuration, "public_site_url", TARGET_URL, "URL publique canonique vérifiée du Hibou Rusé.");
   await updateConfig(configuration, "public_site_host_expected", TARGET_HOST, "Host canonique vérifié obligatoire pour l'ouverture commerciale.");
   await updateConfig(configuration, "domain_verified", "true", "Vérifié automatiquement via /api/site-identity sur d4d5d6.com.");

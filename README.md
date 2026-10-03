@@ -14,6 +14,8 @@ Lemon Squeezy est la couche Merchant of Record. Digify est la couche prévue pou
 
 Site connecté à Airtable.
 
+La production vidéo canonique passe exclusivement par Video Studio V5 et la file `HIBOU_VIDEO_RENDER_QUEUE_V2`. L'ancien chemin agent V2 est désactivé et en lecture seule.
+
 
 ## Reprise du projet
 

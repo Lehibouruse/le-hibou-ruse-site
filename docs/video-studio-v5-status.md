@@ -1,6 +1,8 @@
 # Video Studio V5 — readiness status
 
-Branch: `feat/video-studio-v5`.
+> **Archive de conception.** Ce tableau décrit l'état de la branche au moment de sa rédaction et ne constitue plus la source de vérité opérationnelle. L'état courant est dans `WORK_STATE.md`; l'exécution canonique utilise la file `HIBOU_VIDEO_RENDER_QUEUE_V2` et reste opt-in.
+
+Branch historique : `feat/video-studio-v5`.
 
 This branch is intentionally isolated from production. No Airtable migration in this branch is applied automatically, no production publish path is enabled, and no GPU E2E is executed by CI.
 

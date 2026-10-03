@@ -3,8 +3,7 @@
   "git": {
     "deploymentEnabled": {
       "**": false,
-      "main": true,
-      "fix/site-funnel-20260930": true
+      "main": true
     },
     "ignoreCommand": "git diff HEAD^ HEAD --quiet -- app components lib public package.json package-lock.json proxy.js vercel.json"
   },

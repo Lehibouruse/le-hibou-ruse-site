@@ -12,6 +12,8 @@ test("la promotion du domaine exige une preuve d’identité canonique", () => {
   assert.match(route, /domain_verified/);
   assert.match(route, /social_link_template/);
   assert.match(route, /public_site_url/);
+  assert.match(route, /getAllRecords\(TABLES\.configuration\)/);
+  assert.doesNotMatch(route, /getRecords\(TABLES\.configuration\)/);
 });
 
 test("un échec de résolution ne promeut pas le domaine", () => {
@@ -21,5 +23,6 @@ test("un échec de résolution ne promeut pas le domaine", () => {
 test("le reconcileur est planifié sans réactiver les previews de branches", () => {
   assert.equal(vercel.git.deploymentEnabled["**"], false);
   assert.equal(vercel.git.deploymentEnabled.main, true);
+  assert.deepEqual(Object.keys(vercel.git.deploymentEnabled).sort(), ["**", "main"]);
   assert.equal(vercel.crons.some((item) => item.path === "/api/domain-reconcile"), true);
 });

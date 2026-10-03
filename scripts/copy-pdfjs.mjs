@@ -1,0 +1,11 @@
+import { mkdir, copyFile, cp } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+const require=createRequire(import.meta.url);
+const root=dirname(require.resolve('pdfjs-dist/package.json'));
+const output=join(process.cwd(),'public','reader','vendor');
+await mkdir(output,{recursive:true});
+for (const name of ['pdf.mjs','pdf.worker.mjs']) await copyFile(join(root,'legacy','build',name),join(output,name));
+await copyFile(join(root,'LICENSE'),join(output,'LICENSE'));
+for (const name of ['standard_fonts','cmaps','wasm']) await cp(join(root,name),join(output,name),{recursive:true});
+console.log('Self-hosted PDF.js assets prepared. No manuscript is exported.');

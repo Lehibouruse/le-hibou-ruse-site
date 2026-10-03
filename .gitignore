@@ -1,5 +1,6 @@
 node_modules/
 .next/
+/public/reader/
 .env*
 !.env.example
 .vercel/

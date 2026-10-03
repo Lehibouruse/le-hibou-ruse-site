@@ -9,6 +9,9 @@ const robots = readFileSync(new URL("../app/robots.js", import.meta.url), "utf8"
 
 test("l’aperçu exige une session QA signée créée après authentification propriétaire", () => {
   assert.match(preview, /adminCredentialsAuthorized/);
+  assert.match(preview, /derivedCredentialsAuthorized/);
+  assert.match(preview, /PREVIEW_RECOVERY_DIGEST/);
+  assert.doesNotMatch(preview, /Hibou-QA-Jxk3KZ2vW4tXPdT-0opY/);
   assert.match(preview, /signReaderPreviewToken/);
   assert.match(preview, /verifyReaderPreviewToken/);
   assert.match(preview, /HttpOnly; Secure; SameSite=Strict/);

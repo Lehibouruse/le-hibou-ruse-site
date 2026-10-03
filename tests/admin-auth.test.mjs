@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adminAuthorized, adminCredentialsAuthorized, adminOrServiceAuthorized, serviceAuthorized } from "../lib/admin-auth.mjs";
+import { adminAuthorized, adminCredentialsAuthorized, adminOrServiceAuthorized, derivedCredentialsAuthorized, serviceAuthorized } from "../lib/admin-auth.mjs";
 
 function requestWithAuthorization(value) {
   return new Request("https://example.test", { headers: value ? { authorization: value } : {} });
@@ -33,4 +33,12 @@ test("les identifiants admin soumis par un formulaire utilisent la même compara
   assert.equal(adminCredentialsAuthorized("hibou", "wrong", env), false);
   assert.equal(adminCredentialsAuthorized("wrong", "pw", env), false);
   assert.equal(adminCredentialsAuthorized("hibou", "pw", {}), false);
+});
+
+test("un identifiant dédié peut être vérifié sans enregistrer son mot de passe", () => {
+  const salt = "test-salt";
+  const digest = "5b5eca6048dbf51b3c2cf0f0a26f461138e28831c2283be6a3356fd89c7e7c60";
+  assert.equal(derivedCredentialsAuthorized("hibou", "pw", "hibou", salt, digest), true);
+  assert.equal(derivedCredentialsAuthorized("Hibou", "pw", "hibou", salt, digest), false);
+  assert.equal(derivedCredentialsAuthorized("hibou", "wrong", "hibou", salt, digest), false);
 });

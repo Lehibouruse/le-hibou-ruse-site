@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { DEFAULT_RESERVED_JOB_IDS, eligibleJobsFormula, reservedJobIds } from "../lib/job-eligibility.mjs";
 import { validateGithubActionsClaims } from "../lib/github-oidc.mjs";
-import { isAgenticAction, toolsForAction } from "../lib/agent-capabilities.mjs";
+import { isAgenticAction, toolsForAction, workerInstructions } from "../lib/agent-capabilities.mjs";
 import { failureDisposition, vercelCommitState } from "../lib/agent-runtime.mjs";
 
 const NOW = 2_000_000_000;
@@ -51,7 +51,7 @@ test("l'OIDC accepte uniquement le workflow scheduler exact sur main", () => {
   assert.throws(() => validateGithubActionsClaims(validClaims({ iat: NOW - 601 }), NOW), /mission/);
 });
 
-test("le registre borne les écritures site et branche la chaîne vidéo", () => {
+test("le registre borne les écritures site et neutralise l'ancienne chaîne vidéo", () => {
   assert.equal(isAgenticAction("UPDATE_SITE", { objective: "mission globale" }), true);
   assert.equal(isAgenticAction("UPDATE_SITE", { key: "hero" }), false);
   assert.equal(isAgenticAction("CREATE_VIDEO", {}), true);
@@ -61,10 +61,16 @@ test("le registre borne les écritures site et branche la chaîne vidéo", () =>
   assert.ok(siteNames.includes("site_edit"));
   assert.ok(siteNames.includes("repo_read_many"));
   assert.equal(siteNames.includes("generate_speech"), false);
-  assert.ok(videoNames.includes("assemble_video"));
-  assert.ok(videoNames.includes("video_qc"));
-  assert.ok(videoNames.includes("register_video_draft"));
+  assert.ok(videoNames.includes("airtable_read"));
+  assert.equal(videoNames.includes("assemble_video"), false);
+  assert.equal(videoNames.includes("video_qc"), false);
+  assert.equal(videoNames.includes("register_video_draft"), false);
   assert.equal(videoNames.includes("schedule_post"), false);
+  const videoInstructions = workerInstructions("CREATE_VIDEO");
+  assert.match(videoInstructions, /ANCIEN CHEMIN VIDEO DESACTIVE/);
+  assert.match(videoInstructions, /HIBOU_VIDEO_RENDER_QUEUE_V2/);
+  assert.match(videoInstructions, /HIBOU_AIRTABLE_SOURCE_SNAPSHOT_V1/);
+  assert.match(videoInstructions, /PROMPT_CONTRACT_PASS/);
 });
 
 test("une erreur récupérable passe en Retry avec backoff borné", () => {

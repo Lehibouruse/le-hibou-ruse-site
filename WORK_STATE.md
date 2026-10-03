@@ -1,160 +1,61 @@
 # Le Hibou Rusé — état de reprise canonique
 
-Dernière mise à jour : 24/09/2026.
+Dernière mise à jour : 03/10/2026.
 
-## Règle de lecture
+## Sources de vérité
 
-Toujours distinguer :
-1. **code présent dans `main`** ;
-2. **runtime réellement configuré** ;
-3. **test réel réussi** ;
-4. **production/publi­cation autorisée**.
+Toujours distinguer le code présent dans `main`, la configuration réellement active, une preuve d'exécution réussie et l'autorisation de publier. Une CI verte ou un artefact historique ne remplace aucune de ces preuves.
 
-Une CI verte ne prouve ni un accès externe, ni un secret configuré, ni une publication réelle.
+- Code du site et du pipeline : dépôt `Lehibouruse/le-hibou-ruse-site`, branche `main`.
+- Données éditoriales et états opérationnels : base Airtable `D4-D5-D6 — Média fiscal`.
+- Production web : projet Vercel `le-hibou-ruse-site`, domaine canonique `d4d5d6.com`.
+- Vidéo : Video Studio V5 local, piloté exclusivement par `HIBOU_VIDEO_RENDER_QUEUE_V2`.
 
-## Matériel local à confirmer par diagnostic
+Le dépôt vide `Lehibouruse/Site-du-Hibou-Rus-`, les branches fermées, les previews passées et les documents de branche marqués comme archives ne sont pas des sources de vérité.
 
-Informations connues : PC gaming Windows, Intel Core i9 et NVIDIA GeForce RTX. Le modèle exact du PC, le modèle exact du GPU, la VRAM, la RAM et le stockage ne doivent pas être considérés comme confirmés tant que le diagnostic local n'a pas été exécuté.
+## Vidéo canonique V5
 
-Le profil canonique est `video/hardware/detect-at-runtime.json`. Le diagnostic runtime est obligatoire avant génération lourde.
+Le chemin V2 de l'ancien agent est désactivé et ne reçoit plus aucun outil de génération ou de rendu. Toute production vidéo doit :
 
-## Vidéo locale
+1. partir des enregistrements Airtable courants ;
+2. embarquer un reçu `HIBOU_AIRTABLE_SOURCE_SNAPSHOT_V1` ;
+3. entrer par la file `HIBOU_VIDEO_RENDER_QUEUE_V2` ;
+4. être exécutée localement par le pipeline V5, avec ses gates runtime ;
+5. conserver la publication verrouillée ;
+6. obtenir le verdict final `PROMPT_CONTRACT_PASS` et la revue humaine requise.
 
-Le socle vidéo est dans `main` :
-- contrat `HIBOU_VIDEO_CONTRACT_V1` ;
-- Airtable → scènes/storyboard ;
-- Chatterbox Multilingual local ;
-- ComfyUI local ;
-- génération séquentielle de candidats image ;
-- sous-titres, mastering audio, rendu FFmpeg 1080×1920 / 30 fps ;
-- QC, hashes, manifests ;
-- smoke test d'une seule scène ;
-- reporting Airtable qui distingue un smoke d'un pilote complet ;
-- installation Windows staged : diagnostic par défaut, installations lourdes uniquement avec switches explicites.
+Les anciens scripts V2/V3, pilotes, rendus, prompts et scènes techniques non reliées ne doivent jamais être utilisés pour lancer une production.
 
-Le profil image de départ dépend de la VRAM réellement mesurée. Pour une machine contrainte, le pipeline prévoit batch 1, génération séquentielle, low-VRAM/quantification adaptée et baisse de résolution avant tout autre compromis. Aucun fallback cloud payant silencieux.
+### Box Spread
 
-Preuve runtime encore attendue :
-1. diagnostic GPU/driver/CUDA/disque ;
-2. une scène voix Chatterbox ;
-3. trois images ComfyUI ;
-4. smoke complet ;
-5. trois scènes ;
-6. pilote complet + lecture iPhone.
+La seule fiche éditoriale de référence est `Lombard vs Box Spread — marge bancaire`, Script V4, état `CANONICAL — SCRIPT V4 — CLEAN`, avec les 15 scènes `box_spread_s01` à `box_spread_s15`. Les anciens POC et paramètres dérivés ne font pas autorité.
 
-## Worker Windows
+## État web et infrastructure
 
-Le worker local est opt-in :
-- exécution désactivée par défaut ;
-- queue inactive par défaut ;
-- démarrage explicite ;
-- health local uniquement ;
-- aucune lecture de cookies navigateur depuis une commande distante ;
-- aucun téléchargement automatique pendant un diagnostic.
-
-## Commerce
-
-- Lemon Squeezy = Merchant of Record.
-- TEST et LIVE restent séparés.
-- Le bootstrap TEST existe côté code.
-- Le consentement de fourniture numérique est feature-flagged.
-- Les replays ordinaires du parcours de consentement réutilisent le checkout déjà journalisé via un `request_id` stable.
-- Les commandes/remboursements sont dédupliqués.
-- Les liens d'accès publics n'énumèrent pas les commandes.
-
-Preuve encore nécessaire avant LIVE :
-- clé Lemon TEST installée côté Vercel ;
-- checkout TEST ;
-- webhook TEST ;
-- livraison/révocation TEST ;
-- confirmation durable du consentement ;
-- validation explicite avant activation LIVE.
-
-## Réseaux sociaux
-
-Les intégrations utilisent un control plane fail-closed. Un connecteur présent dans le code ne vaut jamais approbation externe.
-
-- Bluesky : métriques publiques possibles sans credentials lorsque l'URI du post existe.
-- Reddit : activation uniquement après accord externe requis et configuration correspondante.
-- Les autres réseaux conservent leurs propres OAuth/audits/contraintes.
-
-## Sécurité
-
-Déjà dans `main` :
-- trust boundaries et politique sécurité ;
-- auth explicite des routes sensibles ;
-- paid-AI fail-closed ;
-- CSP en Report-Only ;
-- inventaire statique de la surface API ;
-- Dependabot npm + GitHub Actions ;
-- scanner local de patterns sensibles ;
-- audit des GitHub Actions non épinglées ;
-- dry-run de rotation des secrets sans émission de valeurs ;
-- replay/idempotence des principales écritures publiques ;
-- politique WAF/rate-limit en mode observation, non enforced.
-
-Restent à prouver ou activer :
-- branch protection GitHub ;
-- observation navigateur CSP puis enforcement minimal ;
-- rate limiting distribué/Vercel-WAF après observation du trafic ;
-- exercice réel de rotation d'un secret TEST.
-
-## Sauvegardes / résilience
-
-Dans `main` :
-- Git bundle ;
-- exports Airtable safe/redacted ;
-- chiffrement AES-256-GCM disponible pour exports sensibles ;
-- manifest + SHA-256 ;
-- restore rehearsal local non destructif ;
-- planification Windows opt-in ;
-- copie indépendante : vérification avant copie, copie, re-vérification après copie.
-
-Restent à faire en runtime :
-- premier backup réel ;
-- rehearsal PASS sur ce backup ;
-- destination réellement indépendante choisie ;
-- première copie indépendante PASS ;
-- actifs Library prioritaires recopiés ;
-- RPO/RTO mesurés.
-
-## Airtable
-
-Airtable reste la source opérationnelle pour :
-- Roadmap ;
-- Content Pipeline ;
-- Montages ;
-- Livre ;
-- scènes vidéo ;
-- comptes sociaux ;
-- configuration non secrète ;
-- statuts et preuves.
-
-Aucun secret en clair ne doit être stocké dans les tables ordinaires.
-
-## Livre
-
-La liste canonique contient le socle Top 100+ des montages regroupés. Format des fiches :
-1. concept/mécanisme technique ;
-2. Exemple du Hibou, chiffré, narratif et provocateur ;
-3. risques associés uniquement lorsqu'ils existent.
-
-Rédaction prévue par lots de 10 fiches, cible globale d'environ 100 à 250 pages avant mise en forme.
-
-## Blocages humains réellement utiles
-
-1. PC : exécuter le diagnostic local puis le premier smoke vidéo.
-2. Lemon : ajouter la clé TEST directement dans Vercel, sans la transmettre dans le chat.
-3. GitHub : confirmer la branch protection de `main`.
-4. Vercel : activer/observer ultérieurement WAF/rate-limit selon le plan.
-5. Backup : choisir une vraie destination indépendante et lancer le premier backup réel.
-6. Accès sociaux : compléter uniquement les OAuth/approbations externes réellement nécessaires.
+- Le domaine `https://d4d5d6.com` répond et `/api/site-identity` confirme l'identité canonique.
+- Vercel ne doit déployer automatiquement que `main` ; toutes les autres branches sont désactivées par défaut.
+- Les routes qui ont besoin de la configuration complète doivent utiliser la pagination Airtable. La table Configuration dépasse 100 lignes et les Jobs dépassent 100 lignes.
+- Les secrets restent dans leurs magasins dédiés. Aucun audit ou nettoyage ne doit lire, recopier ou supprimer une valeur secrète sans preuve d'usage et décision explicite.
 
 ## Garde-fous
 
-- aucun secret dans Git/Airtable/docs ;
+- aucun secret dans Git, Airtable ordinaire ou la documentation ;
 - aucun fallback payant silencieux ;
-- aucun endpoint local exposé publiquement ;
 - aucun worker démarré implicitement ;
 - aucune publication automatique non validée ;
-- ne jamais inventer un runtime, un accès externe ou une preuve de test.
+- aucune suppression ambiguë : archiver ou conserver ;
+- aucune ancienne version ne doit concurrencer une source canonique actuelle.
+
+## Preuves encore distinctes
+
+- Un pipeline présent dans le code n'est pas un rendu V5 réussi sur la machine locale.
+- Un profil Airtable actif n'est pas une autorisation de publication.
+- Une variable Vercel présente n'est pas une preuve que l'intégration externe fonctionne.
+- Une branche fusionnée ou une preview historique n'est pas une branche active.
+
+## Documents
+
+- Index documentaire : `docs/README.md`.
+- Activation V5 opt-in : `docs/video-studio-v5-activation.md`.
+- Méthodologie V5 : `docs/video-methodology-roadmap-v5.md`.
+- Les documents de statut liés à une branche doivent être lus comme des archives datées lorsqu'ils l'indiquent.

@@ -10,6 +10,8 @@ test("la réconciliation exige une couverture V2B Completed complète", () => {
   assert.match(route, /jobId\.includes\("-v2b-"\)/);
   assert.match(route, /fullRangeCovered/);
   assert.match(route, /String\(p\.book_record_id/);
+  assert.match(route, /getAllRecords\(TABLES\.jobs\)/);
+  assert.doesNotMatch(route, /getRecords\(TABLES\.jobs/);
 });
 
 test("la réconciliation recalcule le QC sans toucher au contenu", () => {

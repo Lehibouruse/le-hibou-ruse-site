@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { getRecords, TABLES, configMap } from "../../../lib/airtable";
+import { getAllRecords, TABLES, configMap } from "../../../lib/airtable";
 import { renderBookDocument } from "../../../lib/book-renderer.mjs";
 
 export const runtime = "nodejs";
@@ -39,8 +39,8 @@ export async function GET(request) {
   }
 
   const [chapters, configuration] = await Promise.all([
-    getRecords(TABLES.book, { pageSize: 100 }),
-    getRecords(TABLES.configuration, { pageSize: 100 }),
+    getAllRecords(TABLES.book),
+    getAllRecords(TABLES.configuration),
   ]);
   const config = configMap(configuration);
   const html = renderBookDocument({

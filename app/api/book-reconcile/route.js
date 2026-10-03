@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRecords, TABLES, updateRecord } from "../../../lib/airtable";
+import { getAllRecords, TABLES, updateRecord } from "../../../lib/airtable";
 import { bookQualityGate } from "../../../lib/book-quality.mjs";
 import { verifyGithubActionsToken } from "../../../lib/github-oidc.mjs";
 
@@ -73,8 +73,8 @@ export async function POST(request) {
   }
 
   const [chapters, jobs] = await Promise.all([
-    getRecords(TABLES.book, { pageSize: 100 }),
-    getRecords(TABLES.jobs, { pageSize: 500 }),
+    getAllRecords(TABLES.book),
+    getAllRecords(TABLES.jobs),
   ]);
 
   const reconciled = [];

@@ -4,5 +4,7 @@ node_modules/
 !.env.example
 .vercel/
 npm-debug.log*
+__pycache__/
+*.py[cod]
 .hibou-video-artifacts/
 **/.video-render-cache/

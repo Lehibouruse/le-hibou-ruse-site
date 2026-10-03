@@ -129,6 +129,8 @@ test("compiled prompt application proof is bound to the exact ComfyUI override t
 });
 
 test("CUDA OOM retries exactly once with the prepared local fallback request",async()=>{
+ const priorForceFallback=process.env.HIBOU_IMAGE_FORCE_FALLBACK;
+ delete process.env.HIBOU_IMAGE_FORCE_FALLBACK;
  const root=mkdtempSync(resolve(tmpdir(),"hibou-img-oom-"));
  const manifest=resolve(root,"manifest.json"), selections=resolve(root,"selections.json");
  const one={schema:"HIBOU_IMAGE_PLAN_V1",content_id:"recOOM",requests:[
@@ -141,7 +143,13 @@ test("CUDA OOM retries exactly once with the prepared local fallback request",as
    const p=resolve(root,"fallback.png"); writeFileSync(p,"fallback");
    return {job_id:"fallback-job",request_sha256:"fallback-hash",attempts:1,outputs:[{path:p}]};
  };
- const result=await executeImagePlan(one,{runner,manifestPath:manifest,selectionTemplatePath:selections});
+ let result;
+ try {
+  result=await executeImagePlan(one,{runner,manifestPath:manifest,selectionTemplatePath:selections});
+ } finally {
+  if(priorForceFallback===undefined) delete process.env.HIBOU_IMAGE_FORCE_FALLBACK;
+  else process.env.HIBOU_IMAGE_FORCE_FALLBACK=priorForceFallback;
+ }
  assert.equal(calls,2);
  assert.equal(result.generated_this_run,1);
  const stored=JSON.parse(readFileSync(manifest,"utf8")).results["S01-C1"];

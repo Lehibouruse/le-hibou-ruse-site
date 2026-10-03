@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Request the existing main-only read-only audit
+      - name: Request the existing main-only TEST preflight
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --method POST repos/Lehibouruse/le-hibou-ruse-site/actions/workflows/lemon-readiness.yml/dispatches -f ref=main
-          echo 'Requested authenticated read-only Lemon audit on main; no payment or settings changed.'
+          printf '%s' '{"ref":"main","inputs":{"action":"preflight"}}' | gh api --method POST repos/Lehibouruse/le-hibou-ruse-site/actions/workflows/lemon-commerce-test.yml/dispatches --input -
+          echo 'Requested dedicated TEST preflight; no purchase, discount, access override or public configuration change.'
